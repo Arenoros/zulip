@@ -3,6 +3,7 @@ import * as z from "zod/mini";
 
 import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
+import {type MouseEvent, mouse_event_schema} from "./livekit_remote_input.ts";
 
 // Screens shared from a desktop app that lets call participants
 // control them are published under this track name.
@@ -31,12 +32,29 @@ const message_schema = z.discriminatedUnion("type", [
     z.object({version: z.literal(PROTOCOL_VERSION), type: z.literal("release")}),
     z.object({
         version: z.literal(PROTOCOL_VERSION),
+        type: z.literal("grant"),
+        token: z.string().check(z.length(32)),
+    }),
+    z.object({
+        version: z.literal(PROTOCOL_VERSION),
+        type: z.literal("mouse"),
+        token: z.string().check(z.length(32)),
+        sequence: z.int().check(z.minimum(1)),
+        event: mouse_event_schema,
+    }),
+    z.object({
+        version: z.literal(PROTOCOL_VERSION),
         type: z.literal("state"),
         control_state: control_state_schema,
     }),
 ]);
-type RemoteControlMessage =
-    {type: "request"} | {type: "release"} | {type: "state"; control_state: ControlState};
+type RemoteControlMessage = z.infer<typeof message_schema>;
+type OutgoingMessage =
+    | {type: "request"}
+    | {type: "release"}
+    | {type: "state"; control_state: ControlState}
+    | {type: "grant"; token: string}
+    | {type: "mouse"; token: string; sequence: number; event: MouseEvent};
 
 export function get_screen_share_publish_options(): TrackPublishOptions {
     if (electron_bridge?.get_remote_control_supported?.() === true) {
@@ -49,11 +67,15 @@ export function is_controllable_screen_share(publication: TrackPublication): boo
     return publication.trackName === CONTROLLABLE_SCREEN_SHARE_TRACK_NAME;
 }
 
-export function encode_message(message: RemoteControlMessage): Uint8Array<ArrayBuffer> {
-    return new TextEncoder().encode(JSON.stringify({version: PROTOCOL_VERSION, ...message}));
+export function encode_message(message: OutgoingMessage): Uint8Array<ArrayBuffer> {
+    const data = message_schema.parse({version: PROTOCOL_VERSION, ...message});
+    return new TextEncoder().encode(JSON.stringify(data));
 }
 
 export function decode_message(payload: Uint8Array): RemoteControlMessage | undefined {
+    if (payload.byteLength > 4096) {
+        return undefined;
+    }
     let data: unknown;
     try {
         data = JSON.parse(new TextDecoder().decode(payload));
@@ -62,6 +84,18 @@ export function decode_message(payload: Uint8Array): RemoteControlMessage | unde
     }
     const result = message_schema.safeParse(data);
     return result.success ? result.data : undefined;
+}
+
+// Read the token only from the owner's desktop event. Public state is
+// always parsed separately, so broadcasting it cannot disclose a token.
+export function parse_control_token(data: unknown): string | undefined {
+    const result = z
+        .object({
+            state: z.literal("controlled"),
+            token: z.string().check(z.length(32)),
+        })
+        .safeParse(data);
+    return result.success ? result.data.token : undefined;
 }
 
 export function parse_control_state(data: unknown): ControlState | undefined {

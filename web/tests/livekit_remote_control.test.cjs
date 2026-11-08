@@ -88,6 +88,52 @@ run_test("parse_control_state", () => {
     assert.equal(livekit_remote_control.parse_control_state(undefined), undefined);
 });
 
+run_test("private grants and mouse messages", () => {
+    const token = "a".repeat(32);
+    for (const message of [
+        {type: "grant", token},
+        {type: "mouse", token, sequence: 1, event: {type: "move", x: 0.5, y: 1}},
+        {
+            type: "mouse",
+            token,
+            sequence: 2,
+            event: {type: "button", x: 0, y: 0, button: "right", down: true},
+        },
+        {type: "mouse", token, sequence: 3, event: {type: "wheel", x: 1, y: 0, dx: 120, dy: -240}},
+    ]) {
+        assert.deepEqual(
+            livekit_remote_control.decode_message(livekit_remote_control.encode_message(message)),
+            {version: 1, ...message},
+        );
+    }
+    const state = {state: "controlled", participant: cordelia, token};
+    assert.equal(livekit_remote_control.parse_control_token(state), token);
+    assert.equal(livekit_remote_control.parse_control_token({state: "shared", token}), undefined);
+    assert.equal(livekit_remote_control.parse_control_token({...state, token: ""}), undefined);
+    assert.deepEqual(
+        livekit_remote_control.decode_message(
+            livekit_remote_control.encode_message({type: "state", control_state: state}),
+        ),
+        {
+            version: 1,
+            type: "state",
+            control_state: {state: "controlled", participant: cordelia},
+        },
+    );
+    assert.equal(livekit_remote_control.decode_message(new Uint8Array(4097)), undefined);
+    for (const event of [
+        {type: "move", x: -0.1, y: 0},
+        {type: "move", x: 0, y: 1.1},
+        {type: "button", x: 0, y: 0, button: "back", down: true},
+        {type: "wheel", x: 0, y: 0, dx: 0, dy: 12_001},
+    ]) {
+        const bytes = new TextEncoder().encode(
+            JSON.stringify({version: 1, type: "mouse", token, sequence: 1, event}),
+        );
+        assert.equal(livekit_remote_control.decode_message(bytes), undefined);
+    }
+});
+
 run_test("describe_control_state for the owner", () => {
     function describe(control_state) {
         return livekit_remote_control.describe_control_state({
