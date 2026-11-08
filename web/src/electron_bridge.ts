@@ -35,6 +35,7 @@ export type ElectronBridge = {
     get_send_notification_reply_message_supported?: () => boolean;
     set_send_notification_reply_message_supported?: (value: boolean) => void;
     decrypt_clipboard?: (version: number) => ClipboardDecrypter;
+    get_remote_control_supported?: () => boolean;
 };
 
 declare global {

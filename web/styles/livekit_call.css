@@ -64,11 +64,19 @@
     flex: 1 1 0;
     gap: 0.5em;
     min-height: 0;
+}
+
+.livekit-call-screen-share {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 0.5em;
+    min-width: 0;
 
     .livekit-call-video {
         flex: 1 1 0;
-        min-width: 0;
-        height: 100%;
+        width: 100%;
+        min-height: 0;
         object-fit: contain;
         border-radius: 0.5em;
         background-color: hsl(0deg 0% 0%);
@@ -130,6 +138,14 @@
     border-radius: 0.25em;
     color: hsl(0deg 0% 100%);
     background-color: hsl(0deg 0% 0% / 60%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Below the shared screen rather than over it, so that every part of
+   the screen can be controlled. */
+.livekit-call-screen-share-label {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
