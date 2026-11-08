@@ -5,6 +5,7 @@ title: Start a call
 import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
 
 import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import StartComposing from "../include/_StartComposing.mdx";
@@ -71,6 +72,51 @@ administrators.
       You can replace the "Join voice call." label for the link with any text you
       like.
     </ZulipTip>
+  </TabItem>
+</Tabs>
+
+## Control a shared screen
+
+When your organization uses LiveKit for calls, call participants can ask to
+control a screen shared from the [Zulip desktop app](/apps/) for Windows, for
+example to help with a problem. The person sharing the screen decides whether
+to give control, and can take it back at any time. Only one participant can
+control a screen at a time.
+
+### Request control of a shared screen
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <Steps>
+      1. Click **Request control** below the shared screen.
+      1. Wait for the person sharing the screen to allow control.
+      1. When you're done, click **Stop controlling** to give back control.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+### Let someone control your screen
+
+<ZulipNote>
+  You can only give control of a screen you share from the Zulip desktop app
+  for Windows.
+</ZulipNote>
+
+<Tabs>
+  <TabItem label="Desktop">
+    <Steps>
+      1. Click on the link to the call in the desktop app.
+      1. Click **Share screen**, and choose the screen to share.
+      1. When someone requests control, click **Allow** in the dialog that
+         appears.
+      1. To take back control, click **Stop control** at the top of your
+         screen.
+    </Steps>
+
+    <KeyboardTip>
+      You can also use <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Shift</kbd> +
+      <kbd>S</kbd> to take back control.
+    </KeyboardTip>
   </TabItem>
 </Tabs>
 

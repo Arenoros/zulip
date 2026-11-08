@@ -24,7 +24,8 @@ export type ElectronBridge = {
         ((
             eventName: "send_notification_reply_message",
             listener: (message_id: number, reply: string) => void,
-        ) => void);
+        ) => void) &
+        ((eventName: "remote_control_state", listener: (state: unknown) => void) => void);
     new_notification?: (
         title: string,
         options: NotificationOptions,
@@ -36,6 +37,10 @@ export type ElectronBridge = {
     set_send_notification_reply_message_supported?: (value: boolean) => void;
     decrypt_clipboard?: (version: number) => ClipboardDecrypter;
     get_remote_control_supported?: () => boolean;
+    request_remote_control?: (identity: string, name: string) => void;
+    stop_remote_control?: () => void;
+    remote_control_participant_left?: (identity: string) => void;
+    screen_share_stopped?: () => void;
 };
 
 declare global {

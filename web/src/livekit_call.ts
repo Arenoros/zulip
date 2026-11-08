@@ -2,6 +2,7 @@ import assert from "minimalistic-assert";
 import {type Participant, Room, RoomEvent, Track, type TrackPublication} from "livekit-client";
 
 import {page_params} from "./base_page_params.ts";
+import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
 import * as livekit_remote_control from "./livekit_remote_control.ts";
 
@@ -33,6 +34,13 @@ const tiles = new Map<string, HTMLElement>();
 const track_elements = new Map<
     Track,
     {media_element: HTMLMediaElement; page_element: HTMLElement}
+>();
+// Who may control each controllable screen share, and the elements
+// showing it, by the identity of the participant sharing the screen.
+const control_states = new Map<string, livekit_remote_control.ControlState>();
+const screen_share_controls = new Map<
+    string,
+    {label_element: HTMLElement; button_element: HTMLButtonElement}
 >();
 let left_call = false;
 
@@ -79,18 +87,84 @@ function update_stage(): void {
     );
 }
 
+function send_control_message(
+    message: Parameters<typeof livekit_remote_control.encode_message>[0],
+    // Everyone, when empty.
+    destination_identities: string[] = [],
+): void {
+    void room.localParticipant.publishData(livekit_remote_control.encode_message(message), {
+        reliable: true,
+        topic: livekit_remote_control.REMOTE_CONTROL_TOPIC,
+        destinationIdentities: destination_identities,
+    });
+}
+
+function is_sharing_controllable_screen(): boolean {
+    const publication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+    return (
+        publication !== undefined &&
+        livekit_remote_control.is_controllable_screen_share(publication)
+    );
+}
+
+function describe_control_state(
+    owner_identity: string,
+): ReturnType<typeof livekit_remote_control.describe_control_state> {
+    const owner = room.getParticipantByIdentity(owner_identity);
+    return livekit_remote_control.describe_control_state({
+        control_state: control_states.get(owner_identity),
+        owner_name: owner?.name ?? owner_identity,
+        is_own_share: owner_identity === room.localParticipant.identity,
+        local_identity: room.localParticipant.identity,
+    });
+}
+
+function update_screen_share_controls(owner_identity: string): void {
+    const controls = screen_share_controls.get(owner_identity);
+    if (controls === undefined) {
+        return;
+    }
+    const {label, action} = describe_control_state(owner_identity);
+    controls.label_element.textContent = label;
+    controls.button_element.hidden = action === undefined;
+    controls.button_element.textContent = action?.label ?? "";
+}
+
 function render_screen_share(
     media_element: HTMLMediaElement,
     publication: TrackPublication,
+    participant: Participant,
 ): HTMLElement {
     const screen_share_element = document.createElement("div");
     screen_share_element.classList.add("livekit-call-screen-share");
     screen_share_element.append(media_element);
     if (livekit_remote_control.is_controllable_screen_share(publication)) {
+        const controls_element = document.createElement("div");
+        controls_element.classList.add("livekit-call-screen-share-controls");
         const label_element = document.createElement("span");
         label_element.classList.add("livekit-call-screen-share-label");
-        label_element.textContent = $t({defaultMessage: "Remote control available"});
-        screen_share_element.append(label_element);
+        const button_element = document.createElement("button");
+        button_element.type = "button";
+        button_element.classList.add("livekit-call-button", "livekit-call-screen-share-button");
+        button_element.addEventListener("click", () => {
+            switch (describe_control_state(participant.identity).action?.type) {
+                case "request":
+                    send_control_message({type: "request"}, [participant.identity]);
+                    break;
+                case "release":
+                    send_control_message({type: "release"}, [participant.identity]);
+                    break;
+                case "stop":
+                    electron_bridge?.stop_remote_control?.();
+                    break;
+                case undefined:
+                    break;
+            }
+        });
+        controls_element.append(label_element, button_element);
+        screen_share_element.append(controls_element);
+        screen_share_controls.set(participant.identity, {label_element, button_element});
+        update_screen_share_controls(participant.identity);
     }
     return screen_share_element;
 }
@@ -110,7 +184,7 @@ function attach_track(track: Track, publication: TrackPublication, participant: 
 
     media_element.classList.add("livekit-call-video");
     if (track.source === Track.Source.ScreenShare) {
-        const screen_share_element = render_screen_share(media_element, publication);
+        const screen_share_element = render_screen_share(media_element, publication, participant);
         stage_element.append(screen_share_element);
         track_elements.set(track, {media_element, page_element: screen_share_element});
         update_stage();
@@ -127,6 +201,10 @@ function detach_track(track: Track, participant: Participant): void {
         track.detach(elements.media_element);
         elements.page_element.remove();
         track_elements.delete(track);
+    }
+    if (track.source === Track.Source.ScreenShare) {
+        screen_share_controls.delete(participant.identity);
+        control_states.delete(participant.identity);
     }
     update_stage();
     if (tiles.has(participant.identity)) {
@@ -182,6 +260,13 @@ room.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
     if (publication.track !== undefined) {
         detach_track(publication.track, participant);
     }
+    // A full reconnect republishes tracks without stopping them.
+    if (
+        publication.source === Track.Source.ScreenShare &&
+        publication.track?.mediaStreamTrack.readyState !== "live"
+    ) {
+        electron_bridge?.screen_share_stopped?.();
+    }
     update_buttons();
 });
 room.on(RoomEvent.TrackMuted, (_publication, participant) => {
@@ -194,9 +279,58 @@ room.on(RoomEvent.TrackUnmuted, (_publication, participant) => {
 });
 room.on(RoomEvent.ParticipantConnected, (participant) => {
     get_tile(participant);
+    const control_state = control_states.get(room.localParticipant.identity);
+    if (control_state !== undefined && is_sharing_controllable_screen()) {
+        send_control_message({type: "state", control_state}, [participant.identity]);
+    }
 });
 room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     remove_tile(participant);
+    electron_bridge?.remote_control_participant_left?.(participant.identity);
+});
+room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
+    if (topic !== livekit_remote_control.REMOTE_CONTROL_TOPIC || participant === undefined) {
+        return;
+    }
+    const message = livekit_remote_control.decode_message(payload);
+    switch (message?.type) {
+        case "state":
+            // Participants only report the state of their own screen share.
+            control_states.set(participant.identity, message.control_state);
+            update_screen_share_controls(participant.identity);
+            break;
+        case "request":
+            if (is_sharing_controllable_screen()) {
+                electron_bridge?.request_remote_control?.(
+                    participant.identity,
+                    participant.name ?? participant.identity,
+                );
+            }
+            break;
+        case "release": {
+            const control_state = control_states.get(room.localParticipant.identity);
+            if (
+                control_state?.state === "controlled" &&
+                control_state.participant.identity === participant.identity
+            ) {
+                electron_bridge?.stop_remote_control?.();
+            }
+            break;
+        }
+        case undefined:
+            break;
+    }
+});
+electron_bridge?.on_event("remote_control_state", (state) => {
+    const control_state = livekit_remote_control.parse_control_state(state);
+    if (control_state === undefined) {
+        return;
+    }
+    control_states.set(room.localParticipant.identity, control_state);
+    update_screen_share_controls(room.localParticipant.identity);
+    if (control_state.state !== "none") {
+        send_control_message({type: "state", control_state});
+    }
 });
 room.on(RoomEvent.AudioPlaybackStatusChanged, update_enable_audio_button);
 room.on(RoomEvent.Disconnected, () => {
@@ -214,7 +348,10 @@ room.on(RoomEvent.Disconnected, () => {
     audio_element.replaceChildren();
     tiles.clear();
     track_elements.clear();
+    control_states.clear();
+    screen_share_controls.clear();
     update_stage();
+    electron_bridge?.screen_share_stopped?.();
 });
 
 microphone_button.addEventListener("click", () => {

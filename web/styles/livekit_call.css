@@ -144,10 +144,24 @@
 
 /* Below the shared screen rather than over it, so that every part of
    the screen can be controlled. */
+.livekit-call-screen-share-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    /* The height of .livekit-call-button, so that the shared screen does
+       not move when the button comes and goes. */
+    min-height: calc(1lh + 1em + 2px);
+}
+
 .livekit-call-screen-share-label {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.livekit-call-screen-share-button {
+    flex-shrink: 0;
 }
 
 .livekit-call-audio {

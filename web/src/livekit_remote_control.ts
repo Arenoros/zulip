@@ -1,10 +1,42 @@
 import type {TrackPublication, TrackPublishOptions} from "livekit-client";
+import * as z from "zod/mini";
 
 import {electron_bridge} from "./electron_bridge.ts";
+import {$t} from "./i18n.ts";
 
 // Screens shared from a desktop app that lets call participants
 // control them are published under this track name.
 const CONTROLLABLE_SCREEN_SHARE_TRACK_NAME = "zulip-controllable-screen-share";
+
+// Participants coordinate remote control with data messages under this
+// topic.  Only the desktop app of the owner of a screen decides who may
+// control it; these messages relay requests and its decisions.
+export const REMOTE_CONTROL_TOPIC = "zulip-remote-control";
+const PROTOCOL_VERSION = 1;
+
+const participant_schema = z.object({identity: z.string(), name: z.string()});
+
+// Who may control a screen share, as the desktop app of its owner
+// reports it.
+const control_state_schema = z.discriminatedUnion("state", [
+    z.object({state: z.literal("none")}),
+    z.object({state: z.literal("shared")}),
+    z.object({state: z.literal("requested"), participant: participant_schema}),
+    z.object({state: z.literal("controlled"), participant: participant_schema}),
+]);
+export type ControlState = z.infer<typeof control_state_schema>;
+
+const message_schema = z.discriminatedUnion("type", [
+    z.object({version: z.literal(PROTOCOL_VERSION), type: z.literal("request")}),
+    z.object({version: z.literal(PROTOCOL_VERSION), type: z.literal("release")}),
+    z.object({
+        version: z.literal(PROTOCOL_VERSION),
+        type: z.literal("state"),
+        control_state: control_state_schema,
+    }),
+]);
+type RemoteControlMessage =
+    {type: "request"} | {type: "release"} | {type: "state"; control_state: ControlState};
 
 export function get_screen_share_publish_options(): TrackPublishOptions {
     if (electron_bridge?.get_remote_control_supported?.() === true) {
@@ -15,4 +47,82 @@ export function get_screen_share_publish_options(): TrackPublishOptions {
 
 export function is_controllable_screen_share(publication: TrackPublication): boolean {
     return publication.trackName === CONTROLLABLE_SCREEN_SHARE_TRACK_NAME;
+}
+
+export function encode_message(message: RemoteControlMessage): Uint8Array<ArrayBuffer> {
+    return new TextEncoder().encode(JSON.stringify({version: PROTOCOL_VERSION, ...message}));
+}
+
+export function decode_message(payload: Uint8Array): RemoteControlMessage | undefined {
+    let data: unknown;
+    try {
+        data = JSON.parse(new TextDecoder().decode(payload));
+    } catch {
+        return undefined;
+    }
+    const result = message_schema.safeParse(data);
+    return result.success ? result.data : undefined;
+}
+
+export function parse_control_state(data: unknown): ControlState | undefined {
+    const result = control_state_schema.safeParse(data);
+    return result.success ? result.data : undefined;
+}
+
+export type ControlAction = "request" | "release" | "stop";
+
+export function describe_control_state({
+    control_state,
+    owner_name,
+    is_own_share,
+    local_identity,
+}: {
+    control_state: ControlState | undefined;
+    owner_name: string;
+    is_own_share: boolean;
+    local_identity: string;
+}): {label: string; action: {type: ControlAction; label: string} | undefined} {
+    if (
+        control_state === undefined ||
+        control_state.state === "none" ||
+        control_state.state === "shared"
+    ) {
+        return {
+            label: $t({defaultMessage: "Remote control available"}),
+            action: is_own_share
+                ? undefined
+                : {type: "request", label: $t({defaultMessage: "Request control"})},
+        };
+    }
+
+    const {participant} = control_state;
+    const is_local_participant = !is_own_share && participant.identity === local_identity;
+    if (control_state.state === "requested") {
+        return {
+            label: is_local_participant
+                ? $t({defaultMessage: "Waiting for {name} to allow control…"}, {name: owner_name})
+                : $t({defaultMessage: "{name} requested control"}, {name: participant.name}),
+            action: undefined,
+        };
+    }
+
+    if (is_own_share) {
+        return {
+            label: $t(
+                {defaultMessage: "{name} is controlling your screen"},
+                {name: participant.name},
+            ),
+            action: {type: "stop", label: $t({defaultMessage: "Stop control"})},
+        };
+    }
+    if (is_local_participant) {
+        return {
+            label: $t({defaultMessage: "You are controlling this screen"}),
+            action: {type: "release", label: $t({defaultMessage: "Stop controlling"})},
+        };
+    }
+    return {
+        label: $t({defaultMessage: "{name} is controlling this screen"}, {name: participant.name}),
+        action: undefined,
+    };
 }
