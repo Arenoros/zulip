@@ -1,0 +1,27 @@
+diff --git a/dist/src/room/data-track/track-interfaces.d.ts b/dist/src/room/data-track/track-interfaces.d.ts
+index 5ec68ed316f3bf966bfba8aa312cc9bd2cafdfa9..3382c35c781fc5531687801d192f85bfee53ae26 100644
+--- a/dist/src/room/data-track/track-interfaces.d.ts
++++ b/dist/src/room/data-track/track-interfaces.d.ts
+@@ -17,7 +17,7 @@ export declare const DataTrackSymbol: symbol;
+ /** An interface representing a data track, either local or remote. */
+ export interface IDataTrack extends ITrack {
+     readonly typeSymbol: typeof DataTrackSymbol;
+-    readonly info?: DataTrackInfo;
++    readonly info?: DataTrackInfo | undefined;
+ }
+ export declare function isDataTrack(subject: unknown): subject is IDataTrack;
+ //# sourceMappingURL=track-interfaces.d.ts.map
+\ No newline at end of file
+diff --git a/dist/src/room/track/LocalTrack.d.ts b/dist/src/room/track/LocalTrack.d.ts
+index c3edc5e5f19b1a7755d518249041b7fbef95d197..09875c8eb287ae22b295d3cfe94d6d9f51f39233 100644
+--- a/dist/src/room/track/LocalTrack.d.ts
++++ b/dist/src/room/track/LocalTrack.d.ts
+@@ -22,7 +22,7 @@ export default abstract class LocalTrack<TrackKind extends Track.Kind = Track.Ki
+     protected muteLock: Mutex;
+     protected pauseUpstreamLock: Mutex;
+     protected processorElement?: HTMLMediaElement;
+-    protected processor?: TrackProcessor<TrackKind, any>;
++    protected processor?: TrackProcessor<TrackKind, any> | undefined;
+     protected audioContext?: AudioContext;
+     protected manuallyStopped: boolean;
+     protected localTrackRecorder: LocalTrackRecorder<typeof this> | undefined;
