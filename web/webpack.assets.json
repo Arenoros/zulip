@@ -138,6 +138,11 @@
         "./styles/portico/stats.css",
         "./src/stats/stats.ts"
     ],
+    "livekit-call": [
+        "./src/bundles/common.ts",
+        "./styles/livekit_call.css",
+        "./src/livekit_call.ts"
+    ],
     "app": ["./src/bundles/app.ts"],
     "digest": ["./src/bundles/legacy_portico_bundle.ts"]
 }

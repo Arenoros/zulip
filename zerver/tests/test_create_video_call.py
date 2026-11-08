@@ -1,8 +1,12 @@
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any
 from unittest import mock
 
+import jwt
 import orjson
 import requests
 import responses
+import time_machine
 from django.core.signing import Signer
 from django.http import HttpResponseRedirect
 from django.test import override_settings
@@ -10,6 +14,10 @@ from typing_extensions import override
 
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
+from zerver.views.video_calls import LIVEKIT_TOKEN_LIFETIME_SECONDS
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 @override_settings(VIDEO_ZOOM_SERVER_TO_SERVER_ACCOUNT_ID=None)
@@ -1146,3 +1154,82 @@ class GoogleMeetVideoCallTest(ZulipTestCase):
 
         response = self.client_post("/json/calls/google_meet/create")
         self.assert_json_error(response, "Invalid Google Meet access token")
+
+
+class LiveKitVideoCallTest(ZulipTestCase):
+    # The claims of a JWT are arbitrary JSON.
+    def get_livekit_token(self, response: "TestHttpResponse") -> dict[str, Any]:
+        self.assertEqual(response.status_code, 200)
+        page_params = self._get_page_params(response)
+        self.assertEqual(page_params["page_type"], "livekit_call")
+        self.assertEqual(page_params["livekit_url"], "wss://livekit.example.com")
+        return jwt.decode(
+            page_params["livekit_token"],
+            "test-api-secret-that-is-at-least-32-bytes",
+            algorithms=["HS256"],
+        )
+
+    def test_join_livekit_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        self.login_user(hamlet)
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        # The token is decoded at the same time it was issued, since
+        # decoding checks that it has not expired.
+        with time_machine.travel(now, tick=False):
+            response = self.client_get("/calls/livekit/join", {"call_id": "123"})
+            livekit_token = self.get_livekit_token(response)
+        self.assertFalse(self._get_page_params(response)["voice_only"])
+        self.assertEqual(
+            livekit_token,
+            {
+                "iss": "test-api-key",
+                "sub": str(hamlet.id),
+                "name": "King Hamlet",
+                "nbf": int(now.timestamp()),
+                "exp": int(now.timestamp()) + LIVEKIT_TOKEN_LIFETIME_SECONDS,
+                "video": {
+                    "room": f"{hamlet.realm.uuid}-123",
+                    "roomJoin": True,
+                    "canPublish": True,
+                    "canPublishData": True,
+                    "canSubscribe": True,
+                },
+            },
+        )
+
+        response = self.client_get("/calls/livekit/join", {"call_id": "123", "voice_only": "true"})
+        self.assertTrue(self._get_page_params(response)["voice_only"])
+
+    def test_join_livekit_call_from_another_realm(self) -> None:
+        self.login("hamlet")
+        response = self.client_get("/calls/livekit/join", {"call_id": "123"})
+        zulip_token = self.get_livekit_token(response)
+
+        sipbtest = self.mit_user("sipbtest")
+        self.login_user(sipbtest)
+        response = self.client_get("/calls/livekit/join", {"call_id": "123"}, subdomain="zephyr")
+        zephyr_token = self.get_livekit_token(response)
+
+        self.assertEqual(
+            zephyr_token["video"], {**zulip_token["video"], "room": f"{sipbtest.realm.uuid}-123"}
+        )
+        self.assertNotEqual(zulip_token["video"], zephyr_token["video"])
+
+    def test_join_livekit_call_invalid_call_id(self) -> None:
+        self.login("hamlet")
+        response = self.client_get("/calls/livekit/join", {"call_id": "abc"})
+        self.assert_json_error(response, "call_id is not valid JSON")
+
+        response = self.client_get("/calls/livekit/join", {"call_id": "-1"})
+        self.assert_json_error(response, "call_id is too small")
+
+    def test_join_livekit_call_not_configured(self) -> None:
+        self.login("hamlet")
+        with self.settings(LIVEKIT_URL=None):
+            response = self.client_get("/calls/livekit/join", {"call_id": "123"})
+        self.assert_json_error(response, "LiveKit credentials have not been configured")
+
+    def test_join_livekit_call_logged_out(self) -> None:
+        response = self.client_get("/calls/livekit/join", {"call_id": "123"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/login/"))

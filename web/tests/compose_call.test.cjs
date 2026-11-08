@@ -88,6 +88,10 @@ const realm_available_video_chat_providers = {
         id: 9,
         name: "Google Meet",
     },
+    livekit: {
+        id: 10,
+        name: "LiveKit",
+    },
 };
 
 function test(label, f) {
@@ -589,6 +593,42 @@ test("videos", ({override, override_rewire}) => {
             .call($textarea, {preventDefault() {}, stopPropagation() {}});
         assert.ok(checked);
     })();
+
+    (function test_livekit_audio_and_video_links_compose_clicked() {
+        let syntax_to_insert;
+
+        const $textarea = $.create("livekit-target-stub");
+        $textarea.set_parents_result(".message_edit_form", []);
+
+        const ev = {
+            preventDefault() {},
+            stopPropagation() {},
+        };
+
+        override(compose_ui, "insert_syntax_and_focus", (syntax) => {
+            syntax_to_insert = syntax;
+        });
+
+        override(
+            realm,
+            "realm_video_chat_provider",
+            realm_available_video_chat_providers.livekit.id,
+        );
+
+        $("textarea#compose-textarea").val("");
+        $("body").get_on_handler("click", ".video_link").call($textarea, ev);
+        // Call IDs consist of 15 random digits.
+        assert.match(
+            syntax_to_insert,
+            /^\[translated: Join video call\.]\(\/calls\/livekit\/join\?call_id=\d{15}\)$/,
+        );
+
+        $("body").get_on_handler("click", ".audio_link").call($textarea, ev);
+        assert.match(
+            syntax_to_insert,
+            /^\[translated: Join voice call\.]\(\/calls\/livekit\/join\?call_id=\d{15}&voice_only=true\)$/,
+        );
+    })();
 });
 
 run_test("get_recipient_label_for_call", ({override}) => {
@@ -690,6 +730,13 @@ test("test_video_chat_button_toggle enabled", ({override}) => {
     override(window, "to_$", () => $("window-stub"));
     compose_setup.initialize();
     assert.equal($(".compose-control-buttons-container .video_link").visible(), true);
+});
+
+test("test_livekit_audio_chat_button_toggle enabled", ({override}) => {
+    override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.livekit.id);
+    override(window, "to_$", () => $("window-stub"));
+    compose_setup.initialize();
+    assert.equal($(".compose-control-buttons-container .audio_link").visible(), true);
 });
 
 test("test_constructor_groups_video_chat_button_toggle enabled", ({override}) => {

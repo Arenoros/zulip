@@ -13,6 +13,7 @@ supported by Zulip are:
 - [Nextcloud Talk](https://zulip.com/integrations/nextcloud-talk)
 - [Webex](https://zulip.com/integrations/webex)
 - [Google Meet](https://zulip.com/integrations/category/video-calling)
+- [LiveKit](#livekit), with calls hosted in Zulip itself
 
 By default, Zulip uses the [cloud version of Jitsi Meet](https://meet.jit.si/)
 as its call provider. This page documents the configurations required to support
@@ -306,3 +307,32 @@ There are two Audience types for Google Cloud OAuth 2.0 apps:
 This enables Google Meet support in your Zulip server. Finally,
 [configure Google Meet as the video call provider](https://zulip.com/help/configure-call-provider)
 in the Zulip organization where you want to use it.
+
+## LiveKit
+
+With the [LiveKit](https://livekit.io/) integration, calls take place on
+a page served by your Zulip server, which uses a LiveKit server for
+audio, video, and screen sharing. You'll need a LiveKit server, either
+[self-hosted](https://docs.livekit.io/home/self-hosting/deployment/) or
+on LiveKit Cloud, and an API key and secret for it.
+
+You can then configure your Zulip server to use that LiveKit server as
+follows:
+
+1. In `/etc/zulip/zulip-secrets.conf`, set `livekit_api_key` and
+   `livekit_api_secret` to the LiveKit API key and secret.
+
+1. In `/etc/zulip/settings.py`, set `LIVEKIT_URL` to the WebSocket URL of
+   your LiveKit server, for example `wss://livekit.example.com`.
+
+1. Restart the Zulip server with
+   `/home/zulip/deployments/current/scripts/restart-server`.
+
+This enables LiveKit support in your Zulip server. Finally, [configure
+LiveKit as the video call
+provider](https://zulip.com/help/configure-call-provider)
+in the Zulip organizations where you want to use it.
+
+Anyone logged in to the organization who has a call's link can join the
+call. Calls are scoped to the organization, so organizations on the same
+or different Zulip servers can share a LiveKit server.

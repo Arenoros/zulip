@@ -73,6 +73,16 @@ const stats_params_schema = z.object({
     translation_data: z.record(z.string(), z.string()),
 });
 
+// Sync this with zerver.views.video_calls.join_livekit_call.
+const livekit_call_params_schema = z.object({
+    ...default_params_schema.shape,
+    page_type: z.literal("livekit_call"),
+    livekit_url: z.string(),
+    livekit_token: z.string(),
+    voice_only: z.boolean(),
+    translation_data: z.record(z.string(), z.string()),
+});
+
 // Sync this with corporate.views.portico.team_view.
 const team_params_schema = z.object({
     ...default_params_schema.shape,
@@ -117,6 +127,7 @@ const page_params_schema = z.discriminatedUnion("page_type", [
     default_params_schema,
     login_page_params_schema,
     home_params_schema,
+    livekit_call_params_schema,
     stats_params_schema,
     team_params_schema,
     upgrade_params_schema,

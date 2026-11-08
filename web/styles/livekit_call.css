@@ -1,0 +1,188 @@
+:root {
+    color-scheme: light;
+
+    --color-livekit-call-background: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 11%)
+    );
+    --color-livekit-call-text: light-dark(
+        hsl(0deg 0% 15%),
+        hsl(0deg 0% 100% / 80%)
+    );
+    --color-livekit-call-tile-background: light-dark(
+        hsl(0deg 0% 22%),
+        hsl(0deg 0% 18%)
+    );
+    --color-livekit-call-button-background: light-dark(
+        hsl(0deg 0% 96%),
+        hsl(0deg 0% 20%)
+    );
+    --color-livekit-call-button-background-hover: light-dark(
+        hsl(0deg 0% 90%),
+        hsl(0deg 0% 26%)
+    );
+    --color-livekit-call-button-border: light-dark(
+        hsl(0deg 0% 80%),
+        hsl(0deg 0% 32%)
+    );
+    --color-livekit-call-button-pressed-background: light-dark(
+        hsl(240deg 96% 68%),
+        hsl(240deg 65% 60%)
+    );
+    --color-livekit-call-leave-background: light-dark(
+        hsl(357deg 64% 47%),
+        hsl(357deg 64% 52%)
+    );
+}
+
+@media screen {
+    :root.dark-theme {
+        color-scheme: dark;
+    }
+}
+
+@media screen and (prefers-color-scheme: dark) {
+    :root.color-scheme-automatic {
+        color-scheme: dark;
+    }
+}
+
+.livekit-call {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    padding: 0.75em;
+    font-family: "Source Sans 3 VF", sans-serif;
+    color: var(--color-livekit-call-text);
+    background-color: var(--color-livekit-call-background);
+}
+
+.livekit-call-stage {
+    display: none;
+    flex: 1 1 0;
+    gap: 0.5em;
+    min-height: 0;
+
+    .livekit-call-video {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 0.5em;
+        background-color: hsl(0deg 0% 0%);
+    }
+}
+
+.livekit-call-stage-active {
+    display: flex;
+}
+
+.livekit-call-participants {
+    display: grid;
+    flex: 1 1 0;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20em), 1fr));
+    align-content: center;
+    gap: 0.5em;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* While a screen is shared, participants move to a strip below it. */
+.livekit-call-stage-active + .livekit-call-participants {
+    flex: 0 0 auto;
+    grid-template-columns: none;
+    grid-auto-columns: 12em;
+    grid-auto-flow: column;
+    overflow: auto hidden;
+}
+
+.livekit-call-tile {
+    position: relative;
+    justify-self: center;
+    width: 100%;
+    max-width: 48em;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    border-radius: 0.5em;
+    background-color: var(--color-livekit-call-tile-background);
+
+    .livekit-call-video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+}
+
+.livekit-call-tile-camera-off .livekit-call-video {
+    display: none;
+}
+
+.livekit-call-tile-name {
+    position: absolute;
+    bottom: 0.5em;
+    left: 0.5em;
+    max-width: calc(100% - 1em);
+    box-sizing: border-box;
+    padding: 0.125em 0.5em;
+    overflow: hidden;
+    border-radius: 0.25em;
+    color: hsl(0deg 0% 100%);
+    background-color: hsl(0deg 0% 0% / 60%);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.livekit-call-audio {
+    display: none;
+}
+
+.livekit-call-status {
+    margin: 0;
+    text-align: center;
+
+    &:empty {
+        display: none;
+    }
+}
+
+.livekit-call-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5em;
+}
+
+.livekit-call-button {
+    padding: 0.5em 1em;
+    border: 1px solid var(--color-livekit-call-button-border);
+    border-radius: 0.5em;
+    font: inherit;
+    color: inherit;
+    background-color: var(--color-livekit-call-button-background);
+    cursor: pointer;
+
+    &:hover:enabled {
+        background-color: var(--color-livekit-call-button-background-hover);
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+.livekit-call-button-pressed,
+.livekit-call-button-pressed:hover:enabled {
+    border-color: transparent;
+    color: hsl(0deg 0% 100%);
+    background-color: var(--color-livekit-call-button-pressed-background);
+}
+
+.livekit-call-leave,
+.livekit-call-leave:hover:enabled {
+    border-color: transparent;
+    color: hsl(0deg 0% 100%);
+    background-color: var(--color-livekit-call-leave-background);
+}

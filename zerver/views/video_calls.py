@@ -3,11 +3,13 @@ import hashlib
 import json
 import logging
 import random
+import time
 from abc import ABC, abstractmethod
 from base64 import b64encode
 from typing import Any, Literal
 from urllib.parse import quote, urlencode, urljoin, urlsplit
 
+import jwt
 import requests
 from defusedxml import ElementTree
 from django.conf import settings
@@ -15,6 +17,7 @@ from django.core.signing import Signer
 from django.http import HttpRequest, HttpResponse
 from django.middleware import csrf
 from django.shortcuts import redirect, render
+from django.utils import translation
 from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
@@ -22,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from oauthlib.oauth2 import OAuth2Error
-from pydantic import Json
+from pydantic import Json, NonNegativeInt
 from requests import Response
 from requests_oauthlib import OAuth2Session
 from typing_extensions import TypedDict, override
@@ -35,6 +38,7 @@ from zerver.lib.cache import (
     zoom_server_access_token_cache_key,
 )
 from zerver.lib.exceptions import ErrorCode, JsonableError
+from zerver.lib.i18n import get_and_set_request_language, get_language_translation_data
 from zerver.lib.message import truncate_content
 from zerver.lib.outgoing_http import OutgoingSession
 from zerver.lib.partial import partial
@@ -741,6 +745,74 @@ def join_bigbluebutton(request: HttpRequest, *, bigbluebutton: str) -> HttpRespo
         settings.BIG_BLUE_BUTTON_URL + "api/join", join_params
     )
     return redirect(append_url_query_string(redirect_url_base, "checksum=" + checksum))
+
+
+# LiveKit only checks the token when joining; it refreshes the token of
+# participants who are already in the call.
+LIVEKIT_TOKEN_LIFETIME_SECONDS = 60 * 60
+
+
+@zulip_login_required
+@never_cache
+@typed_endpoint
+def join_livekit_call(
+    request: HttpRequest, *, call_id: Json[NonNegativeInt], voice_only: Json[bool] = False
+) -> HttpResponse:
+    assert request.user.is_authenticated
+    user_profile = request.user
+
+    if (
+        settings.LIVEKIT_URL is None
+        or settings.LIVEKIT_API_KEY is None
+        or settings.LIVEKIT_API_SECRET is None
+    ):
+        raise VideoCallProviderNotConfiguredError("LiveKit")
+
+    # https://docs.livekit.io/home/get-started/authentication/
+    now = int(time.time())
+    livekit_token = jwt.encode(
+        {
+            "iss": settings.LIVEKIT_API_KEY,
+            "sub": str(user_profile.id),
+            "name": user_profile.full_name,
+            "nbf": now,
+            "exp": now + LIVEKIT_TOKEN_LIFETIME_SECONDS,
+            "video": {
+                # Call links carry only the call ID, and the room is
+                # scoped to the organization of the user opening the
+                # link, so that a link can never join users of different
+                # organizations, even ones on other Zulip servers sharing
+                # the LiveKit server.
+                "room": f"{user_profile.realm.uuid}-{call_id}",
+                "roomJoin": True,
+                "canPublish": True,
+                "canPublishData": True,
+                "canSubscribe": True,
+            },
+        },
+        settings.LIVEKIT_API_SECRET,
+        algorithm="HS256",
+    )
+
+    request_language = get_and_set_request_language(
+        request,
+        user_profile.default_language,
+        translation.get_language_from_path(request.path_info),
+    )
+
+    # Sync this with livekit_call_params_schema in base_page_params.ts.
+    page_params = dict(
+        page_type="livekit_call",
+        livekit_url=settings.LIVEKIT_URL,
+        livekit_token=livekit_token,
+        voice_only=voice_only,
+        translation_data=get_language_translation_data(request_language),
+    )
+    return render(
+        request,
+        "zerver/livekit_call.html",
+        context=dict(page_params=page_params, color_scheme=user_profile.color_scheme),
+    )
 
 
 @typed_endpoint_without_parameters

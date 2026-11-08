@@ -347,6 +347,16 @@ export function generate_and_insert_audio_or_video_call_link(
                 }
                 break;
             }
+            case available_providers.livekit?.id: {
+                const call_id = util.random_int(100000000000000, 999999999999999);
+                const url = `/calls/livekit/join?call_id=${call_id}`;
+                if (is_audio_call) {
+                    insert_audio_call_url(`${url}&voice_only=true`, $target_textarea);
+                } else {
+                    insert_video_call_url(url, $target_textarea);
+                }
+                break;
+            }
             default: {
                 throw new Error(
                     `Unknown video call provider ID ${realm.realm_video_chat_provider}`,

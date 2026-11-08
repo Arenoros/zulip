@@ -269,6 +269,7 @@ from zerver.views.video_calls import (
     deauthorize_zoom_user,
     get_bigbluebutton_url,
     join_bigbluebutton,
+    join_livekit_call,
     make_constructor_groups_video_call,
     make_google_meet_video_call,
     make_webex_video_call,
@@ -744,6 +745,8 @@ i18n_urls = [
     path("calls/google_meet/complete", complete_google_meet_user),
     # Used to join a BigBlueButton video call
     path("calls/bigbluebutton/join", join_bigbluebutton),
+    # Used to join a LiveKit video call
+    path("calls/livekit/join", join_livekit_call),
     # Integrations documentation
     path(
         "integrations/",
