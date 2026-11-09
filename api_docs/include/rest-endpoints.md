@@ -185,6 +185,8 @@
 * [Create Google Meet video call](/api/create-google-meet-video-call)
 * [Create Nextcloud Talk video call](/api/create-nextcloud-talk-video-call)
 * [Create Webex video call](/api/create-webex-video-call)
+* [Start LiveKit call](/api/start-livekit-call)
+* [Answer or cancel a ringing LiveKit call](/api/update-livekit-call-ring)
 
 ## Mobile push notifications
 

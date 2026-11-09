@@ -71,6 +71,28 @@ class AttachmentUpdateEvent(BaseEvent):
     upload_space_used: int
 
 
+class CallRingEvent(BaseEvent):
+    type: Literal["call"] = "call"
+    op: Literal["ring"] = "ring"
+    message_id: int
+    caller_id: int
+    url: str
+    voice_only: bool
+
+
+class CallAnswerEvent(BaseEvent):
+    type: Literal["call"] = "call"
+    op: Literal["accept", "decline"]
+    message_id: int
+    user_id: int
+
+
+class CallCancelEvent(BaseEvent):
+    type: Literal["call"] = "call"
+    op: Literal["cancel"] = "cancel"
+    message_id: int
+
+
 class ChannelFolderForChannelFolderAddEvent(BaseEventModel):
     id: int
     name: str

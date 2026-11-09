@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 from unittest import mock
@@ -12,9 +13,13 @@ from django.http import HttpResponseRedirect
 from django.test import override_settings
 from typing_extensions import override
 
+from zerver.actions.muted_users import do_mute_user
 from zerver.actions.realm_settings import do_set_realm_property
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
+from zerver.models import Realm, UserProfile
+from zerver.models.realms import get_realm
+from zerver.models.streams import get_stream
 from zerver.views.video_calls import LIVEKIT_TOKEN_LIFETIME_SECONDS
 
 if TYPE_CHECKING:
@@ -1244,3 +1249,175 @@ class LiveKitVideoCallTest(ZulipTestCase):
         response = self.client_get("/calls/livekit/join", {"call_id": "123"})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response["Location"].startswith("/login/"))
+
+    def set_livekit_call_provider(self) -> None:
+        do_set_realm_property(
+            get_realm("zulip"),
+            "video_chat_provider",
+            Realm.VIDEO_CHAT_PROVIDERS["livekit"]["id"],
+            acting_user=None,
+        )
+
+    def start_direct_message_call(
+        self, caller: UserProfile, recipients: list[UserProfile], **params: str
+    ) -> tuple[int, list[Mapping[str, Any]]]:
+        self.login_user(caller)
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            result = self.client_post(
+                "/json/calls/livekit/start",
+                {
+                    "type": "direct",
+                    "to": orjson.dumps([user.id for user in recipients]).decode(),
+                    "call_id": "123",
+                    **params,
+                },
+            )
+        message_id = self.assert_json_success(result)["message_id"]
+        return message_id, [event for event in events if event["event"]["type"] == "call"]
+
+    def test_start_livekit_call_in_direct_messages(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        iago = self.example_user("iago")
+        bot = self.example_user("default_bot")
+        self.set_livekit_call_provider()
+        do_mute_user(iago, hamlet)
+
+        message_id, call_events = self.start_direct_message_call(hamlet, [cordelia, iago, bot])
+
+        message = self.get_last_message()
+        self.assertEqual(message.id, message_id)
+        self.assertEqual(message.sender_id, hamlet.id)
+        self.assertEqual(message.content, "[Join video call.](/calls/livekit/join?call_id=123)")
+        self.assertEqual(
+            call_events,
+            [
+                {
+                    "event": {
+                        "type": "call",
+                        "op": "ring",
+                        "message_id": message_id,
+                        "caller_id": hamlet.id,
+                        "url": "/calls/livekit/join?call_id=123",
+                        "voice_only": False,
+                    },
+                    "users": [cordelia.id],
+                }
+            ],
+        )
+
+    def test_start_livekit_voice_call(self) -> None:
+        self.set_livekit_call_provider()
+        _message_id, call_events = self.start_direct_message_call(
+            self.example_user("hamlet"), [self.example_user("cordelia")], voice_only="true"
+        )
+        url = "/calls/livekit/join?call_id=123&voice_only=true"
+        self.assertEqual(self.get_last_message().content, f"[Join voice call.]({url})")
+        self.assertEqual(call_events[0]["event"]["url"], url)
+        self.assertTrue(call_events[0]["event"]["voice_only"])
+
+    def test_start_livekit_call_in_channel(self) -> None:
+        self.set_livekit_call_provider()
+        self.login("hamlet")
+        verona = get_stream("Verona", get_realm("zulip"))
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            result = self.client_post(
+                "/json/calls/livekit/start",
+                {
+                    "type": "channel",
+                    "channel_id": str(verona.id),
+                    "topic": "standup",
+                    "call_id": "123",
+                },
+            )
+        message_id = self.assert_json_success(result)["message_id"]
+        message = self.get_last_message()
+        self.assertEqual(message.id, message_id)
+        self.assertEqual(message.recipient.type_id, verona.id)
+        self.assertEqual(message.topic_name(), "standup")
+        self.assertEqual(message.content, "[Join video call.](/calls/livekit/join?call_id=123)")
+        self.assertEqual(events[0]["event"]["type"], "message")
+
+    def test_start_livekit_call_errors(self) -> None:
+        self.login("hamlet")
+        cordelia_id = self.example_user("cordelia").id
+        direct_call = {"type": "direct", "to": orjson.dumps([cordelia_id]).decode(), "call_id": "1"}
+
+        result = self.client_post("/json/calls/livekit/start", direct_call)
+        self.assert_json_error(result, "LiveKit is not the call provider of this organization.")
+
+        self.set_livekit_call_provider()
+        with self.settings(LIVEKIT_URL=None):
+            result = self.client_post("/json/calls/livekit/start", direct_call)
+        self.assert_json_error(result, "LiveKit is not the call provider of this organization.")
+
+        result = self.client_post("/json/calls/livekit/start", {"type": "direct", "call_id": "1"})
+        self.assert_json_error(result, "Missing 'to' argument")
+
+        result = self.client_post(
+            "/json/calls/livekit/start", {"type": "channel", "topic": "standup", "call_id": "1"}
+        )
+        self.assert_json_error(result, "Missing 'channel_id' argument")
+
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {"type": "direct", "to": orjson.dumps([9999]).decode(), "call_id": "1"},
+        )
+        self.assert_json_error(result, "Invalid user ID 9999")
+
+    def update_call_ring(self, user: UserProfile, message_id: int, op: str) -> "TestHttpResponse":
+        self.login_user(user)
+        return self.client_post(
+            "/json/calls/livekit/ring", {"message_id": str(message_id), "op": op}
+        )
+
+    def test_update_livekit_call_ring(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        iago = self.example_user("iago")
+        self.set_livekit_call_provider()
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia, iago])
+
+        for op in ["accept", "decline"]:
+            with self.capture_send_event_calls(expected_num_events=1) as events:
+                result = self.update_call_ring(cordelia, message_id, op)
+            self.assert_json_success(result)
+            self.assertEqual(
+                events[0],
+                {
+                    "event": {
+                        "type": "call",
+                        "op": op,
+                        "message_id": message_id,
+                        "user_id": cordelia.id,
+                    },
+                    "users": [hamlet.id, cordelia.id],
+                },
+            )
+
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            result = self.update_call_ring(hamlet, message_id, "cancel")
+        self.assert_json_success(result)
+        self.assertEqual(
+            events[0]["event"], {"type": "call", "op": "cancel", "message_id": message_id}
+        )
+        self.assertEqual(sorted(events[0]["users"]), sorted([cordelia.id, iago.id]))
+
+    def test_update_livekit_call_ring_errors(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        self.set_livekit_call_provider()
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia])
+
+        result = self.update_call_ring(hamlet, message_id, "accept")
+        self.assert_json_error(result, "You cannot answer your own call.")
+
+        result = self.update_call_ring(cordelia, message_id, "cancel")
+        self.assert_json_error(result, "Only the caller can cancel a call.")
+
+        result = self.update_call_ring(self.example_user("othello"), message_id, "accept")
+        self.assert_json_error(result, "Invalid message(s)")
+
+        channel_message_id = self.send_stream_message(hamlet, "Verona")
+        result = self.update_call_ring(cordelia, channel_message_id, "decline")
+        self.assert_json_error(result, "Calls in channels do not ring.")

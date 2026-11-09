@@ -6,7 +6,7 @@ import random
 import time
 from abc import ABC, abstractmethod
 from base64 import b64encode
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 import jwt
@@ -30,7 +30,12 @@ from requests import Response
 from requests_oauthlib import OAuth2Session
 from typing_extensions import TypedDict, override
 
-from zerver.actions.video_calls import do_set_video_call_provider_token
+from zerver.actions.video_calls import (
+    check_start_livekit_call,
+    do_answer_call,
+    do_cancel_call,
+    do_set_video_call_provider_token,
+)
 from zerver.decorator import zulip_login_required
 from zerver.lib.cache import (
     cache_with_key,
@@ -39,16 +44,22 @@ from zerver.lib.cache import (
 )
 from zerver.lib.exceptions import ErrorCode, JsonableError
 from zerver.lib.i18n import get_and_set_request_language, get_language_translation_data
-from zerver.lib.message import truncate_content
+from zerver.lib.message import access_message, truncate_content
 from zerver.lib.outgoing_http import OutgoingSession
 from zerver.lib.partial import partial
 from zerver.lib.pysa import mark_sanitized
+from zerver.lib.request import RequestNotes
 from zerver.lib.response import json_success
 from zerver.lib.subdomains import get_subdomain
-from zerver.lib.typed_endpoint import typed_endpoint, typed_endpoint_without_parameters
+from zerver.lib.typed_endpoint import (
+    ApiParamConfig,
+    OptionalTopic,
+    typed_endpoint,
+    typed_endpoint_without_parameters,
+)
 from zerver.lib.url_encoding import append_url_query_string
 from zerver.lib.utils import assert_is_not_none
-from zerver.models import UserProfile
+from zerver.models import Recipient, UserProfile
 from zerver.models.realms import get_realm
 
 
@@ -814,6 +825,73 @@ def join_livekit_call(
         "zerver/livekit_call.html",
         context=dict(page_params=page_params, color_scheme=user_profile.color_scheme),
     )
+
+
+@typed_endpoint
+def start_livekit_call(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    req_type: Annotated[Literal["direct", "channel"], ApiParamConfig("type")],
+    to: Json[list[int]] | None = None,
+    channel_id: Json[int] | None = None,
+    topic: OptionalTopic = None,
+    call_id: Json[NonNegativeInt],
+    voice_only: Json[bool] = False,
+) -> HttpResponse:
+    realm = user_profile.realm
+    livekit = realm.get_enabled_video_chat_providers().get("livekit")
+    if livekit is None or realm.video_chat_provider != livekit["id"]:
+        raise JsonableError(_("LiveKit is not the call provider of this organization."))
+
+    recipient_type_name: Literal["private", "stream"]
+    if req_type == "channel":
+        if channel_id is None:
+            raise JsonableError(_("Missing '{var_name}' argument").format(var_name="channel_id"))
+        recipient_type_name = "stream"
+        message_to = [channel_id]
+    else:
+        if to is None:
+            raise JsonableError(_("Missing '{var_name}' argument").format(var_name="to"))
+        recipient_type_name = "private"
+        message_to = to
+
+    client = RequestNotes.get_notes(request).client
+    assert client is not None
+    message_id = check_start_livekit_call(
+        user_profile,
+        client,
+        recipient_type_name,
+        message_to,
+        topic,
+        call_id=call_id,
+        voice_only=voice_only,
+        read_by_sender=client.default_read_by_sender(),
+    )
+    return json_success(request, data={"message_id": message_id})
+
+
+@typed_endpoint
+def update_livekit_call_ring(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    message_id: Json[NonNegativeInt],
+    operator: Annotated[Literal["accept", "decline", "cancel"], ApiParamConfig("op")],
+) -> HttpResponse:
+    message = access_message(user_profile, message_id, is_modifying_message=False)
+    if message.recipient.type == Recipient.STREAM:
+        raise JsonableError(_("Calls in channels do not ring."))
+
+    if operator == "cancel":
+        if message.sender_id != user_profile.id:
+            raise JsonableError(_("Only the caller can cancel a call."))
+        do_cancel_call(user_profile, message)
+    else:
+        if message.sender_id == user_profile.id:
+            raise JsonableError(_("You cannot answer your own call."))
+        do_answer_call(user_profile, message, operator)
+    return json_success(request)
 
 
 @typed_endpoint_without_parameters

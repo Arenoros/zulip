@@ -277,6 +277,8 @@ from zerver.views.video_calls import (
     register_google_meet_user,
     register_webex_user,
     register_zoom_user,
+    start_livekit_call,
+    update_livekit_call_ring,
 )
 from zerver.views.welcome_bot_custom_message import send_test_welcome_bot_custom_message
 from zproject import dev_urls
@@ -606,6 +608,9 @@ v1_api_and_json_patterns = [
     rest_path("calls/constructorgroups/create", POST=make_constructor_groups_video_call),
     # Used to generate a Nextcloud Talk video call URL
     rest_path("calls/nextcloud_talk/create", POST=create_nextcloud_talk_url),
+    # Used to start a LiveKit call and to answer or cancel its ringing
+    rest_path("calls/livekit/start", POST=start_livekit_call),
+    rest_path("calls/livekit/ring", POST=update_livekit_call_ring),
     # export/realm -> zerver.views.realm_export
     rest_path("export/realm", POST=export_realm, GET=get_realm_exports),
     rest_path("export/realm/<int:export_id>", DELETE=delete_realm_export),

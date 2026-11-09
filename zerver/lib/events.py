@@ -1826,6 +1826,9 @@ def apply_event(
     elif event["type"] == "submessage":
         # The client will get submessages with their messages
         pass
+    elif event["type"] == "call":
+        # Call ringing events are transient and thus ignored
+        pass
     elif event["type"] == "typing":
         # Typing notification events are transient and thus ignored
         pass

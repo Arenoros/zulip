@@ -167,7 +167,12 @@ from zerver.actions.users import (
     do_update_bot_config_data,
     do_update_outgoing_webhook_service,
 )
-from zerver.actions.video_calls import do_set_video_call_provider_token
+from zerver.actions.video_calls import (
+    check_start_livekit_call,
+    do_answer_call,
+    do_cancel_call,
+    do_set_video_call_provider_token,
+)
 from zerver.lib import event_types
 from zerver.lib.drafts import DraftData, do_create_drafts, do_delete_draft, do_edit_draft
 from zerver.lib.event_schema import (
@@ -175,6 +180,9 @@ from zerver.lib.event_schema import (
     check_attachment_add,
     check_attachment_remove,
     check_attachment_update,
+    check_call_answer,
+    check_call_cancel,
+    check_call_ring,
     check_channel_folder_add,
     check_channel_folder_reorder,
     check_channel_folder_update,
@@ -1708,6 +1716,30 @@ class NormalActionsTest(BaseAction):
                 topic_name,
             )
         self.assertEqual(events, [])
+
+    def test_call_events(self) -> None:
+        cordelia = self.example_user("cordelia")
+        with self.verify_action(num_events=2) as events:
+            message_id = check_start_livekit_call(
+                cordelia,
+                get_client("website"),
+                "private",
+                [self.user_profile.id],
+                None,
+                call_id=123,
+                voice_only=False,
+                read_by_sender=True,
+            )
+        check_call_ring("events[1]", events[1])
+        message = Message.objects.get(id=message_id)
+
+        with self.verify_action(state_change_expected=False) as events:
+            do_answer_call(self.user_profile, message, "accept")
+        check_call_answer("events[0]", events[0])
+
+        with self.verify_action(state_change_expected=False) as events:
+            do_cancel_call(cordelia, message)
+        check_call_cancel("events[0]", events[0])
 
     def test_edit_direct_message_typing_events(self) -> None:
         msg_id = self.send_personal_message(self.user_profile, self.example_user("cordelia"))

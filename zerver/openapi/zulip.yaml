@@ -1179,6 +1179,132 @@ paths:
                                 }
                             - type: object
                               description: |
+                                Event sent to the other users in a direct message conversation
+                                when a user starts a LiveKit call in it with
+                                [`POST /calls/livekit/start`](/api/start-livekit-call),
+                                except for bots and users who have muted the caller.
+
+                                Clients should ring until the user answers the call with
+                                [`POST /calls/livekit/ring`](/api/update-livekit-call-ring),
+                                a `call` event with the same `message_id` stops the ringing,
+                                or 45 seconds have passed.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - call
+                                op:
+                                  type: string
+                                  enum:
+                                    - ring
+                                message_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the message with the link to the call.
+                                caller_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the user who started the call.
+                                url:
+                                  type: string
+                                  description: |
+                                    The URL of the call, relative to the organization.
+                                voice_only:
+                                  type: boolean
+                                  description: |
+                                    Whether the call is a voice call.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "call",
+                                  "op": "ring",
+                                  "message_id": 42,
+                                  "caller_id": 10,
+                                  "url": "/calls/livekit/join?call_id=123456789012345",
+                                  "voice_only": false,
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to the caller of a ringing LiveKit call, and to the
+                                clients of the user who answered it, when a user accepts or
+                                declines the call with
+                                [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+
+                                Clients should stop ringing for the call if `user_id` is the
+                                current user, since the user answered on another client.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - call
+                                op:
+                                  type: string
+                                  enum:
+                                    - accept
+                                    - decline
+                                message_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the message with the link to the call.
+                                user_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the user who answered the call.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "call",
+                                  "op": "accept",
+                                  "message_id": 42,
+                                  "user_id": 9,
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to the other users in a direct message conversation
+                                when the caller of a ringing LiveKit call in it cancels the call
+                                with [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+
+                                Clients should stop ringing for the call.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - call
+                                op:
+                                  type: string
+                                  enum:
+                                    - cancel
+                                message_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the message with the link to the call.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "call",
+                                  "op": "cancel",
+                                  "message_id": 42,
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
                                 Event sent to a user's clients when the user completes the OAuth flow
                                 for the [Zoom integration](/help/configure-call-provider). Clients need
                                 to know whether initiating Zoom OAuth is required before creating a Zoom
@@ -27848,6 +27974,159 @@ paths:
                         "result": "success",
                         "url": "https://example.constructor.app/groups/room/room-123",
                       }
+  /calls/livekit/start:
+    post:
+      tags: ["channels"]
+      operationId: start-livekit-call
+      summary: Start LiveKit call
+      description: |
+        Start a call on the Zulip server's [LiveKit](/help/configure-call-provider)
+        integration, in an organization that uses LiveKit as its call provider.
+
+        The server sends a message with a link to the call to the
+        conversation, as the current user. For a direct message
+        conversation, the other users in it are also notified of the
+        incoming call with a [`call op:ring`](/api/get-events#call-ring)
+        event, so that their clients can ring; bots and users who have
+        [muted](/api/mute-user) the current user are not. A call in a
+        channel does not ring anyone.
+
+        Clients should open the call before the response arrives, so that
+        the call can start in the click handler of the button for it, and
+        let the user cancel the ringing with
+        [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                type:
+                  description: |
+                    Whether the call is in a direct message conversation
+                    (`"direct"`) or in a channel topic (`"channel"`).
+                  type: string
+                  enum:
+                    - direct
+                    - channel
+                  example: direct
+                to:
+                  description: |
+                    For a direct message call, the user IDs of the
+                    recipients of the conversation.
+                  type: array
+                  items:
+                    type: integer
+                  example: [9, 10]
+                channel_id:
+                  description: |
+                    For a call in a channel, the ID of the channel.
+                  type: integer
+                  example: 1
+                topic:
+                  description: |
+                    For a call in a channel, the topic of the message with
+                    the link to the call.
+                  type: string
+                  example: Castle
+                call_id:
+                  description: |
+                    A random ID for the call, chosen by the client; it
+                    determines the call link.
+                  type: integer
+                  minimum: 0
+                  example: 123456789012345
+                voice_only:
+                  description: |
+                    Whether the call is a voice call, in which participants
+                    join with their cameras off.
+                  type: boolean
+                  default: false
+                  example: false
+              required:
+                - type
+                - call_id
+            encoding:
+              to:
+                contentType: application/json
+              channel_id:
+                contentType: application/json
+              call_id:
+                contentType: application/json
+              voice_only:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      message_id:
+                        description: |
+                          The ID of the message with the link to the call.
+                        type: integer
+                    example: {"msg": "", "result": "success", "message_id": 42}
+  /calls/livekit/ring:
+    post:
+      tags: ["channels"]
+      operationId: update-livekit-call-ring
+      summary: Answer or cancel a ringing LiveKit call
+      description: |
+        Answer a direct message call started with
+        [`POST /calls/livekit/start`](/api/start-livekit-call), or, as its
+        caller, cancel its ringing.
+
+        Accepting or declining sends a [`call op:accept` or
+        `op:decline`](/api/get-events#call-accept) event to the caller
+        and to the current user's clients, so that they all stop ringing.
+        Cancelling sends a [`call op:cancel`](/api/get-events#call-cancel)
+        event to the other users in the conversation.
+
+        Clients that accept a call should open its link themselves.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                message_id:
+                  description: |
+                    The ID of the message with the link to the call.
+                  type: integer
+                  example: 42
+                op:
+                  description: |
+                    Whether the current user accepts (`"accept"`) or
+                    declines (`"decline"`) the call, or, as its caller,
+                    stops it ringing (`"cancel"`).
+                  type: string
+                  enum:
+                    - accept
+                    - decline
+                    - cancel
+                  example: accept
+              required:
+                - message_id
+                - op
+            encoding:
+              message_id:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
 
 components:
   #######################
