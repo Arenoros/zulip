@@ -62,6 +62,7 @@
 }
 
 .livekit-call-header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -412,6 +413,99 @@
         padding: 0.5em 1em;
         color: hsl(0deg 0% 100%);
         background-color: var(--color-livekit-call-leave-background);
+    }
+}
+
+.livekit-call-device-control {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+
+    @media (width < 40em) {
+        /* Device menus span the width of the window below the header. */
+        position: static;
+    }
+}
+
+.livekit-call-device-menu-toggle {
+    display: flex;
+    align-items: center;
+    padding: 0 0.125em;
+    border: none;
+    border-radius: 0.25em;
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    cursor: pointer;
+
+    &:hover:enabled,
+    &[aria-expanded="true"] {
+        background-color: var(--color-livekit-call-button-background-hover);
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+}
+
+.livekit-call-device-menu {
+    position: absolute;
+    top: calc(100% + 0.25em);
+    right: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    width: max-content;
+    min-width: 16em;
+    max-width: min(24em, calc(100vw - 1.5em));
+    padding: 0.25em 0;
+    border: 1px solid var(--color-livekit-call-button-border);
+    border-radius: 0.5em;
+    background-color: var(--color-livekit-call-background);
+    box-shadow: 0 0.25em 1em hsl(0deg 0% 0% / 20%);
+
+    &[hidden] {
+        display: none;
+    }
+
+    @media (width < 40em) {
+        top: 100%;
+        left: 0.75em;
+        right: 0.75em;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+    }
+}
+
+.livekit-call-device-menu-heading {
+    padding: 0.5em 0.75em 0.25em;
+    font-size: 0.8125em;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.livekit-call-device-menu-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    width: 100%;
+    padding: 0.375em 0.75em;
+    border: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    overflow-wrap: anywhere;
+    background-color: transparent;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background-color: var(--color-livekit-call-button-background-hover);
+    }
+
+    &[aria-checked="false"] .zulip-icon-check {
+        visibility: hidden;
     }
 }
 

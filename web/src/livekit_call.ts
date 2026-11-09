@@ -6,11 +6,14 @@ import {
     RoomEvent,
     Track,
     type TrackPublication,
+    supportsAudioOutputSelection,
 } from "livekit-client";
+import * as z from "zod/mini";
 
 import {page_params} from "./base_page_params.ts";
 import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
+import {localstorage} from "./localstorage.ts";
 import * as livekit_remote_control from "./livekit_remote_control.ts";
 import {RemoteInput} from "./livekit_remote_input.ts";
 
@@ -34,12 +37,26 @@ const screen_share_button = get_element<HTMLButtonElement>("#livekit-call-screen
 const enable_audio_button = get_element<HTMLButtonElement>("#livekit-call-enable-audio");
 const leave_button = get_element<HTMLButtonElement>("#livekit-call-leave");
 const participants_toggle = get_element<HTMLButtonElement>("#livekit-call-participants-toggle");
+type DeviceMenu = {toggle: HTMLButtonElement; menu: HTMLElement; kinds: MediaDeviceKind[]};
+const device_menus: DeviceMenu[] = [
+    {
+        toggle: get_element<HTMLButtonElement>("#livekit-call-microphone-devices"),
+        menu: get_element("#livekit-call-microphone-menu"),
+        kinds: supportsAudioOutputSelection() ? ["audioinput", "audiooutput"] : ["audioinput"],
+    },
+    {
+        toggle: get_element<HTMLButtonElement>("#livekit-call-camera-devices"),
+        menu: get_element("#livekit-call-camera-menu"),
+        kinds: ["videoinput"],
+    },
+];
 const call_buttons = [
     participants_toggle,
     microphone_button,
     camera_button,
     screen_share_button,
     leave_button,
+    ...device_menus.map(({toggle}) => toggle),
 ];
 const controls_element = get_element(".livekit-call-controls");
 const duration_element = get_element(".livekit-call-duration");
@@ -53,7 +70,30 @@ const left_message_element = get_element(".livekit-call-left-message");
 const rejoin_button = get_element<HTMLButtonElement>(".livekit-call-rejoin");
 get_element<HTMLAnchorElement>(".livekit-call-conversation-link").href = conversation_url;
 
-const room = new Room({adaptiveStream: true, dynacast: true});
+const ls = localstorage();
+const SAVED_DEVICES_KEY = "livekit_call_devices";
+// The devices the user chose in earlier calls on this computer.
+const saved_devices: Partial<Record<MediaDeviceKind, string>> =
+    z
+        .object({
+            audioinput: z.optional(z.string()),
+            audiooutput: z.optional(z.string()),
+            videoinput: z.optional(z.string()),
+        })
+        .safeParse(ls.get(SAVED_DEVICES_KEY)).data ?? {};
+
+function device_defaults(device_id: string | undefined): {deviceId?: string} {
+    return device_id === undefined ? {} : {deviceId: device_id};
+}
+
+const room = new Room({
+    adaptiveStream: true,
+    dynacast: true,
+    // A device that is gone falls back to the default one.
+    audioCaptureDefaults: device_defaults(saved_devices.audioinput),
+    videoCaptureDefaults: device_defaults(saved_devices.videoinput),
+    audioOutput: device_defaults(saved_devices.audiooutput),
+});
 const tiles = new Map<string, HTMLElement>();
 // LiveKit can have detached a track from its elements by the time it
 // reports the track as unsubscribed, so we track the elements ourselves,
@@ -78,9 +118,164 @@ const screen_share_controls = new Map<
 >();
 let left_call = false;
 let duration_interval: ReturnType<typeof setInterval> | undefined;
+let status_timeout: ReturnType<typeof setTimeout> | undefined;
+// The devices the call uses, and their names, to tell when they change.
+const active_devices = new Map<MediaDeviceKind, {device_id: string; label: string}>();
+// The devices the user chose in this call, which need no notice.
+const chosen_devices = new Map<MediaDeviceKind, string>();
 
 function show_status(message: string): void {
+    clearTimeout(status_timeout);
     status_element.textContent = message;
+}
+
+// Unplugging a headset changes several devices at once, so notices
+// that come together are shown together.
+let notices: string[] = [];
+function show_notice(message: string): void {
+    notices.push(message);
+    show_status(notices.join(" "));
+    status_timeout = setTimeout(() => {
+        notices = [];
+        show_status("");
+    }, 10 * 1000);
+}
+
+function get_device_kind_name(kind: MediaDeviceKind): string {
+    switch (kind) {
+        case "audioinput":
+            return $t({defaultMessage: "Microphone"});
+        case "audiooutput":
+            return $t({defaultMessage: "Speakers"});
+        case "videoinput":
+            return $t({defaultMessage: "Camera"});
+    }
+}
+
+function get_device_label(kind: MediaDeviceKind, device: MediaDeviceInfo, index: number): string {
+    // Browsers hide device names from pages that may not use them.
+    if (device.label === "") {
+        return $t(
+            {defaultMessage: "{device_kind} {number}"},
+            {device_kind: get_device_kind_name(kind), number: index + 1},
+        );
+    }
+    return device.label;
+}
+
+function get_active_device_id(kind: MediaDeviceKind): string | undefined {
+    return room.getActiveDevice(kind) ?? saved_devices[kind];
+}
+
+// LiveKit switches to another device when the one the call uses goes
+// away, and follows the system's default device.
+async function note_active_device(kind: MediaDeviceKind): Promise<void> {
+    const devices = await Room.getLocalDevices(kind, false);
+    const device_id = get_active_device_id(kind) ?? "default";
+    const index = devices.findIndex((device) => device.deviceId === device_id);
+    const device = devices[index];
+    if (device === undefined) {
+        return;
+    }
+    const current = {device_id, label: get_device_label(kind, device, index)};
+    const previous = active_devices.get(kind);
+    active_devices.set(kind, current);
+    if (
+        previous === undefined ||
+        (previous.device_id === current.device_id && previous.label === current.label) ||
+        chosen_devices.get(kind) === current.device_id
+    ) {
+        return;
+    }
+    switch (kind) {
+        case "audioinput":
+            show_notice(
+                $t({defaultMessage: "Your microphone changed to {device}."}, {device: current.label}),
+            );
+            break;
+        case "audiooutput":
+            show_notice(
+                $t({defaultMessage: "Your speakers changed to {device}."}, {device: current.label}),
+            );
+            break;
+        case "videoinput":
+            show_notice(
+                $t({defaultMessage: "Your camera changed to {device}."}, {device: current.label}),
+            );
+            break;
+    }
+}
+
+async function choose_device(kind: MediaDeviceKind, device_id: string, label: string): Promise<void> {
+    chosen_devices.set(kind, device_id);
+    try {
+        // Not exact, so that LiveKit can fall back to another device
+        // when this one goes away.
+        await room.switchActiveDevice(kind, device_id, false);
+    } catch {
+        show_status($t({defaultMessage: "Could not switch to {device}."}, {device: label}));
+        return;
+    }
+    saved_devices[kind] = device_id;
+    ls.set(SAVED_DEVICES_KEY, saved_devices);
+}
+
+function close_device_menu(device_menu: DeviceMenu, return_focus = false): void {
+    device_menu.menu.hidden = true;
+    device_menu.toggle.setAttribute("aria-expanded", "false");
+    if (return_focus) {
+        device_menu.toggle.focus();
+    }
+}
+
+async function render_device_group(device_menu: DeviceMenu, kind: MediaDeviceKind): Promise<HTMLElement> {
+    const devices = await Room.getLocalDevices(kind, false);
+    const group = document.createElement("div");
+    group.setAttribute("role", "group");
+    const heading = document.createElement("div");
+    heading.id = `livekit-call-device-menu-${kind}`;
+    heading.classList.add("livekit-call-device-menu-heading");
+    heading.textContent = get_device_kind_name(kind);
+    group.setAttribute("aria-labelledby", heading.id);
+    group.append(heading);
+    const active_device_id = get_active_device_id(kind);
+    const checked_device_id = devices.some((device) => device.deviceId === active_device_id)
+        ? active_device_id
+        : devices[0]?.deviceId;
+    for (const [index, device] of devices.entries()) {
+        const label = get_device_label(kind, device, index);
+        const item = document.createElement("button");
+        item.type = "button";
+        item.tabIndex = -1;
+        item.classList.add("livekit-call-device-menu-item");
+        item.setAttribute("role", "menuitemradio");
+        item.setAttribute("aria-checked", String(device.deviceId === checked_device_id));
+        const check = document.createElement("i");
+        check.classList.add("zulip-icon", "zulip-icon-check");
+        check.setAttribute("aria-hidden", "true");
+        const label_element = document.createElement("span");
+        label_element.textContent = label;
+        item.append(check, label_element);
+        item.addEventListener("click", () => {
+            close_device_menu(device_menu, true);
+            void choose_device(kind, device.deviceId, label);
+        });
+        group.append(item);
+    }
+    return group;
+}
+
+async function open_device_menu(device_menu: DeviceMenu): Promise<void> {
+    const groups = await Promise.all(
+        device_menu.kinds.map(async (kind) => render_device_group(device_menu, kind)),
+    );
+    device_menu.menu.replaceChildren(...groups);
+    device_menu.menu.hidden = false;
+    device_menu.toggle.setAttribute("aria-expanded", "true");
+    const items = [
+        ...device_menu.menu.querySelectorAll<HTMLElement>(".livekit-call-device-menu-item"),
+    ];
+    (items.find((item) => item.getAttribute("aria-checked") === "true") ?? items[0])?.focus();
 }
 
 function get_display_name(participant: Participant): string {
@@ -645,6 +840,72 @@ side_panel.addEventListener("keydown", (event) => {
         participants_toggle.focus();
     }
 });
+for (const device_menu of device_menus) {
+    device_menu.toggle.addEventListener("click", () => {
+        if (!device_menu.menu.hidden) {
+            close_device_menu(device_menu);
+            return;
+        }
+        for (const other_menu of device_menus) {
+            close_device_menu(other_menu);
+        }
+        void open_device_menu(device_menu);
+    });
+    device_menu.menu.addEventListener("keydown", (event) => {
+        const items = [
+            ...device_menu.menu.querySelectorAll<HTMLElement>(".livekit-call-device-menu-item"),
+        ];
+        const index = items.findIndex((item) => item === document.activeElement);
+        let next_item;
+        switch (event.key) {
+            case "ArrowDown":
+                next_item = items[(index + 1) % items.length];
+                break;
+            case "ArrowUp":
+                next_item = items.at(index - 1);
+                break;
+            case "Home":
+                next_item = items[0];
+                break;
+            case "End":
+                next_item = items.at(-1);
+                break;
+            case "Escape":
+                close_device_menu(device_menu, true);
+                event.preventDefault();
+                return;
+            case "Tab":
+                close_device_menu(device_menu);
+                return;
+            default:
+                return;
+        }
+        event.preventDefault();
+        next_item?.focus();
+    });
+}
+document.addEventListener("click", (event) => {
+    for (const device_menu of device_menus) {
+        if (
+            !device_menu.menu.hidden &&
+            event.target instanceof Node &&
+            !device_menu.menu.contains(event.target) &&
+            !device_menu.toggle.contains(event.target)
+        ) {
+            close_device_menu(device_menu);
+        }
+    }
+});
+room.on(RoomEvent.ActiveDeviceChanged, (kind) => {
+    void note_active_device(kind);
+});
+room.on(RoomEvent.MediaDevicesChanged, () => {
+    for (const device_menu of device_menus) {
+        if (!device_menu.menu.hidden) {
+            void open_device_menu(device_menu);
+        }
+    }
+});
 rejoin_button.addEventListener("click", () => {
     // The server checks whether the call is still going on.
     window.location.reload();
@@ -686,6 +947,9 @@ async function join(): Promise<void> {
             async () => room.localParticipant.setCameraEnabled(true),
             $t({defaultMessage: "Could not access your camera."}),
         );
+    }
+    for (const kind of ["audioinput", "audiooutput", "videoinput"] as const) {
+        await note_active_device(kind);
     }
 }
 

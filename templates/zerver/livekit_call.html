@@ -18,16 +18,28 @@
                 <span class="livekit-call-button-label">{{ _("Participants") }}</span>
             </button>
             <span class="livekit-call-controls-separator"></span>
-            <button type="button" id="livekit-call-microphone" class="livekit-call-button" aria-pressed="false" title="{{ _('Mic') }}" disabled>
-                <i class="zulip-icon zulip-icon-mic livekit-call-icon-on" aria-hidden="true"></i>
-                <i class="zulip-icon zulip-icon-mic-off livekit-call-icon-off" aria-hidden="true"></i>
-                <span class="livekit-call-button-label">{{ _("Mic") }}</span>
-            </button>
-            <button type="button" id="livekit-call-camera" class="livekit-call-button" aria-pressed="false" title="{{ _('Camera') }}" disabled>
-                <i class="zulip-icon zulip-icon-video livekit-call-icon-on" aria-hidden="true"></i>
-                <i class="zulip-icon zulip-icon-video-off livekit-call-icon-off" aria-hidden="true"></i>
-                <span class="livekit-call-button-label">{{ _("Camera") }}</span>
-            </button>
+            <div class="livekit-call-device-control">
+                <button type="button" id="livekit-call-microphone" class="livekit-call-button" aria-pressed="false" title="{{ _('Mic') }}" disabled>
+                    <i class="zulip-icon zulip-icon-mic livekit-call-icon-on" aria-hidden="true"></i>
+                    <i class="zulip-icon zulip-icon-mic-off livekit-call-icon-off" aria-hidden="true"></i>
+                    <span class="livekit-call-button-label">{{ _("Mic") }}</span>
+                </button>
+                <button type="button" id="livekit-call-microphone-devices" class="livekit-call-device-menu-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="livekit-call-microphone-menu" aria-label="{{ _('Choose microphone and speakers') }}" title="{{ _('Choose microphone and speakers') }}" disabled>
+                    <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="livekit-call-microphone-menu" class="livekit-call-device-menu" role="menu" aria-label="{{ _('Choose microphone and speakers') }}" hidden></div>
+            </div>
+            <div class="livekit-call-device-control">
+                <button type="button" id="livekit-call-camera" class="livekit-call-button" aria-pressed="false" title="{{ _('Camera') }}" disabled>
+                    <i class="zulip-icon zulip-icon-video livekit-call-icon-on" aria-hidden="true"></i>
+                    <i class="zulip-icon zulip-icon-video-off livekit-call-icon-off" aria-hidden="true"></i>
+                    <span class="livekit-call-button-label">{{ _("Camera") }}</span>
+                </button>
+                <button type="button" id="livekit-call-camera-devices" class="livekit-call-device-menu-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="livekit-call-camera-menu" aria-label="{{ _('Choose camera') }}" title="{{ _('Choose camera') }}" disabled>
+                    <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="livekit-call-camera-menu" class="livekit-call-device-menu" role="menu" aria-label="{{ _('Choose camera') }}" hidden></div>
+            </div>
             <button type="button" id="livekit-call-screen-share" class="livekit-call-button" aria-pressed="false" title="{{ _('Share') }}" disabled>
                 <i class="zulip-icon zulip-icon-monitor-up" aria-hidden="true"></i>
                 <span class="livekit-call-button-label">{{ _("Share") }}</span>
