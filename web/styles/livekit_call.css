@@ -33,6 +33,10 @@
         hsl(357deg 64% 47%),
         hsl(357deg 64% 52%)
     );
+    --color-livekit-call-link: light-dark(
+        hsl(210deg 94% 42%),
+        hsl(200deg 100% 50%)
+    );
 }
 
 @media screen {
@@ -52,11 +56,166 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.75em;
-    padding: 0.75em;
     font-family: "Source Sans 3 VF", sans-serif;
     color: var(--color-livekit-call-text);
     background-color: var(--color-livekit-call-background);
+}
+
+.livekit-call-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid var(--color-livekit-call-button-border);
+}
+
+.livekit-call-heading {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75em;
+    min-width: 0;
+}
+
+.livekit-call-title {
+    margin: 0;
+    overflow: hidden;
+    font-size: 1.125em;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.livekit-call-duration {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+.livekit-call-body {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+.livekit-call-main {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 0.75em;
+    min-width: 0;
+    padding: 0.75em;
+}
+
+.livekit-call-side-panel {
+    display: flex;
+    flex: 0 0 18em;
+    flex-direction: column;
+    min-width: 0;
+    overflow-y: auto;
+    border-left: 1px solid var(--color-livekit-call-button-border);
+    background-color: var(--color-livekit-call-background);
+
+    &[hidden] {
+        display: none;
+    }
+
+    @media (width < 40em) {
+        /* Narrow windows have no room beside the stage. */
+        position: absolute;
+        inset: 0;
+        border-left: none;
+    }
+}
+
+.livekit-call-side-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+}
+
+.livekit-call-side-panel-title {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.livekit-call-side-panel-close {
+    display: flex;
+    padding: 0.375em;
+    border: none;
+    border-radius: 0.25em;
+    color: inherit;
+    background-color: transparent;
+    cursor: pointer;
+
+    &:hover {
+        background-color: var(--color-livekit-call-button-background-hover);
+    }
+}
+
+.livekit-call-participant-list {
+    margin: 0;
+    padding: 0 0.75em 0.75em;
+    list-style: none;
+}
+
+.livekit-call-participant {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.375em 0;
+}
+
+.livekit-call-participant-name {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.livekit-call-left {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1em;
+    padding: 0.75em;
+    text-align: center;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+.livekit-call-left-message {
+    margin: 0;
+    font-size: 1.25em;
+}
+
+.livekit-call-left-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1em;
+}
+
+.livekit-call-conversation-link {
+    color: var(--color-livekit-call-link);
 }
 
 .livekit-call-stage {
@@ -186,9 +345,95 @@
 
 .livekit-call-controls {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5em;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.25em;
+
+    &[hidden] {
+        display: none;
+    }
+
+    .livekit-call-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.125em;
+        min-width: 4.5em;
+        padding: 0.375em 0.5em;
+        border-color: transparent;
+        background-color: transparent;
+
+        &:hover:enabled {
+            background-color: var(--color-livekit-call-button-background-hover);
+        }
+
+        &[hidden] {
+            display: none;
+        }
+
+        .zulip-icon {
+            font-size: 1.25em;
+        }
+
+        @media (width < 50em) {
+            min-width: 0;
+        }
+    }
+
+    /* The microphone and camera icons show whether they are on. */
+    #livekit-call-microphone,
+    #livekit-call-camera {
+        &[aria-pressed="true"] .livekit-call-icon-off,
+        &[aria-pressed="false"] .livekit-call-icon-on {
+            display: none;
+        }
+
+        &.livekit-call-button-pressed {
+            color: inherit;
+            background-color: transparent;
+
+            &:hover:enabled {
+                background-color: var(--color-livekit-call-button-background-hover);
+            }
+        }
+    }
+
+    .livekit-call-button-pressed,
+    .livekit-call-button-pressed:hover:enabled {
+        color: hsl(0deg 0% 100%);
+        background-color: var(--color-livekit-call-button-pressed-background);
+    }
+
+    .livekit-call-leave,
+    .livekit-call-leave:hover:enabled {
+        flex-direction: row;
+        gap: 0.375em;
+        margin-left: 0.5em;
+        padding: 0.5em 1em;
+        color: hsl(0deg 0% 100%);
+        background-color: var(--color-livekit-call-leave-background);
+    }
+}
+
+.livekit-call-controls-separator {
+    align-self: stretch;
+    width: 1px;
+    margin: 0.25em 0.5em;
+    background-color: var(--color-livekit-call-button-border);
+}
+
+.livekit-call-button-label {
+    font-size: 0.8125em;
+
+    @media (width < 50em) {
+        /* Icons only, with the label left for screen readers. */
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
 }
 
 .livekit-call-button {
@@ -208,18 +453,4 @@
         cursor: not-allowed;
         opacity: 0.5;
     }
-}
-
-.livekit-call-button-pressed,
-.livekit-call-button-pressed:hover:enabled {
-    border-color: transparent;
-    color: hsl(0deg 0% 100%);
-    background-color: var(--color-livekit-call-button-pressed-background);
-}
-
-.livekit-call-leave,
-.livekit-call-leave:hover:enabled {
-    border-color: transparent;
-    color: hsl(0deg 0% 100%);
-    background-color: var(--color-livekit-call-leave-background);
 }

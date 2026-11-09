@@ -2,21 +2,66 @@
 {% set entrypoint = "livekit-call" %}
 
 {% block title %}
-<title>{{ _("Call") }} | Zulip</title>
+<title>{{ call_title }} | Zulip</title>
 {% endblock %}
 
 {% block content %}
 <div class="livekit-call">
-    <div class="livekit-call-stage"></div>
-    <div class="livekit-call-participants"></div>
-    <div class="livekit-call-audio"></div>
-    <p class="livekit-call-status" role="status"></p>
-    <div class="livekit-call-controls">
-        <button type="button" id="livekit-call-microphone" class="livekit-call-button" aria-pressed="false" disabled>{{ _("Microphone") }}</button>
-        <button type="button" id="livekit-call-camera" class="livekit-call-button" aria-pressed="false" disabled>{{ _("Camera") }}</button>
-        <button type="button" id="livekit-call-screen-share" class="livekit-call-button" aria-pressed="false" disabled>{{ _("Share screen") }}</button>
-        <button type="button" id="livekit-call-enable-audio" class="livekit-call-button" hidden>{{ _("Enable audio") }}</button>
-        <button type="button" id="livekit-call-leave" class="livekit-call-button livekit-call-leave" disabled>{{ _("Leave") }}</button>
+    <header class="livekit-call-header">
+        <div class="livekit-call-heading">
+            <h1 class="livekit-call-title" title="{{ call_title }}">{{ call_title }}</h1>
+            <span class="livekit-call-duration" role="timer"></span>
+        </div>
+        <div class="livekit-call-controls">
+            <button type="button" id="livekit-call-participants-toggle" class="livekit-call-button" aria-pressed="false" aria-controls="livekit-call-side-panel" title="{{ _('Participants') }}" disabled>
+                <i class="zulip-icon zulip-icon-users" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Participants") }}</span>
+            </button>
+            <span class="livekit-call-controls-separator"></span>
+            <button type="button" id="livekit-call-microphone" class="livekit-call-button" aria-pressed="false" title="{{ _('Mic') }}" disabled>
+                <i class="zulip-icon zulip-icon-mic livekit-call-icon-on" aria-hidden="true"></i>
+                <i class="zulip-icon zulip-icon-mic-off livekit-call-icon-off" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Mic") }}</span>
+            </button>
+            <button type="button" id="livekit-call-camera" class="livekit-call-button" aria-pressed="false" title="{{ _('Camera') }}" disabled>
+                <i class="zulip-icon zulip-icon-video livekit-call-icon-on" aria-hidden="true"></i>
+                <i class="zulip-icon zulip-icon-video-off livekit-call-icon-off" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Camera") }}</span>
+            </button>
+            <button type="button" id="livekit-call-screen-share" class="livekit-call-button" aria-pressed="false" title="{{ _('Share') }}" disabled>
+                <i class="zulip-icon zulip-icon-monitor-up" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Share") }}</span>
+            </button>
+            <button type="button" id="livekit-call-enable-audio" class="livekit-call-button" hidden>{{ _("Enable audio") }}</button>
+            <button type="button" id="livekit-call-leave" class="livekit-call-button livekit-call-leave" title="{{ _('Leave') }}" disabled>
+                <i class="zulip-icon zulip-icon-phone-off" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Leave") }}</span>
+            </button>
+        </div>
+    </header>
+    <div class="livekit-call-body">
+        <main class="livekit-call-main">
+            <div class="livekit-call-stage"></div>
+            <div class="livekit-call-participants"></div>
+            <p class="livekit-call-status" role="status"></p>
+        </main>
+        <aside id="livekit-call-side-panel" class="livekit-call-side-panel" aria-labelledby="livekit-call-side-panel-title" hidden>
+            <div class="livekit-call-side-panel-header">
+                <h2 id="livekit-call-side-panel-title" class="livekit-call-side-panel-title"></h2>
+                <button type="button" class="livekit-call-side-panel-close" aria-label="{{ _('Close') }}">
+                    <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                </button>
+            </div>
+            <ul class="livekit-call-participant-list"></ul>
+        </aside>
     </div>
+    <div class="livekit-call-left" hidden>
+        <p class="livekit-call-left-message"></p>
+        <div class="livekit-call-left-actions">
+            <button type="button" class="livekit-call-button livekit-call-rejoin">{{ _("Rejoin") }}</button>
+            <a class="livekit-call-conversation-link">{{ _("Go to the conversation") }}</a>
+        </div>
+    </div>
+    <div class="livekit-call-audio"></div>
 </div>
 {% endblock %}

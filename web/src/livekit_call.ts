@@ -15,7 +15,8 @@ import * as livekit_remote_control from "./livekit_remote_control.ts";
 import {RemoteInput} from "./livekit_remote_input.ts";
 
 assert(page_params.page_type === "livekit_call");
-const {livekit_url, livekit_token, voice_only, remote_control_enabled} = page_params;
+const {livekit_url, livekit_token, voice_only, remote_control_enabled, conversation_url} =
+    page_params;
 
 function get_element<T extends HTMLElement>(selector: string): T {
     const element = document.querySelector<T>(selector);
@@ -32,7 +33,25 @@ const camera_button = get_element<HTMLButtonElement>("#livekit-call-camera");
 const screen_share_button = get_element<HTMLButtonElement>("#livekit-call-screen-share");
 const enable_audio_button = get_element<HTMLButtonElement>("#livekit-call-enable-audio");
 const leave_button = get_element<HTMLButtonElement>("#livekit-call-leave");
-const call_buttons = [microphone_button, camera_button, screen_share_button, leave_button];
+const participants_toggle = get_element<HTMLButtonElement>("#livekit-call-participants-toggle");
+const call_buttons = [
+    participants_toggle,
+    microphone_button,
+    camera_button,
+    screen_share_button,
+    leave_button,
+];
+const controls_element = get_element(".livekit-call-controls");
+const duration_element = get_element(".livekit-call-duration");
+const body_element = get_element(".livekit-call-body");
+const side_panel = get_element("#livekit-call-side-panel");
+const side_panel_title = get_element(".livekit-call-side-panel-title");
+const side_panel_close = get_element<HTMLButtonElement>(".livekit-call-side-panel-close");
+const participant_list = get_element(".livekit-call-participant-list");
+const left_element = get_element(".livekit-call-left");
+const left_message_element = get_element(".livekit-call-left-message");
+const rejoin_button = get_element<HTMLButtonElement>(".livekit-call-rejoin");
+get_element<HTMLAnchorElement>(".livekit-call-conversation-link").href = conversation_url;
 
 const room = new Room({adaptiveStream: true, dynacast: true});
 const tiles = new Map<string, HTMLElement>();
@@ -58,9 +77,58 @@ const screen_share_controls = new Map<
     {label_element: HTMLElement; button_element: HTMLButtonElement}
 >();
 let left_call = false;
+let duration_interval: ReturnType<typeof setInterval> | undefined;
 
 function show_status(message: string): void {
     status_element.textContent = message;
+}
+
+function get_display_name(participant: Participant): string {
+    const name = participant.name ?? participant.identity;
+    return participant === room.localParticipant ? $t({defaultMessage: "{name} (you)"}, {name}) : name;
+}
+
+function format_duration(total_seconds: number): string {
+    const hours = Math.floor(total_seconds / 3600);
+    const minutes = Math.floor((total_seconds % 3600) / 60);
+    const seconds = String(total_seconds % 60).padStart(2, "0");
+    if (hours === 0) {
+        return `${minutes}:${seconds}`;
+    }
+    return `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`;
+}
+
+function update_participant_list(): void {
+    const participants = [room.localParticipant, ...room.remoteParticipants.values()];
+    side_panel_title.textContent = $t(
+        {defaultMessage: "Participants ({count})"},
+        {count: participants.length},
+    );
+    participant_list.replaceChildren(
+        ...participants.map((participant) => {
+            const item = document.createElement("li");
+            item.classList.add("livekit-call-participant");
+            const name_element = document.createElement("span");
+            name_element.classList.add("livekit-call-participant-name");
+            name_element.textContent = get_display_name(participant);
+            name_element.title = name_element.textContent;
+            item.append(name_element);
+            if (!participant.isMicrophoneEnabled) {
+                const muted_element = document.createElement("i");
+                muted_element.classList.add("zulip-icon", "zulip-icon-mic-off");
+                muted_element.setAttribute("role", "img");
+                muted_element.setAttribute("aria-label", $t({defaultMessage: "Muted"}));
+                muted_element.title = $t({defaultMessage: "Muted"});
+                item.append(muted_element);
+            }
+            return item;
+        }),
+    );
+}
+
+function set_side_panel_open(open: boolean): void {
+    side_panel.hidden = !open;
+    set_pressed(participants_toggle, open);
 }
 
 function get_tile(participant: Participant): HTMLElement {
@@ -70,11 +138,7 @@ function get_tile(participant: Participant): HTMLElement {
         tile.classList.add("livekit-call-tile", "livekit-call-tile-camera-off");
         const name_element = document.createElement("span");
         name_element.classList.add("livekit-call-tile-name");
-        const name = participant.name ?? participant.identity;
-        name_element.textContent =
-            participant === room.localParticipant
-                ? $t({defaultMessage: "{name} (you)"}, {name})
-                : name;
+        name_element.textContent = get_display_name(participant);
         tile.append(name_element);
         participants_element.append(tile);
         tiles.set(participant.identity, tile);
@@ -333,6 +397,7 @@ room.on(RoomEvent.LocalTrackPublished, (publication, participant) => {
         attach_track(publication.track, publication, participant);
     }
     update_buttons();
+    update_participant_list();
 });
 room.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
     if (publication.track !== undefined) {
@@ -346,17 +411,23 @@ room.on(RoomEvent.LocalTrackUnpublished, (publication, participant) => {
         electron_bridge?.screen_share_stopped?.();
     }
     update_buttons();
+    update_participant_list();
 });
 room.on(RoomEvent.TrackMuted, (_publication, participant) => {
     update_camera_state(participant);
     update_buttons();
+    update_participant_list();
 });
 room.on(RoomEvent.TrackUnmuted, (_publication, participant) => {
     update_camera_state(participant);
     update_buttons();
+    update_participant_list();
 });
+room.on(RoomEvent.TrackPublished, update_participant_list);
+room.on(RoomEvent.TrackUnpublished, update_participant_list);
 room.on(RoomEvent.ParticipantConnected, (participant) => {
     get_tile(participant);
+    update_participant_list();
     const control_state = control_states.get(room.localParticipant.identity);
     if (control_state !== undefined && is_sharing_controllable_screen()) {
         send_control_message({type: "state", control_state}, [participant.identity]);
@@ -369,6 +440,7 @@ room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     control_states.delete(participant.identity);
     clear_request_refusal(participant.identity);
     remove_tile(participant);
+    update_participant_list();
     electron_bridge?.remote_control_participant_left?.(participant.identity);
 });
 room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
@@ -491,11 +563,15 @@ electron_bridge?.on_event("remote_control_state", (state) => {
 });
 room.on(RoomEvent.AudioPlaybackStatusChanged, update_enable_audio_button);
 room.on(RoomEvent.Disconnected, () => {
-    show_status(
-        left_call
-            ? $t({defaultMessage: "You left the call."})
-            : $t({defaultMessage: "You were disconnected from the call."}),
-    );
+    clearInterval(duration_interval);
+    left_message_element.textContent = left_call
+        ? $t({defaultMessage: "You left the call."})
+        : $t({defaultMessage: "You were disconnected from the call."});
+    controls_element.hidden = true;
+    duration_element.hidden = true;
+    body_element.hidden = true;
+    left_element.hidden = false;
+    rejoin_button.focus();
     for (const button of call_buttons) {
         button.disabled = true;
     }
@@ -549,7 +625,29 @@ enable_audio_button.addEventListener("click", () => {
 });
 leave_button.addEventListener("click", () => {
     left_call = true;
-    void room.disconnect();
+    void room.disconnect().then(() => {
+        // Browsers only let a page close a window that a script opened,
+        // or one with nothing to go back to; otherwise the page shows
+        // that the user left.
+        window.close();
+    });
+});
+participants_toggle.addEventListener("click", () => {
+    set_side_panel_open(participants_toggle.getAttribute("aria-pressed") !== "true");
+});
+side_panel_close.addEventListener("click", () => {
+    set_side_panel_open(false);
+    participants_toggle.focus();
+});
+side_panel.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        set_side_panel_open(false);
+        participants_toggle.focus();
+    }
+});
+rejoin_button.addEventListener("click", () => {
+    // The server checks whether the call is still going on.
+    window.location.reload();
 });
 
 async function join(): Promise<void> {
@@ -562,10 +660,18 @@ async function join(): Promise<void> {
     }
     show_status("");
 
+    const connected_at = Date.now();
+    duration_element.textContent = format_duration(0);
+    duration_interval = setInterval(() => {
+        duration_element.textContent = format_duration(
+            Math.floor((Date.now() - connected_at) / 1000),
+        );
+    }, 1000);
     get_tile(room.localParticipant);
     for (const participant of room.remoteParticipants.values()) {
         get_tile(participant);
     }
+    update_participant_list();
     for (const button of call_buttons) {
         button.disabled = false;
     }

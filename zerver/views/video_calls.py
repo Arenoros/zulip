@@ -823,13 +823,14 @@ def join_livekit_call(
     # other call links, such as ones inserted while editing a message,
     # admit anyone in the organization.
     dm_user_ids = None
+    stream = None
     if dm is not None:
         dm_user_ids = {int(user_id) for user_id in dm.split(",")}
         if user_profile.id not in dm_user_ids:
             return render_livekit_call_access_denied(request)
     elif channel_id is not None:
         try:
-            access_stream_by_id(user_profile, channel_id)
+            stream, _sub = access_stream_by_id(user_profile, channel_id)
         except JsonableError:
             return render_livekit_call_access_denied(request)
     room = get_livekit_call_room(
@@ -846,6 +847,22 @@ def join_livekit_call(
                 )
             },
         )
+
+    # Only the call record proves that the link names a real
+    # conversation, so other calls get generic names.
+    call_title = _("Call")
+    conversation_url = user_profile.realm.url
+    if call is not None:
+        conversation_url = get_livekit_call_conversation_url(user_profile.realm, call.message)
+        if stream is not None:
+            call_title = f"#{stream.name} > {call.message.topic_name()}"
+        else:
+            names = sorted(
+                recipient["full_name"]
+                for recipient in get_display_recipient(call.message.recipient)
+                if recipient["id"] != user_profile.id
+            )
+            call_title = ", ".join(names) if names else user_profile.full_name
 
     # https://docs.livekit.io/home/get-started/authentication/
     now = int(time.time())
@@ -875,12 +892,17 @@ def join_livekit_call(
         livekit_token=livekit_token,
         voice_only=voice_only,
         remote_control_enabled=user_profile.realm.enable_livekit_remote_control,
+        conversation_url=conversation_url,
         translation_data=get_language_translation_data(request_language),
     )
     return render(
         request,
         "zerver/livekit_call.html",
-        context=dict(page_params=page_params, color_scheme=user_profile.color_scheme),
+        context=dict(
+            page_params=page_params,
+            color_scheme=user_profile.color_scheme,
+            call_title=call_title,
+        ),
     )
 
 

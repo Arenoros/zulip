@@ -1308,6 +1308,50 @@ class LiveKitVideoCallTest(ZulipTestCase):
         response = self.join_livekit_call(hamlet, channel_id="abc")
         self.assert_json_error(response, "channel_id is not valid JSON")
 
+    def test_join_livekit_call_title(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        iago = self.example_user("iago")
+        realm = hamlet.realm
+        self.set_livekit_call_provider()
+
+        # Without a call record, the link might not name a real
+        # conversation.
+        response = self.join_livekit_call(hamlet, dm=f"{hamlet.id},{cordelia.id}")
+        self.assert_in_response("<title>Call | Zulip</title>", response)
+        self.assertEqual(self._get_page_params(response)["conversation_url"], realm.url)
+
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia, iago])
+        dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id, iago.id]))
+        response = self.join_livekit_call(cordelia, dm=dm)
+        self.assert_in_response("<title>Iago, King Hamlet | Zulip</title>", response)
+        self.assertEqual(
+            self._get_page_params(response)["conversation_url"],
+            f"{realm.url}/#narrow/dm/{dm}-group/with/{message_id}",
+        )
+
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {"type": "direct", "to": orjson.dumps([hamlet.id]).decode(), "call_id": "124"},
+        )
+        self.assert_json_success(result)
+        response = self.join_livekit_call(hamlet, call_id="124", dm=str(hamlet.id))
+        self.assert_in_response("<title>King Hamlet | Zulip</title>", response)
+
+        verona = get_stream("Verona", realm)
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {"type": "channel", "channel_id": str(verona.id), "topic": "standup", "call_id": "125"},
+        )
+        message_id = self.assert_json_success(result)["message_id"]
+        response = self.join_livekit_call(hamlet, call_id="125", channel_id=str(verona.id))
+        self.assert_in_response("<title>#Verona &gt; standup | Zulip</title>", response)
+        self.assertEqual(
+            self._get_page_params(response)["conversation_url"],
+            f"{realm.url}/#narrow/channel/{verona.id}/topic/standup/with/{message_id}",
+        )
+
     def test_join_livekit_call_logged_out(self) -> None:
         response = self.client_get("/calls/livekit/join", {"call_id": "123"})
         self.assertEqual(response.status_code, 302)

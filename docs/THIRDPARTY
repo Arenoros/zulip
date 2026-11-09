@@ -94,6 +94,42 @@ Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/ic
 License: ISC License
 Comment: Icon has been modified by Vlad Koborov
 
+Files: web/icons/mic.svg
+Source: https://lucide.dev/icons/mic
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/mic)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
+Files: web/icons/mic-off.svg
+Source: https://lucide.dev/icons/mic-off
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/mic-off)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
+Files: web/icons/monitor-up.svg
+Source: https://lucide.dev/icons/monitor-up
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/monitor-up)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
+Files: web/icons/phone-off.svg
+Source: https://lucide.dev/icons/phone-off
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/phone-off)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
+Files: web/icons/video.svg
+Source: https://lucide.dev/icons/video
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/video)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
+Files: web/icons/video-off.svg
+Source: https://lucide.dev/icons/video-off
+Copyright: 2013-2023 Cole Bemis, Lucide Contributors 2025 (https://lucide.dev/icons/video-off)
+License: ISC License
+Comment: Strokes converted to paths with picosvg
+
 Files: web/icons/account.svg
 Copyright: 2013-2023 Cole Bemis (https://feathericons.com)
 License: Expat
