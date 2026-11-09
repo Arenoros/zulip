@@ -2,6 +2,7 @@ from collections.abc import Collection
 from typing import Literal
 
 from django.db import transaction
+from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
 
@@ -15,8 +16,9 @@ from zerver.lib.event_types import (
     HasWebexTokenEvent,
     HasZoomTokenEvent,
 )
+from zerver.lib.exceptions import JsonableError
 from zerver.lib.muted_users import get_muting_users
-from zerver.models import Client, Message, Realm, UserMessage, UserProfile
+from zerver.models import Client, LiveKitCall, Message, Realm, Recipient, UserMessage, UserProfile
 from zerver.tornado.django_api import send_event_on_commit, send_event_rollback_unsafe
 
 
@@ -76,8 +78,12 @@ def check_start_livekit_call(
     if recipient_type_name == "private":
         user_ids = sorted({*message_to, caller.id})
         url += "&dm=" + ",".join(str(user_id) for user_id in user_ids)
+        room = get_livekit_call_room(caller.realm, call_id, dm_user_ids=user_ids)
     else:
         url += f"&channel_id={message_to[0]}"
+        room = get_livekit_call_room(caller.realm, call_id, channel_id=message_to[0])
+    if LiveKitCall.objects.filter(room=room).exists():
+        raise JsonableError(_("This call has already been started."))
     if voice_only:
         url += "&voice_only=true"
     with override_language(caller.default_language):
@@ -91,6 +97,7 @@ def check_start_livekit_call(
         f"[{link_text}]({url})",
         read_by_sender=read_by_sender,
     ).message_id
+    LiveKitCall.objects.create(room=room, message_id=message_id)
 
     # Like channel meetings in other chat apps, a call in a channel
     # only posts its link; only direct message calls ring.
@@ -109,6 +116,29 @@ def check_start_livekit_call(
         send_event_on_commit(caller.realm, event, ring_user_ids)
 
     return message_id
+
+
+@transaction.atomic(durable=True)
+def do_end_livekit_call(room: str) -> None:
+    call = (
+        LiveKitCall.objects.select_for_update(no_key=True, of=("self",))
+        .select_related("message__realm", "message__recipient")
+        .filter(room=room, date_ended=None)
+        .first()
+    )
+    if call is None:
+        return
+    call.date_ended = timezone_now()
+    call.save(update_fields=["date_ended"])
+
+    # A call that ends while it is still ringing stops ringing, for the
+    # caller too.
+    if call.message.recipient.type != Recipient.STREAM:
+        user_ids = UserMessage.objects.filter(message_id=call.message_id).values_list(
+            "user_profile_id", flat=True
+        )
+        event = CallCancelEvent(message_id=call.message_id)
+        send_event_on_commit(call.message.realm, event, list(user_ids))
 
 
 def do_answer_call(

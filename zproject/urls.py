@@ -270,6 +270,7 @@ from zerver.views.video_calls import (
     get_bigbluebutton_url,
     join_bigbluebutton,
     join_livekit_call,
+    livekit_webhook,
     make_constructor_groups_video_call,
     make_google_meet_video_call,
     make_webex_video_call,
@@ -752,6 +753,7 @@ i18n_urls = [
     path("calls/bigbluebutton/join", join_bigbluebutton),
     # Used to join a LiveKit video call
     path("calls/livekit/join", join_livekit_call),
+    path("calls/livekit/webhook", livekit_webhook),
     # Integrations documentation
     path(
         "integrations/",

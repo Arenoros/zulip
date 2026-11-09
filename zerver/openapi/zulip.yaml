@@ -1274,9 +1274,12 @@ paths:
                               description: |
                                 Event sent to the other users in a direct message conversation
                                 when the caller of a ringing LiveKit call in it cancels the call
-                                with [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+                                with [`POST /calls/livekit/ring`](/api/update-livekit-call-ring),
+                                and to all the users in it, including the caller, when the
+                                call ends.
 
-                                Clients should stop ringing for the call.
+                                Clients should stop ringing for the call, and stop showing
+                                that the call is ringing.
 
                                 **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
                               properties:

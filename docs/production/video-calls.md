@@ -339,3 +339,27 @@ access the channel. Other call links, such as ones inserted while
 editing a message, can be joined by anyone logged in to the organization
 who has the link. Calls are scoped to the organization, so organizations
 on the same or different Zulip servers can share a LiveKit server.
+
+### Ending calls
+
+To let Zulip know when calls end, configure your LiveKit server to send
+[webhooks](https://docs.livekit.io/home/server/webhooks/) to your Zulip
+server, signed with the API key that Zulip uses. For a self-hosted
+LiveKit server, add this to its configuration file:
+
+```yaml
+webhook:
+  api_key: <your LiveKit API key>
+  urls:
+    - https://zulip.example.com/calls/livekit/webhook
+```
+
+A call ends when LiveKit closes its room, which it does once everyone has
+left the call and its `departure_timeout` (20 seconds by default) has
+passed; this also gives someone who lost their connection time to
+rejoin. The link to a call that has ended then says so instead of
+starting the call again, and an unanswered incoming call stops ringing.
+Without webhooks, call links keep working after calls end.
+
+If several Zulip servers share a LiveKit server, they need to use the
+same API key to receive its webhooks.

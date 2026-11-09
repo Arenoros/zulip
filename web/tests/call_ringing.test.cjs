@@ -296,6 +296,13 @@ test("outgoing call is cancelled", (helpers) => {
     assert.deepEqual(faded_banners, [$banner]);
 });
 
+test("outgoing call ends", (helpers) => {
+    const $banner = start_direct_message_call(helpers, [alice.user_id], 46);
+    call_ringing.dispatch({op: "cancel", message_id: 46});
+    assert.deepEqual(faded_banners, [$banner]);
+    assert.equal(timeouts.size, 0);
+});
+
 test("incoming call is accepted", ({override}) => {
     let played_sounds = 0;
     override(ui_util, "play_audio", () => {

@@ -169,6 +169,7 @@ ALL_ZULIP_TABLES = {
     "zerver_groupgroupmembership",
     "zerver_huddle",
     "zerver_imageattachment",
+    "zerver_livekitcall",
     "zerver_message",
     "zerver_missedmessageemailaddress",
     "zerver_multiuseinvite",
@@ -297,6 +298,9 @@ NON_EXPORTED_TABLES = {
     # ChannelEmailAddress entries are low value to export since
     # channel email addresses include the server's hostname.
     "zerver_channelemailaddress",
+    # LiveKit calls only matter while they are going on, on the LiveKit
+    # server the Zulip server uses.
+    "zerver_livekitcall",
     # For any tables listed below here, it's a bug that they are not present in the export.
 }
 

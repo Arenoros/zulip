@@ -1,0 +1,15 @@
+{% extends "zerver/portico_error_pages/portico_error_page.html" %}
+
+{% block title %}
+<title>{{ _("This call has ended") }} | Zulip</title>
+{% endblock %}
+
+{% block error_page_content %}
+<img src="{{ static('images/errors/400art.svg') }}" alt=""/>
+<div class="errorbox">
+    <div class="errorcontent">
+        <h1 class="lead">{{ _("This call has ended") }}</h1>
+        <p><a href="{{ conversation_url }}">{{ _("Go to the conversation") }}</a></p>
+    </div>
+</div>
+{% endblock %}

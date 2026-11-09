@@ -1,3 +1,5 @@
+import hashlib
+from base64 import b64encode
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
@@ -17,7 +19,7 @@ from zerver.actions.muted_users import do_mute_user
 from zerver.actions.realm_settings import do_set_realm_property
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
-from zerver.models import Realm, UserProfile
+from zerver.models import LiveKitCall, Realm, UserProfile
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
 from zerver.views.video_calls import LIVEKIT_TOKEN_LIFETIME_SECONDS
@@ -1353,6 +1355,9 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(message.id, message_id)
         self.assertEqual(message.sender_id, hamlet.id)
         self.assertEqual(message.content, f"[Join video call.]({url})")
+        call = LiveKitCall.objects.get(message_id=message_id)
+        self.assertEqual(call.room, f"{hamlet.realm.uuid}-dm-{dm}-123")
+        self.assertIsNone(call.date_ended)
         self.assertEqual(
             call_events,
             [
@@ -1407,6 +1412,10 @@ class LiveKitVideoCallTest(ZulipTestCase):
             f"[Join video call.](/calls/livekit/join?call_id=123&channel_id={verona.id})",
         )
         self.assertEqual(events[0]["event"]["type"], "message")
+        self.assertEqual(
+            LiveKitCall.objects.get(message_id=message_id).room,
+            f"{verona.realm.uuid}-channel-{verona.id}-123",
+        )
 
     def test_start_livekit_call_errors(self) -> None:
         self.login("hamlet")
@@ -1434,6 +1443,11 @@ class LiveKitVideoCallTest(ZulipTestCase):
             {"type": "direct", "to": orjson.dumps([9999]).decode(), "call_id": "1"},
         )
         self.assert_json_error(result, "Invalid user ID 9999")
+
+        self.assert_json_success(self.client_post("/json/calls/livekit/start", direct_call))
+        result = self.client_post("/json/calls/livekit/start", direct_call)
+        self.assert_json_error(result, "This call has already been started.")
+        self.assertEqual(LiveKitCall.objects.count(), 1)
 
     def update_call_ring(self, user: UserProfile, message_id: int, op: str) -> "TestHttpResponse":
         self.login_user(user)
@@ -1491,3 +1505,122 @@ class LiveKitVideoCallTest(ZulipTestCase):
         channel_message_id = self.send_stream_message(hamlet, "Verona")
         result = self.update_call_ring(cordelia, channel_message_id, "decline")
         self.assert_json_error(result, "Calls in channels do not ring.")
+
+    def post_livekit_webhook(
+        self,
+        event: Mapping[str, object],
+        *,
+        api_key: str = "test-api-key",
+        api_secret: str = "test-api-secret-that-is-at-least-32-bytes",
+        signed_body: bytes | None = None,
+    ) -> "TestHttpResponse":
+        body = orjson.dumps(event)
+        body_hash = b64encode(hashlib.sha256(signed_body or body).digest()).decode()
+        token = jwt.encode({"iss": api_key, "sha256": body_hash}, api_secret, algorithm="HS256")
+        return self.client_post(
+            "/calls/livekit/webhook",
+            body,
+            content_type="application/webhook+json",
+            headers={"Authorization": token},
+        )
+
+    def room_finished(self, room: str) -> dict[str, object]:
+        return {"event": "room_finished", "room": {"name": room}}
+
+    def test_livekit_webhook_ends_direct_message_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        self.set_livekit_call_provider()
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia])
+        call = LiveKitCall.objects.get(message_id=message_id)
+        dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id]))
+
+        response = self.join_livekit_call(cordelia, dm=dm)
+        self.assertEqual(self.get_livekit_token(response)["video"]["room"], call.room)
+
+        with self.capture_send_event_calls(expected_num_events=0):
+            result = self.post_livekit_webhook(
+                {"event": "participant_left", "room": {"name": call.room}}
+            )
+        self.assert_json_success(result)
+        call.refresh_from_db()
+        self.assertIsNone(call.date_ended)
+
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        with (
+            time_machine.travel(now, tick=False),
+            self.capture_send_event_calls(expected_num_events=1) as events,
+        ):
+            result = self.post_livekit_webhook(self.room_finished(call.room))
+        self.assert_json_success(result)
+        call.refresh_from_db()
+        self.assertEqual(call.date_ended, now)
+        self.assertEqual(
+            events[0]["event"], {"type": "call", "op": "cancel", "message_id": message_id}
+        )
+        self.assertEqual(sorted(events[0]["users"]), sorted([hamlet.id, cordelia.id]))
+
+        # LiveKit can send an event more than once.
+        with self.capture_send_event_calls(expected_num_events=0):
+            result = self.post_livekit_webhook(self.room_finished(call.room))
+        self.assert_json_success(result)
+        call.refresh_from_db()
+        self.assertEqual(call.date_ended, now)
+
+        response = self.join_livekit_call(cordelia, dm=dm)
+        self.assertEqual(response.status_code, 200)
+        self.assert_in_response("This call has ended", response)
+        self.assert_in_response(
+            f'href="{hamlet.realm.url}/#narrow/dm/{dm}/with/{message_id}"', response
+        )
+        self.assertNotIn("livekit_token", response.content.decode())
+
+    def test_livekit_webhook_ends_channel_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        verona = get_stream("Verona", hamlet.realm)
+        self.set_livekit_call_provider()
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {"type": "channel", "channel_id": str(verona.id), "topic": "standup", "call_id": "123"},
+        )
+        message_id = self.assert_json_success(result)["message_id"]
+        call = LiveKitCall.objects.get(message_id=message_id)
+
+        # Calls in channels don't ring, so there is nothing to cancel.
+        with self.capture_send_event_calls(expected_num_events=0):
+            result = self.post_livekit_webhook(self.room_finished(call.room))
+        self.assert_json_success(result)
+        call.refresh_from_db()
+        self.assertIsNotNone(call.date_ended)
+
+        response = self.join_livekit_call(hamlet, channel_id=str(verona.id))
+        self.assert_in_response("This call has ended", response)
+        self.assert_in_response(
+            f'href="{hamlet.realm.url}/#narrow/channel/{verona.id}/topic/standup/with/{message_id}"',
+            response,
+        )
+
+    def test_livekit_webhook_unknown_room(self) -> None:
+        # Other Zulip servers can share the LiveKit server.
+        with self.capture_send_event_calls(expected_num_events=0):
+            result = self.post_livekit_webhook(self.room_finished("another-server-room"))
+        self.assert_json_success(result)
+
+    def test_livekit_webhook_invalid_signature(self) -> None:
+        event = self.room_finished("room")
+        for response in [
+            self.post_livekit_webhook(event, api_secret="another-secret-that-is-at-least-32-bytes"),
+            self.post_livekit_webhook(event, api_key="another-api-key"),
+            self.post_livekit_webhook(event, signed_body=b"{}"),
+            self.client_post(
+                "/calls/livekit/webhook",
+                orjson.dumps(event),
+                content_type="application/webhook+json",
+            ),
+        ]:
+            self.assert_json_error(response, "Invalid LiveKit webhook signature", status_code=401)
+
+        with self.settings(LIVEKIT_API_SECRET=None):
+            response = self.post_livekit_webhook(event)
+        self.assert_json_error(response, "LiveKit credentials have not been configured")

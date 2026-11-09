@@ -74,3 +74,4 @@ from zerver.models.user_topics import UserTopic as UserTopic
 from zerver.models.users import RealmUserDefault as RealmUserDefault
 from zerver.models.users import UserBaseSettings as UserBaseSettings
 from zerver.models.users import UserProfile as UserProfile
+from zerver.models.video_calls import LiveKitCall as LiveKitCall

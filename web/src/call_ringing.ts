@@ -302,7 +302,9 @@ export function dispatch(event: CallRingEvent | CallAnswerEvent | CallCancelEven
             break;
         }
         case "cancel":
+            // Either the caller cancelled the call, or the call ended.
             end_incoming_call(event.message_id);
+            end_outgoing_call(event.message_id);
             break;
     }
 }

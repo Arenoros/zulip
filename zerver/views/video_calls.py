@@ -10,6 +10,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 import jwt
+import orjson
 import requests
 from defusedxml import ElementTree
 from django.conf import settings
@@ -34,6 +35,7 @@ from zerver.actions.video_calls import (
     check_start_livekit_call,
     do_answer_call,
     do_cancel_call,
+    do_end_livekit_call,
     do_set_video_call_provider_token,
     get_livekit_call_room,
 )
@@ -43,7 +45,8 @@ from zerver.lib.cache import (
     flush_zoom_server_access_token_cache,
     zoom_server_access_token_cache_key,
 )
-from zerver.lib.exceptions import ErrorCode, JsonableError
+from zerver.lib.display_recipient import get_display_recipient
+from zerver.lib.exceptions import ErrorCode, JsonableError, UnauthorizedError
 from zerver.lib.i18n import get_and_set_request_language, get_language_translation_data
 from zerver.lib.message import access_message, truncate_content
 from zerver.lib.outgoing_http import OutgoingSession
@@ -59,9 +62,9 @@ from zerver.lib.typed_endpoint import (
     typed_endpoint,
     typed_endpoint_without_parameters,
 )
-from zerver.lib.url_encoding import append_url_query_string
+from zerver.lib.url_encoding import append_url_query_string, pm_message_url, stream_message_url
 from zerver.lib.utils import assert_is_not_none
-from zerver.models import Recipient, UserProfile
+from zerver.models import LiveKitCall, Message, Realm, Recipient, UserProfile
 from zerver.models.realms import get_realm
 
 
@@ -769,6 +772,32 @@ def render_livekit_call_access_denied(request: HttpRequest) -> HttpResponse:
     return render(request, "zerver/portico_error_pages/livekit_call_access_denied.html", status=403)
 
 
+def render_livekit_call_ended(request: HttpRequest, realm: Realm, message: Message) -> HttpResponse:
+    if message.is_channel_message:
+        conversation_url = stream_message_url(
+            realm,
+            {
+                "id": message.id,
+                "stream_id": message.recipient.type_id,
+                "display_recipient": None,
+                "topic": message.topic_name(),
+            },
+            conversation_link=True,
+            include_channel_name=False,
+        )
+    else:
+        conversation_url = pm_message_url(
+            realm,
+            {"id": message.id, "display_recipient": get_display_recipient(message.recipient)},
+            conversation_link=True,
+        )
+    return render(
+        request,
+        "zerver/portico_error_pages/livekit_call_ended.html",
+        context={"conversation_url": conversation_url},
+    )
+
+
 @zulip_login_required
 @never_cache
 @typed_endpoint
@@ -812,6 +841,9 @@ def join_livekit_call(
     room = get_livekit_call_room(
         user_profile.realm, call_id, dm_user_ids=dm_user_ids, channel_id=channel_id
     )
+    call = LiveKitCall.objects.filter(room=room).select_related("message__recipient").first()
+    if call is not None and call.date_ended is not None:
+        return render_livekit_call_ended(request, user_profile.realm, call.message)
 
     # https://docs.livekit.io/home/get-started/authentication/
     now = int(time.time())
@@ -848,6 +880,33 @@ def join_livekit_call(
         "zerver/livekit_call.html",
         context=dict(page_params=page_params, color_scheme=user_profile.color_scheme),
     )
+
+
+@csrf_exempt
+@require_POST
+@typed_endpoint_without_parameters
+def livekit_webhook(request: HttpRequest) -> HttpResponse:
+    if settings.LIVEKIT_API_KEY is None or settings.LIVEKIT_API_SECRET is None:
+        raise VideoCallProviderNotConfiguredError("LiveKit")
+
+    # https://docs.livekit.io/home/server/webhooks/
+    try:
+        claims = jwt.decode(
+            request.headers.get("Authorization", ""),
+            settings.LIVEKIT_API_SECRET,
+            algorithms=["HS256"],
+            issuer=settings.LIVEKIT_API_KEY,
+        )
+    except jwt.InvalidTokenError:
+        raise UnauthorizedError(_("Invalid LiveKit webhook signature"))
+    body_hash = b64encode(hashlib.sha256(request.body).digest()).decode()
+    if not constant_time_compare(claims.get("sha256", ""), body_hash):
+        raise UnauthorizedError(_("Invalid LiveKit webhook signature"))
+
+    event = orjson.loads(request.body)
+    if event["event"] == "room_finished":
+        do_end_livekit_call(event["room"]["name"])
+    return json_success(request)
 
 
 @typed_endpoint
