@@ -333,6 +333,9 @@ LiveKit as the video call
 provider](https://zulip.com/help/configure-call-provider)
 in the Zulip organizations where you want to use it.
 
-Anyone logged in to the organization who has a call's link can join the
-call. Calls are scoped to the organization, so organizations on the same
-or different Zulip servers can share a LiveKit server.
+Only the people in the conversation where a call was started can join
+it: everyone in the direct message conversation, or everyone who can
+access the channel. Other call links, such as ones inserted while
+editing a message, can be joined by anyone logged in to the organization
+who has the link. Calls are scoped to the organization, so organizations
+on the same or different Zulip servers can share a LiveKit server.

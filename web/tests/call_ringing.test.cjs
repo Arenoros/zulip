@@ -160,6 +160,14 @@ test("get_call_url", () => {
         call_ringing.get_call_url(123, true),
         "/calls/livekit/join?call_id=123&voice_only=true",
     );
+    assert.equal(
+        call_ringing.get_call_url(123, true, {dm_user_ids: [3, 1, 2, 1]}),
+        "/calls/livekit/join?call_id=123&dm=1,2,3&voice_only=true",
+    );
+    assert.equal(
+        call_ringing.get_call_url(123, false, {channel_id: 5}),
+        "/calls/livekit/join?call_id=123&channel_id=5",
+    );
 });
 
 test("start channel call", ({override, disallow}) => {
@@ -177,7 +185,9 @@ test("start channel call", ({override, disallow}) => {
     override(compose_state, "stream_id", () => 5);
     override(compose_state, "topic", () => "standup");
     call_ringing.start_call_from_compose(123, true);
-    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&voice_only=true"]);
+    assert.deepEqual(opened_urls, [
+        "/calls/livekit/join?call_id=123&channel_id=5&voice_only=true",
+    ]);
     assert.equal(posts.length, 1);
     assert.equal(posts[0].url, "/json/calls/livekit/start");
     assert.deepEqual(posts[0].data, {
@@ -203,7 +213,7 @@ test("start direct message call errors", ({override}) => {
     override(compose_validate, "validate_private_message", () => true);
     override(compose_state, "private_message_recipient_ids", () => [alice.user_id]);
     call_ringing.start_call_from_compose(123, false);
-    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123"]);
+    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&dm=1,2"]);
 
     const xhr = {responseJSON: {msg: "Invalid user ID 9999"}};
     override(channel, "xhr_error_message", (message, error_xhr) => {

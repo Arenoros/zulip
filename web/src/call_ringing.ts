@@ -57,8 +57,20 @@ const outgoing_calls = new Map<number, OutgoingCall>();
 
 const start_call_response_schema = z.object({message_id: z.number()});
 
-export function get_call_url(call_id: number, voice_only: boolean): string {
-    const url = `/calls/livekit/join?call_id=${call_id}`;
+// Sync with check_start_livekit_call, which puts the same link in the
+// message for the call.
+export function get_call_url(
+    call_id: number,
+    voice_only: boolean,
+    conversation?: {dm_user_ids: number[]} | {channel_id: number},
+): string {
+    let url = `/calls/livekit/join?call_id=${call_id}`;
+    if (conversation !== undefined) {
+        url +=
+            "dm_user_ids" in conversation
+                ? `&dm=${util.sorted_ids(conversation.dm_user_ids).join(",")}`
+                : `&channel_id=${conversation.channel_id}`;
+    }
     return voice_only ? `${url}&voice_only=true` : url;
 }
 
@@ -89,6 +101,7 @@ function update_call_ring(message_id: number, op: "accept" | "decline" | "cancel
 
 export let start_call_from_compose = (call_id: number, voice_only: boolean): void => {
     let data: Record<string, string>;
+    let url: string;
     let ring_user_ids: number[] = [];
     if (compose_state.get_message_type() === "stream") {
         const stream_id = compose_state.stream_id();
@@ -105,12 +118,16 @@ export let start_call_from_compose = (call_id: number, voice_only: boolean): voi
             channel_id: JSON.stringify(stream_id),
             topic: compose_state.topic(),
         };
+        url = get_call_url(call_id, voice_only, {channel_id: stream_id});
     } else {
         if (!compose_validate.validate_private_message()) {
             return;
         }
         const recipient_ids = compose_state.private_message_recipient_ids();
         data = {type: "direct", to: JSON.stringify(recipient_ids)};
+        url = get_call_url(call_id, voice_only, {
+            dm_user_ids: [...recipient_ids, current_user.user_id],
+        });
         ring_user_ids = recipient_ids.filter(
             (user_id) => user_id !== current_user.user_id && !people.is_valid_bot_user(user_id),
         );
@@ -118,7 +135,7 @@ export let start_call_from_compose = (call_id: number, voice_only: boolean): voi
 
     // Browsers block windows that are not opened directly in response
     // to a click, so the call opens before the server responds.
-    open_call(get_call_url(call_id, voice_only));
+    open_call(url);
     void channel.post({
         url: "/json/calls/livekit/start",
         data: {...data, call_id: JSON.stringify(call_id), voice_only: JSON.stringify(voice_only)},

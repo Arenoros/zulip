@@ -1245,6 +1245,67 @@ class LiveKitVideoCallTest(ZulipTestCase):
             response = self.client_get("/calls/livekit/join", {"call_id": "123"})
         self.assert_json_error(response, "LiveKit credentials have not been configured")
 
+    def join_livekit_call(self, user: UserProfile, **params: str) -> "TestHttpResponse":
+        self.login_user(user)
+        return self.client_get("/calls/livekit/join", {"call_id": "123", **params})
+
+    def assert_livekit_call_access_denied(self, response: "TestHttpResponse") -> None:
+        self.assertEqual(response.status_code, 403)
+        self.assert_in_response("No access to this call", response)
+        self.assertNotIn("livekit_token", response.content.decode())
+
+    def test_join_livekit_direct_message_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        user_ids = sorted([hamlet.id, cordelia.id])
+        room = f"{hamlet.realm.uuid}-dm-{user_ids[0]},{user_ids[1]}-123"
+
+        # The room doesn't depend on how the link lists the users.
+        dm = f"{cordelia.id},{hamlet.id},{cordelia.id}"
+        for user in [hamlet, cordelia]:
+            response = self.join_livekit_call(user, dm=dm)
+            self.assertEqual(self.get_livekit_token(response)["video"]["room"], room)
+
+        response = self.join_livekit_call(self.example_user("othello"), dm=dm)
+        self.assert_livekit_call_access_denied(response)
+
+    def test_join_livekit_channel_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        public_channel = self.make_stream("standup")
+        response = self.join_livekit_call(hamlet, channel_id=str(public_channel.id))
+        self.assertEqual(
+            self.get_livekit_token(response)["video"]["room"],
+            f"{hamlet.realm.uuid}-channel-{public_channel.id}-123",
+        )
+
+        polonius = self.example_user("polonius")
+        response = self.join_livekit_call(polonius, channel_id=str(public_channel.id))
+        self.assert_livekit_call_access_denied(response)
+
+        private_channel = self.make_stream("secret", invite_only=True)
+        self.subscribe(hamlet, "secret")
+        response = self.join_livekit_call(hamlet, channel_id=str(private_channel.id))
+        self.assertEqual(
+            self.get_livekit_token(response)["video"]["room"],
+            f"{hamlet.realm.uuid}-channel-{private_channel.id}-123",
+        )
+
+        othello = self.example_user("othello")
+        response = self.join_livekit_call(othello, channel_id=str(private_channel.id))
+        self.assert_livekit_call_access_denied(response)
+
+        response = self.join_livekit_call(hamlet, channel_id="9999")
+        self.assert_livekit_call_access_denied(response)
+
+    def test_join_livekit_call_invalid_conversation(self) -> None:
+        hamlet = self.example_user("hamlet")
+        for dm in ["", "abc", f"{hamlet.id},", "12345678901"]:
+            response = self.join_livekit_call(hamlet, dm=dm)
+            self.assert_json_error(response, "dm has invalid format")
+
+        response = self.join_livekit_call(hamlet, channel_id="abc")
+        self.assert_json_error(response, "channel_id is not valid JSON")
+
     def test_join_livekit_call_logged_out(self) -> None:
         response = self.client_get("/calls/livekit/join", {"call_id": "123"})
         self.assertEqual(response.status_code, 302)
@@ -1285,10 +1346,13 @@ class LiveKitVideoCallTest(ZulipTestCase):
 
         message_id, call_events = self.start_direct_message_call(hamlet, [cordelia, iago, bot])
 
+        user_ids = sorted([hamlet.id, cordelia.id, iago.id, bot.id])
+        dm = ",".join(str(user_id) for user_id in user_ids)
+        url = f"/calls/livekit/join?call_id=123&dm={dm}"
         message = self.get_last_message()
         self.assertEqual(message.id, message_id)
         self.assertEqual(message.sender_id, hamlet.id)
-        self.assertEqual(message.content, "[Join video call.](/calls/livekit/join?call_id=123)")
+        self.assertEqual(message.content, f"[Join video call.]({url})")
         self.assertEqual(
             call_events,
             [
@@ -1298,7 +1362,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
                         "op": "ring",
                         "message_id": message_id,
                         "caller_id": hamlet.id,
-                        "url": "/calls/livekit/join?call_id=123",
+                        "url": url,
                         "voice_only": False,
                     },
                     "users": [cordelia.id],
@@ -1308,10 +1372,13 @@ class LiveKitVideoCallTest(ZulipTestCase):
 
     def test_start_livekit_voice_call(self) -> None:
         self.set_livekit_call_provider()
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
         _message_id, call_events = self.start_direct_message_call(
-            self.example_user("hamlet"), [self.example_user("cordelia")], voice_only="true"
+            hamlet, [cordelia], voice_only="true"
         )
-        url = "/calls/livekit/join?call_id=123&voice_only=true"
+        dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id]))
+        url = f"/calls/livekit/join?call_id=123&dm={dm}&voice_only=true"
         self.assertEqual(self.get_last_message().content, f"[Join voice call.]({url})")
         self.assertEqual(call_events[0]["event"]["url"], url)
         self.assertTrue(call_events[0]["event"]["voice_only"])
@@ -1335,7 +1402,10 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(message.id, message_id)
         self.assertEqual(message.recipient.type_id, verona.id)
         self.assertEqual(message.topic_name(), "standup")
-        self.assertEqual(message.content, "[Join video call.](/calls/livekit/join?call_id=123)")
+        self.assertEqual(
+            message.content,
+            f"[Join video call.](/calls/livekit/join?call_id=123&channel_id={verona.id})",
+        )
         self.assertEqual(events[0]["event"]["type"], "message")
 
     def test_start_livekit_call_errors(self) -> None:

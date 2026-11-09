@@ -1,0 +1,20 @@
+{% extends "zerver/portico_error_pages/portico_error_page.html" %}
+
+{% block title %}
+<title>{{ _("No access to this call") }} | Zulip</title>
+{% endblock %}
+
+{% block error_page_content %}
+<img src="{{ static('images/errors/400art.svg') }}" alt=""/>
+<div class="errorbox">
+    <div class="errorcontent">
+        <h1 class="lead">{{ _("No access to this call") }}</h1>
+        <p>
+            {% trans %}
+            This call is only open to the people in the conversation where it started.
+            {% endtrans %}
+        </p>
+        <p><a href="{{ realm_url }}">{{ _("Go to Zulip") }}</a></p>
+    </div>
+</div>
+{% endblock %}

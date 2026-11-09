@@ -49,7 +49,14 @@ def check_start_livekit_call(
     voice_only: bool,
     read_by_sender: bool,
 ) -> int:
+    # The link names the conversation, so that join_livekit_call only
+    # admits the people in it.
     url = f"/calls/livekit/join?call_id={call_id}"
+    if recipient_type_name == "private":
+        user_ids = sorted({*message_to, caller.id})
+        url += "&dm=" + ",".join(str(user_id) for user_id in user_ids)
+    else:
+        url += f"&channel_id={message_to[0]}"
     if voice_only:
         url += "&voice_only=true"
     with override_language(caller.default_language):

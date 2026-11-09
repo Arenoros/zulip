@@ -1225,7 +1225,7 @@ paths:
                                   "op": "ring",
                                   "message_id": 42,
                                   "caller_id": 10,
-                                  "url": "/calls/livekit/join?call_id=123456789012345",
+                                  "url": "/calls/livekit/join?call_id=123456789012345&dm=9,10",
                                   "voice_only": false,
                                   "id": 0,
                                 }
@@ -27995,6 +27995,15 @@ paths:
         the call can start in the click handler of the button for it, and
         let the user cancel the ringing with
         [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+
+        The link to the call, relative to the organization, is
+        `/calls/livekit/join?call_id={call_id}`, followed by
+        `&dm={user_ids}` for a direct message call, where `user_ids` are
+        the sorted, comma-separated IDs of the users in the conversation,
+        including the current user, or by `&channel_id={channel_id}` for a
+        call in a channel, and by `&voice_only=true` for a voice call. Only
+        the users in the direct message conversation, or the users who can
+        access the channel, can join the call.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
       requestBody:

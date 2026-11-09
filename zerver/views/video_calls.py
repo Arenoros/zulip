@@ -25,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from oauthlib.oauth2 import OAuth2Error
-from pydantic import Json, NonNegativeInt
+from pydantic import Json, NonNegativeInt, StringConstraints
 from requests import Response
 from requests_oauthlib import OAuth2Session
 from typing_extensions import TypedDict, override
@@ -50,6 +50,7 @@ from zerver.lib.partial import partial
 from zerver.lib.pysa import mark_sanitized
 from zerver.lib.request import RequestNotes
 from zerver.lib.response import json_success
+from zerver.lib.streams import access_stream_by_id
 from zerver.lib.subdomains import get_subdomain
 from zerver.lib.typed_endpoint import (
     ApiParamConfig,
@@ -763,11 +764,20 @@ def join_bigbluebutton(request: HttpRequest, *, bigbluebutton: str) -> HttpRespo
 LIVEKIT_TOKEN_LIFETIME_SECONDS = 60 * 60
 
 
+def render_livekit_call_access_denied(request: HttpRequest) -> HttpResponse:
+    return render(request, "zerver/portico_error_pages/livekit_call_access_denied.html", status=403)
+
+
 @zulip_login_required
 @never_cache
 @typed_endpoint
 def join_livekit_call(
-    request: HttpRequest, *, call_id: Json[NonNegativeInt], voice_only: Json[bool] = False
+    request: HttpRequest,
+    *,
+    call_id: Json[NonNegativeInt],
+    dm: Annotated[str, StringConstraints(pattern=r"^[0-9]{1,10}(,[0-9]{1,10})*$")] | None = None,
+    channel_id: Json[int] | None = None,
+    voice_only: Json[bool] = False,
 ) -> HttpResponse:
     assert request.user.is_authenticated
     user_profile = request.user
@@ -779,6 +789,32 @@ def join_livekit_call(
     ):
         raise VideoCallProviderNotConfiguredError("LiveKit")
 
+    request_language = get_and_set_request_language(
+        request,
+        user_profile.default_language,
+        translation.get_language_from_path(request.path_info),
+    )
+
+    # Rooms are scoped to the organization of the user opening the
+    # link, so that a link can never join users of different
+    # organizations, even ones on other Zulip servers sharing the
+    # LiveKit server. A call started in a conversation has a room of
+    # its own, which only admits the people in that conversation;
+    # other call links, such as ones inserted while editing a
+    # message, admit anyone in the organization.
+    room = f"{user_profile.realm.uuid}-{call_id}"
+    if dm is not None:
+        user_ids = sorted({int(user_id) for user_id in dm.split(",")})
+        if user_profile.id not in user_ids:
+            return render_livekit_call_access_denied(request)
+        room = f"{user_profile.realm.uuid}-dm-{','.join(map(str, user_ids))}-{call_id}"
+    elif channel_id is not None:
+        try:
+            access_stream_by_id(user_profile, channel_id)
+        except JsonableError:
+            return render_livekit_call_access_denied(request)
+        room = f"{user_profile.realm.uuid}-channel-{channel_id}-{call_id}"
+
     # https://docs.livekit.io/home/get-started/authentication/
     now = int(time.time())
     livekit_token = jwt.encode(
@@ -789,12 +825,7 @@ def join_livekit_call(
             "nbf": now,
             "exp": now + LIVEKIT_TOKEN_LIFETIME_SECONDS,
             "video": {
-                # Call links carry only the call ID, and the room is
-                # scoped to the organization of the user opening the
-                # link, so that a link can never join users of different
-                # organizations, even ones on other Zulip servers sharing
-                # the LiveKit server.
-                "room": f"{user_profile.realm.uuid}-{call_id}",
+                "room": room,
                 "roomJoin": True,
                 "canPublish": True,
                 "canPublishData": True,
@@ -803,12 +834,6 @@ def join_livekit_call(
         },
         settings.LIVEKIT_API_SECRET,
         algorithm="HS256",
-    )
-
-    request_language = get_and_set_request_language(
-        request,
-        user_profile.default_language,
-        translation.get_language_from_path(request.path_info),
     )
 
     # Sync this with livekit_call_params_schema in base_page_params.ts.

@@ -162,7 +162,7 @@ exports.fixtures = {
         op: "ring",
         message_id: 1000,
         caller_id: typing_person1.user_id,
-        url: "/calls/livekit/join?call_id=123456789012345",
+        url: "/calls/livekit/join?call_id=123456789012345&dm=9,10",
         voice_only: false,
     },
 
