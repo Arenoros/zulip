@@ -5655,6 +5655,13 @@ paths:
                                         guest users to prominently highlight their status.
 
                                         **Changes**: New in Zulip 8.0 (feature level 216).
+                                    enable_livekit_remote_control:
+                                      type: boolean
+                                      description: |
+                                        Whether participants in [LiveKit calls](/help/start-a-call#control-a-shared-screen)
+                                        can request control of screens shared from the Zulip desktop app.
+
+                                        **Changes**: New in Zulip 13.0 (feature level ZF-550ef3).
                                     enable_spectator_access:
                                       type: boolean
                                       description: |
@@ -21893,6 +21900,15 @@ paths:
                           guest users to prominently highlight their status.
 
                           **Changes**: New in Zulip 8.0 (feature level 216).
+                      realm_enable_livekit_remote_control:
+                        type: boolean
+                        description: |
+                          Present if `realm` is present in `fetch_event_types`.
+
+                          Whether participants in [LiveKit calls](/help/start-a-call#control-a-shared-screen)
+                          can request control of screens shared from the Zulip desktop app.
+
+                          **Changes**: New in Zulip 13.0 (feature level ZF-550ef3).
                       realm_can_access_all_users_group:
                         allOf:
                           - $ref: "#/components/schemas/GroupSettingValue"

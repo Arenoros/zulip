@@ -12,6 +12,7 @@ from django.http import HttpResponseRedirect
 from django.test import override_settings
 from typing_extensions import override
 
+from zerver.actions.realm_settings import do_set_realm_property
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
 from zerver.views.video_calls import LIVEKIT_TOKEN_LIFETIME_SECONDS
@@ -1179,6 +1180,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
             response = self.client_get("/calls/livekit/join", {"call_id": "123"})
             livekit_token = self.get_livekit_token(response)
         self.assertFalse(self._get_page_params(response)["voice_only"])
+        self.assertTrue(self._get_page_params(response)["remote_control_enabled"])
         self.assertEqual(
             livekit_token,
             {
@@ -1199,6 +1201,15 @@ class LiveKitVideoCallTest(ZulipTestCase):
 
         response = self.client_get("/calls/livekit/join", {"call_id": "123", "voice_only": "true"})
         self.assertTrue(self._get_page_params(response)["voice_only"])
+
+    def test_join_livekit_call_remote_control_disabled(self) -> None:
+        hamlet = self.example_user("hamlet")
+        do_set_realm_property(
+            hamlet.realm, "enable_livekit_remote_control", False, acting_user=None
+        )
+        self.login_user(hamlet)
+        response = self.client_get("/calls/livekit/join", {"call_id": "123"})
+        self.assertFalse(self._get_page_params(response)["remote_control_enabled"])
 
     def test_join_livekit_call_from_another_realm(self) -> None:
         self.login("hamlet")

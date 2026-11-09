@@ -284,6 +284,14 @@ export function is_video_chat_provider_jitsi_meet(): boolean {
     return video_chat_provider_id === jitsi_meet_id;
 }
 
+export function is_video_chat_provider_livekit(): boolean {
+    const video_chat_provider_id = Number.parseInt(
+        $<HTMLSelectOneElement>("select:not([multiple])#id_realm_video_chat_provider").val()!,
+        10,
+    );
+    return video_chat_provider_id === realm.realm_available_video_chat_providers.livekit?.id;
+}
+
 function get_jitsi_server_url_setting_value(
     $input_elem: JQuery<HTMLSelectElement>,
     for_api_data = true,

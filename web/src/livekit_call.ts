@@ -15,7 +15,7 @@ import * as livekit_remote_control from "./livekit_remote_control.ts";
 import {RemoteInput} from "./livekit_remote_input.ts";
 
 assert(page_params.page_type === "livekit_call");
-const {livekit_url, livekit_token, voice_only} = page_params;
+const {livekit_url, livekit_token, voice_only, remote_control_enabled} = page_params;
 
 function get_element<T extends HTMLElement>(selector: string): T {
     const element = document.querySelector<T>(selector);
@@ -182,7 +182,7 @@ function render_screen_share(
     const screen_share_element = document.createElement("div");
     screen_share_element.classList.add("livekit-call-screen-share");
     screen_share_element.append(media_element);
-    if (livekit_remote_control.is_controllable_screen_share(publication)) {
+    if (remote_control_enabled && livekit_remote_control.is_controllable_screen_share(publication)) {
         const controls_element = document.createElement("div");
         controls_element.classList.add("livekit-call-screen-share-controls");
         const label_element = document.createElement("span");
@@ -539,7 +539,7 @@ screen_share_button.addEventListener("click", () => {
             room.localParticipant.setScreenShareEnabled(
                 !room.localParticipant.isScreenShareEnabled,
                 undefined,
-                livekit_remote_control.get_screen_share_publish_options(),
+                livekit_remote_control.get_screen_share_publish_options(remote_control_enabled),
             ),
         $t({defaultMessage: "Could not share your screen."}),
     );

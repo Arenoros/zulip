@@ -65,8 +65,11 @@ type OutgoingMessage =
     | {type: "mouse"; token: string; sequence: number; event: MouseEvent}
     | {type: "key"; token: string; sequence: number; code: string; down: boolean};
 
-export function get_screen_share_publish_options(): TrackPublishOptions {
-    if (electron_bridge?.get_remote_control_supported?.() === true) {
+export function get_screen_share_publish_options(
+    // Whether the organization allows remote control.
+    remote_control_enabled: boolean,
+): TrackPublishOptions {
+    if (remote_control_enabled && electron_bridge?.get_remote_control_supported?.() === true) {
         return {name: CONTROLLABLE_SCREEN_SHARE_TRACK_NAME};
     }
     return {};

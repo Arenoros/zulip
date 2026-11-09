@@ -80,6 +80,7 @@ const livekit_call_params_schema = z.object({
     livekit_url: z.string(),
     livekit_token: z.string(),
     voice_only: z.boolean(),
+    remote_control_enabled: z.boolean(),
     translation_data: z.record(z.string(), z.string()),
 });
 

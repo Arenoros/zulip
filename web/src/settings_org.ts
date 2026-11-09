@@ -277,11 +277,18 @@ function set_jitsi_server_url_dropdown(): void {
     update_jitsi_server_url_custom_input(dropdown_val);
 }
 
+function update_livekit_remote_control_visibility(): void {
+    $("#realm_enable_livekit_remote_control_setting").toggle(
+        settings_components.is_video_chat_provider_livekit(),
+    );
+}
+
 function set_video_chat_provider_dropdown(): void {
     const chat_provider_id = realm.realm_video_chat_provider;
     $("#id_realm_video_chat_provider").val(chat_provider_id);
 
     set_jitsi_server_url_dropdown();
+    update_livekit_remote_control_visibility();
 }
 
 function set_gif_rating_policy_dropdown(): void {
@@ -1728,6 +1735,7 @@ export function build_page(): void {
 
     $("#id_realm_video_chat_provider").on("change", () => {
         set_jitsi_server_url_dropdown();
+        update_livekit_remote_control_visibility();
     });
 
     $<HTMLSelectOneElement>("select:not([multiple])#id_realm_jitsi_server_url").on(

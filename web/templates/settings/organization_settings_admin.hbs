@@ -222,6 +222,15 @@
                           name="realm_jitsi_server_url_custom_input" class="realm_jitsi_server_url_custom_input settings_url_input" maxlength="200" />
                     </div>
                 </div>
+
+                <div class="dependent-settings-block" id="realm_enable_livekit_remote_control_setting">
+                    {{> settings_checkbox
+                      setting_name="realm_enable_livekit_remote_control"
+                      prefix="id_"
+                      is_checked=realm_enable_livekit_remote_control
+                      label=admin_settings_label.realm_enable_livekit_remote_control
+                      help_link="/help/configure-call-provider#disable-control-of-shared-screens"}}
+                </div>
             </div>
             <div class="input-group">
                 <label for="id_realm_gif_rating_policy" class="settings-field-label">

@@ -806,6 +806,7 @@ def join_livekit_call(
         livekit_url=settings.LIVEKIT_URL,
         livekit_token=livekit_token,
         voice_only=voice_only,
+        remote_control_enabled=user_profile.realm.enable_livekit_remote_control,
         translation_data=get_language_translation_data(request_language),
     )
     return render(

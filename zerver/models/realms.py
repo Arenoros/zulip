@@ -704,6 +704,10 @@ class Realm(models.Model):
     JITSI_SERVER_SPECIAL_VALUES_MAP = {"default": None}
     jitsi_server_url = models.URLField(null=True, default=None)
 
+    # Whether participants in LiveKit calls can request control of
+    # screens shared from the desktop app.
+    enable_livekit_remote_control = models.BooleanField(default=True, db_default=True)
+
     # Please access this via get_gif_rating_policy_options.
     GIF_RATING_POLICY_OPTIONS = {
         "disabled": {
@@ -780,6 +784,7 @@ class Realm(models.Model):
         emails_restricted_to_domains=bool,
         enable_guest_user_dm_warning=bool,
         enable_guest_user_indicator=bool,
+        enable_livekit_remote_control=bool,
         enable_read_receipts=bool,
         enable_spectator_access=bool,
         gif_rating_policy=int,

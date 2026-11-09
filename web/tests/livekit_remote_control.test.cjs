@@ -14,25 +14,30 @@ const hamlet = {identity: "10", name: "King Hamlet"};
 
 run_test("screen share from a desktop app supporting remote control", ({override}) => {
     override(electron_bridge, "electron_bridge", {get_remote_control_supported: () => true});
-    const publish_options = livekit_remote_control.get_screen_share_publish_options();
+    const publish_options = livekit_remote_control.get_screen_share_publish_options(true);
     assert.ok(
         livekit_remote_control.is_controllable_screen_share({trackName: publish_options.name}),
     );
 });
 
+run_test("screen share in an organization that disabled remote control", ({override}) => {
+    override(electron_bridge, "electron_bridge", {get_remote_control_supported: () => true});
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(false), {});
+});
+
 run_test("screen share from a browser", ({override}) => {
     override(electron_bridge, "electron_bridge", undefined);
-    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(), {});
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(true), {});
 });
 
 run_test("screen share from an older desktop app", ({override}) => {
     override(electron_bridge, "electron_bridge", {});
-    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(), {});
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(true), {});
 });
 
 run_test("screen share from a desktop app not supporting remote control", ({override}) => {
     override(electron_bridge, "electron_bridge", {get_remote_control_supported: () => false});
-    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(), {});
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(true), {});
 });
 
 run_test("is_controllable_screen_share", () => {
