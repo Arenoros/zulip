@@ -27,9 +27,10 @@ export function open(banner: Banner | AlertBanner, $banner_container: JQuery): J
     return $banner;
 }
 
-export function append(banner: Banner | AlertBanner, $banner_container: JQuery): void {
-    const $banner_html = render_banner(banner);
-    $banner_container.append($banner_html);
+export function append(banner: Banner | AlertBanner, $banner_container: JQuery): JQuery {
+    const $banner = $(render_banner(banner));
+    $banner_container.append($banner);
+    return $banner;
 }
 
 export function open_and_close(
