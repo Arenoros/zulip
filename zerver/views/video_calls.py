@@ -35,6 +35,7 @@ from zerver.actions.video_calls import (
     do_answer_call,
     do_cancel_call,
     do_set_video_call_provider_token,
+    get_livekit_call_room,
 )
 from zerver.decorator import zulip_login_required
 from zerver.lib.cache import (
@@ -795,25 +796,22 @@ def join_livekit_call(
         translation.get_language_from_path(request.path_info),
     )
 
-    # Rooms are scoped to the organization of the user opening the
-    # link, so that a link can never join users of different
-    # organizations, even ones on other Zulip servers sharing the
-    # LiveKit server. A call started in a conversation has a room of
-    # its own, which only admits the people in that conversation;
-    # other call links, such as ones inserted while editing a
-    # message, admit anyone in the organization.
-    room = f"{user_profile.realm.uuid}-{call_id}"
+    # A call started in a conversation only admits the people in it;
+    # other call links, such as ones inserted while editing a message,
+    # admit anyone in the organization.
+    dm_user_ids = None
     if dm is not None:
-        user_ids = sorted({int(user_id) for user_id in dm.split(",")})
-        if user_profile.id not in user_ids:
+        dm_user_ids = {int(user_id) for user_id in dm.split(",")}
+        if user_profile.id not in dm_user_ids:
             return render_livekit_call_access_denied(request)
-        room = f"{user_profile.realm.uuid}-dm-{','.join(map(str, user_ids))}-{call_id}"
     elif channel_id is not None:
         try:
             access_stream_by_id(user_profile, channel_id)
         except JsonableError:
             return render_livekit_call_access_denied(request)
-        room = f"{user_profile.realm.uuid}-channel-{channel_id}-{call_id}"
+    room = get_livekit_call_room(
+        user_profile.realm, call_id, dm_user_ids=dm_user_ids, channel_id=channel_id
+    )
 
     # https://docs.livekit.io/home/get-started/authentication/
     now = int(time.time())

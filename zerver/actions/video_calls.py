@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from typing import Literal
 
 from django.db import transaction
@@ -15,7 +16,7 @@ from zerver.lib.event_types import (
     HasZoomTokenEvent,
 )
 from zerver.lib.muted_users import get_muting_users
-from zerver.models import Client, Message, UserMessage, UserProfile
+from zerver.models import Client, Message, Realm, UserMessage, UserProfile
 from zerver.tornado.django_api import send_event_on_commit, send_event_rollback_unsafe
 
 
@@ -36,6 +37,26 @@ def do_set_video_call_provider_token(
     else:
         event = HasZoomTokenEvent(value=token is not None)
     send_event_on_commit(user.realm, event, [user.id])
+
+
+def get_livekit_call_room(
+    realm: Realm,
+    call_id: int,
+    *,
+    dm_user_ids: Collection[int] | None = None,
+    channel_id: int | None = None,
+) -> str:
+    # Rooms are scoped to the organization of the user opening the
+    # link, so that a link can never join users of different
+    # organizations, even ones on other Zulip servers sharing the
+    # LiveKit server. A call started in a conversation has a room of
+    # its own, named after the conversation.
+    if dm_user_ids is not None:
+        user_ids = ",".join(str(user_id) for user_id in sorted(set(dm_user_ids)))
+        return f"{realm.uuid}-dm-{user_ids}-{call_id}"
+    if channel_id is not None:
+        return f"{realm.uuid}-channel-{channel_id}-{call_id}"
+    return f"{realm.uuid}-{call_id}"
 
 
 def check_start_livekit_call(
