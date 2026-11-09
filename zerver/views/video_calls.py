@@ -772,9 +772,9 @@ def render_livekit_call_access_denied(request: HttpRequest) -> HttpResponse:
     return render(request, "zerver/portico_error_pages/livekit_call_access_denied.html", status=403)
 
 
-def render_livekit_call_ended(request: HttpRequest, realm: Realm, message: Message) -> HttpResponse:
+def get_livekit_call_conversation_url(realm: Realm, message: Message) -> str:
     if message.is_channel_message:
-        conversation_url = stream_message_url(
+        return stream_message_url(
             realm,
             {
                 "id": message.id,
@@ -785,16 +785,10 @@ def render_livekit_call_ended(request: HttpRequest, realm: Realm, message: Messa
             conversation_link=True,
             include_channel_name=False,
         )
-    else:
-        conversation_url = pm_message_url(
-            realm,
-            {"id": message.id, "display_recipient": get_display_recipient(message.recipient)},
-            conversation_link=True,
-        )
-    return render(
-        request,
-        "zerver/portico_error_pages/livekit_call_ended.html",
-        context={"conversation_url": conversation_url},
+    return pm_message_url(
+        realm,
+        {"id": message.id, "display_recipient": get_display_recipient(message.recipient)},
+        conversation_link=True,
     )
 
 
@@ -843,7 +837,15 @@ def join_livekit_call(
     )
     call = LiveKitCall.objects.filter(room=room).select_related("message__recipient").first()
     if call is not None and call.date_ended is not None:
-        return render_livekit_call_ended(request, user_profile.realm, call.message)
+        return render(
+            request,
+            "zerver/portico_error_pages/livekit_call_ended.html",
+            context={
+                "conversation_url": get_livekit_call_conversation_url(
+                    user_profile.realm, call.message
+                )
+            },
+        )
 
     # https://docs.livekit.io/home/get-started/authentication/
     now = int(time.time())
