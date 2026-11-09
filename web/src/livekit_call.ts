@@ -1,5 +1,12 @@
 import assert from "minimalistic-assert";
-import {type Participant, Room, RoomEvent, Track, type TrackPublication} from "livekit-client";
+import {
+    ConnectionQuality,
+    type Participant,
+    Room,
+    RoomEvent,
+    Track,
+    type TrackPublication,
+} from "livekit-client";
 
 import {page_params} from "./base_page_params.ts";
 import {electron_bridge} from "./electron_bridge.ts";
@@ -41,6 +48,8 @@ const track_elements = new Map<
 const control_states = new Map<string, livekit_remote_control.ControlState>();
 const remote_inputs = new Map<string, RemoteInput>();
 const control_tokens = new Map<string, string>();
+// The token of the current grant of control of our own screen share.
+let own_control_token: string | undefined;
 // Timers for the screens whose owner refused a request of the local
 // participant less than REQUEST_COOLDOWN_MS ago.
 const request_refusal_timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -107,6 +116,21 @@ function send_control_message(
         .catch(() => {
             electron_bridge?.stop_remote_control?.();
         });
+}
+
+// Tells the other participants who may control our screen share, and
+// the controller its token.
+function publish_own_control_state(): void {
+    const control_state = control_states.get(room.localParticipant.identity);
+    if (control_state === undefined || control_state.state === "none") {
+        return;
+    }
+    send_control_message({type: "state", control_state});
+    if (control_state.state === "controlled" && own_control_token !== undefined) {
+        send_control_message({type: "grant", token: own_control_token}, [
+            control_state.participant.identity,
+        ]);
+    }
 }
 
 function is_sharing_controllable_screen(): boolean {
@@ -347,6 +371,40 @@ room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     remove_tile(participant);
     electron_bridge?.remote_control_participant_left?.(participant.identity);
 });
+room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+    const control_state = control_states.get(room.localParticipant.identity);
+    if (
+        quality === ConnectionQuality.Lost &&
+        control_state?.state === "controlled" &&
+        control_state.participant.identity === participant.identity
+    ) {
+        electron_bridge?.stop_remote_control?.();
+    }
+});
+// Remote control ends whenever either side loses its connection to the
+// call, even briefly, and takes a new request to start again.
+room.on(RoomEvent.Reconnecting, () => {
+    electron_bridge?.stop_remote_control?.();
+    for (const remote_input of remote_inputs.values()) {
+        remote_input.set_token(undefined);
+    }
+    control_tokens.clear();
+});
+room.on(RoomEvent.Reconnected, () => {
+    const local_identity = room.localParticipant.identity;
+    for (const [owner_identity, control_state] of control_states) {
+        if (owner_identity === local_identity) {
+            // Others may have missed changes while we were reconnecting.
+            publish_own_control_state();
+        } else if (
+            control_state.state === "controlled" &&
+            control_state.participant.identity === local_identity
+        ) {
+            // The owner may not have noticed that we lost the connection.
+            send_control_message({type: "release"}, [owner_identity]);
+        }
+    }
+});
 room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
     if (topic !== livekit_remote_control.REMOTE_CONTROL_TOPIC || participant === undefined) {
         return;
@@ -427,14 +485,9 @@ electron_bridge?.on_event("remote_control_state", (state) => {
         return;
     }
     control_states.set(room.localParticipant.identity, control_state);
+    own_control_token = livekit_remote_control.parse_control_token(state);
     update_screen_share_controls(room.localParticipant.identity);
-    if (control_state.state !== "none") {
-        send_control_message({type: "state", control_state});
-        const token = livekit_remote_control.parse_control_token(state);
-        if (control_state.state === "controlled" && token !== undefined) {
-            send_control_message({type: "grant", token}, [control_state.participant.identity]);
-        }
-    }
+    publish_own_control_state();
 });
 room.on(RoomEvent.AudioPlaybackStatusChanged, update_enable_audio_button);
 room.on(RoomEvent.Disconnected, () => {
