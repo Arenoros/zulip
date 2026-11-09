@@ -3,6 +3,7 @@ import * as z from "zod/mini";
 
 import render_confirm_google_meet_authorization from "../templates/confirm_dialog/confirm_google_meet_authorization.hbs";
 
+import * as call_ringing from "./call_ringing.ts";
 import * as channel from "./channel.ts";
 import * as compose_banner from "./compose_banner.ts";
 import * as compose_call from "./compose_call.ts";
@@ -349,9 +350,13 @@ export function generate_and_insert_audio_or_video_call_link(
             }
             case available_providers.livekit?.id: {
                 const call_id = util.random_int(100000000000000, 999999999999999);
-                const url = `/calls/livekit/join?call_id=${call_id}`;
+                if (edit_message_id === undefined) {
+                    call_ringing.start_call_from_compose(call_id, is_audio_call);
+                    break;
+                }
+                const url = call_ringing.get_call_url(call_id, is_audio_call);
                 if (is_audio_call) {
-                    insert_audio_call_url(`${url}&voice_only=true`, $target_textarea);
+                    insert_audio_call_url(url, $target_textarea);
                 } else {
                     insert_video_call_url(url, $target_textarea);
                 }

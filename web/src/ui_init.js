@@ -19,6 +19,7 @@ import * as banners from "./banners.ts";
 import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import {is_browser_unsupported_old_version} from "./browser_support.ts";
+import * as call_ringing from "./call_ringing.ts";
 import * as channel from "./channel.ts";
 import * as channel_folders from "./channel_folders.ts";
 import * as channel_folders_popover from "./channel_folders_popover.ts";
@@ -597,6 +598,7 @@ export async function initialize_everything(state_data) {
     banners.initialize();
     navbar_alerts.initialize();
     popup_banners.initialize();
+    call_ringing.initialize();
     message_list_hover.initialize();
     initialize_kitchen_sink_stuff();
     local_message.initialize(state_data.local_message);

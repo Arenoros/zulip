@@ -157,6 +157,15 @@ exports.fixtures = {
         upload_space_used: 90000,
     },
 
+    call__ring: {
+        type: "call",
+        op: "ring",
+        message_id: 1000,
+        caller_id: typing_person1.user_id,
+        url: "/calls/livekit/join?call_id=123456789012345",
+        voice_only: false,
+    },
+
     channel_folder__add: {
         type: "channel_folder",
         op: "add",

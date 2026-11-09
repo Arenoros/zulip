@@ -10,7 +10,7 @@ export type ReloadingReason = "reload" | "update";
 let retry_connection_interval: ReturnType<typeof setInterval> | undefined;
 let original_retry_delay_secs = 0;
 
-function fade_out_popup_banner($banner: JQuery): void {
+export function fade_out_popup_banner($banner: JQuery): void {
     $banner.addClass("fade-out");
     // The delay is the same as the animation duration for fade-out.
     setTimeout(() => {

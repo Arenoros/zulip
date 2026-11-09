@@ -9,6 +9,7 @@ import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import * as browser_history from "./browser_history.ts";
 import {buddy_list} from "./buddy_list.ts";
+import * as call_ringing from "./call_ringing.ts";
 import * as channel_folders from "./channel_folders.ts";
 import * as compose from "./compose.ts";
 import {compose_call_session_manager} from "./compose_call_session.ts";
@@ -121,6 +122,10 @@ export function dispatch_normal_event(event) {
 
         case "attachment":
             attachments_ui.update_attachments(event);
+            break;
+
+        case "call":
+            call_ringing.dispatch(event);
             break;
 
         case "channel_folder":

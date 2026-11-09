@@ -31,6 +31,7 @@ set_global(
 );
 
 const server_events_dispatch = zrequire("server_events_dispatch");
+const call_ringing = zrequire("call_ringing");
 const compose_call_ui = zrequire("compose_call_ui");
 const compose_setup = zrequire("compose_setup");
 const people = zrequire("people");
@@ -105,7 +106,7 @@ function test(label, f) {
     });
 }
 
-test("videos", ({override, override_rewire}) => {
+test("videos", ({override, override_rewire, disallow_rewire}) => {
     override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.disabled.id);
     override(window, "to_$", () => $("window-stub"));
 
@@ -594,11 +595,51 @@ test("videos", ({override, override_rewire}) => {
         assert.ok(checked);
     })();
 
-    (function test_livekit_audio_and_video_links_compose_clicked() {
-        let syntax_to_insert;
-
+    (function test_livekit_calls_compose_clicked() {
         const $textarea = $.create("livekit-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
+
+        const ev = {
+            preventDefault() {},
+            stopPropagation() {},
+        };
+
+        override(
+            realm,
+            "realm_video_chat_provider",
+            realm_available_video_chat_providers.livekit.id,
+        );
+        const started_calls = [];
+        override_rewire(call_ringing, "start_call_from_compose", (call_id, voice_only) => {
+            started_calls.push({call_id, voice_only});
+        });
+
+        $("textarea#compose-textarea").val("");
+        with_overrides(({disallow}) => {
+            disallow(compose_ui, "insert_syntax_and_focus");
+            $("body").get_on_handler("click", ".video_link").call($textarea, ev);
+            $("body").get_on_handler("click", ".audio_link").call($textarea, ev);
+        });
+        // Call IDs consist of 15 random digits.
+        assert.equal(started_calls.length, 2);
+        for (const {call_id} of started_calls) {
+            assert.match(String(call_id), /^\d{15}$/);
+        }
+        assert.deepEqual(
+            started_calls.map(({voice_only}) => voice_only),
+            [false, true],
+        );
+    })();
+
+    (function test_livekit_links_message_edit_clicked() {
+        let syntax_to_insert;
+
+        const $button = $.create("livekit-edit-button-stub");
+        const $row = $.create("livekit-edit-row-stub");
+        $row.set_closest_results(".overlay-message-row", []);
+        $row.attr("data-message-id", "42");
+        $button.set_parents_result(".message_edit_form", $.create("livekit-edit-form-stub"));
+        $button.set_parents_result(".message_row", $row);
 
         const ev = {
             preventDefault() {},
@@ -608,22 +649,20 @@ test("videos", ({override, override_rewire}) => {
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
         });
-
         override(
             realm,
             "realm_video_chat_provider",
             realm_available_video_chat_providers.livekit.id,
         );
+        disallow_rewire(call_ringing, "start_call_from_compose");
 
-        $("textarea#compose-textarea").val("");
-        $("body").get_on_handler("click", ".video_link").call($textarea, ev);
-        // Call IDs consist of 15 random digits.
+        $("body").get_on_handler("click", ".video_link").call($button, ev);
         assert.match(
             syntax_to_insert,
             /^\[translated: Join video call\.]\(\/calls\/livekit\/join\?call_id=\d{15}\)$/,
         );
 
-        $("body").get_on_handler("click", ".audio_link").call($textarea, ev);
+        $("body").get_on_handler("click", ".audio_link").call($button, ev);
         assert.match(
             syntax_to_insert,
             /^\[translated: Join voice call\.]\(\/calls\/livekit\/join\?call_id=\d{15}&voice_only=true\)$/,

@@ -25,6 +25,7 @@ const alert_words_ui = mock_esm("../src/alert_words_ui");
 const attachments_ui = mock_esm("../src/attachments_ui");
 const audible_notifications = mock_esm("../src/audible_notifications");
 const bot_data = mock_esm("../src/bot_data");
+const call_ringing = mock_esm("../src/call_ringing");
 const compose_pm_pill = mock_esm("../src/compose_pm_pill");
 const compose = mock_esm("../src/compose");
 const {electron_bridge} = mock_esm("../src/electron_bridge", {
@@ -298,6 +299,15 @@ run_test("attachments", ({override}) => {
     const stub = make_stub();
     // attachments_ui is hard to test deeply
     override(attachments_ui, "update_attachments", stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert_same(stub.get_args("event").event, event);
+});
+
+run_test("call", ({override}) => {
+    const event = event_fixtures.call__ring;
+    const stub = make_stub();
+    override(call_ringing, "dispatch", stub.f);
     dispatch(event);
     assert.equal(stub.num_calls, 1);
     assert_same(stub.get_args("event").event, event);
