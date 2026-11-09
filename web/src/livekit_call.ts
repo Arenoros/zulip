@@ -11,15 +11,24 @@ import {
 import * as z from "zod/mini";
 
 import {page_params} from "./base_page_params.ts";
+import * as csrf from "./csrf.ts";
 import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
+import * as livekit_call_invites from "./livekit_call_invites.ts";
 import {localstorage} from "./localstorage.ts";
 import * as livekit_remote_control from "./livekit_remote_control.ts";
 import {RemoteInput} from "./livekit_remote_input.ts";
+import {get_retry_backoff_seconds} from "./retry_backoff.ts";
 
 assert(page_params.page_type === "livekit_call");
-const {livekit_url, livekit_token, voice_only, remote_control_enabled, conversation_url} =
-    page_params;
+const {
+    livekit_url,
+    livekit_token,
+    voice_only,
+    remote_control_enabled,
+    conversation_url,
+    call_message_id,
+} = page_params;
 
 function get_element<T extends HTMLElement>(selector: string): T {
     const element = document.querySelector<T>(selector);
@@ -65,6 +74,11 @@ const side_panel = get_element("#livekit-call-side-panel");
 const side_panel_title = get_element(".livekit-call-side-panel-title");
 const side_panel_close = get_element<HTMLButtonElement>(".livekit-call-side-panel-close");
 const participant_list = get_element(".livekit-call-participant-list");
+const invite_element = get_element(".livekit-call-invite");
+const invite_search = get_element<HTMLInputElement>(".livekit-call-invite-search");
+const invite_results = get_element(".livekit-call-invite-results");
+const invited_element = get_element(".livekit-call-invited");
+const invited_list = get_element(".livekit-call-invited-list");
 const left_element = get_element(".livekit-call-left");
 const left_message_element = get_element(".livekit-call-left-message");
 const rejoin_button = get_element<HTMLButtonElement>(".livekit-call-rejoin");
@@ -73,7 +87,7 @@ get_element<HTMLAnchorElement>(".livekit-call-conversation-link").href = convers
 const ls = localstorage();
 const SAVED_DEVICES_KEY = "livekit_call_devices";
 // The devices the user chose in earlier calls on this computer.
-const saved_devices: Partial<Record<MediaDeviceKind, string>> =
+const saved_devices: Partial<Record<MediaDeviceKind, string | undefined>> =
     z
         .object({
             audioinput: z.optional(z.string()),
@@ -117,6 +131,14 @@ const screen_share_controls = new Map<
     {label_element: HTMLElement; button_element: HTMLButtonElement}
 >();
 let left_call = false;
+// Who has been called to join the call, and who has been in it, whose
+// calls are over.
+let call_rings = page_params.call_rings;
+const joined_user_ids = new Set(page_params.call_joined_user_ids);
+let invited_timeout: ReturnType<typeof setTimeout> | undefined;
+type User = {user_id: number; full_name: string; is_active: boolean; is_bot: boolean};
+let users_promise: Promise<Map<number, User>> | undefined;
+let users: Map<number, User> | undefined;
 let duration_interval: ReturnType<typeof setInterval> | undefined;
 let status_timeout: ReturnType<typeof setTimeout> | undefined;
 // The devices the call uses, and their names, to tell when they change.
@@ -319,6 +341,206 @@ function update_participant_list(): void {
             return item;
         }),
     );
+}
+
+async function load_users(): Promise<Map<number, User>> {
+    users_promise ??= (async () => {
+        const response = await fetch("/json/users");
+        const {members} = z
+            .object({
+                members: z.array(
+                    z.object({
+                        user_id: z.number(),
+                        full_name: z.string(),
+                        is_active: z.boolean(),
+                        is_bot: z.boolean(),
+                    }),
+                ),
+            })
+            .parse(await response.json());
+        users = new Map(members.map((user) => [user.user_id, user]));
+        return users;
+    })();
+    return users_promise;
+}
+
+async function post(url: string, data: Record<string, string>): Promise<Response> {
+    return fetch(url, {
+        method: "POST",
+        headers: {"X-CSRFToken": csrf.csrf_token ?? ""},
+        body: new URLSearchParams(data),
+    });
+}
+
+function get_connected_user_ids(): Set<number> {
+    return new Set(
+        [room.localParticipant, ...room.remoteParticipants.values()].map((participant) =>
+            Number(participant.identity),
+        ),
+    );
+}
+
+async function invite(user_id: number): Promise<void> {
+    assert(call_message_id !== null);
+    const response = await post("/json/calls/livekit/invite", {
+        message_id: JSON.stringify(call_message_id),
+        user_ids: JSON.stringify([user_id]),
+    });
+    if (!response.ok) {
+        const error = z.object({msg: z.string()}).safeParse(await response.json());
+        show_notice(error.data?.msg ?? $t({defaultMessage: "Could not invite them to the call."}));
+    }
+}
+
+function update_invited_list(): void {
+    const invited_users = livekit_call_invites.get_invited_users(
+        call_rings,
+        joined_user_ids,
+        Date.now() / 1000,
+    );
+    invited_element.hidden = invited_users.length === 0;
+    if (invited_users.length > 0 && users === undefined) {
+        void load_users().then(update_invited_list);
+    }
+    invited_list.replaceChildren(
+        ...invited_users.map(({user_id, status}) => {
+            const item = document.createElement("li");
+            item.classList.add("livekit-call-participant");
+            const name_element = document.createElement("span");
+            name_element.classList.add("livekit-call-participant-name");
+            name_element.textContent =
+                users?.get(user_id)?.full_name ?? $t({defaultMessage: "Unknown user"});
+            name_element.title = name_element.textContent;
+            const status_element = document.createElement("span");
+            status_element.classList.add("livekit-call-invited-status");
+            switch (status) {
+                case "calling":
+                    status_element.textContent = $t({defaultMessage: "Calling…"});
+                    break;
+                case "declined":
+                    status_element.textContent = $t({defaultMessage: "Declined"});
+                    break;
+                case "missed":
+                    status_element.textContent = $t({defaultMessage: "Didn't answer"});
+                    break;
+            }
+            const text_element = document.createElement("div");
+            text_element.classList.add("livekit-call-invited-text");
+            text_element.append(name_element, status_element);
+            item.append(text_element);
+            if (status !== "calling") {
+                const call_again_button = document.createElement("button");
+                call_again_button.type = "button";
+                call_again_button.classList.add("livekit-call-button", "livekit-call-call-again");
+                call_again_button.textContent = $t({defaultMessage: "Call again"});
+                call_again_button.addEventListener("click", () => {
+                    void invite(user_id);
+                });
+                item.append(call_again_button);
+            }
+            return item;
+        }),
+    );
+    // Calls time out without an event.
+    clearTimeout(invited_timeout);
+    if (invited_users.some(({status}) => status === "calling")) {
+        invited_timeout = setTimeout(update_invited_list, 1000);
+    }
+}
+
+async function update_invite_results(): Promise<void> {
+    const query = invite_search.value.trim().toLowerCase();
+    if (query === "") {
+        invite_results.replaceChildren();
+        return;
+    }
+    const all_users = await load_users();
+    const connected_user_ids = get_connected_user_ids();
+    const matches = [...all_users.values()]
+        .filter(
+            (user) =>
+                user.is_active &&
+                !user.is_bot &&
+                !connected_user_ids.has(user.user_id) &&
+                user.full_name.toLowerCase().includes(query),
+        )
+        .slice(0, 8);
+    if (matches.length === 0) {
+        const empty_element = document.createElement("li");
+        empty_element.classList.add("livekit-call-invite-empty");
+        empty_element.textContent = $t({defaultMessage: "No matching people."});
+        invite_results.replaceChildren(empty_element);
+        return;
+    }
+    invite_results.replaceChildren(
+        ...matches.map((user) => {
+            const item = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.classList.add("livekit-call-invite-result");
+            button.textContent = user.full_name;
+            button.addEventListener("click", () => {
+                invite_search.value = "";
+                invite_results.replaceChildren();
+                invite_search.focus();
+                void invite(user.user_id);
+            });
+            item.append(button);
+            return item;
+        }),
+    );
+}
+
+// The call window does not load the Zulip web app, so it gets the
+// events it needs, about who is being called, itself.
+async function listen_for_call_events(): Promise<void> {
+    const event_schema = z.looseObject({id: z.number()});
+    const rings_event_schema = z.object({
+        type: z.literal("call"),
+        op: z.literal("rings"),
+        message_id: z.number(),
+        rings: z.array(livekit_call_invites.call_ring_schema),
+    });
+    let queue: {queue_id: string; last_event_id: number} | undefined;
+    let failures = 0;
+    while (!left_call) {
+        try {
+            if (queue === undefined) {
+                const response = await post("/json/register", {
+                    event_types: JSON.stringify(["call"]),
+                    fetch_event_types: JSON.stringify([]),
+                });
+                queue = z
+                    .object({queue_id: z.string(), last_event_id: z.number()})
+                    .parse(await response.json());
+            }
+            const response = await fetch(
+                `/json/events?${new URLSearchParams({
+                    queue_id: queue.queue_id,
+                    last_event_id: String(queue.last_event_id),
+                })}`,
+            );
+            const data: unknown = await response.json();
+            if (z.object({code: z.literal("BAD_EVENT_QUEUE_ID")}).safeParse(data).success) {
+                queue = undefined;
+                continue;
+            }
+            for (const event of z.object({events: z.array(event_schema)}).parse(data).events) {
+                queue.last_event_id = Math.max(queue.last_event_id, event.id);
+                const rings_event = rings_event_schema.safeParse(event);
+                if (rings_event.success && rings_event.data.message_id === call_message_id) {
+                    call_rings = rings_event.data.rings;
+                    update_invited_list();
+                }
+            }
+            failures = 0;
+        } catch {
+            failures += 1;
+            await new Promise((resolve) => {
+                setTimeout(resolve, get_retry_backoff_seconds(undefined, failures) * 1000);
+            });
+        }
+    }
 }
 
 function set_side_panel_open(open: boolean): void {
@@ -623,6 +845,8 @@ room.on(RoomEvent.TrackUnpublished, update_participant_list);
 room.on(RoomEvent.ParticipantConnected, (participant) => {
     get_tile(participant);
     update_participant_list();
+    joined_user_ids.add(Number(participant.identity));
+    update_invited_list();
     const control_state = control_states.get(room.localParticipant.identity);
     if (control_state !== undefined && is_sharing_controllable_screen()) {
         send_control_message({type: "state", control_state}, [participant.identity]);
@@ -906,6 +1130,9 @@ room.on(RoomEvent.MediaDevicesChanged, () => {
         }
     }
 });
+invite_search.addEventListener("input", () => {
+    void update_invite_results();
+});
 rejoin_button.addEventListener("click", () => {
     // The server checks whether the call is still going on.
     window.location.reload();
@@ -931,8 +1158,14 @@ async function join(): Promise<void> {
     get_tile(room.localParticipant);
     for (const participant of room.remoteParticipants.values()) {
         get_tile(participant);
+        joined_user_ids.add(Number(participant.identity));
     }
     update_participant_list();
+    if (call_message_id !== null) {
+        invite_element.hidden = false;
+        update_invited_list();
+        void listen_for_call_events();
+    }
     for (const button of call_buttons) {
         button.disabled = false;
     }

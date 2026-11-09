@@ -24,6 +24,7 @@ from zerver.lib.event_types import (
     CallAnswerEvent,
     CallCancelEvent,
     CallRingEvent,
+    CallRingsEvent,
     ChannelFolderAddEvent,
     ChannelFolderReorderEvent,
     ChannelFolderUpdateEvent,
@@ -173,6 +174,7 @@ check_attachment_update = make_checker(AttachmentUpdateEvent)
 check_call_answer = make_checker(CallAnswerEvent)
 check_call_cancel = make_checker(CallCancelEvent)
 check_call_ring = make_checker(CallRingEvent)
+check_call_rings = make_checker(CallRingsEvent)
 check_channel_folder_add = make_checker(ChannelFolderAddEvent)
 check_channel_folder_reorder = make_checker(ChannelFolderReorderEvent)
 check_custom_profile_fields = make_checker(CustomProfileFieldsEvent)

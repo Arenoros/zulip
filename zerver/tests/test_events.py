@@ -168,10 +168,13 @@ from zerver.actions.users import (
     do_update_outgoing_webhook_service,
 )
 from zerver.actions.video_calls import (
+    check_invite_to_livekit_call,
     check_start_livekit_call,
     do_answer_call,
     do_cancel_call,
+    do_end_livekit_call,
     do_set_video_call_provider_token,
+    do_update_livekit_call_participant,
 )
 from zerver.lib import event_types
 from zerver.lib.drafts import DraftData, do_create_drafts, do_delete_draft, do_edit_draft
@@ -183,6 +186,7 @@ from zerver.lib.event_schema import (
     check_call_answer,
     check_call_cancel,
     check_call_ring,
+    check_call_rings,
     check_channel_folder_add,
     check_channel_folder_reorder,
     check_channel_folder_update,
@@ -303,6 +307,8 @@ from zerver.models import (
     CustomProfileField,
     Device,
     ImageAttachment,
+    LiveKitCall,
+    LiveKitCallRing,
     Message,
     MultiuseInvite,
     NamedUserGroup,
@@ -1731,14 +1737,27 @@ class NormalActionsTest(BaseAction):
                 read_by_sender=True,
             )
         check_call_ring("events[1]", events[1])
-        message = Message.objects.get(id=message_id)
+        call = LiveKitCall.objects.get(message_id=message_id)
+        ring = LiveKitCallRing.objects.get(call=call, user_profile=self.user_profile)
+        do_update_livekit_call_participant(call.room, str(self.user_profile.id), in_call=True)
 
-        with self.verify_action(state_change_expected=False) as events:
-            do_answer_call(self.user_profile, message, "accept")
+        with self.verify_action(state_change_expected=False, num_events=2) as events:
+            do_answer_call(self.user_profile, ring, "accept")
         check_call_answer("events[0]", events[0])
+        check_call_rings("events[1]", events[1])
 
         with self.verify_action(state_change_expected=False) as events:
-            do_cancel_call(cordelia, message)
+            check_invite_to_livekit_call(self.user_profile, call, [self.example_user("othello")])
+        check_call_rings("events[0]", events[0])
+
+        with self.verify_action(state_change_expected=False) as events:
+            do_cancel_call(self.user_profile, call)
+        check_call_rings("events[0]", events[0])
+
+        with self.verify_action(state_change_expected=False) as events:
+            check_invite_to_livekit_call(self.user_profile, call, [self.example_user("othello")])
+        with self.verify_action(state_change_expected=False) as events:
+            do_end_livekit_call(call.room)
         check_call_cancel("events[0]", events[0])
 
     def test_edit_direct_message_typing_events(self) -> None:

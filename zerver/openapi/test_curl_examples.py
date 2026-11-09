@@ -41,10 +41,11 @@ UNTESTED_GENERATED_CURL_EXAMPLES = {
     "create-google-meet-video-call",
     "create-nextcloud-talk-video-call",
     "create-webex-video-call",
-    # Needs LiveKit to be the organization's call provider, and a
-    # message with a direct message call to answer.
+    # Needs LiveKit to be the organization's call provider, and a call
+    # to answer or invite users to.
     "start-livekit-call",
     "update-livekit-call-ring",
+    "invite-to-livekit-call",
     # Successfully running this example would deactivate the "zulip"
     # realm used by the test server, breaking the curl examples that
     # run after it.

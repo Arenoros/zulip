@@ -32,11 +32,14 @@ from requests_oauthlib import OAuth2Session
 from typing_extensions import TypedDict, override
 
 from zerver.actions.video_calls import (
+    check_invite_to_livekit_call,
     check_start_livekit_call,
     do_answer_call,
     do_cancel_call,
     do_end_livekit_call,
     do_set_video_call_provider_token,
+    do_update_livekit_call_participant,
+    get_livekit_call_rings,
     get_livekit_call_room,
 )
 from zerver.decorator import zulip_login_required
@@ -48,7 +51,7 @@ from zerver.lib.cache import (
 from zerver.lib.display_recipient import get_display_recipient
 from zerver.lib.exceptions import ErrorCode, JsonableError, UnauthorizedError
 from zerver.lib.i18n import get_and_set_request_language, get_language_translation_data
-from zerver.lib.message import access_message, truncate_content
+from zerver.lib.message import truncate_content
 from zerver.lib.outgoing_http import OutgoingSession
 from zerver.lib.partial import partial
 from zerver.lib.pysa import mark_sanitized
@@ -64,8 +67,17 @@ from zerver.lib.typed_endpoint import (
 )
 from zerver.lib.url_encoding import append_url_query_string, pm_message_url, stream_message_url
 from zerver.lib.utils import assert_is_not_none
-from zerver.models import LiveKitCall, Message, Realm, Recipient, UserProfile
+from zerver.models import (
+    LiveKitCall,
+    LiveKitCallParticipant,
+    LiveKitCallRing,
+    Message,
+    Realm,
+    UserMessage,
+    UserProfile,
+)
 from zerver.models.realms import get_realm
+from zerver.models.users import get_user_profile_by_id_in_realm
 
 
 class VideoCallSession(OutgoingSession):
@@ -822,21 +834,24 @@ def join_livekit_call(
     # A call started in a conversation only admits the people in it;
     # other call links, such as ones inserted while editing a message,
     # admit anyone in the organization.
-    dm_user_ids = None
+    dm_user_ids = None if dm is None else {int(user_id) for user_id in dm.split(",")}
+    room = get_livekit_call_room(
+        user_profile.realm, call_id, dm_user_ids=dm_user_ids, channel_id=channel_id
+    )
+    call = LiveKitCall.objects.filter(room=room).select_related("message__recipient").first()
     stream = None
-    if dm is not None:
-        dm_user_ids = {int(user_id) for user_id in dm.split(",")}
-        if user_profile.id not in dm_user_ids:
+    if dm_user_ids is not None:
+        # People called to join the call can join it too.
+        if user_profile.id not in dm_user_ids and (
+            call is None
+            or not LiveKitCallRing.objects.filter(call=call, user_profile=user_profile).exists()
+        ):
             return render_livekit_call_access_denied(request)
     elif channel_id is not None:
         try:
             stream, _sub = access_stream_by_id(user_profile, channel_id)
         except JsonableError:
             return render_livekit_call_access_denied(request)
-    room = get_livekit_call_room(
-        user_profile.realm, call_id, dm_user_ids=dm_user_ids, channel_id=channel_id
-    )
-    call = LiveKitCall.objects.filter(room=room).select_related("message__recipient").first()
     if call is not None and call.date_ended is not None:
         return render(
             request,
@@ -893,6 +908,18 @@ def join_livekit_call(
         voice_only=voice_only,
         remote_control_enabled=user_profile.realm.enable_livekit_remote_control,
         conversation_url=conversation_url,
+        # People can only be called to calls started in a conversation.
+        call_message_id=None if call is None else call.message_id,
+        call_rings=[]
+        if call is None
+        else [ring.model_dump() for ring in get_livekit_call_rings(call)],
+        call_joined_user_ids=[]
+        if call is None
+        else list(
+            LiveKitCallParticipant.objects.filter(call=call).values_list(
+                "user_profile_id", flat=True
+            )
+        ),
         translation_data=get_language_translation_data(request_language),
     )
     return render(
@@ -930,6 +957,12 @@ def livekit_webhook(request: HttpRequest) -> HttpResponse:
     event = orjson.loads(request.body)
     if event["event"] == "room_finished":
         do_end_livekit_call(event["room"]["name"])
+    elif event["event"] in ("participant_joined", "participant_left"):
+        do_update_livekit_call_participant(
+            event["room"]["name"],
+            event["participant"]["identity"],
+            in_call=event["event"] == "participant_joined",
+        )
     return json_success(request)
 
 
@@ -977,6 +1010,28 @@ def start_livekit_call(
     return json_success(request, data={"message_id": message_id})
 
 
+def access_livekit_call(user_profile: UserProfile, message_id: int) -> LiveKitCall:
+    call = (
+        LiveKitCall.objects.select_related("message__recipient")
+        .filter(message_id=message_id, message__realm_id=user_profile.realm_id)
+        .first()
+    )
+    if call is not None:
+        if call.message.is_channel_message:
+            try:
+                access_stream_by_id(user_profile, call.message.recipient.type_id)
+            except JsonableError:
+                pass
+            else:
+                return call
+        elif (
+            UserMessage.objects.filter(message_id=message_id, user_profile=user_profile).exists()
+            or LiveKitCallRing.objects.filter(call=call, user_profile=user_profile).exists()
+        ):
+            return call
+    raise JsonableError(_("Invalid call"))
+
+
 @typed_endpoint
 def update_livekit_call_ring(
     request: HttpRequest,
@@ -985,18 +1040,40 @@ def update_livekit_call_ring(
     message_id: Json[NonNegativeInt],
     operator: Annotated[Literal["accept", "decline", "cancel"], ApiParamConfig("op")],
 ) -> HttpResponse:
-    message = access_message(user_profile, message_id, is_modifying_message=False)
-    if message.recipient.type == Recipient.STREAM:
-        raise JsonableError(_("Calls in channels do not ring."))
-
+    call = access_livekit_call(user_profile, message_id)
     if operator == "cancel":
-        if message.sender_id != user_profile.id:
+        if not LiveKitCallRing.objects.filter(call=call, caller=user_profile).exists():
             raise JsonableError(_("Only the caller can cancel a call."))
-        do_cancel_call(user_profile, message)
+        do_cancel_call(user_profile, call)
     else:
-        if message.sender_id == user_profile.id:
-            raise JsonableError(_("You cannot answer your own call."))
-        do_answer_call(user_profile, message, operator)
+        ring = (
+            LiveKitCallRing.objects.select_related("call")
+            .filter(call=call, user_profile=user_profile)
+            .order_by("-id")
+            .first()
+        )
+        if ring is None:
+            raise JsonableError(_("You were not called."))
+        do_answer_call(user_profile, ring, operator)
+    return json_success(request)
+
+
+@typed_endpoint
+def invite_to_livekit_call(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    message_id: Json[NonNegativeInt],
+    user_ids: Json[list[int]],
+) -> HttpResponse:
+    call = access_livekit_call(user_profile, message_id)
+    invitees = []
+    for user_id in user_ids:
+        try:
+            invitees.append(get_user_profile_by_id_in_realm(user_id, user_profile.realm))
+        except UserProfile.DoesNotExist:
+            raise JsonableError(_("Invalid user ID {user_id}").format(user_id=user_id))
+    check_invite_to_livekit_call(user_profile, call, invitees)
     return json_success(request)
 
 

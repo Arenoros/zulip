@@ -187,6 +187,7 @@
 * [Create Webex video call](/api/create-webex-video-call)
 * [Start LiveKit call](/api/start-livekit-call)
 * [Answer or cancel a ringing LiveKit call](/api/update-livekit-call-ring)
+* [Invite users to a LiveKit call](/api/invite-to-livekit-call)
 
 ## Mobile push notifications
 

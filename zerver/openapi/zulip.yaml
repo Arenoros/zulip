@@ -1181,7 +1181,9 @@ paths:
                               description: |
                                 Event sent to the other users in a direct message conversation
                                 when a user starts a LiveKit call in it with
-                                [`POST /calls/livekit/start`](/api/start-livekit-call),
+                                [`POST /calls/livekit/start`](/api/start-livekit-call), and to
+                                users called to join a call with
+                                [`POST /calls/livekit/invite`](/api/invite-to-livekit-call),
                                 except for bots and users who have muted the caller.
 
                                 Clients should ring until the user answers the call with
@@ -1209,7 +1211,8 @@ paths:
                                 caller_id:
                                   type: integer
                                   description: |
-                                    The ID of the user who started the call.
+                                    The ID of the user who is calling: the user who started
+                                    the call, or the user who invited the current user to it.
                                 url:
                                   type: string
                                   description: |
@@ -1231,9 +1234,9 @@ paths:
                                 }
                             - type: object
                               description: |
-                                Event sent to the caller of a ringing LiveKit call, and to the
-                                clients of the user who answered it, when a user accepts or
-                                declines the call with
+                                Event sent to the user who called someone to a ringing LiveKit
+                                call, and to the clients of the user who answered it, when a
+                                user accepts or declines the call with
                                 [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
 
                                 Clients should stop ringing for the call if `user_id` is the
@@ -1272,11 +1275,11 @@ paths:
                                 }
                             - type: object
                               description: |
-                                Event sent to the other users in a direct message conversation
-                                when the caller of a ringing LiveKit call in it cancels the call
-                                with [`POST /calls/livekit/ring`](/api/update-livekit-call-ring),
-                                and to all the users in it, including the caller, when the
-                                call ends.
+                                Event sent to the users being called to a LiveKit call when
+                                the user calling them cancels the call with
+                                [`POST /calls/livekit/ring`](/api/update-livekit-call-ring),
+                                and to them and the users calling them, when the call ends
+                                while it is still ringing.
 
                                 Clients should stop ringing for the call, and stop showing
                                 that the call is ringing.
@@ -1304,6 +1307,82 @@ paths:
                                   "type": "call",
                                   "op": "cancel",
                                   "message_id": 42,
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to the users in a LiveKit call, and to the users
+                                who called people to it, when someone is called to join the
+                                call, answers, or stops being called. Only clients that show
+                                a call, like its call window, need this event.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-2f67b6).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - call
+                                op:
+                                  type: string
+                                  enum:
+                                    - rings
+                                message_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the message with the link to the call.
+                                rings:
+                                  type: array
+                                  description: |
+                                    Every time a user was called to join the call, oldest
+                                    first. A user who was called again has several entries.
+                                  items:
+                                    type: object
+                                    additionalProperties: false
+                                    properties:
+                                      user_id:
+                                        type: integer
+                                        description: |
+                                          The ID of the user who was called.
+                                      caller_id:
+                                        type: integer
+                                        description: |
+                                          The ID of the user who called them.
+                                      date_rang:
+                                        type: integer
+                                        description: |
+                                          When they were called, as a UNIX timestamp. Calls
+                                          that nobody answers stop ringing after 45 seconds.
+                                      answer:
+                                        type: string
+                                        nullable: true
+                                        enum:
+                                          - accept
+                                          - decline
+                                          - cancel
+                                          - null
+                                        description: |
+                                          `"accept"` or `"decline"` if the user answered,
+                                          `"cancel"` if the caller stopped calling them, and
+                                          `null` if nobody did before the call timed out or
+                                          ended.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "call",
+                                  "op": "rings",
+                                  "message_id": 42,
+                                  "rings":
+                                    [
+                                      {
+                                        "user_id": 9,
+                                        "caller_id": 10,
+                                        "date_rang": 1767225600,
+                                        "answer": "decline",
+                                      },
+                                    ],
                                   "id": 0,
                                 }
                             - type: object
@@ -28094,15 +28173,19 @@ paths:
       operationId: update-livekit-call-ring
       summary: Answer or cancel a ringing LiveKit call
       description: |
-        Answer a direct message call started with
-        [`POST /calls/livekit/start`](/api/start-livekit-call), or, as its
-        caller, cancel its ringing.
+        Answer a LiveKit call that the current user is being called to,
+        either a direct message call started with
+        [`POST /calls/livekit/start`](/api/start-livekit-call) or a call
+        they were invited to with
+        [`POST /calls/livekit/invite`](/api/invite-to-livekit-call), or
+        stop calling the users that the current user called to it.
 
         Accepting or declining sends a [`call op:accept` or
-        `op:decline`](/api/get-events#call-accept) event to the caller
-        and to the current user's clients, so that they all stop ringing.
-        Cancelling sends a [`call op:cancel`](/api/get-events#call-cancel)
-        event to the other users in the conversation.
+        `op:decline`](/api/get-events#call-accept) event to the user who
+        called the current user and to the current user's clients, so that
+        they all stop ringing. Cancelling sends a
+        [`call op:cancel`](/api/get-events#call-cancel) event to the users
+        that the current user was calling.
 
         Clients that accept a call should open its link themselves.
 
@@ -28135,6 +28218,57 @@ paths:
                 - op
             encoding:
               message_id:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calls/livekit/invite:
+    post:
+      tags: ["channels"]
+      operationId: invite-to-livekit-call
+      summary: Invite users to a LiveKit call
+      description: |
+        Call users to join a LiveKit call that is going on, which the
+        current user can join. The call must have been started with
+        [`POST /calls/livekit/start`](/api/start-livekit-call).
+
+        The users get a [`call op:ring`](/api/get-events#call-ring) event,
+        and can then join the call even if it was started in a direct
+        message conversation they are not in. For a call in a channel,
+        they need to have access to the channel. The current user must be
+        allowed to send them direct messages.
+
+        Bots and deactivated users are not called. Users who have
+        [muted](/api/mute-user) the current user are not rung, but are
+        shown as being called to the other users in the call.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-2f67b6).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                message_id:
+                  description: |
+                    The ID of the message with the link to the call.
+                  type: integer
+                  example: 42
+                user_ids:
+                  description: |
+                    The IDs of the users to call.
+                  type: array
+                  items:
+                    type: integer
+                  example: [9]
+              required:
+                - message_id
+                - user_ids
+            encoding:
+              message_id:
+                contentType: application/json
+              user_ids:
                 contentType: application/json
       responses:
         "200":

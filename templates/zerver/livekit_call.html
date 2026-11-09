@@ -7,6 +7,7 @@
 
 {% block content %}
 <div class="livekit-call">
+    {{ csrf_input }}
     <header class="livekit-call-header">
         <div class="livekit-call-heading">
             <h1 class="livekit-call-title" title="{{ call_title }}">{{ call_title }}</h1>
@@ -64,7 +65,15 @@
                     <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
                 </button>
             </div>
+            <div class="livekit-call-invite" hidden>
+                <input type="search" class="livekit-call-invite-search" placeholder="{{ _('Invite someone…') }}" aria-label="{{ _('Invite someone to the call') }}" autocomplete="off"/>
+                <ul class="livekit-call-invite-results"></ul>
+            </div>
             <ul class="livekit-call-participant-list"></ul>
+            <div class="livekit-call-invited" hidden>
+                <h3 class="livekit-call-invited-title">{{ _("Invited") }}</h3>
+                <ul class="livekit-call-invited-list"></ul>
+            </div>
         </aside>
     </div>
     <div class="livekit-call-left" hidden>

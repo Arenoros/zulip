@@ -13,13 +13,18 @@ import time_machine
 from django.core.signing import Signer
 from django.http import HttpResponseRedirect
 from django.test import override_settings
+from django.utils.timezone import now as timezone_now
 from typing_extensions import override
 
 from zerver.actions.muted_users import do_mute_user
-from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.realm_settings import (
+    do_change_realm_permission_group_setting,
+    do_set_realm_property,
+)
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
-from zerver.models import LiveKitCall, Realm, UserProfile
+from zerver.models import LiveKitCall, LiveKitCallParticipant, LiveKitCallRing, Realm, UserProfile
+from zerver.models.groups import NamedUserGroup, SystemGroups
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
 from zerver.views.video_calls import LIVEKIT_TOKEN_LIFETIME_SECONDS
@@ -1369,7 +1374,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self, caller: UserProfile, recipients: list[UserProfile], **params: str
     ) -> tuple[int, list[Mapping[str, Any]]]:
         self.login_user(caller)
-        with self.capture_send_event_calls(expected_num_events=2) as events:
+        with self.capture_send_event_calls(expected_num_events=3) as events:
             result = self.client_post(
                 "/json/calls/livekit/start",
                 {
@@ -1401,22 +1406,35 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(message.content, f"[Join video call.]({url})")
         call = LiveKitCall.objects.get(message_id=message_id)
         self.assertEqual(call.room, f"{hamlet.realm.uuid}-dm-{dm}-123")
+        self.assertEqual(call.url, url)
+        self.assertFalse(call.voice_only)
         self.assertIsNone(call.date_ended)
         self.assertEqual(
-            call_events,
-            [
-                {
-                    "event": {
-                        "type": "call",
-                        "op": "ring",
-                        "message_id": message_id,
-                        "caller_id": hamlet.id,
-                        "url": url,
-                        "voice_only": False,
-                    },
-                    "users": [cordelia.id],
-                }
-            ],
+            call_events[0],
+            {
+                "event": {
+                    "type": "call",
+                    "op": "ring",
+                    "message_id": message_id,
+                    "caller_id": hamlet.id,
+                    "url": url,
+                    "voice_only": False,
+                },
+                "users": [cordelia.id],
+            },
+        )
+        # Iago muted Hamlet, so he is not rung, but is shown as called.
+        rings = call_events[1]["event"]["rings"]
+        self.assertEqual(
+            [(ring["user_id"], ring["caller_id"], ring["answer"]) for ring in rings],
+            [(cordelia.id, hamlet.id, None), (iago.id, hamlet.id, None)],
+        )
+        self.assertEqual(call_events[1]["users"], [hamlet.id])
+        self.assertEqual(
+            set(
+                LiveKitCallRing.objects.filter(call=call).values_list("user_profile_id", flat=True)
+            ),
+            {cordelia.id, iago.id},
         )
 
     def test_start_livekit_voice_call(self) -> None:
@@ -1506,8 +1524,11 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.set_livekit_call_provider()
         message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia, iago])
 
-        for op in ["accept", "decline"]:
-            with self.capture_send_event_calls(expected_num_events=1) as events:
+        for op, answer in [
+            ("accept", LiveKitCallRing.ACCEPTED),
+            ("decline", LiveKitCallRing.DECLINED),
+        ]:
+            with self.capture_send_event_calls(expected_num_events=2) as events:
                 result = self.update_call_ring(cordelia, message_id, op)
             self.assert_json_success(result)
             self.assertEqual(
@@ -1522,14 +1543,29 @@ class LiveKitVideoCallTest(ZulipTestCase):
                     "users": [hamlet.id, cordelia.id],
                 },
             )
+            self.assertEqual(
+                [(ring["user_id"], ring["answer"]) for ring in events[1]["event"]["rings"]],
+                [(cordelia.id, op), (iago.id, None)],
+            )
+            self.assertEqual(LiveKitCallRing.objects.get(user_profile=cordelia).answer, answer)
 
-        with self.capture_send_event_calls(expected_num_events=1) as events:
+        # Cancelling only stops calling the users who have not answered.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
             result = self.update_call_ring(hamlet, message_id, "cancel")
         self.assert_json_success(result)
         self.assertEqual(
-            events[0]["event"], {"type": "call", "op": "cancel", "message_id": message_id}
+            events[0],
+            {
+                "event": {"type": "call", "op": "cancel", "message_id": message_id},
+                "users": [iago.id],
+            },
         )
-        self.assertEqual(sorted(events[0]["users"]), sorted([cordelia.id, iago.id]))
+        self.assertEqual(
+            LiveKitCallRing.objects.get(user_profile=iago).answer, LiveKitCallRing.CANCELLED
+        )
+        self.assertEqual(
+            LiveKitCallRing.objects.get(user_profile=cordelia).answer, LiveKitCallRing.DECLINED
+        )
 
     def test_update_livekit_call_ring_errors(self) -> None:
         hamlet = self.example_user("hamlet")
@@ -1538,17 +1574,17 @@ class LiveKitVideoCallTest(ZulipTestCase):
         message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia])
 
         result = self.update_call_ring(hamlet, message_id, "accept")
-        self.assert_json_error(result, "You cannot answer your own call.")
+        self.assert_json_error(result, "You were not called.")
 
         result = self.update_call_ring(cordelia, message_id, "cancel")
         self.assert_json_error(result, "Only the caller can cancel a call.")
 
         result = self.update_call_ring(self.example_user("othello"), message_id, "accept")
-        self.assert_json_error(result, "Invalid message(s)")
+        self.assert_json_error(result, "Invalid call")
 
         channel_message_id = self.send_stream_message(hamlet, "Verona")
         result = self.update_call_ring(cordelia, channel_message_id, "decline")
-        self.assert_json_error(result, "Calls in channels do not ring.")
+        self.assert_json_error(result, "Invalid call")
 
     def post_livekit_webhook(
         self,
@@ -1584,7 +1620,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
 
         with self.capture_send_event_calls(expected_num_events=0):
             result = self.post_livekit_webhook(
-                {"event": "participant_left", "room": {"name": call.room}}
+                {"event": "track_published", "room": {"name": call.room}}
             )
         self.assert_json_success(result)
         call.refresh_from_db()
@@ -1668,3 +1704,175 @@ class LiveKitVideoCallTest(ZulipTestCase):
         with self.settings(LIVEKIT_API_SECRET=None):
             response = self.post_livekit_webhook(event)
         self.assert_json_error(response, "LiveKit credentials have not been configured")
+
+    def invite_to_call(
+        self, user: UserProfile, message_id: int, invitees: list[UserProfile]
+    ) -> "TestHttpResponse":
+        self.login_user(user)
+        return self.client_post(
+            "/json/calls/livekit/invite",
+            {
+                "message_id": str(message_id),
+                "user_ids": orjson.dumps([invitee.id for invitee in invitees]).decode(),
+            },
+        )
+
+    def test_invite_to_livekit_direct_message_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        iago = self.example_user("iago")
+        self.set_livekit_call_provider()
+        message_id, call_events = self.start_direct_message_call(hamlet, [cordelia])
+        call = LiveKitCall.objects.get(message_id=message_id)
+        dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id]))
+
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            result = self.invite_to_call(hamlet, message_id, [othello])
+        self.assert_json_success(result)
+        self.assertEqual(events[0], {**call_events[0], "users": [othello.id]})
+        self.assertEqual(
+            [(ring["user_id"], ring["caller_id"]) for ring in events[1]["event"]["rings"]],
+            [(cordelia.id, hamlet.id), (othello.id, hamlet.id)],
+        )
+        self.assertEqual(events[1]["users"], [hamlet.id])
+
+        # Othello was called, so he can join the call, and answer.
+        response = self.join_livekit_call(othello, dm=dm)
+        self.assertEqual(self.get_livekit_token(response)["video"]["room"], call.room)
+        page_params = self._get_page_params(response)
+        self.assertEqual(page_params["call_message_id"], message_id)
+        self.assertEqual(
+            [ring["user_id"] for ring in page_params["call_rings"]], [cordelia.id, othello.id]
+        )
+        self.assertEqual(page_params["call_joined_user_ids"], [])
+        result = self.update_call_ring(othello, message_id, "accept")
+        self.assert_json_success(result)
+        self.assert_livekit_call_access_denied(self.join_livekit_call(iago, dm=dm))
+
+        # Anyone who can join the call can invite people to it.
+        result = self.invite_to_call(cordelia, message_id, [iago])
+        self.assert_json_success(result)
+        self.assertEqual(
+            LiveKitCallRing.objects.get(call=call, user_profile=iago).caller_id, cordelia.id
+        )
+        result = self.invite_to_call(self.example_user("aaron"), message_id, [iago])
+        self.assert_json_error(result, "Invalid call")
+
+        # Calling someone again records another call.
+        result = self.invite_to_call(hamlet, message_id, [othello])
+        self.assert_json_success(result)
+        self.assertEqual(LiveKitCallRing.objects.filter(call=call, user_profile=othello).count(), 2)
+
+    def test_invite_to_livekit_call_errors(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        realm = hamlet.realm
+        self.set_livekit_call_provider()
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia])
+
+        result = self.invite_to_call(hamlet, message_id + 1000, [othello])
+        self.assert_json_error(result, "Invalid call")
+
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/calls/livekit/invite",
+            {"message_id": str(message_id), "user_ids": orjson.dumps([9999]).decode()},
+        )
+        self.assert_json_error(result, "Invalid user ID 9999")
+
+        nobody_group = NamedUserGroup.objects.get(
+            name=SystemGroups.NOBODY, realm_for_sharding=realm, is_system_group=True
+        )
+        do_change_realm_permission_group_setting(
+            realm, "direct_message_permission_group", nobody_group, acting_user=None
+        )
+        result = self.invite_to_call(hamlet, message_id, [othello])
+        self.assert_json_error(result, "Direct messages are disabled in this organization.")
+
+        LiveKitCall.objects.filter(message_id=message_id).update(date_ended=timezone_now())
+        result = self.invite_to_call(hamlet, message_id, [othello])
+        self.assert_json_error(result, "This call has ended.")
+        self.assertFalse(LiveKitCallRing.objects.filter(user_profile=othello).exists())
+
+    def test_invite_to_livekit_channel_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        self.set_livekit_call_provider()
+        channel = self.make_stream("secret", invite_only=True)
+        self.subscribe(hamlet, "secret")
+        self.subscribe(cordelia, "secret")
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {
+                "type": "channel",
+                "channel_id": str(channel.id),
+                "topic": "standup",
+                "call_id": "123",
+            },
+        )
+        message_id = self.assert_json_success(result)["message_id"]
+
+        result = self.invite_to_call(hamlet, message_id, [othello])
+        self.assert_json_error(result, "Othello, the Moor of Venice cannot access this channel.")
+        result = self.invite_to_call(othello, message_id, [cordelia])
+        self.assert_json_error(result, "Invalid call")
+
+        # People invited to a call in a channel are rung, even though
+        # starting it rings nobody.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            result = self.invite_to_call(hamlet, message_id, [cordelia])
+        self.assert_json_success(result)
+        self.assertEqual(events[0]["event"]["op"], "ring")
+        self.assertEqual(events[0]["users"], [cordelia.id])
+        result = self.update_call_ring(cordelia, message_id, "decline")
+        self.assert_json_success(result)
+
+    def test_livekit_webhook_participants(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        self.set_livekit_call_provider()
+        message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia])
+        call = LiveKitCall.objects.get(message_id=message_id)
+
+        def participant_event(event: str, identity: str, room: str = call.room) -> None:
+            result = self.post_livekit_webhook(
+                {"event": event, "room": {"name": room}, "participant": {"identity": identity}}
+            )
+            self.assert_json_success(result)
+
+        participant_event("participant_joined", str(cordelia.id))
+        self.assertTrue(
+            LiveKitCallParticipant.objects.get(call=call, user_profile=cordelia).in_call
+        )
+
+        # People in the call learn who is being called.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            self.invite_to_call(hamlet, message_id, [othello])
+        self.assertEqual(sorted(events[1]["users"]), sorted([hamlet.id, cordelia.id]))
+
+        participant_event("participant_left", str(cordelia.id))
+        self.assertFalse(
+            LiveKitCallParticipant.objects.get(call=call, user_profile=cordelia).in_call
+        )
+        response = self.join_livekit_call(
+            hamlet, dm=f"{min(hamlet.id, cordelia.id)},{max(hamlet.id, cordelia.id)}"
+        )
+        self.assertEqual(self._get_page_params(response)["call_joined_user_ids"], [cordelia.id])
+
+        # Participants of other calls and organizations are ignored.
+        participant_event("participant_joined", str(othello.id), room="another-server-room")
+        participant_event("participant_joined", "not-a-user")
+        participant_event("participant_joined", str(self.mit_user("sipbtest").id))
+        participant_event("participant_joined", str(hamlet.id))
+        self.assertEqual(
+            set(LiveKitCallParticipant.objects.values_list("user_profile_id", flat=True)),
+            {cordelia.id, hamlet.id},
+        )
+
+        self.post_livekit_webhook(self.room_finished(call.room))
+        self.assertFalse(LiveKitCallParticipant.objects.filter(in_call=True).exists())

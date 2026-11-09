@@ -38,6 +38,12 @@ export type CallCancelEvent = {
     message_id: number;
 };
 
+// For call windows, which show who is being called.
+export type CallRingsEvent = {
+    op: "rings";
+    message_id: number;
+};
+
 type IncomingCall = {
     $banner: JQuery;
     url: string;
@@ -266,7 +272,9 @@ function end_incoming_call(message_id: number): void {
     popup_banners.fade_out_popup_banner(call.$banner);
 }
 
-export function dispatch(event: CallRingEvent | CallAnswerEvent | CallCancelEvent): void {
+export function dispatch(
+    event: CallRingEvent | CallAnswerEvent | CallCancelEvent | CallRingsEvent,
+): void {
     switch (event.op) {
         case "ring":
             if (!incoming_calls.has(event.message_id)) {
@@ -305,6 +313,8 @@ export function dispatch(event: CallRingEvent | CallAnswerEvent | CallCancelEven
             // Either the caller cancelled the call, or the call ended.
             end_incoming_call(event.message_id);
             end_outgoing_call(event.message_id);
+            break;
+        case "rings":
             break;
     }
 }

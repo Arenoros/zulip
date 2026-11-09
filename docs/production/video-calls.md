@@ -359,7 +359,10 @@ left the call and its `departure_timeout` (20 seconds by default) has
 passed; this also gives someone who lost their connection time to
 rejoin. The link to a call that has ended then says so instead of
 starting the call again, and an unanswered incoming call stops ringing.
-Without webhooks, call links keep working after calls end.
+Webhooks also tell Zulip who is in a call, so that everyone in it can see
+who is being called to join it. Without webhooks, call links keep working
+after calls end, and only the people who invite others to a call see
+whether they answer.
 
 If several Zulip servers share a LiveKit server, they need to use the
 same API key to receive its webhooks.

@@ -93,6 +93,20 @@ class CallCancelEvent(BaseEvent):
     message_id: int
 
 
+class CallRing(BaseEventModel):
+    user_id: int
+    caller_id: int
+    date_rang: int
+    answer: Literal["accept", "decline", "cancel"] | None
+
+
+class CallRingsEvent(BaseEvent):
+    type: Literal["call"] = "call"
+    op: Literal["rings"] = "rings"
+    message_id: int
+    rings: list[CallRing]
+
+
 class ChannelFolderForChannelFolderAddEvent(BaseEventModel):
     id: int
     name: str

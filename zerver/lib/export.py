@@ -170,6 +170,8 @@ ALL_ZULIP_TABLES = {
     "zerver_huddle",
     "zerver_imageattachment",
     "zerver_livekitcall",
+    "zerver_livekitcallparticipant",
+    "zerver_livekitcallring",
     "zerver_message",
     "zerver_missedmessageemailaddress",
     "zerver_multiuseinvite",
@@ -301,6 +303,8 @@ NON_EXPORTED_TABLES = {
     # LiveKit calls only matter while they are going on, on the LiveKit
     # server the Zulip server uses.
     "zerver_livekitcall",
+    "zerver_livekitcallparticipant",
+    "zerver_livekitcallring",
     # For any tables listed below here, it's a bug that they are not present in the export.
 }
 

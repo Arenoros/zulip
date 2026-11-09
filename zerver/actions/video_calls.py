@@ -1,4 +1,5 @@
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
+from datetime import timedelta
 from typing import Literal
 
 from django.db import transaction
@@ -6,20 +7,37 @@ from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
 
-from zerver.actions.message_send import check_send_message
+from zerver.actions.message_send import check_can_send_direct_message, check_send_message
 from zerver.lib.event_types import (
     BaseEvent,
     CallAnswerEvent,
     CallCancelEvent,
+    CallRing,
     CallRingEvent,
+    CallRingsEvent,
     HasGoogleMeetTokenEvent,
     HasWebexTokenEvent,
     HasZoomTokenEvent,
 )
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.muted_users import get_muting_users
-from zerver.models import Client, LiveKitCall, Message, Realm, Recipient, UserMessage, UserProfile
-from zerver.tornado.django_api import send_event_on_commit, send_event_rollback_unsafe
+from zerver.lib.recipient_users import (
+    check_sender_can_access_recipients,
+    recipient_for_user_profiles,
+)
+from zerver.lib.streams import subscribed_to_stream, user_has_content_access
+from zerver.lib.timestamp import datetime_to_timestamp
+from zerver.lib.user_groups import UserGroupMembershipDetails
+from zerver.models import (
+    Client,
+    LiveKitCall,
+    LiveKitCallParticipant,
+    LiveKitCallRing,
+    Realm,
+    Stream,
+    UserProfile,
+)
+from zerver.tornado.django_api import send_event_on_commit
 
 
 @transaction.atomic(durable=True)
@@ -61,6 +79,69 @@ def get_livekit_call_room(
     return f"{realm.uuid}-{call_id}"
 
 
+# Sync this with RING_TIMEOUT_MS in call_ringing.ts.
+LIVEKIT_RING_TIMEOUT = timedelta(seconds=45)
+
+LIVEKIT_RING_ANSWERS: dict[int, Literal["accept", "decline", "cancel"]] = {
+    LiveKitCallRing.ACCEPTED: "accept",
+    LiveKitCallRing.DECLINED: "decline",
+    LiveKitCallRing.CANCELLED: "cancel",
+}
+
+
+def get_livekit_call_rings(call: LiveKitCall) -> list[CallRing]:
+    return [
+        CallRing(
+            user_id=ring.user_profile_id,
+            caller_id=ring.caller_id,
+            date_rang=datetime_to_timestamp(ring.date_rang),
+            answer=None if ring.answer is None else LIVEKIT_RING_ANSWERS[ring.answer],
+        )
+        for ring in LiveKitCallRing.objects.filter(call=call).order_by("id")
+    ]
+
+
+def send_livekit_call_rings_event(
+    realm: Realm, call: LiveKitCall, caller_ids: Iterable[int]
+) -> None:
+    # Everyone in the call, and whoever called people to it, shows who
+    # is being called.
+    user_ids = set(caller_ids) | set(
+        LiveKitCallParticipant.objects.filter(call=call, in_call=True).values_list(
+            "user_profile_id", flat=True
+        )
+    )
+    event = CallRingsEvent(message_id=call.message_id, rings=get_livekit_call_rings(call))
+    send_event_on_commit(realm, event, user_ids)
+
+
+def ring_livekit_call(caller: UserProfile, call: LiveKitCall, user_ids: Iterable[int]) -> None:
+    called_user_ids = list(
+        UserProfile.objects.filter(
+            id__in=user_ids, realm_id=caller.realm_id, is_active=True, is_bot=False
+        )
+        .exclude(id=caller.id)
+        .values_list("id", flat=True)
+    )
+    now = timezone_now()
+    LiveKitCallRing.objects.bulk_create(
+        LiveKitCallRing(call=call, user_profile_id=user_id, caller=caller, date_rang=now)
+        for user_id in called_user_ids
+    )
+    # People who muted the caller are not rung, but are still shown as
+    # being called, so that the caller cannot tell.
+    muting_user_ids = get_muting_users(caller.id)
+    event = CallRingEvent(
+        message_id=call.message_id, caller_id=caller.id, url=call.url, voice_only=call.voice_only
+    )
+    send_event_on_commit(
+        caller.realm,
+        event,
+        [user_id for user_id in called_user_ids if user_id not in muting_user_ids],
+    )
+    send_livekit_call_rings_event(caller.realm, call, [caller.id])
+
+
 def check_start_livekit_call(
     caller: UserProfile,
     client: Client,
@@ -97,23 +178,14 @@ def check_start_livekit_call(
         f"[{link_text}]({url})",
         read_by_sender=read_by_sender,
     ).message_id
-    LiveKitCall.objects.create(room=room, message_id=message_id)
+    call = LiveKitCall.objects.create(
+        room=room, message_id=message_id, url=url, voice_only=voice_only
+    )
 
     # Like channel meetings in other chat apps, a call in a channel
     # only posts its link; only direct message calls ring.
     if recipient_type_name == "private":
-        muting_user_ids = get_muting_users(caller.id)
-        ring_user_ids = [
-            user_id
-            for user_id in UserProfile.objects.filter(
-                id__in=message_to, realm_id=caller.realm_id, is_active=True, is_bot=False
-            ).values_list("id", flat=True)
-            if user_id != caller.id and user_id not in muting_user_ids
-        ]
-        event = CallRingEvent(
-            message_id=message_id, caller_id=caller.id, url=url, voice_only=voice_only
-        )
-        send_event_on_commit(caller.realm, event, ring_user_ids)
+        ring_livekit_call(caller, call, message_to)
 
     return message_id
 
@@ -130,30 +202,77 @@ def do_end_livekit_call(room: str) -> None:
         return
     call.date_ended = timezone_now()
     call.save(update_fields=["date_ended"])
+    LiveKitCallParticipant.objects.filter(call=call).update(in_call=False)
 
-    # A call that ends while it is still ringing stops ringing, for the
-    # caller too.
-    if call.message.recipient.type != Recipient.STREAM:
-        user_ids = UserMessage.objects.filter(message_id=call.message_id).values_list(
-            "user_profile_id", flat=True
-        )
+    # A call that ends while it is still ringing stops ringing, for its
+    # callers too.
+    unanswered_rings = list(LiveKitCallRing.objects.filter(call=call, answer=None))
+    user_ids = {ring.user_profile_id for ring in unanswered_rings} | {
+        ring.caller_id for ring in unanswered_rings
+    }
+    if user_ids:
         event = CallCancelEvent(message_id=call.message_id)
-        send_event_on_commit(call.message.realm, event, list(user_ids))
+        send_event_on_commit(call.message.realm, event, user_ids)
 
 
-def do_answer_call(
-    user_profile: UserProfile, message: Message, operator: Literal["accept", "decline"]
+def check_invite_to_livekit_call(
+    inviter: UserProfile, call: LiveKitCall, invitees: list[UserProfile]
 ) -> None:
-    # The user's other clients stop ringing too.
-    event = CallAnswerEvent(op=operator, message_id=message.id, user_id=user_profile.id)
-    send_event_rollback_unsafe(user_profile.realm, event, [message.sender_id, user_profile.id])
+    if call.date_ended is not None:
+        raise JsonableError(_("This call has ended."))
+    if call.message.is_channel_message:
+        stream = Stream.objects.get(id=call.message.recipient.type_id)
+        for invitee in invitees:
+            if not user_has_content_access(
+                invitee,
+                stream,
+                UserGroupMembershipDetails(user_recursive_group_ids=None),
+                is_subscribed=subscribed_to_stream(invitee, stream.id),
+            ):
+                raise JsonableError(
+                    _("{full_name} cannot access this channel.").format(full_name=invitee.full_name)
+                )
+    # Calling someone is a way of contacting them, so it follows the
+    # same rules as direct messages.
+    for invitee in invitees:
+        check_sender_can_access_recipients(inviter, [invitee])
+        recipient = recipient_for_user_profiles([invitee], None, inviter)
+        check_can_send_direct_message(inviter.realm, inviter, [invitee], recipient)
+    ring_livekit_call(inviter, call, [invitee.id for invitee in invitees])
 
 
-def do_cancel_call(caller: UserProfile, message: Message) -> None:
-    recipient_user_ids = (
-        UserMessage.objects.filter(message_id=message.id)
-        .exclude(user_profile_id=caller.id)
-        .values_list("user_profile_id", flat=True)
+def do_update_livekit_call_participant(room: str, identity: str, in_call: bool) -> None:
+    call = LiveKitCall.objects.select_related("message").filter(room=room).first()
+    # Participants are identified by their user ID; see join_livekit_call.
+    if call is None or not identity.isdecimal():
+        return
+    user_profile = UserProfile.objects.filter(
+        id=int(identity), realm_id=call.message.realm_id
+    ).first()
+    if user_profile is None:
+        return
+    LiveKitCallParticipant.objects.update_or_create(
+        call=call, user_profile=user_profile, defaults={"in_call": in_call}
     )
-    event = CallCancelEvent(message_id=message.id)
-    send_event_rollback_unsafe(caller.realm, event, list(recipient_user_ids))
+
+
+@transaction.atomic(durable=True)
+def do_answer_call(
+    user_profile: UserProfile, ring: LiveKitCallRing, operator: Literal["accept", "decline"]
+) -> None:
+    ring.answer = LiveKitCallRing.ACCEPTED if operator == "accept" else LiveKitCallRing.DECLINED
+    ring.save(update_fields=["answer"])
+    # The user's other clients stop ringing too.
+    event = CallAnswerEvent(op=operator, message_id=ring.call.message_id, user_id=user_profile.id)
+    send_event_on_commit(user_profile.realm, event, [ring.caller_id, user_profile.id])
+    send_livekit_call_rings_event(user_profile.realm, ring.call, [ring.caller_id])
+
+
+@transaction.atomic(durable=True)
+def do_cancel_call(caller: UserProfile, call: LiveKitCall) -> None:
+    rings = LiveKitCallRing.objects.filter(call=call, caller=caller, answer=None)
+    user_ids = [ring.user_profile_id for ring in rings]
+    rings.update(answer=LiveKitCallRing.CANCELLED)
+    event = CallCancelEvent(message_id=call.message_id)
+    send_event_on_commit(caller.realm, event, user_ids)
+    send_livekit_call_rings_event(caller.realm, call, [caller.id])

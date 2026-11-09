@@ -268,6 +268,7 @@ from zerver.views.video_calls import (
     create_nextcloud_talk_url,
     deauthorize_zoom_user,
     get_bigbluebutton_url,
+    invite_to_livekit_call,
     join_bigbluebutton,
     join_livekit_call,
     livekit_webhook,
@@ -612,6 +613,7 @@ v1_api_and_json_patterns = [
     # Used to start a LiveKit call and to answer or cancel its ringing
     rest_path("calls/livekit/start", POST=start_livekit_call),
     rest_path("calls/livekit/ring", POST=update_livekit_call_ring),
+    rest_path("calls/livekit/invite", POST=invite_to_livekit_call),
     # export/realm -> zerver.views.realm_export
     rest_path("export/realm", POST=export_realm, GET=get_realm_exports),
     rest_path("export/realm/<int:export_id>", DELETE=delete_realm_export),

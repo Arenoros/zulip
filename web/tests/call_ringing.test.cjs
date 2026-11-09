@@ -296,6 +296,13 @@ test("outgoing call is cancelled", (helpers) => {
     assert.deepEqual(faded_banners, [$banner]);
 });
 
+test("call windows' events are ignored", (helpers) => {
+    const $banner = start_direct_message_call(helpers, [alice.user_id], 47);
+    call_ringing.dispatch({op: "rings", message_id: 47, rings: []});
+    assert.deepEqual(faded_banners, []);
+    assert.equal($banner.banner.label, "translated: Calling Alice…");
+});
+
 test("outgoing call ends", (helpers) => {
     const $banner = start_direct_message_call(helpers, [alice.user_id], 46);
     call_ringing.dispatch({op: "cancel", message_id: 46});
