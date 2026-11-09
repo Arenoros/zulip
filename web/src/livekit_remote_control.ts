@@ -112,6 +112,24 @@ export function parse_control_state(data: unknown): ControlState | undefined {
     return result.success ? result.data : undefined;
 }
 
+// The owner's desktop app ignores further requests from a participant
+// for this long after refusing one.
+export const REQUEST_COOLDOWN_MS = 30 * 1000;
+
+// A request of the local participant ends with the screen still shared
+// only when the owner refused it, or did not answer in time.
+export function is_refused_request(
+    previous: ControlState | undefined,
+    next: ControlState,
+    local_identity: string,
+): boolean {
+    return (
+        previous?.state === "requested" &&
+        previous.participant.identity === local_identity &&
+        next.state === "shared"
+    );
+}
+
 export type ControlAction = "request" | "release" | "stop";
 
 export function describe_control_state({
@@ -120,6 +138,7 @@ export function describe_control_state({
     is_own_share,
     local_identity,
     keyboard_active,
+    request_refused,
 }: {
     control_state: ControlState | undefined;
     owner_name: string;
@@ -127,12 +146,31 @@ export function describe_control_state({
     local_identity: string;
     // Whether the local participant's keyboard goes to the shared screen.
     keyboard_active: boolean;
-}): {label: string; action: {type: ControlAction; label: string} | undefined} {
+    // Whether the owner refused the local participant's request less
+    // than REQUEST_COOLDOWN_MS ago.
+    request_refused: boolean;
+}): {
+    label: string;
+    action: {type: ControlAction; label: string; disabled?: boolean} | undefined;
+} {
     if (
         control_state === undefined ||
         control_state.state === "none" ||
         control_state.state === "shared"
     ) {
+        if (request_refused) {
+            return {
+                label: $t(
+                    {defaultMessage: "{name} didn't allow control. You can ask again in a moment."},
+                    {name: owner_name},
+                ),
+                action: {
+                    type: "request",
+                    label: $t({defaultMessage: "Request control"}),
+                    disabled: true,
+                },
+            };
+        }
         return {
             label: $t({defaultMessage: "Remote control available"}),
             action: is_own_share

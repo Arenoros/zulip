@@ -41,6 +41,9 @@ const track_elements = new Map<
 const control_states = new Map<string, livekit_remote_control.ControlState>();
 const remote_inputs = new Map<string, RemoteInput>();
 const control_tokens = new Map<string, string>();
+// Timers for the screens whose owner refused a request of the local
+// participant less than REQUEST_COOLDOWN_MS ago.
+const request_refusal_timers = new Map<string, ReturnType<typeof setTimeout>>();
 const screen_share_controls = new Map<
     string,
     {label_element: HTMLElement; button_element: HTMLButtonElement}
@@ -124,6 +127,7 @@ function describe_control_state(
         is_own_share: owner_identity === room.localParticipant.identity,
         local_identity: room.localParticipant.identity,
         keyboard_active: remote_inputs.get(owner_identity)?.keyboard_active ?? false,
+        request_refused: request_refusal_timers.has(owner_identity),
     });
 }
 
@@ -137,7 +141,13 @@ function update_screen_share_controls(owner_identity: string): void {
     // Narrow windows truncate the label.
     controls.label_element.title = label;
     controls.button_element.hidden = action === undefined;
+    controls.button_element.disabled = action?.disabled === true;
     controls.button_element.textContent = action?.label ?? "";
+}
+
+function clear_request_refusal(owner_identity: string): void {
+    clearTimeout(request_refusal_timers.get(owner_identity));
+    request_refusal_timers.delete(owner_identity);
 }
 
 function render_screen_share(
@@ -248,6 +258,7 @@ function detach_track(track: Track, participant: Participant): void {
         control_tokens.delete(participant.identity);
         screen_share_controls.delete(participant.identity);
         control_states.delete(participant.identity);
+        clear_request_refusal(participant.identity);
     }
     update_stage();
     if (tiles.has(participant.identity)) {
@@ -332,6 +343,7 @@ room.on(RoomEvent.ParticipantDisconnected, (participant) => {
     remote_inputs.delete(participant.identity);
     control_tokens.delete(participant.identity);
     control_states.delete(participant.identity);
+    clear_request_refusal(participant.identity);
     remove_tile(participant);
     electron_bridge?.remote_control_participant_left?.(participant.identity);
 });
@@ -341,8 +353,24 @@ room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
     }
     const message = livekit_remote_control.decode_message(payload);
     switch (message?.type) {
-        case "state":
+        case "state": {
             // Participants only report the state of their own screen share.
+            if (
+                livekit_remote_control.is_refused_request(
+                    control_states.get(participant.identity),
+                    message.control_state,
+                    room.localParticipant.identity,
+                )
+            ) {
+                clear_request_refusal(participant.identity);
+                request_refusal_timers.set(
+                    participant.identity,
+                    setTimeout(() => {
+                        request_refusal_timers.delete(participant.identity);
+                        update_screen_share_controls(participant.identity);
+                    }, livekit_remote_control.REQUEST_COOLDOWN_MS),
+                );
+            }
             control_states.set(participant.identity, message.control_state);
             if (
                 message.control_state.state !== "controlled" ||
@@ -353,6 +381,7 @@ room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
             }
             update_screen_share_controls(participant.identity);
             break;
+        }
         case "grant": {
             const state = control_states.get(participant.identity);
             if (
@@ -429,6 +458,10 @@ room.on(RoomEvent.Disconnected, () => {
     remote_inputs.clear();
     control_tokens.clear();
     control_states.clear();
+    for (const timer of request_refusal_timers.values()) {
+        clearTimeout(timer);
+    }
+    request_refusal_timers.clear();
     screen_share_controls.clear();
     update_stage();
     electron_bridge?.screen_share_stopped?.();

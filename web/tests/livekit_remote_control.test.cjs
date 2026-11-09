@@ -144,6 +144,28 @@ run_test("private grants and mouse messages", () => {
     }
 });
 
+run_test("is_refused_request", () => {
+    const requested = {state: "requested", participant: cordelia};
+    const {is_refused_request} = livekit_remote_control;
+    assert.ok(is_refused_request(requested, {state: "shared"}, cordelia.identity));
+    assert.ok(!is_refused_request(requested, {state: "shared"}, hamlet.identity));
+    assert.ok(
+        !is_refused_request(
+            requested,
+            {state: "controlled", participant: cordelia},
+            cordelia.identity,
+        ),
+    );
+    assert.ok(
+        !is_refused_request(
+            {state: "controlled", participant: cordelia},
+            {state: "shared"},
+            cordelia.identity,
+        ),
+    );
+    assert.ok(!is_refused_request(undefined, {state: "shared"}, cordelia.identity));
+});
+
 run_test("describe_control_state for the owner", () => {
     function describe(control_state) {
         return livekit_remote_control.describe_control_state({
@@ -152,6 +174,7 @@ run_test("describe_control_state for the owner", () => {
             is_own_share: true,
             local_identity: "9",
             keyboard_active: false,
+            request_refused: false,
         });
     }
 
@@ -179,6 +202,7 @@ run_test("describe_control_state for other participants", () => {
             is_own_share: false,
             local_identity,
             keyboard_active,
+            request_refused: false,
         });
     }
 
@@ -186,6 +210,20 @@ run_test("describe_control_state for other participants", () => {
         label: "translated: Remote control available",
         action: {type: "request", label: "translated: Request control"},
     });
+    assert.deepEqual(
+        livekit_remote_control.describe_control_state({
+            control_state: {state: "shared"},
+            owner_name: "Desdemona",
+            is_own_share: false,
+            local_identity: cordelia.identity,
+            keyboard_active: false,
+            request_refused: true,
+        }),
+        {
+            label: "translated: Desdemona didn't allow control. You can ask again in a moment.",
+            action: {type: "request", label: "translated: Request control", disabled: true},
+        },
+    );
     assert.deepEqual(describe({state: "requested", participant: cordelia}, cordelia.identity), {
         label: "translated: Waiting for Desdemona to allow control…",
         action: undefined,
