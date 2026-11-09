@@ -63,14 +63,21 @@ function setup(override, send) {
         clientWidth: 200,
         clientHeight: 100,
         setPointerCapture: () => {},
+        focus() {
+            video.dispatchEvent(new Event("focus"));
+        },
     });
     const packets = [];
+    const keyboard_states = [];
     const remote_input = new RemoteInput(
         video,
         send ??
             (async (token, sequence, event) => {
                 packets.push({token, sequence, event});
             }),
+        () => {
+            keyboard_states.push(remote_input.keyboard_active);
+        },
     );
     function emit(type, data = {}, target = video) {
         const event = new Event(type, {cancelable: true});
@@ -82,7 +89,7 @@ function setup(override, send) {
         target.dispatchEvent(event);
         return event.defaultPrevented;
     }
-    return {remote_input, packets, emit, page_window, page_document};
+    return {remote_input, video, packets, keyboard_states, emit, page_window, page_document};
 }
 
 run_test("moves require a grant and send only the latest position at 60 Hz", async ({override}) => {
@@ -327,5 +334,69 @@ run_test("lossy failure can be followed by a newer move", async ({override}) => 
         {type: "move", x: 0.5, y: 0.5},
         {type: "move", x: 0.75, y: 0.5},
     ]);
+    s.remote_input.destroy();
+});
+
+run_test("keys go to the shared screen while it has the focus", ({override}) => {
+    const s = setup(override);
+    assert.equal(s.emit("keydown", {code: "KeyA"}), false);
+    s.remote_input.set_token(token);
+    assert.equal(s.video.tabIndex, -1);
+    assert.ok(!s.remote_input.keyboard_active);
+    s.emit("pointerdown");
+    s.emit("pointerup");
+    assert.ok(s.remote_input.keyboard_active);
+    assert.deepEqual(s.keyboard_states, [false, true]);
+    assert.equal(s.emit("keydown", {code: "KeyA"}), true);
+    assert.equal(s.emit("keydown", {code: "KeyA", repeat: true}), true);
+    assert.equal(s.emit("keyup", {code: "KeyA"}), true);
+    // Pressed before the keyboard went to the shared screen.
+    assert.equal(s.emit("keyup", {code: "KeyB"}), true);
+    // The Windows keys stay with the controller's computer.
+    assert.equal(s.emit("keydown", {code: "MetaLeft"}), false);
+    assert.equal(s.emit("keydown", {code: ""}), false);
+    assert.deepEqual(
+        s.packets.slice(2).map(({sequence, event}) => [sequence, event]),
+        [
+            [3, {type: "key", code: "KeyA", down: true}],
+            [4, {type: "key", code: "KeyA", down: true}],
+            [5, {type: "key", code: "KeyA", down: false}],
+        ],
+    );
+    s.emit("keydown", {code: "ShiftLeft"});
+    s.emit("blur");
+    assert.deepEqual(s.packets.at(-1).event, {type: "key", code: "ShiftLeft", down: false});
+    assert.ok(!s.remote_input.keyboard_active);
+    assert.equal(s.keyboard_states.at(-1), false);
+    s.remote_input.destroy();
+});
+
+run_test("losing the page or the grant releases held keys", ({override}) => {
+    const s = setup(override);
+    for (const end of [
+        () => s.emit("blur", {}, s.page_window),
+        () => {
+            s.page_document.hidden = true;
+            s.emit("visibilitychange", {}, s.page_document);
+        },
+        () => s.remote_input.set_token(undefined),
+        () => s.remote_input.destroy(),
+    ]) {
+        s.remote_input.set_token(token);
+        s.emit("keydown", {code: "ControlLeft"});
+        end();
+        assert.deepEqual(s.packets.at(-1).event, {type: "key", code: "ControlLeft", down: false});
+    }
+});
+
+run_test("scrolling reaches the screen before a later key", ({override}) => {
+    const s = setup(override);
+    s.remote_input.set_token(token);
+    s.emit("wheel", {deltaX: 0, deltaY: 100, deltaMode: 0});
+    s.emit("keydown", {code: "PageDown"});
+    assert.deepEqual(
+        s.packets.map(({event}) => event.type),
+        ["wheel", "key"],
+    );
     s.remote_input.destroy();
 });

@@ -44,6 +44,14 @@ const message_schema = z.discriminatedUnion("type", [
     }),
     z.object({
         version: z.literal(PROTOCOL_VERSION),
+        type: z.literal("key"),
+        token: z.string().check(z.length(32)),
+        sequence: z.int().check(z.minimum(1)),
+        code: z.string().check(z.maxLength(32)),
+        down: z.boolean(),
+    }),
+    z.object({
+        version: z.literal(PROTOCOL_VERSION),
         type: z.literal("state"),
         control_state: control_state_schema,
     }),
@@ -54,7 +62,8 @@ type OutgoingMessage =
     | {type: "release"}
     | {type: "state"; control_state: ControlState}
     | {type: "grant"; token: string}
-    | {type: "mouse"; token: string; sequence: number; event: MouseEvent};
+    | {type: "mouse"; token: string; sequence: number; event: MouseEvent}
+    | {type: "key"; token: string; sequence: number; code: string; down: boolean};
 
 export function get_screen_share_publish_options(): TrackPublishOptions {
     if (electron_bridge?.get_remote_control_supported?.() === true) {
@@ -110,11 +119,14 @@ export function describe_control_state({
     owner_name,
     is_own_share,
     local_identity,
+    keyboard_active,
 }: {
     control_state: ControlState | undefined;
     owner_name: string;
     is_own_share: boolean;
     local_identity: string;
+    // Whether the local participant's keyboard goes to the shared screen.
+    keyboard_active: boolean;
 }): {label: string; action: {type: ControlAction; label: string} | undefined} {
     if (
         control_state === undefined ||
@@ -151,7 +163,12 @@ export function describe_control_state({
     }
     if (is_local_participant) {
         return {
-            label: $t({defaultMessage: "You are controlling this screen"}),
+            label: keyboard_active
+                ? $t({
+                      defaultMessage:
+                          "Your keyboard controls this screen. Click outside it to stop.",
+                  })
+                : $t({defaultMessage: "You are controlling this screen. Click it to type."}),
             action: {type: "release", label: $t({defaultMessage: "Stop controlling"})},
         };
     }

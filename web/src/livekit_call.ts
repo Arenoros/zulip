@@ -123,6 +123,7 @@ function describe_control_state(
         owner_name: owner?.name ?? owner_identity,
         is_own_share: owner_identity === room.localParticipant.identity,
         local_identity: room.localParticipant.identity,
+        keyboard_active: remote_inputs.get(owner_identity)?.keyboard_active ?? false,
     });
 }
 
@@ -133,6 +134,8 @@ function update_screen_share_controls(owner_identity: string): void {
     }
     const {label, action} = describe_control_state(owner_identity);
     controls.label_element.textContent = label;
+    // Narrow windows truncate the label.
+    controls.label_element.title = label;
     controls.button_element.hidden = action === undefined;
     controls.button_element.textContent = action?.label ?? "";
 }
@@ -175,16 +178,30 @@ function render_screen_share(
         screen_share_controls.set(participant.identity, {label_element, button_element});
         update_screen_share_controls(participant.identity);
         if (participant !== room.localParticipant && media_element instanceof HTMLVideoElement) {
-            const remote_input = new RemoteInput(media_element, async (token, sequence, event) => {
-                await room.localParticipant.publishData(
-                    livekit_remote_control.encode_message({type: "mouse", token, sequence, event}),
-                    {
-                        reliable: event.type !== "move",
-                        topic: livekit_remote_control.REMOTE_CONTROL_TOPIC,
-                        destinationIdentities: [participant.identity],
-                    },
-                );
-            });
+            const remote_input = new RemoteInput(
+                media_element,
+                async (token, sequence, event) => {
+                    await room.localParticipant.publishData(
+                        livekit_remote_control.encode_message(
+                            event.type === "key"
+                                ? {type: "key", token, sequence, code: event.code, down: event.down}
+                                : {type: "mouse", token, sequence, event},
+                        ),
+                        {
+                            reliable: event.type !== "move",
+                            topic: livekit_remote_control.REMOTE_CONTROL_TOPIC,
+                            destinationIdentities: [participant.identity],
+                        },
+                    );
+                },
+                () => {
+                    media_element.classList.toggle(
+                        "livekit-call-video-keyboard",
+                        remote_input.keyboard_active,
+                    );
+                    update_screen_share_controls(participant.identity);
+                },
+            );
             remote_inputs.set(participant.identity, remote_input);
             remote_input.set_token(control_tokens.get(participant.identity));
         }
@@ -348,6 +365,7 @@ room.on(RoomEvent.DataReceived, (payload, participant, _kind, topic) => {
             break;
         }
         case "mouse":
+        case "key":
             if (is_sharing_controllable_screen()) {
                 electron_bridge?.send_remote_control_input?.(participant.identity, message);
             }

@@ -100,6 +100,7 @@ run_test("private grants and mouse messages", () => {
             event: {type: "button", x: 0, y: 0, button: "right", down: true},
         },
         {type: "mouse", token, sequence: 3, event: {type: "wheel", x: 1, y: 0, dx: 120, dy: -240}},
+        {type: "key", token, sequence: 4, code: "KeyA", down: true},
     ]) {
         assert.deepEqual(
             livekit_remote_control.decode_message(livekit_remote_control.encode_message(message)),
@@ -132,6 +133,15 @@ run_test("private grants and mouse messages", () => {
         );
         assert.equal(livekit_remote_control.decode_message(bytes), undefined);
     }
+    for (const key of [
+        {code: "K".repeat(33), down: true},
+        {code: "KeyA", down: "yes"},
+    ]) {
+        const bytes = new TextEncoder().encode(
+            JSON.stringify({version: 1, type: "key", token, sequence: 1, ...key}),
+        );
+        assert.equal(livekit_remote_control.decode_message(bytes), undefined);
+    }
 });
 
 run_test("describe_control_state for the owner", () => {
@@ -141,6 +151,7 @@ run_test("describe_control_state for the owner", () => {
             owner_name: "Desdemona",
             is_own_share: true,
             local_identity: "9",
+            keyboard_active: false,
         });
     }
 
@@ -161,12 +172,13 @@ run_test("describe_control_state for the owner", () => {
 });
 
 run_test("describe_control_state for other participants", () => {
-    function describe(control_state, local_identity) {
+    function describe(control_state, local_identity, keyboard_active = false) {
         return livekit_remote_control.describe_control_state({
             control_state,
             owner_name: "Desdemona",
             is_own_share: false,
             local_identity,
+            keyboard_active,
         });
     }
 
@@ -183,9 +195,16 @@ run_test("describe_control_state for other participants", () => {
         action: undefined,
     });
     assert.deepEqual(describe({state: "controlled", participant: cordelia}, cordelia.identity), {
-        label: "translated: You are controlling this screen",
+        label: "translated: You are controlling this screen. Click it to type.",
         action: {type: "release", label: "translated: Stop controlling"},
     });
+    assert.deepEqual(
+        describe({state: "controlled", participant: cordelia}, cordelia.identity, true),
+        {
+            label: "translated: Your keyboard controls this screen. Click outside it to stop.",
+            action: {type: "release", label: "translated: Stop controlling"},
+        },
+    );
     assert.deepEqual(describe({state: "controlled", participant: cordelia}, hamlet.identity), {
         label: "translated: Cordelia is controlling this screen",
         action: undefined,

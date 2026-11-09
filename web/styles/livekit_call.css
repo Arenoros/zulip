@@ -80,6 +80,13 @@
         object-fit: contain;
         border-radius: 0.5em;
         background-color: hsl(0deg 0% 0%);
+        /* Focus only matters as .livekit-call-video-keyboard below. */
+        outline: none;
+    }
+
+    /* The controller's keyboard goes to the shared screen. */
+    .livekit-call-video-keyboard {
+        outline: 0.2em solid var(--color-livekit-call-button-pressed-background);
     }
 }
 

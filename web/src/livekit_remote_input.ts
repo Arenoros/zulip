@@ -22,6 +22,8 @@ export const mouse_event_schema = z.discriminatedUnion("type", [
     }),
 ]);
 export type MouseEvent = z.infer<typeof mouse_event_schema>;
+// A physical key, by its KeyboardEvent.code.
+export type KeyEvent = {type: "key"; code: string; down: boolean};
 type Position = {x: number; y: number};
 
 export function video_position(
@@ -52,13 +54,19 @@ function bounded_wheel_delta(pixels: number): number {
     return Math.round(Math.max(-12_000, Math.min(12_000, pixels)));
 }
 
-// One mouse sender per remote video. Moves and scrolling are sent at
-// most 60 times a second: only the latest pending move is sent, and
-// scrolling is summed until then. Button transitions and scrolling use
-// the reliable channel.
+// One mouse and keyboard sender per remote video. Moves and scrolling
+// are sent at most 60 times a second: only the latest pending move is
+// sent, and scrolling is summed until then. Button transitions,
+// scrolling, and keys use the reliable channel. Keys go to the shared
+// screen while the video has the focus, which clicking it gives.
 export class RemoteInput {
     private readonly video: HTMLVideoElement;
-    private readonly send: (token: string, sequence: number, event: MouseEvent) => Promise<void>;
+    private readonly send: (
+        token: string,
+        sequence: number,
+        event: MouseEvent | KeyEvent,
+    ) => Promise<void>;
+    private readonly on_keyboard_change: () => void;
     private readonly listeners = new AbortController();
     private token: string | undefined;
     private sequence = 0;
@@ -69,11 +77,15 @@ export class RemoteInput {
     private flush_timer: ReturnType<typeof setTimeout> | undefined;
     private move_in_flight = false;
     private readonly pressed_buttons = new Set<"left" | "middle" | "right">();
+    private readonly pressed_keys = new Set<string>();
+    private focused = false;
 
-    constructor(video: HTMLVideoElement, send: RemoteInput["send"]) {
+    constructor(video: HTMLVideoElement, send: RemoteInput["send"], on_keyboard_change: () => void) {
         this.video = video;
         this.send = send;
+        this.on_keyboard_change = on_keyboard_change;
         const options = {signal: this.listeners.signal};
+        video.tabIndex = -1;
         video.addEventListener(
             "pointermove",
             (event) => {
@@ -105,6 +117,7 @@ export class RemoteInput {
                     return;
                 }
                 event.preventDefault();
+                video.focus({preventScroll: true});
                 video.setPointerCapture(event.pointerId);
                 this.pressed_buttons.add(button);
                 this.last_position = point;
@@ -166,16 +179,62 @@ export class RemoteInput {
             },
             {...options, passive: false},
         );
-        window.addEventListener("blur", () => this.release_buttons(), options);
+        for (const type of ["keydown", "keyup"] as const) {
+            video.addEventListener(
+                type,
+                (event) => {
+                    // The Windows keys stay with the controller's computer.
+                    if (
+                        this.token === undefined ||
+                        event.code === "" ||
+                        event.code.startsWith("Meta")
+                    ) {
+                        return;
+                    }
+                    event.preventDefault();
+                    const down = type === "keydown";
+                    if (down) {
+                        this.pressed_keys.add(event.code);
+                    } else if (!this.pressed_keys.delete(event.code)) {
+                        // Pressed before the keyboard went to the shared screen.
+                        return;
+                    }
+                    this.publish({type: "key", code: event.code, down});
+                },
+                options,
+            );
+        }
+        video.addEventListener(
+            "focus",
+            () => {
+                this.focused = true;
+                this.on_keyboard_change();
+            },
+            options,
+        );
+        video.addEventListener(
+            "blur",
+            () => {
+                this.focused = false;
+                this.release_keys();
+                this.on_keyboard_change();
+            },
+            options,
+        );
+        window.addEventListener("blur", () => this.release_all(), options);
         document.addEventListener(
             "visibilitychange",
             () => {
                 if (document.hidden) {
-                    this.release_buttons();
+                    this.release_all();
                 }
             },
             options,
         );
+    }
+
+    get keyboard_active(): boolean {
+        return this.token !== undefined && this.focused;
     }
 
     private button(button: number): "left" | "middle" | "right" | undefined {
@@ -191,10 +250,10 @@ export class RemoteInput {
         );
     }
 
-    private publish(event: MouseEvent): void {
+    private publish(event: MouseEvent | KeyEvent): void {
         assert(this.token !== undefined);
-        if (event.type === "button") {
-            // Scrolling before a click must reach the screen before it.
+        if (event.type === "button" || event.type === "key") {
+            // Scrolling before a click or key must reach the screen before it.
             this.publish_pending_wheel();
         }
         this.sequence += 1;
@@ -268,16 +327,29 @@ export class RemoteInput {
         this.pressed_buttons.clear();
     }
 
+    private release_keys(): void {
+        for (const code of this.pressed_keys) {
+            this.publish({type: "key", code, down: false});
+        }
+        this.pressed_keys.clear();
+    }
+
+    private release_all(): void {
+        this.release_buttons();
+        this.release_keys();
+    }
+
     set_token(token: string | undefined): void {
         if (this.token === token) {
             return;
         }
-        this.release_buttons();
+        this.release_all();
         clearTimeout(this.flush_timer);
         this.flush_timer = undefined;
         this.pending_wheel = undefined;
         this.token = token;
         this.sequence = 0;
+        this.on_keyboard_change();
     }
 
     destroy(): void {
