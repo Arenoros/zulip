@@ -90,3 +90,5 @@ core
 ## Miscellaneous
 # (Ideally this section is empty.)
 .transifexrc
+.agents
+.scratch
