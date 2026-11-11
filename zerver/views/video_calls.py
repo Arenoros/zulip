@@ -40,6 +40,8 @@ from zerver.actions.video_calls import (
     do_mark_missed_livekit_calls_seen,
     do_set_video_call_provider_token,
     do_update_livekit_call_participant,
+    get_livekit_call_chat_message,
+    get_livekit_call_conversation,
     get_livekit_call_rings,
     get_livekit_call_room,
     get_missed_livekit_calls,
@@ -860,7 +862,7 @@ def join_livekit_call(
             "zerver/portico_error_pages/livekit_call_ended.html",
             context={
                 "conversation_url": get_livekit_call_conversation_url(
-                    user_profile.realm, call.message
+                    user_profile.realm, get_livekit_call_chat_message(call)
                 )
             },
         )
@@ -869,8 +871,11 @@ def join_livekit_call(
     # conversation, so other calls get generic names.
     call_title = _("Call")
     conversation_url = user_profile.realm.url
+    call_chat = None
     if call is not None:
-        conversation_url = get_livekit_call_conversation_url(user_profile.realm, call.message)
+        call_chat_message = get_livekit_call_chat_message(call)
+        conversation_url = get_livekit_call_conversation_url(user_profile.realm, call_chat_message)
+        call_chat = get_livekit_call_conversation(call_chat_message).model_dump(exclude_unset=True)
         if stream is not None:
             call_title = f"#{stream.name} > {call.message.topic_name()}"
         else:
@@ -910,6 +915,7 @@ def join_livekit_call(
         voice_only=voice_only,
         remote_control_enabled=user_profile.realm.enable_livekit_remote_control,
         conversation_url=conversation_url,
+        call_chat=call_chat,
         # People can only be called to calls started in a conversation.
         call_message_id=None if call is None else call.message_id,
         call_rings=[]

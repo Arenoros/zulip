@@ -1382,6 +1382,16 @@ paths:
                                           `"cancel"` if the caller stopped calling them, and
                                           `null` if nobody did before the call timed out or
                                           ended.
+                                conversation:
+                                  allOf:
+                                    - $ref: "#/components/schemas/LiveKitCallConversation"
+                                    - description: |
+                                        The call's chat: the conversation shown alongside the
+                                        call. For a direct message call that people were
+                                        invited to, it is the group direct message of everyone
+                                        called to the call.
+
+                                        **Changes**: New in Zulip 13.0 (feature level ZF-711ad6).
                               additionalProperties: false
                               example:
                                 {
@@ -1397,6 +1407,8 @@ paths:
                                         "answer": "decline",
                                       },
                                     ],
+                                  "conversation":
+                                    {"message_id": 42, "user_ids": [9, 10]},
                                   "id": 0,
                                 }
                             - type: object

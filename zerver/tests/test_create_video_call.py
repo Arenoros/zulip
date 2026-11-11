@@ -1338,6 +1338,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
         response = self.join_livekit_call(hamlet, dm=f"{hamlet.id},{cordelia.id}")
         self.assert_in_response("<title>Call | Zulip</title>", response)
         self.assertEqual(self._get_page_params(response)["conversation_url"], realm.url)
+        self.assertIsNone(self._get_page_params(response)["call_chat"])
 
         message_id, _call_events = self.start_direct_message_call(hamlet, [cordelia, iago])
         dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id, iago.id]))
@@ -1346,6 +1347,10 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(
             self._get_page_params(response)["conversation_url"],
             f"{realm.url}/#narrow/dm/{dm}-group/with/{message_id}",
+        )
+        self.assertEqual(
+            self._get_page_params(response)["call_chat"],
+            {"message_id": message_id, "user_ids": sorted([hamlet.id, cordelia.id, iago.id])},
         )
 
         self.login_user(hamlet)
@@ -1368,6 +1373,10 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(
             self._get_page_params(response)["conversation_url"],
             f"{realm.url}/#narrow/channel/{verona.id}/topic/standup/with/{message_id}",
+        )
+        self.assertEqual(
+            self._get_page_params(response)["call_chat"],
+            {"message_id": message_id, "stream_id": verona.id, "topic": "standup"},
         )
 
     def test_join_livekit_call_logged_out(self) -> None:
@@ -1444,6 +1453,10 @@ class LiveKitVideoCallTest(ZulipTestCase):
             [(cordelia.id, hamlet.id, None), (iago.id, hamlet.id, None)],
         )
         self.assertEqual(call_events[1]["users"], [hamlet.id])
+        self.assertEqual(
+            call_events[1]["event"]["conversation"],
+            {"message_id": message_id, "user_ids": user_ids},
+        )
         self.assertEqual(
             set(
                 LiveKitCallRing.objects.filter(call=call).values_list("user_profile_id", flat=True)
@@ -1789,6 +1802,12 @@ class LiveKitVideoCallTest(ZulipTestCase):
             [(cordelia.id, hamlet.id), (cordelia.id, hamlet.id), (othello.id, hamlet.id)],
         )
         self.assertEqual(events[2]["users"], [hamlet.id])
+        # The call chat moves to the group direct message.
+        group_user_ids = sorted([hamlet.id, cordelia.id, othello.id])
+        self.assertEqual(
+            events[2]["event"]["conversation"],
+            {"message_id": invitation.id, "user_ids": group_user_ids},
+        )
         self.assertEqual(
             LiveKitCallRing.objects.get(call=call, user_profile=othello).message_id, invitation.id
         )
@@ -1806,6 +1825,14 @@ class LiveKitVideoCallTest(ZulipTestCase):
         self.assertEqual(self.get_livekit_token(response)["video"]["room"], call.room)
         page_params = self._get_page_params(response)
         self.assertEqual(page_params["call_message_id"], message_id)
+        group_dm = ",".join(map(str, group_user_ids))
+        self.assertEqual(
+            page_params["conversation_url"],
+            f"{hamlet.realm.url}/#narrow/dm/{group_dm}-group/with/{invitation.id}",
+        )
+        self.assertEqual(
+            page_params["call_chat"], {"message_id": invitation.id, "user_ids": group_user_ids}
+        )
         self.assertEqual(
             [ring["user_id"] for ring in page_params["call_rings"]],
             [cordelia.id, cordelia.id, othello.id],
@@ -1854,6 +1881,16 @@ class LiveKitVideoCallTest(ZulipTestCase):
             .latest("id")
             .message_id,
             group_invitation.id,
+        )
+
+        # The link to an ended call leads to its chat.
+        LiveKitCall.objects.filter(id=call.id).update(date_ended=timezone_now())
+        response = self.join_livekit_call(cordelia, dm=dm)
+        self.assert_in_response("This call has ended", response)
+        group_dm = ",".join(map(str, sorted([*group_user_ids, iago.id])))
+        self.assert_in_response(
+            f'href="{hamlet.realm.url}/#narrow/dm/{group_dm}-group/with/{group_invitation.id}"',
+            response,
         )
 
     def test_invite_to_livekit_call_errors(self) -> None:

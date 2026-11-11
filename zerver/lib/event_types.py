@@ -113,6 +113,7 @@ class CallRingsEvent(BaseEvent):
     op: Literal["rings"] = "rings"
     message_id: int
     rings: list[CallRing]
+    conversation: CallConversation
 
 
 class CallMissedSeenEvent(BaseEvent):

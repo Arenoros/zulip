@@ -116,7 +116,11 @@ def send_livekit_call_rings_event(
             "user_profile_id", flat=True
         )
     )
-    event = CallRingsEvent(message_id=call.message_id, rings=get_livekit_call_rings(call))
+    event = CallRingsEvent(
+        message_id=call.message_id,
+        rings=get_livekit_call_rings(call),
+        conversation=get_livekit_call_conversation(get_livekit_call_chat_message(call)),
+    )
     send_event_on_commit(realm, event, user_ids)
 
 
@@ -131,6 +135,20 @@ def get_livekit_call_conversation(message: Message) -> CallConversation:
         message_id=message.id,
         user_ids=sorted(recipient["id"] for recipient in get_display_recipient(message.recipient)),
     )
+
+
+def get_livekit_call_chat_message(call: LiveKitCall) -> Message:
+    # Inviting people to a direct message call moves its chat to the
+    # group direct message of everyone called to it, which only grows,
+    # so the latest message calling someone to the call is in the call
+    # chat.
+    ring = (
+        LiveKitCallRing.objects.filter(call=call)
+        .select_related("message__recipient")
+        .order_by("-message_id")
+        .first()
+    )
+    return call.message if ring is None else ring.message
 
 
 def ring_livekit_call(
