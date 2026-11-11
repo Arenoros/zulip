@@ -36,6 +36,7 @@ from zerver.models.messages import UserMessage as UserMessage
 from zerver.models.muted_users import MutedUser as MutedUser
 from zerver.models.navigation_views import NavigationView as NavigationView
 from zerver.models.onboarding_steps import OnboardingStep as OnboardingStep
+from zerver.models.personal_sections import PersonalSections as PersonalSections
 from zerver.models.prereg_users import EmailChangeStatus as EmailChangeStatus
 from zerver.models.prereg_users import MultiuseInvite as MultiuseInvite
 from zerver.models.prereg_users import PreregistrationRealm as PreregistrationRealm

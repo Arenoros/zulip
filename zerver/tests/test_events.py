@@ -76,6 +76,7 @@ from zerver.actions.navigation_views import (
     do_update_navigation_view,
 )
 from zerver.actions.onboarding_steps import do_mark_onboarding_step_as_read
+from zerver.actions.personal_sections import do_update_personal_sections
 from zerver.actions.presence import do_update_user_presence
 from zerver.actions.reactions import do_add_reaction, do_remove_reaction
 from zerver.actions.realm_domains import (
@@ -217,6 +218,7 @@ from zerver.lib.event_schema import (
     check_navigation_view_remove,
     check_navigation_view_update,
     check_onboarding_steps,
+    check_personal_sections_update,
     check_reaction_add,
     check_reaction_remove,
     check_realm_bot_add,
@@ -2174,6 +2176,14 @@ class NormalActionsTest(BaseAction):
         with self.verify_action() as events:
             do_remove_alert_words(self.user_profile, ["alert_word"])
         check_alert_words("events[0]", events[0])
+
+    def test_personal_sections_events(self) -> None:
+        with self.verify_action() as events:
+            do_update_personal_sections(
+                self.user_profile,
+                [{"name": "Project", "conversations": [[self.example_user("othello").id]]}],
+            )
+        check_personal_sections_update("events[0]", events[0])
 
     def test_saved_replies_events(self) -> None:
         with self.verify_action() as events:

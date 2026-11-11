@@ -181,6 +181,7 @@ ALL_ZULIP_TABLES = {
     "zerver_navigationview",
     "zerver_onboardingstep",
     "zerver_onboardingusermessage",
+    "zerver_personalsections",
     "zerver_preregistrationrealm",
     "zerver_preregistrationuser",
     "zerver_preregistrationuser_streams",
@@ -305,6 +306,9 @@ NON_EXPORTED_TABLES = {
     "zerver_livekitcall",
     "zerver_livekitcallparticipant",
     "zerver_livekitcallring",
+    # Personal sections hold user IDs inside JSON, which the importer
+    # does not know how to renumber.
+    "zerver_personalsections",
     # For any tables listed below here, it's a bug that they are not present in the export.
 }
 

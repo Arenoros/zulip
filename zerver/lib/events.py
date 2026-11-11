@@ -55,6 +55,7 @@ from zerver.lib.narrow_helpers import NeverNegatedNarrowTerm, read_stop_words
 from zerver.lib.narrow_predicate import check_narrow_for_events
 from zerver.lib.navigation_views import get_navigation_views_for_user
 from zerver.lib.onboarding_steps import get_next_onboarding_steps
+from zerver.lib.personal_sections import PersonalSectionsDict, get_personal_sections
 from zerver.lib.presence import get_presence_for_user, get_presences_for_realm
 from zerver.lib.realm_icon import realm_icon_url
 from zerver.lib.realm_logo import get_realm_logo_source, get_realm_logo_url
@@ -363,6 +364,13 @@ def fetch_initial_state_data(
             []
             if user_profile is None
             else [muted_user.model_dump() for muted_user in get_user_mutes(user_profile)]
+        )
+
+    if want("personal_sections"):
+        state["personal_sections"] = (
+            PersonalSectionsDict(conversation_sections=[])
+            if user_profile is None
+            else get_personal_sections(user_profile)
         )
 
     if want("presence"):
@@ -1182,6 +1190,10 @@ def apply_event(
 
     elif event["type"] == "onboarding_steps":
         state["onboarding_steps"] = event["onboarding_steps"]
+    elif event["type"] == "personal_sections":
+        state["personal_sections"] = PersonalSectionsDict(
+            conversation_sections=event["conversation_sections"]
+        )
     elif event["type"] == "custom_profile_fields":
         state["custom_profile_fields"] = event["fields"]
         custom_profile_field_ids = {field["id"] for field in state["custom_profile_fields"]}

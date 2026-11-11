@@ -6784,6 +6784,44 @@ paths:
                             - type: object
                               additionalProperties: false
                               description: |
+                                Event sent to a user's clients when the user changes their
+                                personal sections of direct message conversations.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-48084f).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - personal_sections
+                                op:
+                                  type: string
+                                  enum:
+                                    - update
+                                conversation_sections:
+                                  type: array
+                                  description: |
+                                    The user's sections of direct message conversations, in
+                                    the order the user arranged them.
+                                  items:
+                                    $ref: "#/components/schemas/PersonalConversationSection"
+                              example:
+                                {
+                                  "type": "personal_sections",
+                                  "op": "update",
+                                  "conversation_sections":
+                                    [
+                                      {
+                                        "name": "Project",
+                                        "conversations": [[9], [9, 11]],
+                                      },
+                                    ],
+                                }
+                            - type: object
+                              additionalProperties: false
+                              description: |
                                 Event sent to a user's clients when a reminder is scheduled.
 
                                 **Changes**: New in Zulip 11.0 (feature level 399).
@@ -12750,6 +12788,59 @@ paths:
                         "result": "success",
                         "msg": "",
                         "alert_words": ["bar", "natural", "illustrious"],
+                      }
+  /users/me/personal_sections:
+    patch:
+      operationId: update-personal-sections
+      summary: Update personal sections
+      tags: ["users"]
+      description: |
+        Replace the current user's personal sections of direct message
+        conversations.
+
+        The sections are replaced as a whole, so a client changing one
+        section must send all the sections.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-48084f).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                conversation_sections:
+                  description: |
+                    The new sections of direct message conversations, in the
+                    order to show them. There can be at most 50 sections, with
+                    at most 500 conversations in total.
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/PersonalConversationSection"
+                  example:
+                    [{"name": "Project", "conversations": [[9], [9, 11]]}]
+              required:
+                - conversation_sections
+            encoding:
+              conversation_sections:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CodedError"
+                  - description: |
+                      A typical failed JSON response for when a conversation
+                      is in more than one section:
+                    example:
+                      {
+                        "code": "BAD_REQUEST",
+                        "result": "error",
+                        "msg": "An item can only be in one section.",
                       }
   /users/me/presence:
     post:
@@ -19791,6 +19882,24 @@ paths:
                           navigation views.
 
                           **Changes**: New in Zulip 11.0 (feature level 390).
+                      personal_sections:
+                        type: object
+                        additionalProperties: false
+                        description: |
+                          Present if `personal_sections` is present in `fetch_event_types`.
+
+                          The sections the current user sorted their direct message
+                          conversations into.
+
+                          **Changes**: New in Zulip 13.0 (feature level ZF-48084f).
+                        properties:
+                          conversation_sections:
+                            type: array
+                            description: |
+                              The user's sections of direct message conversations, in
+                              the order the user arranged them.
+                            items:
+                              $ref: "#/components/schemas/PersonalConversationSection"
                       saved_snippets:
                         type: array
                         items:
@@ -30777,6 +30886,32 @@ components:
             The user-facing name for custom navigation views. Omit this
             field for built-in views.
           example: "Alert Words"
+    PersonalConversationSection:
+      type: object
+      additionalProperties: false
+      description: |
+        A section of direct message conversations that a user sorted
+        into it.
+      properties:
+        name:
+          type: string
+          description: |
+            The name of the section, at most 60 characters long. The names
+            of a user's sections differ in more than case.
+        conversations:
+          type: array
+          description: |
+            The conversations in the section. A conversation is in at most
+            one section.
+          items:
+            type: array
+            description: |
+              The IDs of the users in the direct message conversation other
+              than the current user, in ascending order. This is an empty
+              list for the conversation with oneself. A conversation in a
+              section has at most 100 such users.
+            items:
+              type: integer
     SavedSnippet:
       type: object
       description: |

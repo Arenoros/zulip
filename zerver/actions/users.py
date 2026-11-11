@@ -91,6 +91,7 @@ from zerver.models import (
 )
 from zerver.models.bots import get_bot_services
 from zerver.models.messages import UserMessage
+from zerver.models.personal_sections import PersonalSections
 from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.models.realms import get_fake_email_domain
 from zerver.models.saved_snippets import SavedSnippet
@@ -211,6 +212,7 @@ def do_delete_user_core(
             (UserMessage, "user_profile"),
             (ExternalAuthID, "user"),
             (SavedSnippet, "user_profile"),
+            (PersonalSections, "user_profile"),
             (ScheduledMessage, "sender"),
             (Draft, "user_profile"),
         ]

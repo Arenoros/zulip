@@ -54,6 +54,7 @@ from zerver.lib.event_types import (
     NavigationViewRemoveEvent,
     NavigationViewUpdateEvent,
     OnboardingStepsEvent,
+    PersonalSectionsUpdateEvent,
     PersonAvatarFields,
     PersonBotOwnerId,
     PersonCustomProfileField,
@@ -197,6 +198,7 @@ check_navigation_view_add = make_checker(NavigationViewAddEvent)
 check_navigation_view_remove = make_checker(NavigationViewRemoveEvent)
 check_navigation_view_update = make_checker(NavigationViewUpdateEvent)
 check_onboarding_steps = make_checker(OnboardingStepsEvent)
+check_personal_sections_update = make_checker(PersonalSectionsUpdateEvent)
 check_reaction_add = make_checker(ReactionAddEvent)
 check_reaction_remove = make_checker(ReactionRemoveEvent)
 check_realm_bot_delete = make_checker(RealmBotDeleteEvent)

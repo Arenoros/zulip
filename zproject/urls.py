@@ -95,6 +95,7 @@ from zerver.views.navigation_views import (
     update_navigation_view,
 )
 from zerver.views.onboarding_steps import mark_onboarding_step_as_read
+from zerver.views.personal_sections import update_personal_sections
 from zerver.views.presence import (
     get_presence_backend,
     get_status_backend,
@@ -521,6 +522,8 @@ v1_api_and_json_patterns = [
     rest_path("user_groups/<int:user_group_id>/deactivate", POST=deactivate_user_group),
     # users/me -> zerver.views.user_settings
     rest_path("users/me/avatar", POST=set_avatar_backend, DELETE=delete_avatar_backend),
+    # users/me/personal_sections -> zerver.views.personal_sections
+    rest_path("users/me/personal_sections", PATCH=update_personal_sections),
     # users/me/onboarding_steps -> zerver.views.onboarding_steps
     rest_path(
         "users/me/onboarding_steps",

@@ -358,6 +358,17 @@ class OnboardingStepsEvent(BaseEvent):
     onboarding_steps: list[OnboardingSteps]
 
 
+class PersonalConversationSectionFields(BaseEventModel):
+    name: str
+    conversations: list[list[int]]
+
+
+class PersonalSectionsUpdateEvent(BaseEvent):
+    type: Literal["personal_sections"] = "personal_sections"
+    op: Literal["update"] = "update"
+    conversation_sections: list[PersonalConversationSectionFields]
+
+
 class DeviceAddEvent(BaseEvent):
     type: Literal["device"] = "device"
     op: Literal["add"] = "add"
