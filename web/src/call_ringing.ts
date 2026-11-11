@@ -6,6 +6,7 @@ import * as channel from "./channel.ts";
 import * as compose_banner from "./compose_banner.ts";
 import * as compose_state from "./compose_state.ts";
 import * as compose_validate from "./compose_validate.ts";
+import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
 import type {CallConversation} from "./livekit_call_invites.ts";
 import * as livekit_missed_calls from "./livekit_missed_calls.ts";
@@ -94,6 +95,31 @@ function open_call(url: string): void {
     window.open(url, "_blank", "noopener,noreferrer");
 }
 
+// Opens a window for a call that is being started.  The call window only
+// shows the call's chat and lets people invite others if the server has
+// the call when the window loads, so it shows the call once the call is
+// started.
+function open_window_for_new_call(): {show: (url: string) => void; close: () => void} {
+    // The desktop app opens calls in its own window, whenever asked.
+    if (electron_bridge !== undefined) {
+        return {show: open_call, close() {}};
+    }
+    // Browsers block windows that are not opened directly in response
+    // to a click, so an empty window opens right away.
+    const call_window = window.open("", "_blank");
+    if (call_window !== null) {
+        call_window.opener = null;
+    }
+    return {
+        show(url) {
+            call_window?.location.assign(new URL(url, window.location.href).href);
+        },
+        close() {
+            call_window?.close();
+        },
+    };
+}
+
 function format_names(user_ids: number[]): string {
     return util.format_array_as_list(
         user_ids.map((user_id) => people.get_full_name(user_id)),
@@ -149,19 +175,19 @@ export let start_call_from_compose = (call_id: number, voice_only: boolean): voi
         );
     }
 
-    // Browsers block windows that are not opened directly in response
-    // to a click, so the call opens before the server responds.
-    open_call(url);
+    const call_window = open_window_for_new_call();
     void channel.post({
         url: "/json/calls/livekit/start",
         data: {...data, call_id: JSON.stringify(call_id), voice_only: JSON.stringify(voice_only)},
         success(raw_data) {
             const {message_id} = start_call_response_schema.parse(raw_data);
+            call_window.show(url);
             if (ring_user_ids.length > 0) {
                 show_outgoing_call(message_id, ring_user_ids);
             }
         },
         error(xhr) {
+            call_window.close();
             compose_banner.show_error_message(
                 channel.xhr_error_message($t({defaultMessage: "Failed to start the call."}), xhr),
                 compose_banner.CLASSNAMES.generic_compose_error,

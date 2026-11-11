@@ -19,6 +19,7 @@ const compose_state = mock_esm("../src/compose_state");
 const compose_validate = mock_esm("../src/compose_validate", {
     NO_CHANNEL_SELECTED_ERROR_MESSAGE: "Please select a channel.",
 });
+const electron_bridge = mock_esm("../src/electron_bridge");
 const popup_banners = mock_esm("../src/popup_banners");
 const ui_util = mock_esm("../src/ui_util");
 
@@ -77,6 +78,8 @@ const RESULT_BANNER_DURATION_MS = 5000;
 let banner_count = 0;
 let $last_banner;
 let opened_urls;
+// The empty windows opened for calls being started.
+let new_call_windows;
 let posts;
 let faded_banners;
 
@@ -85,12 +88,32 @@ function test(label, f) {
         timeouts.clear();
         intervals.clear();
         opened_urls = [];
+        new_call_windows = [];
         posts = [];
         faded_banners = [];
         window.open = (url, target, features) => {
             assert.equal(target, "_blank");
+            if (url === "") {
+                assert.equal(features, undefined);
+                const call_window = {
+                    opener: window,
+                    url: undefined,
+                    closed: false,
+                    location: {
+                        assign(url) {
+                            call_window.url = url;
+                        },
+                    },
+                    close() {
+                        call_window.closed = true;
+                    },
+                };
+                new_call_windows.push(call_window);
+                return call_window;
+            }
             assert.equal(features, "noopener,noreferrer");
             opened_urls.push(url);
+            return null;
         };
         helpers.override(
             channel,
@@ -182,15 +205,18 @@ test("start channel call", ({override, disallow}) => {
     });
     call_ringing.start_call_from_compose(123, false);
     assert.deepEqual(error.slice(0, 2), ["Please select a channel.", "missing_stream"]);
-    assert.deepEqual(opened_urls, []);
+    assert.deepEqual(new_call_windows, []);
     assert.deepEqual(posts, []);
 
     override(compose_state, "stream_id", () => 5);
     override(compose_state, "topic", () => "standup");
     call_ringing.start_call_from_compose(123, true);
-    assert.deepEqual(opened_urls, [
-        "/calls/livekit/join?call_id=123&channel_id=5&voice_only=true",
-    ]);
+    // The window opens right away, but shows the call once it is
+    // started, so that the call window knows the call.
+    assert.equal(new_call_windows.length, 1);
+    const [call_window] = new_call_windows;
+    assert.equal(call_window.opener, null);
+    assert.equal(call_window.url, undefined);
     assert.equal(posts.length, 1);
     assert.equal(posts[0].url, "/json/calls/livekit/start");
     assert.deepEqual(posts[0].data, {
@@ -204,19 +230,55 @@ test("start channel call", ({override, disallow}) => {
     // Calls in channels don't ring anyone.
     disallow(banners, "append");
     posts[0].success({message_id: 42, result: "success", msg: ""});
+    assert.equal(
+        call_window.url,
+        "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&channel_id=5&voice_only=true",
+    );
+    assert.deepEqual(opened_urls, []);
+});
+
+test("start call in the desktop app", ({override}) => {
+    // The desktop app opens the call window when asked, so it opens once
+    // the call is started.
+    override(electron_bridge, "electron_bridge", {});
+    override(compose_state, "get_message_type", () => "stream");
+    override(compose_state, "stream_id", () => 5);
+    override(compose_state, "topic", () => "standup");
+    call_ringing.start_call_from_compose(123, false);
+    assert.deepEqual(opened_urls, []);
+    posts[0].success({message_id: 42, result: "success", msg: ""});
+    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&channel_id=5"]);
+    assert.deepEqual(new_call_windows, []);
+});
+
+test("start call with the window blocked", ({override}) => {
+    window.open = () => null;
+    override(compose_state, "get_message_type", () => "stream");
+    override(compose_state, "stream_id", () => 5);
+    override(compose_state, "topic", () => "standup");
+    call_ringing.start_call_from_compose(123, false);
+    posts[0].success({message_id: 42, result: "success", msg: ""});
+
+    call_ringing.start_call_from_compose(124, false);
+    override(channel, "xhr_error_message", (message) => message);
+    override(compose_banner, "show_error_message", () => {});
+    posts[1].error({});
+    // The call still starts, and its link is in the conversation.
+    assert.equal(posts.length, 2);
+    assert.deepEqual(opened_urls, []);
 });
 
 test("start direct message call errors", ({override}) => {
     override(compose_state, "get_message_type", () => "private");
     override(compose_validate, "validate_private_message", () => false);
     call_ringing.start_call_from_compose(123, false);
-    assert.deepEqual(opened_urls, []);
+    assert.deepEqual(new_call_windows, []);
     assert.deepEqual(posts, []);
 
     override(compose_validate, "validate_private_message", () => true);
     override(compose_state, "private_message_recipient_ids", () => [alice.user_id]);
     call_ringing.start_call_from_compose(123, false);
-    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&dm=1,2"]);
+    assert.equal(new_call_windows.length, 1);
 
     const xhr = {responseJSON: {msg: "Invalid user ID 9999"}};
     override(channel, "xhr_error_message", (message, error_xhr) => {
@@ -232,6 +294,9 @@ test("start direct message call errors", ({override}) => {
         "translated: Failed to start the call.: Invalid user ID 9999",
         "generic_compose_error",
     ]);
+    // A call that could not start does not open.
+    assert.ok(new_call_windows[0].closed);
+    assert.equal(new_call_windows[0].url, undefined);
 });
 
 test("outgoing call is accepted", (helpers) => {
