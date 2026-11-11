@@ -13,6 +13,12 @@ A request for a Zulip user to join a specific call.
 **Call participant**:
 A person connected to the call.
 
+**Call recording**:
+Audio or video captured during a call and saved for later playback.
+
+**Call transcript**:
+A text rendering of the speech captured during a call.
+
 **Call origin**:
 The direct message conversation or channel topic where a call started.
 
