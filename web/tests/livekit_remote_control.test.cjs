@@ -12,8 +12,10 @@ const livekit_remote_control = zrequire("livekit_remote_control");
 const cordelia = {identity: "8", name: "Cordelia"};
 const hamlet = {identity: "10", name: "King Hamlet"};
 
+const remote_control_desktop_app = {get_remote_control_supported: () => true};
+
 run_test("screen share from a desktop app supporting remote control", ({override}) => {
-    override(electron_bridge, "electron_bridge", {get_remote_control_supported: () => true});
+    override(electron_bridge, "electron_bridge", remote_control_desktop_app);
     const publish_options = livekit_remote_control.get_screen_share_publish_options(true);
     assert.ok(
         livekit_remote_control.is_controllable_screen_share({trackName: publish_options.name}),
@@ -21,7 +23,7 @@ run_test("screen share from a desktop app supporting remote control", ({override
 });
 
 run_test("screen share in an organization that disabled remote control", ({override}) => {
-    override(electron_bridge, "electron_bridge", {get_remote_control_supported: () => true});
+    override(electron_bridge, "electron_bridge", remote_control_desktop_app);
     assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(false), {});
 });
 
