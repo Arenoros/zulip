@@ -47,6 +47,7 @@ import * as dialog_widget from "./dialog_widget.ts";
 import * as drafts from "./drafts.ts";
 import * as drafts_overlay_ui from "./drafts_overlay_ui.ts";
 import * as echo from "./echo.ts";
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import * as emoji from "./emoji.ts";
 import * as emoji_picker from "./emoji_picker.ts";
 import * as emojisets from "./emojisets.ts";
@@ -773,6 +774,8 @@ export async function initialize_everything(state_data) {
         },
     });
 
+    // Must happen before hashchange.ts shows the call chat.
+    embedded_call_chat.initialize();
     // All overlays, and also activity_ui, must be initialized before hashchange.ts
     hashchange.initialize();
 

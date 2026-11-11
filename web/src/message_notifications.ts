@@ -3,6 +3,7 @@ import {$} from "jquery";
 import * as alert_words from "./alert_words.ts";
 import * as blueslip from "./blueslip.ts";
 import * as desktop_notifications from "./desktop_notifications.ts";
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import {$t} from "./i18n.ts";
 import * as message_parser from "./message_parser.ts";
 import type {Message} from "./message_store.ts";
@@ -400,6 +401,11 @@ export function should_send_audible_notification(
 }
 
 export function received_messages(messages: (Message | TestNotificationMessage)[]): void {
+    if (embedded_call_chat.is_active()) {
+        // The main web app and the other apps notify about messages in
+        // the call chat.
+        return;
+    }
     for (const message of messages) {
         if (!message_is_notifiable(message)) {
             continue;

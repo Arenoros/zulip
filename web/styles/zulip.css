@@ -2700,3 +2700,16 @@ body:not(.spectator-view) {
         transform: translate3d(4px, 0, 0);
     }
 }
+
+/* The web app as the chat of a call only shows the call chat. */
+.embedded-call-chat {
+    --navbar-fixed-height: 0px;
+
+    #navbar-fixed-container,
+    #left-sidebar-container,
+    #right-sidebar-container,
+    #compose-recipient,
+    #compose_close {
+        display: none;
+    }
+}

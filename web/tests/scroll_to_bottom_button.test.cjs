@@ -14,6 +14,7 @@ class TransitionEvent {
 }
 set_global("TransitionEvent", TransitionEvent);
 
+const embedded_call_chat = mock_esm("../src/embedded_call_chat", {is_active: () => false});
 const message_lists = mock_esm("../src/message_lists", {current: undefined});
 const message_scroll_state = mock_esm("../src/message_scroll_state", {
     actively_scrolling: false,
@@ -499,6 +500,14 @@ test("next unread DM conversation at the bottom of a DM view", ({override}) => {
 
 test("no arrow without another unread topic", ({override}) => {
     set_feed(override, {view: "topic", other_unread_conversation: false});
+
+    scroll_to_bottom_button.update();
+    assert.ok(!is_shown());
+});
+
+test("no arrow in the chat of a call", ({override}) => {
+    override(embedded_call_chat, "is_active", () => true);
+    set_feed(override, {view: "topic"});
 
     scroll_to_bottom_button.update();
     assert.ok(!is_shown());

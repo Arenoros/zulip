@@ -17,6 +17,7 @@ import * as compose_recipient from "./compose_recipient.ts";
 import * as compose_state from "./compose_state.ts";
 import * as condense from "./condense.ts";
 import * as date_util from "./date_util.ts";
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import * as feedback_widget from "./feedback_widget.ts";
 import {Filter} from "./filter.ts";
 import * as hash_parser from "./hash_parser.ts";
@@ -493,6 +494,10 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
     }
     const filter = new Filter(raw_terms);
     filter.try_adjusting_for_moved_with_target();
+
+    if (embedded_call_chat.is_active() && !embedded_call_chat.is_call_chat(filter)) {
+        return;
+    }
 
     if (!show_opts.force_rerender && try_rendering_locally_for_same_narrow(filter, show_opts)) {
         return;

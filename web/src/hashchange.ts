@@ -7,6 +7,7 @@ import * as admin from "./admin.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
 import * as drafts_overlay_ui from "./drafts_overlay_ui.ts";
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import {Filter} from "./filter.ts";
 import * as hash_parser from "./hash_parser.ts";
 import * as hash_util from "./hash_util.ts";
@@ -575,6 +576,11 @@ function hashchanged(
     // so that this can be part of the main switch statement.
     if (window.location.hash.startsWith("#reload")) {
         // We don't want to change narrow if app is undergoing reload.
+        return undefined;
+    }
+
+    if (embedded_call_chat.is_active() && !embedded_call_chat.is_call_chat_hash(current_hash)) {
+        embedded_call_chat.restore_call_chat_hash(old_hash);
         return undefined;
     }
 

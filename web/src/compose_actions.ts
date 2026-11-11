@@ -17,6 +17,7 @@ import type {ComposeTriggeredOptions} from "./compose_ui.ts";
 import * as compose_validate from "./compose_validate.ts";
 import * as composebox_typeahead from "./composebox_typeahead.ts";
 import * as drafts from "./drafts.ts";
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import * as feedback_widget from "./feedback_widget.ts";
 import {$t} from "./i18n.ts";
 import * as message_lists from "./message_lists.ts";
@@ -363,6 +364,18 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
         opts.private_message_recipient_ids = [];
     }
 
+    if (embedded_call_chat.is_active() && !embedded_call_chat.is_call_chat_recipient(opts)) {
+        // The chat of a call only sends messages to the call chat, so
+        // other conversations open in a new tab.
+        if (
+            raw_opts.private_message_recipient_ids !== undefined ||
+            raw_opts.stream_id !== undefined
+        ) {
+            embedded_call_chat.open_recipient_in_new_tab(opts);
+        }
+        return;
+    }
+
     const subbed_streams = stream_data.subscribed_subs();
     if (
         subbed_streams.length === 1 &&
@@ -509,6 +522,12 @@ export let cancel = (): void => {
 
     $("textarea#compose-textarea").height(40 + "px");
 
+    if (embedded_call_chat.is_active()) {
+        // The chat of a call always shows its compose box.
+        compose_fade.clear_compose();
+        return;
+    }
+
     if (page_params.narrow !== undefined) {
         // Never close the compose box in narrow embedded windows, but
         // at least clear the topic and unfade.
@@ -618,7 +637,33 @@ export type NarrowActivateOpts = {
     show_more_topics: boolean;
 } & ShowMessageViewOpts;
 
+function show_call_chat_compose(): void {
+    // The chat of a call always shows its compose box for the call
+    // chat. When the call chat moves to the group direct message of
+    // everyone called to the call, the compose box keeps what is being
+    // written.
+    const {private_message_recipient_ids} = narrow_state.set_compose_defaults();
+    if (
+        compose_state.get_message_type() === "private" &&
+        private_message_recipient_ids !== undefined
+    ) {
+        compose_state.set_private_message_recipient_ids(private_message_recipient_ids);
+        compose_recipient.update_on_recipient_change();
+        compose_recipient.update_compose_area_placeholder_text();
+        return;
+    }
+    start({
+        message_type: private_message_recipient_ids === undefined ? "stream" : "private",
+        trigger: "call chat",
+    });
+}
+
 export function on_narrow(opts: NarrowActivateOpts): void {
+    if (embedded_call_chat.is_active()) {
+        show_call_chat_compose();
+        return;
+    }
+
     // We use force_close when jumping between direct message narrows with
     // the "p" key, so that we don't have an open compose box that makes
     // it difficult to cycle quickly through unread messages.

@@ -2,6 +2,7 @@ import {$} from "jquery";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
 
+import * as embedded_call_chat from "./embedded_call_chat.ts";
 import * as message_lists from "./message_lists.ts";
 import * as message_scroll_state from "./message_scroll_state.ts";
 import * as message_viewport from "./message_viewport.ts";
@@ -111,6 +112,10 @@ function hide_once_not_hovered(): void {
 }
 
 function next_unread_conversation_mode(): ButtonMode | undefined {
+    if (embedded_call_chat.is_active()) {
+        // The chat of a call only shows the call chat.
+        return undefined;
+    }
     assert(message_lists.current !== undefined);
     const filter = message_lists.current.data.filter;
     if (filter.can_show_next_unread_topic_conversation_button()) {
