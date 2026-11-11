@@ -1221,6 +1221,14 @@ paths:
                                   type: boolean
                                   description: |
                                     Whether the call is a voice call.
+                                conversation:
+                                  allOf:
+                                    - $ref: "#/components/schemas/LiveKitCallConversation"
+                                    - description: |
+                                        The conversation where the user can find the call,
+                                        if they miss it.
+
+                                        **Changes**: New in Zulip 13.0 (feature level ZF-4372b7).
                               additionalProperties: false
                               example:
                                 {
@@ -1230,6 +1238,8 @@ paths:
                                   "caller_id": 10,
                                   "url": "/calls/livekit/join?call_id=123456789012345&dm=9,10",
                                   "voice_only": false,
+                                  "conversation":
+                                    {"message_id": 42, "user_ids": [9, 10]},
                                   "id": 0,
                                 }
                             - type: object
@@ -1237,12 +1247,16 @@ paths:
                                 Event sent to the user who called someone to a ringing LiveKit
                                 call, and to the clients of the user who answered it, when a
                                 user accepts or declines the call with
-                                [`POST /calls/livekit/ring`](/api/update-livekit-call-ring).
+                                [`POST /calls/livekit/ring`](/api/update-livekit-call-ring),
+                                or joins the call while it rings for them, which accepts it.
 
                                 Clients should stop ringing for the call if `user_id` is the
                                 current user, since the user answered on another client.
 
-                                **Changes**: New in Zulip 13.0 (feature level ZF-c4ce18).
+                                **Changes**: Starting with Zulip 13.0 (feature level ZF-4372b7),
+                                joining a call while it rings accepts it.
+
+                                New in Zulip 13.0 (feature level ZF-c4ce18).
                               properties:
                                 id:
                                   $ref: "#/components/schemas/EventIdSchema"
@@ -1383,6 +1397,40 @@ paths:
                                         "answer": "decline",
                                       },
                                     ],
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to a user's clients when the user marks LiveKit
+                                calls they missed as seen with
+                                [`POST /calls/livekit/missed/seen`](/api/mark-missed-livekit-calls-seen).
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-4372b7).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - call
+                                op:
+                                  type: string
+                                  enum:
+                                    - missed_seen
+                                message_ids:
+                                  type: array
+                                  description: |
+                                    The `message_id` of the `conversation` of the missed calls
+                                    that are now seen.
+                                  items:
+                                    type: integer
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "call",
+                                  "op": "missed_seen",
+                                  "message_ids": [42],
                                   "id": 0,
                                 }
                             - type: object
@@ -28222,6 +28270,106 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
+  /calls/livekit/missed:
+    get:
+      tags: ["channels"]
+      operationId: get-missed-livekit-calls
+      summary: Get missed LiveKit calls
+      description: |
+        Get the latest LiveKit calls that the current user was called to
+        and missed: they did not answer or join the call before it stopped
+        ringing.
+
+        Calls that are ringing or were answered are not included, and
+        neither are calls older than the latest 100 missed calls.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-4372b7).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      missed_calls:
+                        type: array
+                        description: |
+                          The missed calls, latest first.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            caller_id:
+                              type: integer
+                              description: |
+                                The ID of the user who called.
+                            date_rang:
+                              type: integer
+                              description: |
+                                When the call rang, as a UNIX timestamp.
+                            seen:
+                              type: boolean
+                              description: |
+                                Whether the user marked the call as seen with
+                                [`POST /calls/livekit/missed/seen`](/api/mark-missed-livekit-calls-seen).
+                            conversation:
+                              $ref: "#/components/schemas/LiveKitCallConversation"
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "missed_calls":
+                          [
+                            {
+                              "caller_id": 10,
+                              "date_rang": 1767225600,
+                              "seen": false,
+                              "conversation":
+                                {"message_id": 42, "user_ids": [9, 10]},
+                            },
+                          ],
+                      }
+  /calls/livekit/missed/seen:
+    post:
+      tags: ["channels"]
+      operationId: mark-missed-livekit-calls-seen
+      summary: Mark missed LiveKit calls as seen
+      description: |
+        Mark the LiveKit calls that the current user missed in the given
+        conversations as seen, for example when the user opens one of the
+        conversations. Sends a
+        [`call op:missed_seen`](/api/get-events#call-missed_seen) event to
+        the user's clients.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-4372b7).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                message_ids:
+                  description: |
+                    The `message_id` of the `conversation` of the missed calls.
+                  type: array
+                  items:
+                    type: integer
+                  example: [42]
+              required:
+                - message_ids
+            encoding:
+              message_ids:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
   /calls/livekit/invite:
     post:
       tags: ["channels"]
@@ -28290,6 +28438,36 @@ components:
         `/fetch_api_key` or `/dev_fetch_api_key` endpoints.
 
   schemas:
+    LiveKitCallConversation:
+      type: object
+      additionalProperties: false
+      description: |
+        The conversation where a user called to a LiveKit call can find the
+        call: the direct message conversation or channel topic where the
+        call started, or, for a user invited to a direct message call, the
+        group direct message of everyone called to it.
+      properties:
+        message_id:
+          type: integer
+          description: |
+            The ID of the message with the link to the call in the conversation.
+        user_ids:
+          type: array
+          items:
+            type: integer
+          description: |
+            For a direct message conversation, the IDs of the users in it,
+            including the current user.
+        stream_id:
+          type: integer
+          description: |
+            For a channel topic, the ID of the channel.
+        topic:
+          type: string
+          description: |
+            For a channel topic, the name of the topic.
+      required:
+        - message_id
     IgnoredParametersUnsupported:
       type: array
       items:

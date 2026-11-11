@@ -188,6 +188,8 @@
 * [Start LiveKit call](/api/start-livekit-call)
 * [Answer or cancel a ringing LiveKit call](/api/update-livekit-call-ring)
 * [Invite users to a LiveKit call](/api/invite-to-livekit-call)
+* [Get missed LiveKit calls](/api/get-missed-livekit-calls)
+* [Mark missed LiveKit calls as seen](/api/mark-missed-livekit-calls-seen)
 
 ## Mobile push notifications
 

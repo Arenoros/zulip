@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import Literal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
@@ -13,6 +14,8 @@ from zerver.lib.event_types import (
     BaseEvent,
     CallAnswerEvent,
     CallCancelEvent,
+    CallConversation,
+    CallMissedSeenEvent,
     CallRing,
     CallRingEvent,
     CallRingsEvent,
@@ -34,6 +37,7 @@ from zerver.models import (
     LiveKitCall,
     LiveKitCallParticipant,
     LiveKitCallRing,
+    Message,
     Realm,
     Stream,
     UserProfile,
@@ -116,8 +120,21 @@ def send_livekit_call_rings_event(
     send_event_on_commit(realm, event, user_ids)
 
 
+def get_livekit_call_conversation(message: Message) -> CallConversation:
+    if message.is_channel_message:
+        return CallConversation(
+            message_id=message.id,
+            stream_id=message.recipient.type_id,
+            topic=message.topic_name(),
+        )
+    return CallConversation(
+        message_id=message.id,
+        user_ids=sorted(recipient["id"] for recipient in get_display_recipient(message.recipient)),
+    )
+
+
 def ring_livekit_call(
-    caller: UserProfile, call: LiveKitCall, user_ids: Iterable[int], message_id: int
+    caller: UserProfile, call: LiveKitCall, user_ids: Iterable[int], message: Message
 ) -> None:
     called_user_ids = list(
         UserProfile.objects.filter(
@@ -132,7 +149,7 @@ def ring_livekit_call(
             call=call,
             user_profile_id=user_id,
             caller=caller,
-            message_id=message_id,
+            message=message,
             date_rang=now,
         )
         for user_id in called_user_ids
@@ -141,7 +158,11 @@ def ring_livekit_call(
     # being called, so that the caller cannot tell.
     muting_user_ids = get_muting_users(caller.id)
     event = CallRingEvent(
-        message_id=call.message_id, caller_id=caller.id, url=call.url, voice_only=call.voice_only
+        message_id=call.message_id,
+        caller_id=caller.id,
+        url=call.url,
+        voice_only=call.voice_only,
+        conversation=get_livekit_call_conversation(message),
     )
     send_event_on_commit(
         caller.realm,
@@ -194,7 +215,7 @@ def check_start_livekit_call(
     # Like channel meetings in other chat apps, a call in a channel
     # only posts its link; only direct message calls ring.
     if recipient_type_name == "private":
-        ring_livekit_call(caller, call, message_to, message_id)
+        ring_livekit_call(caller, call, message_to, call.message)
 
     return message_id
 
@@ -294,13 +315,51 @@ def check_invite_to_livekit_call(
         check_sender_can_access_recipients(inviter, [invitee])
         recipient = recipient_for_user_profiles([invitee], None, inviter)
         check_can_send_direct_message(inviter.realm, inviter, [invitee], recipient)
-    if call.message.is_channel_message:
-        message_id = call.message_id
-    else:
-        message_id = send_livekit_call_invitation(
-            inviter, client, call, invitees, read_by_sender=read_by_sender
+    message = call.message
+    if not message.is_channel_message:
+        message = Message.objects.select_related("recipient").get(
+            id=send_livekit_call_invitation(
+                inviter, client, call, invitees, read_by_sender=read_by_sender
+            )
         )
-    ring_livekit_call(inviter, call, [invitee.id for invitee in invitees], message_id)
+    ring_livekit_call(inviter, call, [invitee.id for invitee in invitees], message)
+
+
+def get_missed_livekit_calls(user_profile: UserProfile) -> list[dict[str, object]]:
+    # A call was missed if the user did not answer it before it timed
+    # out or the call ended.
+    rings = (
+        LiveKitCallRing.objects.filter(user_profile=user_profile)
+        .filter(
+            Q(answer=LiveKitCallRing.CANCELLED)
+            | Q(answer=None, date_rang__lte=timezone_now() - LIVEKIT_RING_TIMEOUT)
+            | Q(answer=None, call__date_ended__isnull=False)
+        )
+        .select_related("message__recipient")
+        # ponytail: only recent missed calls; add paging if people need
+        # older ones, since the conversations they are in show up in
+        # Recent conversations anyway.
+        .order_by("-date_rang")[:100]
+    )
+    return [
+        {
+            "caller_id": ring.caller_id,
+            "date_rang": datetime_to_timestamp(ring.date_rang),
+            "seen": ring.date_seen is not None,
+            "conversation": get_livekit_call_conversation(ring.message).model_dump(
+                exclude_unset=True
+            ),
+        }
+        for ring in rings
+    ]
+
+
+def do_mark_missed_livekit_calls_seen(user_profile: UserProfile, message_ids: list[int]) -> None:
+    LiveKitCallRing.objects.filter(
+        user_profile=user_profile, message_id__in=message_ids, date_seen=None
+    ).update(date_seen=timezone_now())
+    event = CallMissedSeenEvent(message_ids=sorted(set(message_ids)))
+    send_event_on_commit(user_profile.realm, event, [user_profile.id])
 
 
 def do_update_livekit_call_participant(room: str, identity: str, in_call: bool) -> None:
@@ -316,6 +375,22 @@ def do_update_livekit_call_participant(room: str, identity: str, in_call: bool) 
     LiveKitCallParticipant.objects.update_or_create(
         call=call, user_profile=user_profile, defaults={"in_call": in_call}
     )
+    if not in_call:
+        return
+    # Joining a call while it rings for you, for example with the link
+    # in the conversation, answers it.
+    ring = (
+        LiveKitCallRing.objects.filter(
+            call=call,
+            user_profile=user_profile,
+            answer=None,
+            date_rang__gt=timezone_now() - LIVEKIT_RING_TIMEOUT,
+        )
+        .select_related("call")
+        .first()
+    )
+    if ring is not None:
+        do_answer_call(user_profile, ring, "accept")
 
 
 @transaction.atomic(durable=True)

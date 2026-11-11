@@ -37,10 +37,12 @@ from zerver.actions.video_calls import (
     do_answer_call,
     do_cancel_call,
     do_end_livekit_call,
+    do_mark_missed_livekit_calls_seen,
     do_set_video_call_provider_token,
     do_update_livekit_call_participant,
     get_livekit_call_rings,
     get_livekit_call_room,
+    get_missed_livekit_calls,
 )
 from zerver.decorator import zulip_login_required
 from zerver.lib.cache import (
@@ -1055,6 +1057,21 @@ def update_livekit_call_ring(
         if ring is None:
             raise JsonableError(_("You were not called."))
         do_answer_call(user_profile, ring, operator)
+    return json_success(request)
+
+
+@typed_endpoint_without_parameters
+def get_missed_livekit_calls_backend(
+    request: HttpRequest, user_profile: UserProfile
+) -> HttpResponse:
+    return json_success(request, data={"missed_calls": get_missed_livekit_calls(user_profile)})
+
+
+@typed_endpoint
+def mark_missed_livekit_calls_seen(
+    request: HttpRequest, user_profile: UserProfile, *, message_ids: Json[list[int]]
+) -> HttpResponse:
+    do_mark_missed_livekit_calls_seen(user_profile, message_ids)
     return json_success(request)
 
 

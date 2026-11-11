@@ -1,7 +1,7 @@
 import hashlib
 from base64 import b64encode
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
@@ -20,6 +20,11 @@ from zerver.actions.muted_users import do_mute_user
 from zerver.actions.realm_settings import (
     do_change_realm_permission_group_setting,
     do_set_realm_property,
+)
+from zerver.actions.video_calls import (
+    LIVEKIT_RING_TIMEOUT,
+    do_end_livekit_call,
+    do_update_livekit_call_participant,
 )
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
@@ -1427,6 +1432,7 @@ class LiveKitVideoCallTest(ZulipTestCase):
                     "caller_id": hamlet.id,
                     "url": url,
                     "voice_only": False,
+                    "conversation": {"message_id": message_id, "user_ids": user_ids},
                 },
                 "users": [cordelia.id],
             },
@@ -1763,7 +1769,21 @@ class LiveKitVideoCallTest(ZulipTestCase):
             self.direct_message_user_ids(invitation), {hamlet.id, cordelia.id, othello.id}
         )
         self.assertEqual(events[0]["event"]["type"], "message")
-        self.assertEqual(events[1], {**call_events[0], "users": [othello.id]})
+        # The ring tells Othello where to find the call: the group direct
+        # message, rather than the conversation he is not in.
+        self.assertEqual(
+            events[1],
+            {
+                "event": {
+                    **call_events[0]["event"],
+                    "conversation": {
+                        "message_id": invitation.id,
+                        "user_ids": sorted([hamlet.id, cordelia.id, othello.id]),
+                    },
+                },
+                "users": [othello.id],
+            },
+        )
         self.assertEqual(
             [(ring["user_id"], ring["caller_id"]) for ring in events[2]["event"]["rings"]],
             [(cordelia.id, hamlet.id), (cordelia.id, hamlet.id), (othello.id, hamlet.id)],
@@ -1917,10 +1937,18 @@ class LiveKitVideoCallTest(ZulipTestCase):
             )
             self.assert_json_success(result)
 
-        participant_event("participant_joined", str(cordelia.id))
+        # Cordelia joins with the link while the call rings for her,
+        # which answers it.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            participant_event("participant_joined", str(cordelia.id))
         self.assertTrue(
             LiveKitCallParticipant.objects.get(call=call, user_profile=cordelia).in_call
         )
+        self.assertEqual(
+            LiveKitCallRing.objects.get(call=call, user_profile=cordelia).answer,
+            LiveKitCallRing.ACCEPTED,
+        )
+        self.assertEqual(events[0]["event"]["op"], "accept")
 
         # People in the call learn who is being called.
         with self.capture_send_event_calls(expected_num_events=3) as events:
@@ -1948,3 +1976,91 @@ class LiveKitVideoCallTest(ZulipTestCase):
 
         self.post_livekit_webhook(self.room_finished(call.room))
         self.assertFalse(LiveKitCallParticipant.objects.filter(in_call=True).exists())
+
+    def get_missed_calls(self, user: UserProfile) -> list[dict[str, Any]]:
+        self.login_user(user)
+        return self.assert_json_success(self.client_get("/json/calls/livekit/missed"))[
+            "missed_calls"
+        ]
+
+    def test_missed_livekit_calls(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        iago = self.example_user("iago")
+        othello = self.example_user("othello")
+        aaron = self.example_user("aaron")
+        self.set_livekit_call_provider()
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        with time_machine.travel(now, tick=False):
+            message_id, _call_events = self.start_direct_message_call(
+                hamlet, [cordelia, iago, othello, aaron]
+            )
+        call = LiveKitCall.objects.get(message_id=message_id)
+        self.update_call_ring(cordelia, message_id, "accept")
+        self.update_call_ring(iago, message_id, "decline")
+        # Joining the call while it rings answers it.
+        with time_machine.travel(now + timedelta(seconds=10), tick=False):
+            do_update_livekit_call_participant(call.room, str(aaron.id), in_call=True)
+
+        # Ringing calls have not been missed yet.
+        with time_machine.travel(now + timedelta(seconds=10), tick=False):
+            self.assertEqual(self.get_missed_calls(othello), [])
+
+        user_ids = sorted([hamlet.id, cordelia.id, iago.id, othello.id, aaron.id])
+        missed_call = {
+            "caller_id": hamlet.id,
+            "date_rang": int(now.timestamp()),
+            "seen": False,
+            "conversation": {"message_id": message_id, "user_ids": user_ids},
+        }
+        with time_machine.travel(now + LIVEKIT_RING_TIMEOUT, tick=False):
+            self.assertEqual(self.get_missed_calls(othello), [missed_call])
+            for user in [cordelia, iago, aaron]:
+                self.assertEqual(self.get_missed_calls(user), [])
+
+            # Joining after the call stopped ringing doesn't answer it.
+            do_update_livekit_call_participant(call.room, str(othello.id), in_call=True)
+            self.assertEqual(self.get_missed_calls(othello), [missed_call])
+
+        # A call that ends, or that the caller cancels, while it is ringing
+        # is missed right away.
+        with time_machine.travel(now, tick=False):
+            self.update_call_ring(hamlet, message_id, "cancel")
+            self.assertEqual(self.get_missed_calls(othello), [missed_call])
+
+        # The earlier logins were at the time of the call.
+        self.login_user(othello)
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            result = self.client_post(
+                "/json/calls/livekit/missed/seen",
+                {"message_ids": orjson.dumps([message_id]).decode()},
+            )
+        self.assert_json_success(result)
+        self.assertEqual(
+            events[0],
+            {
+                "event": {"type": "call", "op": "missed_seen", "message_ids": [message_id]},
+                "users": [othello.id],
+            },
+        )
+        self.assertEqual(self.get_missed_calls(othello), [{**missed_call, "seen": True}])
+
+    def test_missed_livekit_channel_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        verona = get_stream("Verona", hamlet.realm)
+        self.set_livekit_call_provider()
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/calls/livekit/start",
+            {"type": "channel", "channel_id": str(verona.id), "topic": "standup", "call_id": "123"},
+        )
+        message_id = self.assert_json_success(result)["message_id"]
+        self.invite_to_call(hamlet, message_id, [cordelia])
+        do_end_livekit_call(LiveKitCall.objects.get(message_id=message_id).room)
+
+        [missed_call] = self.get_missed_calls(cordelia)
+        self.assertEqual(
+            missed_call["conversation"],
+            {"message_id": message_id, "stream_id": verona.id, "topic": "standup"},
+        )

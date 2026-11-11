@@ -53,3 +53,5 @@ class LiveKitCallRing(models.Model):
     CANCELLED = 3
     # How the ringing stopped, unless it timed out or is still going on.
     answer = models.PositiveSmallIntegerField(null=True)
+    # When the user opened the conversation of a call they missed.
+    date_seen = models.DateTimeField(null=True)

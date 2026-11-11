@@ -23,6 +23,7 @@ from zerver.lib.event_types import (
     BotServicesOutgoing,
     CallAnswerEvent,
     CallCancelEvent,
+    CallMissedSeenEvent,
     CallRingEvent,
     CallRingsEvent,
     ChannelFolderAddEvent,
@@ -173,6 +174,7 @@ check_attachment_remove = make_checker(AttachmentRemoveEvent)
 check_attachment_update = make_checker(AttachmentUpdateEvent)
 check_call_answer = make_checker(CallAnswerEvent)
 check_call_cancel = make_checker(CallCancelEvent)
+check_call_missed_seen = make_checker(CallMissedSeenEvent)
 check_call_ring = make_checker(CallRingEvent)
 check_call_rings = make_checker(CallRingsEvent)
 check_channel_folder_add = make_checker(ChannelFolderAddEvent)

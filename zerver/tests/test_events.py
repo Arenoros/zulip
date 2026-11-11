@@ -173,6 +173,7 @@ from zerver.actions.video_calls import (
     do_answer_call,
     do_cancel_call,
     do_end_livekit_call,
+    do_mark_missed_livekit_calls_seen,
     do_set_video_call_provider_token,
     do_update_livekit_call_participant,
 )
@@ -185,6 +186,7 @@ from zerver.lib.event_schema import (
     check_attachment_update,
     check_call_answer,
     check_call_cancel,
+    check_call_missed_seen,
     check_call_ring,
     check_call_rings,
     check_channel_folder_add,
@@ -1771,6 +1773,10 @@ class NormalActionsTest(BaseAction):
         with self.verify_action(state_change_expected=False) as events:
             do_end_livekit_call(call.room)
         check_call_cancel("events[0]", events[0])
+
+        with self.verify_action(state_change_expected=False) as events:
+            do_mark_missed_livekit_calls_seen(self.user_profile, [message_id])
+        check_call_missed_seen("events[0]", events[0])
 
     def test_edit_direct_message_typing_events(self) -> None:
         msg_id = self.send_personal_message(self.user_profile, self.example_user("cordelia"))

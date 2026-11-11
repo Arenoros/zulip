@@ -71,6 +71,13 @@ class AttachmentUpdateEvent(BaseEvent):
     upload_space_used: int
 
 
+class CallConversation(BaseEventModel):
+    message_id: int
+    stream_id: int | None = None
+    topic: str | None = None
+    user_ids: list[int] | None = None
+
+
 class CallRingEvent(BaseEvent):
     type: Literal["call"] = "call"
     op: Literal["ring"] = "ring"
@@ -78,6 +85,7 @@ class CallRingEvent(BaseEvent):
     caller_id: int
     url: str
     voice_only: bool
+    conversation: CallConversation
 
 
 class CallAnswerEvent(BaseEvent):
@@ -105,6 +113,12 @@ class CallRingsEvent(BaseEvent):
     op: Literal["rings"] = "rings"
     message_id: int
     rings: list[CallRing]
+
+
+class CallMissedSeenEvent(BaseEvent):
+    type: Literal["call"] = "call"
+    op: Literal["missed_seen"] = "missed_seen"
+    message_ids: list[int]
 
 
 class ChannelFolderForChannelFolderAddEvent(BaseEventModel):
