@@ -32,6 +32,12 @@
             <a class="recent-view-conversation-link recent-view-table-link {{#if is_empty_string_topic}}empty-topic-display{{/if}}" data-tippy-content="{{topic_display_name}}" href="{{topic_url}}" tabindex="-1">{{topic_display_name}}</a>
             {{/if}}
             <div class="recent-view-unread-mention-and-count-wrapper">
+                {{#unless (eq missed_calls_count 0)}}
+                <span class="recent-view-missed-calls tippy-zulip-tooltip {{#unless (eq unseen_missed_calls_count 0)}}recent-view-missed-calls-unseen{{/unless}}" data-tippy-content="{{t 'Missed calls' }}">
+                    <i class="zulip-icon zulip-icon-voice-call" aria-hidden="true"></i>
+                    {{missed_calls_count}}
+                </span>
+                {{/unless}}
                 {{#if is_private}}
                 <span class="unread_mention_info tippy-zulip-tooltip {{#unless has_unread_mention}}unread_hidden{{/unless}}"
                   data-tippy-content="{{t 'You have unread mentions' }}">@</span>

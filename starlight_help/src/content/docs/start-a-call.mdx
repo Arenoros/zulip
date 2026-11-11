@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
+import GoToRecentConversations from "../include/_GoToRecentConversations.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import VideoCallIcon from "~icons/zulip-icon/video-call";
@@ -107,6 +108,27 @@ organization.
       If you miss a call, you can still join it with the link in the message
       about the call, until everyone has left the call.
     </ZulipTip>
+  </TabItem>
+</Tabs>
+
+### Find calls you missed
+
+A call is missed if you didn't answer it before it stopped ringing. In
+[recent conversations](/help/recent-conversations), conversations with
+calls you missed are marked with a phone icon (<VoiceCallIcon />) and the
+number of missed calls. The phone icon next to **Recent conversations** in
+the left sidebar shows how many missed calls you haven't looked at yet.
+Missed calls are marked as seen on all your devices when you open the
+conversation.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToRecentConversations />
+
+      1. Click **Missed calls** at the top to only show conversations with
+         calls you missed.
+    </FlattenedSteps>
   </TabItem>
 </Tabs>
 

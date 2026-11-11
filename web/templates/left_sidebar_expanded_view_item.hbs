@@ -10,6 +10,12 @@
                 {{unread_count}}
             {{/unless}}
         </span>
+        {{#if shows_missed_calls}}
+        <span class="left-sidebar-missed-calls hide">
+            <i class="zulip-icon zulip-icon-voice-call" aria-hidden="true"></i>
+            <span class="left-sidebar-missed-calls-count"></span>
+        </span>
+        {{/if}}
         {{#if supports_masked_unread}}
         <span class="masked_unread_count">
             <i class="zulip-icon zulip-icon-masked-unread"></i>

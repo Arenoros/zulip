@@ -1028,6 +1028,19 @@
         margin: 0;
     }
 
+    .recent-view-missed-calls {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        opacity: 0.7;
+        cursor: default;
+    }
+
+    .recent-view-missed-calls-unseen {
+        color: var(--color-text-missed-call);
+        opacity: 1;
+    }
+
     .recent-view-unread-count-wrapper {
         display: flex;
         align-items: center;

@@ -66,6 +66,12 @@ export function update_reminders_row(): void {
     ui_util.update_unread_count_in_dom($reminders_li, count);
 }
 
+export function update_missed_calls_count(count: number): void {
+    const $missed_calls = $(".top_left_recent_view .left-sidebar-missed-calls");
+    $missed_calls.toggleClass("hide", count === 0);
+    $missed_calls.find(".left-sidebar-missed-calls-count").text(count);
+}
+
 export let update_dom_with_unread_counts = function (
     counts: unread.FullUnreadCountsData,
     skip_animations: boolean,

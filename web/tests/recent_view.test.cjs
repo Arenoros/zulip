@@ -237,13 +237,19 @@ const views_util = zrequire("views_util");
 rt.set_hide_other_views(noop);
 const recent_view_util = zrequire("recent_view_util");
 const rt_data = zrequire("recent_view_data");
+const livekit_missed_calls = zrequire("livekit_missed_calls");
 const muted_users = zrequire("muted_users");
 const {set_realm} = zrequire("state_data");
 const sub_store = zrequire("sub_store");
 const util = zrequire("util");
 
 const REALM_EMPTY_TOPIC_DISPLAY_NAME = "test general chat";
-set_realm(make_realm({realm_empty_topic_display_name: REALM_EMPTY_TOPIC_DISPLAY_NAME}));
+set_realm(
+    make_realm({
+        realm_empty_topic_display_name: REALM_EMPTY_TOPIC_DISPLAY_NAME,
+        realm_available_video_chat_providers: {disabled: {name: "", id: 0}},
+    }),
+);
 
 for (const stream_id of [stream1, stream2, stream3, stream4, stream6]) {
     sub_store.add_hydrated_sub(stream_id, {
@@ -456,6 +462,8 @@ function generate_topic_data(topic_info_array) {
             conversation_key: get_topic_key(stream_id, topic),
             topic_url: "https://www.example.com/with/12",
             unread_count,
+            missed_calls_count: 0,
+            unseen_missed_calls_count: 0,
             mention_in_unread: false,
             visibility_policy,
             all_visibility_policies,
@@ -479,7 +487,7 @@ function stub_out_filter_buttons() {
     //
     //       See show_selected_filters() and set_filter() in the
     //       implementation.
-    for (const filter of ["unread", "muted", "participated", "include_private"]) {
+    for (const filter of ["unread", "muted", "participated", "include_private", "missed_calls"]) {
         const $stub = $.create(`filter-${filter}-stub`);
         const selector = `[data-filter="${filter}"]`;
         $("#recent_view_filter_buttons").set_find_results(selector, $stub);
@@ -599,6 +607,8 @@ test("test_recent_view_show", ({override, mock_template}) => {
         filter_unread: false,
         filter_participated: false,
         filter_pm: false,
+        filter_missed_calls: false,
+        show_missed_calls_filter: false,
         search_val: "",
         is_spectator: false,
         show_folder_filter: false,
@@ -639,6 +649,8 @@ test("test_filter_is_spectator", ({mock_template}) => {
         filter_unread: false,
         filter_participated: false,
         filter_pm: false,
+        filter_missed_calls: false,
+        show_missed_calls_filter: false,
         search_val: "",
         is_spectator: true,
         show_folder_filter: false,
@@ -675,6 +687,8 @@ test("test_no_filter", ({mock_template}) => {
         filter_unread: false,
         filter_participated: false,
         filter_pm: false,
+        filter_missed_calls: false,
+        show_missed_calls_filter: false,
         search_val: "",
         is_spectator: false,
         show_folder_filter: false,
@@ -801,6 +815,8 @@ test("test_filter_pm", ({mock_template}) => {
         filter_unread: false,
         filter_participated: false,
         filter_pm: true,
+        filter_missed_calls: false,
+        show_missed_calls_filter: false,
         search_val: "",
         is_spectator: false,
         show_folder_filter: false,
@@ -853,6 +869,8 @@ test("test_filter_participated", ({mock_template}) => {
             filter_unread: false,
             filter_participated: expected_filter_participated,
             filter_pm: false,
+            filter_missed_calls: false,
+            show_missed_calls_filter: false,
             search_val: "",
             is_spectator: false,
             show_folder_filter: false,
@@ -1782,4 +1800,39 @@ test("test_folder_filter", () => {
     // Clean up folder_id modifications.
     delete sub1.folder_id;
     delete sub4.folder_id;
+});
+
+test("test_filter_missed_calls", () => {
+    rt.clear_for_tests();
+    rt.set_filters_for_tests();
+    stub_out_filter_buttons();
+    rt.set_filter("missed_calls");
+    const dm_with_missed_call = {last_msg_id: 15, participated: true, type: "private"};
+    const other_dm = {last_msg_id: 17, participated: true, type: "private"};
+    const topic = {last_msg_id: 1, participated: true, type: "stream"};
+    livekit_missed_calls.add({
+        caller_id: 2,
+        date_rang: 0,
+        seen: true,
+        conversation: {message_id: 15, user_ids: [1, 2, 3]},
+    });
+
+    // Without LiveKit, nobody misses calls, so the filter does nothing.
+    assert.equal(rt.filters_should_hide_row(dm_with_missed_call), true);
+    assert.equal(rt.filters_should_hide_row(topic), false);
+
+    set_realm(
+        make_realm({
+            realm_empty_topic_display_name: REALM_EMPTY_TOPIC_DISPLAY_NAME,
+            realm_available_video_chat_providers: {
+                disabled: {name: "", id: 0},
+                livekit: {name: "LiveKit", id: 7},
+            },
+        }),
+    );
+    // The filter shows direct messages with missed calls, even though
+    // "Include DMs" is off.
+    assert.equal(rt.filters_should_hide_row(dm_with_missed_call), false);
+    assert.equal(rt.filters_should_hide_row(other_dm), true);
+    assert.equal(rt.filters_should_hide_row(topic), true);
 });

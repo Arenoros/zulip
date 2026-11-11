@@ -30,3 +30,13 @@
     {{/if}}
     {{t 'Participated' }}
 </button>
+{{#if show_missed_calls_filter}}
+<button data-filter="missed_calls" type="button" class="button-recent-filters {{#if is_spectator}}fake_disabled_button{{/if}}" role="checkbox" aria-checked="false">
+    {{#if filter_missed_calls}}
+    <i class="fa fa-check-square-o"></i>
+    {{else}}
+    <i class="fa fa-square-o"></i>
+    {{/if}}
+    {{t 'Missed calls' }}
+</button>
+{{/if}}

@@ -66,6 +66,7 @@ import * as left_sidebar_navigation_area_popovers from "./left_sidebar_navigatio
 import * as left_sidebar_tooltips from "./left_sidebar_tooltips.ts";
 import * as lightbox from "./lightbox.ts";
 import * as linkifiers from "./linkifiers.ts";
+import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as loading_error from "./loading_error.ts";
 import * as local_message from "./local_message.ts";
 import * as markdown from "./markdown.ts";
@@ -599,6 +600,16 @@ export async function initialize_everything(state_data) {
     navbar_alerts.initialize();
     popup_banners.initialize();
     call_ringing.initialize();
+    if (livekit_missed_calls.is_available()) {
+        livekit_missed_calls.initialize({
+            on_change() {
+                left_sidebar_navigation_area.update_missed_calls_count(
+                    livekit_missed_calls.get_unseen_count(),
+                );
+                recent_view_ui.complete_rerender();
+            },
+        });
+    }
     message_list_hover.initialize();
     initialize_kitchen_sink_stuff();
     local_message.initialize(state_data.local_message);

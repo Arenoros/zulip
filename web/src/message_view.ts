@@ -25,6 +25,7 @@ import {$t} from "./i18n.ts";
 import * as inbox_ui from "./inbox_ui.ts";
 import * as inbox_util from "./inbox_util.ts";
 import * as left_sidebar_navigation_area from "./left_sidebar_navigation_area.ts";
+import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as message_edit from "./message_edit.ts";
 import * as message_feed_loading from "./message_feed_loading.ts";
 import * as message_feed_top_notices from "./message_feed_top_notices.ts";
@@ -1759,6 +1760,7 @@ function handle_post_view_change(
 
     narrow_title.update_narrow_title(filter);
     left_sidebar_navigation_area.handle_narrow_activated(filter);
+    livekit_missed_calls.handle_narrow_activated(filter);
     stream_list.handle_narrow_activated(filter, opts.change_hash, opts.show_more_topics);
     pm_list.handle_narrow_activated(filter);
     // This also builds the user sidebar.

@@ -4,6 +4,7 @@ import * as tippy from "tippy.js";
 
 import * as drafts from "./drafts.ts";
 import {$t} from "./i18n.ts";
+import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as scheduled_messages from "./scheduled_messages.ts";
 import * as settings_data from "./settings_data.ts";
 import {disconnect_toggle_class, observe_toggle_class} from "./sidebar_tooltip_helpers.ts";
@@ -100,6 +101,22 @@ export function initialize(): void {
                         ),
                     );
                     break;
+            }
+
+            if (sidebar_option === "recent") {
+                const missed_calls_count = livekit_missed_calls.get_unseen_count();
+                $container
+                    .find(".views-missed-calls-count")
+                    .toggleClass("hide", missed_calls_count === 0)
+                    .text(
+                        $t(
+                            {
+                                defaultMessage:
+                                    "You have {missed_calls_count, plural, one {# new missed call} other {# new missed calls}}.",
+                            },
+                            {missed_calls_count},
+                        ),
+                    );
             }
 
             // Since the tooltip is attached to the anchor tag which doesn't

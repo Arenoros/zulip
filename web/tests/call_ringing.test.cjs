@@ -54,6 +54,7 @@ function run_timeouts(delay) {
 }
 
 const call_ringing = zrequire("call_ringing");
+const livekit_missed_calls = zrequire("livekit_missed_calls");
 const people = zrequire("people");
 const {set_current_user} = zrequire("state_data");
 const {initialize_user_settings} = zrequire("user_settings");
@@ -65,6 +66,7 @@ const bot = make_user({user_id: 4, full_name: "Bot", is_bot: true});
 for (const user of [me, alice, bob, bot]) {
     people.add_active_user(user);
 }
+people.initialize_current_user(me.user_id);
 set_current_user({user_id: me.user_id});
 const user_settings = {enable_sounds: true};
 initialize_user_settings({user_settings});
@@ -151,6 +153,7 @@ function ring(message_id, voice_only = false) {
         caller_id: alice.user_id,
         url: `/calls/livekit/join?call_id=${message_id}`,
         voice_only,
+        conversation: {message_id, user_ids: [me.user_id, alice.user_id]},
     });
 }
 
@@ -357,6 +360,8 @@ test("incoming call is declined", () => {
 });
 
 test("incoming call stops ringing", () => {
+    const missed_calls = livekit_missed_calls.get_counts(`${alice.user_id}`).count;
+
     ring(52);
     const $answered_banner = $last_banner;
     call_ringing.dispatch({op: "accept", message_id: 52, user_id: me.user_id});
@@ -376,5 +381,13 @@ test("incoming call stops ringing", () => {
     // Events for calls that already stopped ringing are ignored.
     call_ringing.dispatch({op: "cancel", message_id: 54});
     assert.equal(faded_banners.length, 3);
+
+    // The cancelled call and the one that timed out were missed.
+    assert.deepEqual(livekit_missed_calls.get_counts(`${alice.user_id}`), {
+        count: missed_calls + 2,
+        unseen_count: 2,
+    });
+    call_ringing.dispatch({op: "missed_seen", message_ids: [53, 54]});
+    assert.equal(livekit_missed_calls.get_unseen_count(), 0);
 });
 

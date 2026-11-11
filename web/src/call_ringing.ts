@@ -7,6 +7,7 @@ import * as compose_banner from "./compose_banner.ts";
 import * as compose_state from "./compose_state.ts";
 import * as compose_validate from "./compose_validate.ts";
 import {$t} from "./i18n.ts";
+import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as people from "./people.ts";
 import * as popup_banners from "./popup_banners.ts";
 import {current_user} from "./state_data.ts";
@@ -25,6 +26,7 @@ export type CallRingEvent = {
     caller_id: number;
     url: string;
     voice_only: boolean;
+    conversation: livekit_missed_calls.CallConversation;
 };
 
 export type CallAnswerEvent = {
@@ -44,8 +46,15 @@ export type CallRingsEvent = {
     message_id: number;
 };
 
+export type CallMissedSeenEvent = {
+    op: "missed_seen";
+    message_ids: number[];
+};
+
 type IncomingCall = {
     $banner: JQuery;
+    event: CallRingEvent;
+    date_rang: number;
     url: string;
     timeout: ReturnType<typeof setTimeout>;
     ring_sound_interval: ReturnType<typeof setInterval>;
@@ -247,9 +256,11 @@ function show_incoming_call(event: CallRingEvent): void {
     );
     incoming_calls.set(event.message_id, {
         $banner,
+        event,
+        date_rang: Math.floor(Date.now() / 1000),
         url: event.url,
         timeout: setTimeout(() => {
-            end_incoming_call(event.message_id);
+            end_incoming_call(event.message_id, true);
         }, RING_TIMEOUT_MS),
         // The message with the call link already played the first
         // notification sound.
@@ -261,10 +272,19 @@ function show_incoming_call(event: CallRingEvent): void {
     });
 }
 
-function end_incoming_call(message_id: number): void {
+// A call that stops ringing without being answered was missed.
+function end_incoming_call(message_id: number, missed = false): void {
     const call = incoming_calls.get(message_id);
     if (call === undefined) {
         return;
+    }
+    if (missed) {
+        livekit_missed_calls.add({
+            caller_id: call.event.caller_id,
+            date_rang: call.date_rang,
+            seen: false,
+            conversation: call.event.conversation,
+        });
     }
     clearTimeout(call.timeout);
     clearInterval(call.ring_sound_interval);
@@ -273,7 +293,7 @@ function end_incoming_call(message_id: number): void {
 }
 
 export function dispatch(
-    event: CallRingEvent | CallAnswerEvent | CallCancelEvent | CallRingsEvent,
+    event: CallRingEvent | CallAnswerEvent | CallCancelEvent | CallRingsEvent | CallMissedSeenEvent,
 ): void {
     switch (event.op) {
         case "ring":
@@ -311,10 +331,13 @@ export function dispatch(
         }
         case "cancel":
             // Either the caller cancelled the call, or the call ended.
-            end_incoming_call(event.message_id);
+            end_incoming_call(event.message_id, true);
             end_outgoing_call(event.message_id);
             break;
         case "rings":
+            break;
+        case "missed_seen":
+            livekit_missed_calls.mark_seen(event.message_ids);
             break;
     }
 }

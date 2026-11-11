@@ -13,6 +13,8 @@ export type BuiltInViewBasicMetadata = {
     has_unread_count: boolean;
     unread_count_type: "normal-count" | "quiet-count" | "";
     supports_masked_unread: boolean;
+    // Whether the view shows how many calls the user missed.
+    shows_missed_calls?: boolean;
     hidden_for_spectators: boolean;
     menu_icon_class: string;
     menu_aria_label: string;
@@ -47,6 +49,7 @@ export const built_in_views_meta_data: Record<string, BuiltInViewBasicMetadata> 
         has_unread_count: true,
         unread_count_type: "normal-count",
         supports_masked_unread: true,
+        shows_missed_calls: true,
         hidden_for_spectators: false,
         menu_icon_class: "recent-view-sidebar-menu-icon",
         menu_aria_label: $t({defaultMessage: "Recent conversations options"}),

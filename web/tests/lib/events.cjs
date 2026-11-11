@@ -164,6 +164,10 @@ exports.fixtures = {
         caller_id: typing_person1.user_id,
         url: "/calls/livekit/join?call_id=123456789012345&dm=9,10",
         voice_only: false,
+        conversation: {
+            message_id: 1000,
+            user_ids: [9, 10],
+        },
     },
 
     channel_folder__add: {

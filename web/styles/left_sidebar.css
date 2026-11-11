@@ -1538,6 +1538,19 @@ li.active-sub-filter {
     }
 }
 
+.left-sidebar-missed-calls {
+    grid-area: controls;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: var(--left-sidebar-unread-offset);
+    color: var(--color-text-missed-call);
+
+    &.hide {
+        display: none;
+    }
+}
+
 /* Low-attention unreads have no bounding box,
    so their counters should be aligned on the
    same baseline as the navigation label. */

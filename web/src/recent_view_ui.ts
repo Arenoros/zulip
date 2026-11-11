@@ -28,6 +28,7 @@ import * as keydown_util from "./keydown_util.ts";
 import * as left_sidebar_navigation_area from "./left_sidebar_navigation_area.ts";
 import * as list_widget from "./list_widget.ts";
 import type {ListWidget} from "./list_widget.ts";
+import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as loading from "./loading.ts";
 import {localstorage} from "./localstorage.ts";
 import type {MessageListData} from "./message_list_data.ts";
@@ -762,6 +763,8 @@ type ConversationContext = {
     full_last_msg_date_time: string;
     conversation_key: string;
     unread_count: number;
+    missed_calls_count: number;
+    unseen_missed_calls_count: number;
     last_msg_time: string;
     senders: people.SenderInfo[];
     other_senders_count: number;
@@ -935,10 +938,13 @@ function format_conversation(conversation_data: ConversationData): ConversationC
         };
     }
 
+    const missed_calls = livekit_missed_calls.get_counts(conversation_key);
     const shared_context = {
         full_last_msg_date_time,
         conversation_key,
         unread_count,
+        missed_calls_count: missed_calls.count,
+        unseen_missed_calls_count: missed_calls.unseen_count,
         last_msg_time,
         last_msg_url: hash_util.by_conversation_and_time_url(last_msg),
         is_spectator: page_params.is_spectator,
@@ -1106,6 +1112,14 @@ export function filters_should_hide_row(topic_data: ConversationData): boolean {
         return true;
     }
 
+    const filter_missed_calls = filters.has("missed_calls") && livekit_missed_calls.is_available();
+    if (
+        filter_missed_calls &&
+        livekit_missed_calls.get_counts(get_conversation_key(topic_data)).count === 0
+    ) {
+        return true;
+    }
+
     if (dropdown_filters.has(views_util.FILTERS.UNMUTED_TOPICS) && msg.type === "stream") {
         // We want to show the unmuted or followed topics within muted
         // streams in Recent Conversations.
@@ -1120,7 +1134,9 @@ export function filters_should_hide_row(topic_data: ConversationData): boolean {
         }
     }
 
-    if (!filters.has("include_private") && topic_data.type === "private") {
+    // Most calls are in direct messages, so the missed calls filter
+    // shows them even when direct messages are otherwise excluded.
+    if (!filters.has("include_private") && !filter_missed_calls && topic_data.type === "private") {
         return true;
     }
 
@@ -1385,6 +1401,8 @@ function get_recent_view_filters_params(): {
     filter_unread: boolean;
     filter_participated: boolean;
     filter_pm: boolean;
+    filter_missed_calls: boolean;
+    show_missed_calls_filter: boolean;
     is_spectator: boolean;
     show_folder_filter: boolean;
     folder_filter_tooltip: string;
@@ -1393,6 +1411,8 @@ function get_recent_view_filters_params(): {
         filter_unread: filters.has("unread"),
         filter_participated: filters.has("participated"),
         filter_pm: filters.has("include_private"),
+        filter_missed_calls: filters.has("missed_calls"),
+        show_missed_calls_filter: livekit_missed_calls.is_available(),
         is_spectator: page_params.is_spectator,
         show_folder_filter: channel_folders.user_has_folders(),
         folder_filter_tooltip:
