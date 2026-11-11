@@ -28234,9 +28234,11 @@ paths:
 
         The users get a [`call op:ring`](/api/get-events#call-ring) event,
         and can then join the call even if it was started in a direct
-        message conversation they are not in. For a call in a channel,
-        they need to have access to the channel. The current user must be
-        allowed to send them direct messages.
+        message conversation they are not in. For a direct message call,
+        the current user also sends the call's link to the group direct
+        message of everyone called to the call, unless it already has it.
+        For a call in a channel, they need to have access to the channel.
+        The current user must be allowed to send them direct messages.
 
         Bots and deactivated users are not called. Users who have
         [muted](/api/mute-user) the current user are not rung, but are

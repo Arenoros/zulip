@@ -8,6 +8,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
 
 from zerver.actions.message_send import check_can_send_direct_message, check_send_message
+from zerver.lib.display_recipient import get_display_recipient
 from zerver.lib.event_types import (
     BaseEvent,
     CallAnswerEvent,
@@ -115,7 +116,9 @@ def send_livekit_call_rings_event(
     send_event_on_commit(realm, event, user_ids)
 
 
-def ring_livekit_call(caller: UserProfile, call: LiveKitCall, user_ids: Iterable[int]) -> None:
+def ring_livekit_call(
+    caller: UserProfile, call: LiveKitCall, user_ids: Iterable[int], message_id: int
+) -> None:
     called_user_ids = list(
         UserProfile.objects.filter(
             id__in=user_ids, realm_id=caller.realm_id, is_active=True, is_bot=False
@@ -125,7 +128,13 @@ def ring_livekit_call(caller: UserProfile, call: LiveKitCall, user_ids: Iterable
     )
     now = timezone_now()
     LiveKitCallRing.objects.bulk_create(
-        LiveKitCallRing(call=call, user_profile_id=user_id, caller=caller, date_rang=now)
+        LiveKitCallRing(
+            call=call,
+            user_profile_id=user_id,
+            caller=caller,
+            message_id=message_id,
+            date_rang=now,
+        )
         for user_id in called_user_ids
     )
     # People who muted the caller are not rung, but are still shown as
@@ -185,7 +194,7 @@ def check_start_livekit_call(
     # Like channel meetings in other chat apps, a call in a channel
     # only posts its link; only direct message calls ring.
     if recipient_type_name == "private":
-        ring_livekit_call(caller, call, message_to)
+        ring_livekit_call(caller, call, message_to, message_id)
 
     return message_id
 
@@ -215,8 +224,55 @@ def do_end_livekit_call(room: str) -> None:
         send_event_on_commit(call.message.realm, event, user_ids)
 
 
+def send_livekit_call_invitation(
+    inviter: UserProfile,
+    client: Client,
+    call: LiveKitCall,
+    invitees: list[UserProfile],
+    *,
+    read_by_sender: bool,
+) -> int:
+    # Everyone called to a direct message call shares a group direct
+    # message with the call's link, where the call's chat continues,
+    # and where people who missed the call find it.
+    user_ids = {recipient["id"] for recipient in get_display_recipient(call.message.recipient)}
+    user_ids |= set(
+        LiveKitCallRing.objects.filter(call=call).values_list("user_profile_id", flat=True)
+    )
+    user_ids |= {invitee.id for invitee in invitees}
+    user_ids.discard(inviter.id)
+    recipient = recipient_for_user_profiles(
+        list(UserProfile.objects.filter(id__in=user_ids)), None, inviter
+    )
+    if recipient.id == call.message.recipient_id:
+        return call.message_id
+    message_id = (
+        LiveKitCallRing.objects.filter(call=call, message__recipient_id=recipient.id)
+        .values_list("message_id", flat=True)
+        .first()
+    )
+    if message_id is not None:
+        return message_id
+    with override_language(inviter.default_language):
+        link_text = _("Join voice call.") if call.voice_only else _("Join video call.")
+    return check_send_message(
+        inviter,
+        client,
+        "private",
+        sorted(user_ids),
+        None,
+        f"[{link_text}]({call.url})",
+        read_by_sender=read_by_sender,
+    ).message_id
+
+
 def check_invite_to_livekit_call(
-    inviter: UserProfile, call: LiveKitCall, invitees: list[UserProfile]
+    inviter: UserProfile,
+    client: Client,
+    call: LiveKitCall,
+    invitees: list[UserProfile],
+    *,
+    read_by_sender: bool,
 ) -> None:
     if call.date_ended is not None:
         raise JsonableError(_("This call has ended."))
@@ -238,7 +294,13 @@ def check_invite_to_livekit_call(
         check_sender_can_access_recipients(inviter, [invitee])
         recipient = recipient_for_user_profiles([invitee], None, inviter)
         check_can_send_direct_message(inviter.realm, inviter, [invitee], recipient)
-    ring_livekit_call(inviter, call, [invitee.id for invitee in invitees])
+    if call.message.is_channel_message:
+        message_id = call.message_id
+    else:
+        message_id = send_livekit_call_invitation(
+            inviter, client, call, invitees, read_by_sender=read_by_sender
+        )
+    ring_livekit_call(inviter, call, [invitee.id for invitee in invitees], message_id)
 
 
 def do_update_livekit_call_participant(room: str, identity: str, in_call: bool) -> None:

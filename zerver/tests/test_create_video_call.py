@@ -23,7 +23,15 @@ from zerver.actions.realm_settings import (
 )
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.url_encoding import append_url_query_string
-from zerver.models import LiveKitCall, LiveKitCallParticipant, LiveKitCallRing, Realm, UserProfile
+from zerver.models import (
+    LiveKitCall,
+    LiveKitCallParticipant,
+    LiveKitCallRing,
+    Message,
+    Realm,
+    UserMessage,
+    UserProfile,
+)
 from zerver.models.groups import NamedUserGroup, SystemGroups
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
@@ -1705,6 +1713,11 @@ class LiveKitVideoCallTest(ZulipTestCase):
             response = self.post_livekit_webhook(event)
         self.assert_json_error(response, "LiveKit credentials have not been configured")
 
+    def direct_message_user_ids(self, message: Message) -> set[int]:
+        return set(
+            UserMessage.objects.filter(message=message).values_list("user_profile_id", flat=True)
+        )
+
     def invite_to_call(
         self, user: UserProfile, message_id: int, invitees: list[UserProfile]
     ) -> "TestHttpResponse":
@@ -1727,15 +1740,46 @@ class LiveKitVideoCallTest(ZulipTestCase):
         call = LiveKitCall.objects.get(message_id=message_id)
         dm = ",".join(str(user_id) for user_id in sorted([hamlet.id, cordelia.id]))
 
-        with self.capture_send_event_calls(expected_num_events=2) as events:
+        # Calling someone from the conversation again needs no new message.
+        with self.capture_send_event_calls(expected_num_events=2):
+            result = self.invite_to_call(hamlet, message_id, [cordelia])
+        self.assert_json_success(result)
+        self.assertEqual(
+            LiveKitCallRing.objects.filter(call=call, user_profile=cordelia)
+            .latest("id")
+            .message_id,
+            message_id,
+        )
+
+        # Inviting someone to a direct message call posts its link to the
+        # group direct message of everyone called to it.
+        with self.capture_send_event_calls(expected_num_events=3) as events:
             result = self.invite_to_call(hamlet, message_id, [othello])
         self.assert_json_success(result)
-        self.assertEqual(events[0], {**call_events[0], "users": [othello.id]})
+        invitation = self.get_last_message()
+        self.assertEqual(invitation.sender_id, hamlet.id)
+        self.assertEqual(invitation.content, f"[Join video call.]({call.url})")
         self.assertEqual(
-            [(ring["user_id"], ring["caller_id"]) for ring in events[1]["event"]["rings"]],
-            [(cordelia.id, hamlet.id), (othello.id, hamlet.id)],
+            self.direct_message_user_ids(invitation), {hamlet.id, cordelia.id, othello.id}
         )
-        self.assertEqual(events[1]["users"], [hamlet.id])
+        self.assertEqual(events[0]["event"]["type"], "message")
+        self.assertEqual(events[1], {**call_events[0], "users": [othello.id]})
+        self.assertEqual(
+            [(ring["user_id"], ring["caller_id"]) for ring in events[2]["event"]["rings"]],
+            [(cordelia.id, hamlet.id), (cordelia.id, hamlet.id), (othello.id, hamlet.id)],
+        )
+        self.assertEqual(events[2]["users"], [hamlet.id])
+        self.assertEqual(
+            LiveKitCallRing.objects.get(call=call, user_profile=othello).message_id, invitation.id
+        )
+        self.assertEqual(
+            list(
+                LiveKitCallRing.objects.filter(call=call, user_profile=cordelia).values_list(
+                    "message_id", flat=True
+                )
+            ),
+            [message_id, message_id],
+        )
 
         # Othello was called, so he can join the call, and answer.
         response = self.join_livekit_call(othello, dm=dm)
@@ -1743,26 +1787,54 @@ class LiveKitVideoCallTest(ZulipTestCase):
         page_params = self._get_page_params(response)
         self.assertEqual(page_params["call_message_id"], message_id)
         self.assertEqual(
-            [ring["user_id"] for ring in page_params["call_rings"]], [cordelia.id, othello.id]
+            [ring["user_id"] for ring in page_params["call_rings"]],
+            [cordelia.id, cordelia.id, othello.id],
         )
         self.assertEqual(page_params["call_joined_user_ids"], [])
         result = self.update_call_ring(othello, message_id, "accept")
         self.assert_json_success(result)
         self.assert_livekit_call_access_denied(self.join_livekit_call(iago, dm=dm))
 
-        # Anyone who can join the call can invite people to it.
+        # Anyone who can join the call can invite people to it, which
+        # grows the group direct message.
         result = self.invite_to_call(cordelia, message_id, [iago])
         self.assert_json_success(result)
+        iago_ring = LiveKitCallRing.objects.get(call=call, user_profile=iago)
+        self.assertEqual(iago_ring.caller_id, cordelia.id)
+        group_invitation = self.get_last_message()
+        self.assertEqual(iago_ring.message_id, group_invitation.id)
         self.assertEqual(
-            LiveKitCallRing.objects.get(call=call, user_profile=iago).caller_id, cordelia.id
+            self.direct_message_user_ids(self.get_last_message()),
+            {hamlet.id, cordelia.id, othello.id, iago.id},
         )
         result = self.invite_to_call(self.example_user("aaron"), message_id, [iago])
         self.assert_json_error(result, "Invalid call")
 
-        # Calling someone again records another call.
-        result = self.invite_to_call(hamlet, message_id, [othello])
+        # Calling someone again records another call, in the group direct
+        # message of everyone called so far, which already has the
+        # call's link.
+        with self.capture_send_event_calls(expected_num_events=2):
+            result = self.invite_to_call(hamlet, message_id, [othello])
         self.assert_json_success(result)
-        self.assertEqual(LiveKitCallRing.objects.filter(call=call, user_profile=othello).count(), 2)
+        self.assertEqual(
+            list(
+                LiveKitCallRing.objects.filter(call=call, user_profile=othello).values_list(
+                    "message_id", flat=True
+                )
+            ),
+            [invitation.id, group_invitation.id],
+        )
+        # Calling someone from the original conversation again uses the
+        # group direct message too.
+        with self.capture_send_event_calls(expected_num_events=2):
+            result = self.invite_to_call(othello, message_id, [cordelia])
+        self.assert_json_success(result)
+        self.assertEqual(
+            LiveKitCallRing.objects.filter(call=call, user_profile=cordelia)
+            .latest("id")
+            .message_id,
+            group_invitation.id,
+        )
 
     def test_invite_to_livekit_call_errors(self) -> None:
         hamlet = self.example_user("hamlet")
@@ -1851,9 +1923,9 @@ class LiveKitVideoCallTest(ZulipTestCase):
         )
 
         # People in the call learn who is being called.
-        with self.capture_send_event_calls(expected_num_events=2) as events:
+        with self.capture_send_event_calls(expected_num_events=3) as events:
             self.invite_to_call(hamlet, message_id, [othello])
-        self.assertEqual(sorted(events[1]["users"]), sorted([hamlet.id, cordelia.id]))
+        self.assertEqual(sorted(events[2]["users"]), sorted([hamlet.id, cordelia.id]))
 
         participant_event("participant_left", str(cordelia.id))
         self.assertFalse(

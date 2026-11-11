@@ -1073,7 +1073,15 @@ def invite_to_livekit_call(
             invitees.append(get_user_profile_by_id_in_realm(user_id, user_profile.realm))
         except UserProfile.DoesNotExist:
             raise JsonableError(_("Invalid user ID {user_id}").format(user_id=user_id))
-    check_invite_to_livekit_call(user_profile, call, invitees)
+    client = RequestNotes.get_notes(request).client
+    assert client is not None
+    check_invite_to_livekit_call(
+        user_profile,
+        client,
+        call,
+        invitees,
+        read_by_sender=client.default_read_by_sender(),
+    )
     return json_success(request)
 
 

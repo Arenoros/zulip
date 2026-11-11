@@ -41,6 +41,11 @@ class LiveKitCallRing(models.Model):
     call = models.ForeignKey(LiveKitCall, on_delete=models.CASCADE)
     user_profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
     caller = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="+")
+    # The message with the link to the call in the conversation where
+    # the user can find the call: the call's message, or for someone
+    # invited to a direct message call, the message inviting them to
+    # the group direct message of everyone called to it.
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="+")
     date_rang = models.DateTimeField()
 
     ACCEPTED = 1

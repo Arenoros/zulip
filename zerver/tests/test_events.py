@@ -1746,16 +1746,28 @@ class NormalActionsTest(BaseAction):
         check_call_answer("events[0]", events[0])
         check_call_rings("events[1]", events[1])
 
-        with self.verify_action(state_change_expected=False) as events:
-            check_invite_to_livekit_call(self.user_profile, call, [self.example_user("othello")])
-        check_call_rings("events[0]", events[0])
+        with self.verify_action(num_events=2) as events:
+            check_invite_to_livekit_call(
+                self.user_profile,
+                get_client("website"),
+                call,
+                [self.example_user("othello")],
+                read_by_sender=True,
+            )
+        check_call_rings("events[1]", events[1])
 
         with self.verify_action(state_change_expected=False) as events:
             do_cancel_call(self.user_profile, call)
         check_call_rings("events[0]", events[0])
 
         with self.verify_action(state_change_expected=False) as events:
-            check_invite_to_livekit_call(self.user_profile, call, [self.example_user("othello")])
+            check_invite_to_livekit_call(
+                self.user_profile,
+                get_client("website"),
+                call,
+                [self.example_user("othello")],
+                read_by_sender=True,
+            )
         with self.verify_action(state_change_expected=False) as events:
             do_end_livekit_call(call.room)
         check_call_cancel("events[0]", events[0])
