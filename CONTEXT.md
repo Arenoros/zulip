@@ -20,7 +20,7 @@ The direct message conversation or channel topic where a call started.
 The Zulip conversation shown alongside a call. For a direct message call, it follows the people included in the conversation. For a channel call, it is the originating topic.
 
 **Call chat recipient**:
-The caller, an original recipient of a direct message call, or an invitee who has joined it. A recipient remains part of the conversation after leaving the call.
+The caller, an original recipient of a direct message call, or anyone invited to it, whether or not they joined it. A recipient remains part of the conversation after leaving the call.
 
 **Link-only call**:
 A call opened from a standalone call link that carries no association with a Zulip conversation.

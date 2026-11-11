@@ -14,6 +14,11 @@
             <span class="livekit-call-duration" role="timer"></span>
         </div>
         <div class="livekit-call-controls">
+            <button type="button" id="livekit-call-chat-toggle" class="livekit-call-button" aria-pressed="false" aria-controls="livekit-call-side-panel" title="{{ _('Chat') }}" disabled hidden>
+                <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
+                <span class="livekit-call-button-label">{{ _("Chat") }}</span>
+                <span class="livekit-call-unread-count" hidden></span>
+            </button>
             <button type="button" id="livekit-call-participants-toggle" class="livekit-call-button" aria-pressed="false" aria-controls="livekit-call-side-panel" title="{{ _('Participants') }}" disabled>
                 <i class="zulip-icon zulip-icon-users" aria-hidden="true"></i>
                 <span class="livekit-call-button-label">{{ _("Participants") }}</span>
@@ -65,14 +70,19 @@
                     <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
                 </button>
             </div>
-            <div class="livekit-call-invite" hidden>
-                <input type="search" class="livekit-call-invite-search" placeholder="{{ _('Invite someone…') }}" aria-label="{{ _('Invite someone to the call') }}" autocomplete="off"/>
-                <ul class="livekit-call-invite-results"></ul>
+            <div class="livekit-call-chat" hidden>
+                <iframe name="zulip-call-chat" class="livekit-call-chat-frame" title="{{ _('Chat') }}"></iframe>
             </div>
-            <ul class="livekit-call-participant-list"></ul>
-            <div class="livekit-call-invited" hidden>
-                <h3 class="livekit-call-invited-title">{{ _("Invited") }}</h3>
-                <ul class="livekit-call-invited-list"></ul>
+            <div class="livekit-call-participants-panel" hidden>
+                <div class="livekit-call-invite" hidden>
+                    <input type="search" class="livekit-call-invite-search" placeholder="{{ _('Invite someone…') }}" aria-label="{{ _('Invite someone to the call') }}" autocomplete="off"/>
+                    <ul class="livekit-call-invite-results"></ul>
+                </div>
+                <ul class="livekit-call-participant-list"></ul>
+                <div class="livekit-call-invited" hidden>
+                    <h3 class="livekit-call-invited-title">{{ _("Invited") }}</h3>
+                    <ul class="livekit-call-invited-list"></ul>
+                </div>
             </div>
         </aside>
     </div>

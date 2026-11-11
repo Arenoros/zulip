@@ -5,7 +5,8 @@ const assert = require("node:assert/strict");
 const {zrequire} = require("./lib/namespace.cjs");
 const {run_test} = require("./lib/test.cjs");
 
-const {RING_TIMEOUT_SECONDS, get_invited_users} = zrequire("livekit_call_invites");
+const {RING_TIMEOUT_SECONDS, get_call_chat_hash, get_invited_users} =
+    zrequire("livekit_call_invites");
 
 function ring(user_id, date_rang, answer = null) {
     return {user_id, caller_id: 1, date_rang, answer};
@@ -35,4 +36,12 @@ run_test("get_invited_users", () => {
         {user_id: 3, status: "declined"},
     ]);
     assert.deepEqual(get_invited_users([], new Set(), now), []);
+});
+
+run_test("get_call_chat_hash", () => {
+    assert.equal(get_call_chat_hash({message_id: 1, user_ids: [8, 10, 12]}), "#narrow/dm/8,10,12");
+    assert.equal(
+        get_call_chat_hash({message_id: 1, stream_id: 5, topic: "daily standup"}),
+        "#narrow/channel/5/topic/daily.20standup",
+    );
 });

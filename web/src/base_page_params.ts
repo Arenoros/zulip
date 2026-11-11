@@ -1,6 +1,6 @@
 import * as z from "zod/mini";
 
-import {call_ring_schema} from "./livekit_call_invites.ts";
+import {call_conversation_schema, call_ring_schema} from "./livekit_call_invites.ts";
 import {show_loading_error} from "./loading_error.ts";
 import {get_retry_backoff_seconds} from "./retry_backoff.ts";
 import {narrow_term_schema, state_data_schema} from "./state_data.ts";
@@ -83,6 +83,7 @@ const livekit_call_params_schema = z.object({
     voice_only: z.boolean(),
     remote_control_enabled: z.boolean(),
     conversation_url: z.string(),
+    call_chat: z.nullable(call_conversation_schema),
     call_message_id: z.nullable(z.number()),
     call_rings: z.array(call_ring_schema),
     call_joined_user_ids: z.array(z.number()),

@@ -1,4 +1,7 @@
+import assert from "minimalistic-assert";
 import * as z from "zod/mini";
+
+import * as internal_url from "./internal_url.ts";
 
 // Sync this with LIVEKIT_RING_TIMEOUT in zerver/actions/video_calls.py.
 export const RING_TIMEOUT_SECONDS = 45;
@@ -19,6 +22,16 @@ export const call_conversation_schema = z.object({
     user_ids: z.optional(z.array(z.number())),
 });
 export type CallConversation = z.infer<typeof call_conversation_schema>;
+
+// The URL fragment of the web app that shows the call chat, without
+// anchoring it at the message with the call's link.
+export function get_call_chat_hash(conversation: CallConversation): string {
+    if (conversation.user_ids !== undefined) {
+        return `#narrow/dm/${conversation.user_ids.join(",")}`;
+    }
+    assert(conversation.stream_id !== undefined && conversation.topic !== undefined);
+    return `#narrow/channel/${conversation.stream_id}/topic/${internal_url.encodeHashComponent(conversation.topic)}`;
+}
 
 export type InvitedUser = {user_id: number; status: "calling" | "declined" | "missed"};
 

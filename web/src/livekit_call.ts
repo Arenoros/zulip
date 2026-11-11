@@ -27,6 +27,7 @@ const {
     voice_only,
     remote_control_enabled,
     conversation_url,
+    call_chat,
     call_message_id,
 } = page_params;
 
@@ -46,6 +47,8 @@ const screen_share_button = get_element<HTMLButtonElement>("#livekit-call-screen
 const enable_audio_button = get_element<HTMLButtonElement>("#livekit-call-enable-audio");
 const leave_button = get_element<HTMLButtonElement>("#livekit-call-leave");
 const participants_toggle = get_element<HTMLButtonElement>("#livekit-call-participants-toggle");
+const chat_toggle = get_element<HTMLButtonElement>("#livekit-call-chat-toggle");
+const chat_unread_count_element = get_element(".livekit-call-unread-count");
 type DeviceMenu = {toggle: HTMLButtonElement; menu: HTMLElement; kinds: MediaDeviceKind[]};
 const device_menus: DeviceMenu[] = [
     {
@@ -60,6 +63,7 @@ const device_menus: DeviceMenu[] = [
     },
 ];
 const call_buttons = [
+    chat_toggle,
     participants_toggle,
     microphone_button,
     camera_button,
@@ -73,6 +77,9 @@ const body_element = get_element(".livekit-call-body");
 const side_panel = get_element("#livekit-call-side-panel");
 const side_panel_title = get_element(".livekit-call-side-panel-title");
 const side_panel_close = get_element<HTMLButtonElement>(".livekit-call-side-panel-close");
+const chat_element = get_element(".livekit-call-chat");
+const chat_frame = get_element<HTMLIFrameElement>(".livekit-call-chat-frame");
+const participants_panel = get_element(".livekit-call-participants-panel");
 const participant_list = get_element(".livekit-call-participant-list");
 const invite_element = get_element(".livekit-call-invite");
 const invite_search = get_element<HTMLInputElement>(".livekit-call-invite-search");
@@ -82,7 +89,8 @@ const invited_list = get_element(".livekit-call-invited-list");
 const left_element = get_element(".livekit-call-left");
 const left_message_element = get_element(".livekit-call-left-message");
 const rejoin_button = get_element<HTMLButtonElement>(".livekit-call-rejoin");
-get_element<HTMLAnchorElement>(".livekit-call-conversation-link").href = conversation_url;
+const conversation_link = get_element<HTMLAnchorElement>(".livekit-call-conversation-link");
+conversation_link.href = conversation_url;
 
 const ls = localstorage();
 const SAVED_DEVICES_KEY = "livekit_call_devices";
@@ -131,6 +139,15 @@ const screen_share_controls = new Map<
     {label_element: HTMLElement; button_element: HTMLButtonElement}
 >();
 let left_call = false;
+type SidePanelView = "chat" | "participants";
+let side_panel_view: SidePanelView | undefined;
+// The call chat, as a URL fragment of the web app, which is shown in
+// the chat frame once the web app there is ready.
+let call_chat_hash =
+    call_chat === null ? undefined : livekit_call_invites.get_call_chat_hash(call_chat);
+let chat_frame_ready = false;
+let chat_frame_hash = call_chat_hash;
+let chat_unread_count = 0;
 // Who has been called to join the call, and who has been in it, whose
 // calls are over.
 let call_rings = page_params.call_rings;
@@ -315,12 +332,19 @@ function format_duration(total_seconds: number): string {
     return `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`;
 }
 
+function update_side_panel_title(): void {
+    side_panel_title.textContent =
+        side_panel_view === "chat"
+            ? $t({defaultMessage: "Chat"})
+            : $t(
+                  {defaultMessage: "Participants ({count})"},
+                  {count: room.remoteParticipants.size + 1},
+              );
+}
+
 function update_participant_list(): void {
     const participants = [room.localParticipant, ...room.remoteParticipants.values()];
-    side_panel_title.textContent = $t(
-        {defaultMessage: "Participants ({count})"},
-        {count: participants.length},
-    );
+    update_side_panel_title();
     participant_list.replaceChildren(
         ...participants.map((participant) => {
             const item = document.createElement("li");
@@ -491,6 +515,12 @@ async function update_invite_results(): Promise<void> {
     );
 }
 
+function show_call_chat(conversation: livekit_call_invites.CallConversation): void {
+    call_chat_hash = livekit_call_invites.get_call_chat_hash(conversation);
+    conversation_link.href = `/${call_chat_hash}/with/${conversation.message_id}`;
+    update_chat_frame();
+}
+
 // The call window does not load the Zulip web app, so it gets the
 // events it needs, about who is being called, itself.
 async function listen_for_call_events(): Promise<void> {
@@ -500,6 +530,7 @@ async function listen_for_call_events(): Promise<void> {
         op: z.literal("rings"),
         message_id: z.number(),
         rings: z.array(livekit_call_invites.call_ring_schema),
+        conversation: livekit_call_invites.call_conversation_schema,
     });
     let queue: {queue_id: string; last_event_id: number} | undefined;
     let failures = 0;
@@ -531,6 +562,7 @@ async function listen_for_call_events(): Promise<void> {
                 if (rings_event.success && rings_event.data.message_id === call_message_id) {
                     call_rings = rings_event.data.rings;
                     update_invited_list();
+                    show_call_chat(rings_event.data.conversation);
                 }
             }
             failures = 0;
@@ -543,9 +575,50 @@ async function listen_for_call_events(): Promise<void> {
     }
 }
 
-function set_side_panel_open(open: boolean): void {
-    side_panel.hidden = !open;
-    set_pressed(participants_toggle, open);
+function post_to_chat_frame(
+    message: {type: "show_call_chat"; hash: string} | {type: "focus_compose"},
+): void {
+    chat_frame.contentWindow?.postMessage(message, window.location.origin);
+}
+
+function update_chat_frame(): void {
+    if (!chat_frame_ready || call_chat_hash === undefined || chat_frame_hash === call_chat_hash) {
+        return;
+    }
+    chat_frame_hash = call_chat_hash;
+    post_to_chat_frame({type: "show_call_chat", hash: call_chat_hash});
+}
+
+function update_chat_unread_count(): void {
+    chat_unread_count_element.textContent = String(chat_unread_count);
+    chat_unread_count_element.hidden = chat_unread_count === 0 || side_panel_view === "chat";
+}
+
+function show_side_panel(view: SidePanelView | undefined): void {
+    side_panel_view = view;
+    side_panel.hidden = view === undefined;
+    chat_element.hidden = view !== "chat";
+    participants_panel.hidden = view !== "participants";
+    set_pressed(chat_toggle, view === "chat");
+    set_pressed(participants_toggle, view === "participants");
+    update_side_panel_title();
+    update_chat_unread_count();
+    if (view === "chat") {
+        // Like opening a conversation in the web app, opening the chat
+        // focuses its compose box, and the messages there become read.
+        // The web app only sees which messages are visible once the
+        // frame has its size, by the next animation frame.
+        requestAnimationFrame(() => {
+            chat_frame.focus();
+            post_to_chat_frame({type: "focus_compose"});
+        });
+    }
+}
+
+function close_side_panel(): void {
+    const toggle = side_panel_view === "chat" ? chat_toggle : participants_toggle;
+    show_side_panel(undefined);
+    toggle.focus();
 }
 
 function get_tile(participant: Participant): HTMLElement {
@@ -1051,18 +1124,31 @@ leave_button.addEventListener("click", () => {
         window.close();
     });
 });
+chat_toggle.addEventListener("click", () => {
+    show_side_panel(side_panel_view === "chat" ? undefined : "chat");
+});
 participants_toggle.addEventListener("click", () => {
-    set_side_panel_open(participants_toggle.getAttribute("aria-pressed") !== "true");
+    show_side_panel(side_panel_view === "participants" ? undefined : "participants");
 });
 side_panel_close.addEventListener("click", () => {
-    set_side_panel_open(false);
-    participants_toggle.focus();
+    close_side_panel();
 });
 side_panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-        set_side_panel_open(false);
-        participants_toggle.focus();
+        close_side_panel();
     }
+});
+window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin || event.source !== chat_frame.contentWindow) {
+        return;
+    }
+    const message = z
+        .object({type: z.literal("call_chat_unread_count"), count: z.number()})
+        .parse(event.data);
+    chat_frame_ready = true;
+    update_chat_frame();
+    chat_unread_count = message.count;
+    update_chat_unread_count();
 });
 for (const device_menu of device_menus) {
     device_menu.toggle.addEventListener("click", () => {
@@ -1165,6 +1251,11 @@ async function join(): Promise<void> {
         invite_element.hidden = false;
         update_invited_list();
         void listen_for_call_events();
+    }
+    if (call_chat_hash !== undefined) {
+        // The chat loads with the call, to show unread messages in it.
+        chat_toggle.hidden = false;
+        chat_frame.src = `/${call_chat_hash}`;
     }
     for (const button of call_buttons) {
         button.disabled = false;
