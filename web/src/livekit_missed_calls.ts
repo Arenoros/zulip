@@ -2,20 +2,13 @@ import * as z from "zod/mini";
 
 import * as channel from "./channel.ts";
 import type {Filter} from "./filter.ts";
+import {call_conversation_schema} from "./livekit_call_invites.ts";
+import type {CallConversation} from "./livekit_call_invites.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
 import * as people from "./people.ts";
 import {get_topic_key} from "./recent_view_util.ts";
 import {realm} from "./state_data.ts";
-
-// Sync this with LiveKitCallConversation in zerver/openapi/zulip.yaml.
-export const call_conversation_schema = z.object({
-    message_id: z.number(),
-    stream_id: z.optional(z.number()),
-    topic: z.optional(z.string()),
-    user_ids: z.optional(z.array(z.number())),
-});
-export type CallConversation = z.infer<typeof call_conversation_schema>;
 
 const missed_call_schema = z.object({
     caller_id: z.number(),

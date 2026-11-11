@@ -7,6 +7,7 @@ import * as compose_banner from "./compose_banner.ts";
 import * as compose_state from "./compose_state.ts";
 import * as compose_validate from "./compose_validate.ts";
 import {$t} from "./i18n.ts";
+import type {CallConversation} from "./livekit_call_invites.ts";
 import * as livekit_missed_calls from "./livekit_missed_calls.ts";
 import * as people from "./people.ts";
 import * as popup_banners from "./popup_banners.ts";
@@ -26,7 +27,7 @@ export type CallRingEvent = {
     caller_id: number;
     url: string;
     voice_only: boolean;
-    conversation: livekit_missed_calls.CallConversation;
+    conversation: CallConversation;
 };
 
 export type CallAnswerEvent = {

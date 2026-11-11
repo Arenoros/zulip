@@ -11,6 +11,15 @@ export const call_ring_schema = z.object({
 });
 export type CallRing = z.infer<typeof call_ring_schema>;
 
+// Sync this with LiveKitCallConversation in zerver/openapi/zulip.yaml.
+export const call_conversation_schema = z.object({
+    message_id: z.number(),
+    stream_id: z.optional(z.number()),
+    topic: z.optional(z.string()),
+    user_ids: z.optional(z.array(z.number())),
+});
+export type CallConversation = z.infer<typeof call_conversation_schema>;
+
 export type InvitedUser = {user_id: number; status: "calling" | "declined" | "missed"};
 
 // The people called to join the call who have not joined it, with how
