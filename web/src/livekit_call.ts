@@ -860,6 +860,66 @@ function update_enable_audio_button(): void {
     enable_audio_button.hidden = room.canPlaybackAudio;
 }
 
+async function start_screen_share(): Promise<void> {
+    const tracks = await room.localParticipant.createScreenTracks();
+    const publish_options =
+        livekit_remote_control.get_screen_share_publish_options(remote_control_enabled);
+    try {
+        await Promise.all(
+            tracks.map(async (track) => room.localParticipant.publishTrack(track, publish_options)),
+        );
+    } catch (error) {
+        for (const track of tracks) {
+            track.stop();
+        }
+        throw error;
+    }
+}
+
+let changing_screen_share_source = false;
+
+// Shares the source the user chose in the share panel of the desktop
+// app instead of the current one.  Viewers keep seeing the share, unless
+// it has to be published again to change whether it is controllable.
+async function change_screen_share_source(): Promise<void> {
+    const old_track = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+    if (old_track === undefined || changing_screen_share_source) {
+        return;
+    }
+    changing_screen_share_source = true;
+    try {
+        const [new_track, ...other_tracks] = await room.localParticipant.createScreenTracks();
+        assert(new_track !== undefined);
+        for (const track of other_tracks) {
+            track.stop();
+        }
+        const publish_options =
+            livekit_remote_control.get_screen_share_publish_options(remote_control_enabled);
+        const publication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+        if (publication?.track !== old_track) {
+            // The share stopped meanwhile.
+            new_track.stop();
+            return;
+        }
+        if (
+            livekit_remote_control.is_controllable_screen_share(publication) ===
+            livekit_remote_control.is_controllable_screen_share({
+                trackName: publish_options.name ?? "",
+            })
+        ) {
+            await old_track.replaceTrack(new_track.mediaStreamTrack, false);
+            return;
+        }
+        // The track stays live while unpublished, so that the desktop
+        // app does not take the share as stopped.
+        await room.localParticipant.unpublishTrack(old_track, false);
+        old_track.stop();
+        await room.localParticipant.publishTrack(new_track, publish_options);
+    } finally {
+        changing_screen_share_source = false;
+    }
+}
+
 async function set_device_enabled(
     enable: () => Promise<unknown>,
     error_message: string,
@@ -1104,12 +1164,22 @@ camera_button.addEventListener("click", () => {
 screen_share_button.addEventListener("click", () => {
     void set_device_enabled(
         async () =>
-            room.localParticipant.setScreenShareEnabled(
-                !room.localParticipant.isScreenShareEnabled,
-                undefined,
-                livekit_remote_control.get_screen_share_publish_options(remote_control_enabled),
-            ),
+            room.localParticipant.isScreenShareEnabled
+                ? room.localParticipant.setScreenShareEnabled(false)
+                : start_screen_share(),
         $t({defaultMessage: "Could not share your screen."}),
+    );
+});
+electron_bridge?.on_event("screen_share_change_source", () => {
+    void set_device_enabled(
+        change_screen_share_source,
+        $t({defaultMessage: "Could not share your screen."}),
+    );
+});
+electron_bridge?.on_event("screen_share_stop", () => {
+    void set_device_enabled(
+        async () => room.localParticipant.setScreenShareEnabled(false),
+        $t({defaultMessage: "Could not stop sharing your screen."}),
     );
 });
 enable_audio_button.addEventListener("click", () => {

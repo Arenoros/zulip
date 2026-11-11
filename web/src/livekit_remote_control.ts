@@ -65,17 +65,27 @@ type OutgoingMessage =
     | {type: "mouse"; token: string; sequence: number; event: MouseEvent}
     | {type: "key"; token: string; sequence: number; code: string; down: boolean};
 
+// Call this once the source of the screen share is captured, since only
+// then can the desktop app tell whether it is a screen or a window.
 export function get_screen_share_publish_options(
     // Whether the organization allows remote control.
     remote_control_enabled: boolean,
 ): TrackPublishOptions {
-    if (remote_control_enabled && electron_bridge?.get_remote_control_supported?.() === true) {
-        return {name: CONTROLLABLE_SCREEN_SHARE_TRACK_NAME};
+    if (!remote_control_enabled || electron_bridge?.get_remote_control_supported?.() !== true) {
+        return {};
     }
-    return {};
+    // Older versions of the desktop app only share screens, and do not
+    // tell.
+    const source_kind =
+        electron_bridge.get_screen_share_source_kind === undefined
+            ? "screen"
+            : electron_bridge.get_screen_share_source_kind();
+    return source_kind === "screen" ? {name: CONTROLLABLE_SCREEN_SHARE_TRACK_NAME} : {};
 }
 
-export function is_controllable_screen_share(publication: TrackPublication): boolean {
+export function is_controllable_screen_share(
+    publication: Pick<TrackPublication, "trackName">,
+): boolean {
     return publication.trackName === CONTROLLABLE_SCREEN_SHARE_TRACK_NAME;
 }
 

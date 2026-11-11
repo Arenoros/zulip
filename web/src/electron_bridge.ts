@@ -18,7 +18,12 @@ export type ClipboardDecrypter = {
 export type ElectronBridge = {
     send_event: (eventName: string | symbol, ...args: unknown[]) => boolean;
     on_event: ((
-        eventName: "logout" | "show-keyboard-shortcuts" | "show-notification-settings",
+        eventName:
+            | "logout"
+            | "screen_share_change_source"
+            | "screen_share_stop"
+            | "show-keyboard-shortcuts"
+            | "show-notification-settings",
         listener: () => void,
     ) => void) &
         ((
@@ -41,6 +46,7 @@ export type ElectronBridge = {
     request_remote_control?: (identity: string, name: string) => void;
     stop_remote_control?: () => void;
     remote_control_participant_left?: (identity: string) => void;
+    get_screen_share_source_kind?: () => "screen" | "window" | null;
     screen_share_stopped?: () => void;
 };
 

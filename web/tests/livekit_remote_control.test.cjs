@@ -14,12 +14,38 @@ const hamlet = {identity: "10", name: "King Hamlet"};
 
 const remote_control_desktop_app = {get_remote_control_supported: () => true};
 
-run_test("screen share from a desktop app supporting remote control", ({override}) => {
+run_test("screen share from a desktop app that only shares screens", ({override}) => {
     override(electron_bridge, "electron_bridge", remote_control_desktop_app);
     const publish_options = livekit_remote_control.get_screen_share_publish_options(true);
     assert.ok(
         livekit_remote_control.is_controllable_screen_share({trackName: publish_options.name}),
     );
+});
+
+run_test("screen share from a desktop app telling what it shares", ({override}) => {
+    override(electron_bridge, "electron_bridge", {
+        ...remote_control_desktop_app,
+        get_screen_share_source_kind: () => "screen",
+    });
+    const publish_options = livekit_remote_control.get_screen_share_publish_options(true);
+    assert.ok(
+        livekit_remote_control.is_controllable_screen_share({trackName: publish_options.name}),
+    );
+});
+
+run_test("window share from a desktop app", ({override}) => {
+    override(electron_bridge, "electron_bridge", {
+        ...remote_control_desktop_app,
+        get_screen_share_source_kind: () => "window",
+    });
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(true), {});
+
+    // Without a source, there is nothing to control either.
+    override(electron_bridge, "electron_bridge", {
+        ...remote_control_desktop_app,
+        get_screen_share_source_kind: () => null,
+    });
+    assert.deepEqual(livekit_remote_control.get_screen_share_publish_options(true), {});
 });
 
 run_test("screen share in an organization that disabled remote control", ({override}) => {
