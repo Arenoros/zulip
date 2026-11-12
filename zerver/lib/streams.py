@@ -1530,6 +1530,19 @@ def can_administer_accessible_channel(channel: Stream, user_profile: UserProfile
     )
 
 
+def user_can_administer_channel_folder(
+    user_profile: UserProfile, channel_folder: ChannelFolder
+) -> bool:
+    if user_profile.is_realm_admin:
+        return True
+
+    return user_has_permission_for_group_setting(
+        channel_folder.can_administer_group_id,
+        user_profile,
+        ChannelFolder.channel_folder_permission_group_settings["can_administer_group"],
+    )
+
+
 def get_metadata_access_streams(
     user_profile: UserProfile,
     streams: Collection[Stream],

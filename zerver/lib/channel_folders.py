@@ -5,14 +5,17 @@ from django.utils.translation import gettext as _
 
 from zerver.lib.exceptions import CannotAdministerChannelError, ChannelExistsError, JsonableError
 from zerver.lib.markdown import markdown_convert
-from zerver.lib.streams import get_short_channel_name, get_web_public_streams_queryset
+from zerver.lib.streams import (
+    get_short_channel_name,
+    get_web_public_streams_queryset,
+    user_can_administer_channel_folder,
+)
 from zerver.lib.string_validation import check_string_is_printable
 from zerver.lib.timestamp import datetime_to_timestamp
 from zerver.lib.types import UserGroupMembersData, UserGroupMembersDict
 from zerver.lib.user_groups import (
     get_group_setting_value_for_register_api,
     get_members_and_subgroups_of_groups,
-    user_has_permission_for_group_setting,
 )
 from zerver.models import ChannelFolder, Realm, Stream, UserGroup, UserProfile
 from zerver.models.streams import bulk_get_streams
@@ -132,19 +135,6 @@ def get_channel_folder_by_id(channel_folder_id: int, realm: Realm) -> ChannelFol
         return channel_folder
     except ChannelFolder.DoesNotExist:
         raise JsonableError(_("Invalid channel folder ID"))
-
-
-def user_can_administer_channel_folder(
-    user_profile: UserProfile, channel_folder: ChannelFolder
-) -> bool:
-    if user_profile.is_realm_admin:
-        return True
-
-    return user_has_permission_for_group_setting(
-        channel_folder.can_administer_group_id,
-        user_profile,
-        ChannelFolder.channel_folder_permission_group_settings["can_administer_group"],
-    )
 
 
 def access_channel_folder_for_administration(
