@@ -16,10 +16,41 @@
         --bubble-free-edge: 12%;
     }
 
+    /* The conversation is named in the navbar; the date of each day
+       is shown in a date divider instead. */
+    .message_header {
+        display: none;
+    }
+
     .recipient_row .message_row {
         border-left: 0;
         border-right: 0;
         border-bottom: 0;
+    }
+
+    .message_feed_divider {
+        grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
+
+        &::after {
+            display: block;
+            grid-area: right_divider_content;
+            content: " ";
+            height: 0;
+            border-bottom: 1px solid
+                var(--color-border-message-group-spacer-line);
+        }
+
+        .date-divider-content {
+            grid-area: middle_divider_content;
+            text-transform: none;
+            letter-spacing: normal;
+            color: var(--color-text-message-bubble-caption);
+
+            &::before,
+            &::after {
+                display: none;
+            }
+        }
     }
 
     .message_row:not(.direct_mention, .group_mention) {

@@ -1319,6 +1319,64 @@ test("message series in the bubble layout", ({override}) => {
     assert.deepEqual(senders_shown(view), [true, false, false, false, false]);
 });
 
+const bubble_test_ten_am = new Date(2026, 10, 9, 10, 0).getTime() / 1000;
+
+function bubble_test_dm_at(minutes) {
+    return {
+        id: Number(_.uniqueId()),
+        type: "private",
+        is_private: true,
+        is_stream: false,
+        sender_id: 5,
+        to_user_ids: "5",
+        display_recipient: [{id: 5, email: "alice@example.com", full_name: "Alice"}],
+        timestamp: bubble_test_ten_am + minutes * 60,
+        historical: false,
+        clean_reactions: new Map(),
+        submessages: [],
+    };
+}
+
+function make_bubble_test_view() {
+    const list = new message_list.MessageList({
+        data: new MessageListData({
+            excludes_muted_topics: false,
+            filter: new Filter([{operator: "dm", operand: [5]}]),
+        }),
+        is_node_test: true,
+    });
+    return list.view;
+}
+
+function rendered_containers(view) {
+    return view._message_groups.flatMap((group) => group.message_containers);
+}
+
+test("date dividers in the bubble layout", ({override}) => {
+    // The recipient bar with the date is hidden in the bubble layout,
+    // so the first message of a group gets a date divider.
+    const messages = [bubble_test_dm_at(0), bubble_test_dm_at(1)];
+
+    override(user_settings, "web_direct_message_bubbles", true);
+    let view = make_bubble_test_view();
+    view.merge_message_groups(view.build_message_groups(messages), "bottom");
+    let result = rendered_containers(view);
+    assert.deepEqual(
+        result.map((container) => container.want_date_divider),
+        [true, false],
+    );
+    assert.equal(result[0].date_divider_html, String(bubble_test_ten_am * 1000));
+
+    override(user_settings, "web_direct_message_bubbles", false);
+    view = make_bubble_test_view();
+    view.merge_message_groups(view.build_message_groups(messages), "bottom");
+    result = rendered_containers(view);
+    assert.deepEqual(
+        result.map((container) => container.want_date_divider),
+        [false, false],
+    );
+});
+
 test("render_windows", ({mock_template}) => {
     mock_template("message_list.hbs", false, () => "<message-list-stub>");
     // We only render up to 400 messages at a time in our message list,

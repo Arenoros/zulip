@@ -283,6 +283,22 @@ function get_date_divider_data(opts: {
     };
 }
 
+// In the bubble layout, the recipient bar is hidden, so a date
+// divider shows the date of the first message of each group.
+function get_group_start_date_divider_data(
+    message: Message,
+    display_year: boolean,
+): {
+    want_date_divider: boolean;
+    date_divider_html: string;
+} {
+    const time = new Date(message.timestamp * 1000);
+    return {
+        want_date_divider: true,
+        date_divider_html: timerender.render_date(time, display_year).outerHTML,
+    };
+}
+
 export function get_timestr(message: Message): string {
     const time = new Date(message.timestamp * 1000);
     return timerender.stringify_time(time);
@@ -1037,8 +1053,15 @@ export class MessageListView {
             } else {
                 finish_group();
                 start_group(prev_message_container?.msg, message);
-                want_date_divider = false;
-                date_divider_html = undefined;
+                if (bubble_layout) {
+                    ({want_date_divider, date_divider_html} = get_group_start_date_divider_data(
+                        message,
+                        year_changed,
+                    ));
+                } else {
+                    want_date_divider = false;
+                    date_divider_html = undefined;
+                }
                 include_recipient = true;
 
                 if (message.type === "stream") {
@@ -1177,6 +1200,15 @@ export class MessageListView {
             });
         } else {
             clear_message_divider(curr_msg_container);
+            if (this.is_bubble_layout()) {
+                Object.assign(
+                    curr_msg_container,
+                    get_group_start_date_divider_data(
+                        curr_msg_container.msg,
+                        curr_msg_container.year_changed,
+                    ),
+                );
+            }
         }
 
         if (where === "top") {
