@@ -1283,9 +1283,16 @@ def bulk_can_access_stream_metadata_user_ids(streams: list[Stream]) -> dict[int,
         stream for stream in streams if stream.folder_id is not None and not stream.is_web_public
     ]
     if len(folder_streams) > 0:
-        channel_folders = ChannelFolder.objects.filter(
-            id__in={stream.folder_id for stream in folder_streams}
+        channel_folders = get_private_channel_folders(
+            {stream.folder_id for stream in folder_streams}
         )
+        # Everyone can see a public folder.
+        folder_streams = [
+            stream
+            for stream in folder_streams
+            if stream.folder_id in {channel_folder.id for channel_folder in channel_folders}
+        ]
+    if len(folder_streams) > 0:
         folder_audience_user_ids = get_channel_folder_audience_user_ids(
             channel_folders, folder_streams[0].realm_id
         )
@@ -1700,13 +1707,15 @@ def get_inaccessible_channel_folder_ids(
 def check_users_can_see_folders_of_channels(
     streams: Collection[Stream], users: Collection[UserProfile]
 ) -> None:
-    folder_ids = {stream.folder_id for stream in streams if stream.folder_id is not None}
-    if not folder_ids:
+    channel_folders = get_private_channel_folders(
+        {stream.folder_id for stream in streams if stream.folder_id is not None}
+    )
+    if not channel_folders:
         return
     folder_audience_user_ids = get_channel_folder_audience_user_ids(
-        ChannelFolder.objects.filter(id__in=folder_ids), next(iter(streams)).realm_id
+        channel_folders, channel_folders[0].realm_id
     )
-    for stream in [stream for stream in streams if stream.folder_id is not None]:
+    for stream in [stream for stream in streams if stream.folder_id in folder_audience_user_ids]:
         for user in users:
             assert stream.folder_id is not None
             if user.id not in folder_audience_user_ids[stream.folder_id]:
@@ -1719,13 +1728,23 @@ def check_users_can_see_folders_of_channels(
 
 def limit_to_channel_folder_audience(stream: Stream, user_ids: Iterable[int]) -> list[int]:
     """Of these users, those who can see the folder of the channel."""
-    if stream.folder_id is None:
+    channel_folders = get_private_channel_folders([stream.folder_id])
+    if not channel_folders:
         return list(user_ids)
-    assert stream.folder is not None
-    audience_user_ids = get_channel_folder_audience_user_ids([stream.folder], stream.realm_id)[
-        stream.folder_id
+    audience_user_ids = get_channel_folder_audience_user_ids(channel_folders, stream.realm_id)[
+        channel_folders[0].id
     ]
     return [user_id for user_id in user_ids if user_id in audience_user_ids]
+
+
+def get_private_channel_folders(channel_folder_ids: Collection[int | None]) -> list[ChannelFolder]:
+    """Who can see a public folder needs no computing; it is everyone."""
+    folder_ids = [folder_id for folder_id in channel_folder_ids if folder_id is not None]
+    if not folder_ids:
+        return []
+    return list(
+        ChannelFolder.objects.filter(id__in=folder_ids).exclude(public_channel_folder_query())
+    )
 
 
 def public_channel_folder_query(*, folder_field: str = "") -> Q:

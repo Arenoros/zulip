@@ -3,7 +3,7 @@ from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
@@ -26,6 +26,7 @@ from zerver.lib.streams import (
     get_channel_folder_audience_user_ids,
     get_qualified_channel_name,
     get_short_channel_name,
+    public_channel_folder_query,
     send_stream_creation_event,
     send_stream_deletion_event,
 )
@@ -81,13 +82,28 @@ def get_channel_folder_audiences(
     )
 
 
-def get_channel_folders_using_groups(
+def private_channel_folders_using_group(group_field: str = "id") -> Exists:
+    """Whether a private folder uses the group, as an annotation on
+    groups. Changing who is in a group cannot change who can see a
+    public folder, which is everyone.
+    """
+    return Exists(
+        ChannelFolder.objects.filter(
+            Q(can_access_group_id=OuterRef(group_field))
+            | Q(can_administer_group_id=OuterRef(group_field))
+        ).exclude(public_channel_folder_query())
+    )
+
+
+def get_private_channel_folders_using_groups(
     realm: Realm, group_ids: Collection[int]
 ) -> list[ChannelFolder]:
+    if not group_ids:
+        return []
     return list(
-        ChannelFolder.objects.filter(realm=realm).filter(
-            Q(can_access_group_id__in=group_ids) | Q(can_administer_group_id__in=group_ids)
-        )
+        ChannelFolder.objects.filter(realm=realm)
+        .filter(Q(can_access_group_id__in=group_ids) | Q(can_administer_group_id__in=group_ids))
+        .exclude(public_channel_folder_query())
     )
 
 

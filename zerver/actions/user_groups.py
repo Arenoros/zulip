@@ -9,7 +9,8 @@ from django.utils.translation import gettext as _
 
 from zerver.actions.channel_folders import (
     get_channel_folder_audiences,
-    get_channel_folders_using_groups,
+    get_private_channel_folders_using_groups,
+    private_channel_folders_using_group,
     update_access_to_channel_folders,
 )
 from zerver.lib.event_types import (
@@ -365,13 +366,18 @@ def bulk_add_members_to_user_groups(
         return
 
     realm = user_groups[0].realm
-    supergroups = get_recursive_supergroups_union_for_groups(
-        [user_group.id for user_group in user_groups]
+    supergroups = list(
+        get_recursive_supergroups_union_for_groups(
+            [user_group.id for user_group in user_groups]
+        ).annotate(used_by_private_folder=private_channel_folders_using_group())
     )
     # Channels in folders that use these groups are handled with the
     # folders, since who can see them depends on who can see the folder.
     old_folder_audiences = get_channel_folder_audiences(
-        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
+        realm,
+        get_private_channel_folders_using_groups(
+            realm, [group.id for group in supergroups if group.used_by_private_folder]
+        ),
     )
     folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
     streams = [
@@ -471,13 +477,18 @@ def bulk_remove_members_from_user_groups(
         return
 
     realm = user_groups[0].realm
-    supergroups = get_recursive_supergroups_union_for_groups(
-        [user_group.id for user_group in user_groups]
+    supergroups = list(
+        get_recursive_supergroups_union_for_groups(
+            [user_group.id for user_group in user_groups]
+        ).annotate(used_by_private_folder=private_channel_folders_using_group())
     )
     # Channels in folders that use these groups are handled with the
     # folders, since who can see them depends on who can see the folder.
     old_folder_audiences = get_channel_folder_audiences(
-        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
+        realm,
+        get_private_channel_folders_using_groups(
+            realm, [group.id for group in supergroups if group.used_by_private_folder]
+        ),
     )
     folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
     streams = [
@@ -569,11 +580,18 @@ def add_subgroups_to_user_group(
         return
 
     realm = user_group.realm
-    supergroups = get_recursive_supergroups_union_for_groups([user_group.id])
+    supergroups = list(
+        get_recursive_supergroups_union_for_groups([user_group.id]).annotate(
+            used_by_private_folder=private_channel_folders_using_group()
+        )
+    )
     # Channels in folders that use these groups are handled with the
     # folders, since who can see them depends on who can see the folder.
     old_folder_audiences = get_channel_folder_audiences(
-        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
+        realm,
+        get_private_channel_folders_using_groups(
+            realm, [group.id for group in supergroups if group.used_by_private_folder]
+        ),
     )
     folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
     streams = [
@@ -674,11 +692,18 @@ def remove_subgroups_from_user_group(
         return
 
     realm = user_group.realm
-    supergroups = get_recursive_supergroups_union_for_groups([user_group.id])
+    supergroups = list(
+        get_recursive_supergroups_union_for_groups([user_group.id]).annotate(
+            used_by_private_folder=private_channel_folders_using_group()
+        )
+    )
     # Channels in folders that use these groups are handled with the
     # folders, since who can see them depends on who can see the folder.
     old_folder_audiences = get_channel_folder_audiences(
-        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
+        realm,
+        get_private_channel_folders_using_groups(
+            realm, [group.id for group in supergroups if group.used_by_private_folder]
+        ),
     )
     folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
     streams = [

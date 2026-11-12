@@ -58,6 +58,7 @@ from zerver.lib.streams import (
     get_anonymous_group_membership_dict_for_streams,
     get_channel_folder_audience_user_ids,
     get_channel_name_in_folder,
+    get_private_channel_folders,
     get_stream_permission_policy_key,
     get_stream_post_policy_value_based_on_group_setting,
     get_users_dict_with_metadata_access_to_streams_via_permission_groups,
@@ -875,16 +876,16 @@ def bulk_add_subscriptions(
 
     # Only those who can see the folder of a channel can subscribe to
     # it. Callers acting on a request check this to report it.
-    folder_ids = {stream.folder_id for stream in streams if stream.folder_id is not None}
-    if folder_ids:
-        folder_audience_user_ids = get_channel_folder_audience_user_ids(
-            ChannelFolder.objects.filter(id__in=folder_ids), realm.id
-        )
+    private_folders = get_private_channel_folders(
+        {stream.folder_id for stream in streams if stream.folder_id is not None}
+    )
+    if private_folders:
+        folder_audience_user_ids = get_channel_folder_audience_user_ids(private_folders, realm.id)
         subs_to_add, subs_to_activate = (
             [
                 sub_info
                 for sub_info in sub_infos
-                if sub_info.stream.folder_id is None
+                if sub_info.stream.folder_id not in folder_audience_user_ids
                 or sub_info.user.id in folder_audience_user_ids[sub_info.stream.folder_id]
             ]
             for sub_infos in [subs_to_add, subs_to_activate]

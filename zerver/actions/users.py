@@ -63,6 +63,7 @@ from zerver.lib.stream_traffic import get_streams_traffic
 from zerver.lib.streams import (
     get_anonymous_group_membership_dict_for_streams,
     get_streams_for_user,
+    public_channel_folder_query,
     send_stream_deletion_event,
     stream_to_dict,
 )
@@ -640,9 +641,13 @@ def do_change_user_role(
         include_web_public=True,
         include_all=True,
     )
-    # Organization administrators can see every channel folder.
+    # Organization administrators can see every channel folder, and
+    # everyone can see public folders.
     old_folder_audiences = get_channel_folder_audiences(
-        user_profile.realm, ChannelFolder.objects.filter(realm_id=user_profile.realm_id)
+        user_profile.realm,
+        ChannelFolder.objects.filter(realm_id=user_profile.realm_id).exclude(
+            public_channel_folder_query()
+        ),
     )
 
     user_profile.role = value

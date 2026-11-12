@@ -339,7 +339,10 @@ def get_stream(stream_name: str, realm: Realm) -> Stream:
 
 
 def get_stream_by_id_in_realm(stream_id: int, realm: Realm) -> Stream:
-    return Stream.objects.select_related("realm", "recipient").get(id=stream_id, realm=realm)
+    # The folder of a channel is needed to check access to it.
+    return Stream.objects.select_related("realm", "recipient", "folder").get(
+        id=stream_id, realm=realm
+    )
 
 
 def bulk_get_streams(realm: Realm, stream_names: set[str]) -> dict[str, Any]:
