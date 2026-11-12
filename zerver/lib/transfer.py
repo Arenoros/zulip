@@ -9,7 +9,7 @@ from zerver.lib.avatar_hash import user_avatar_path
 from zerver.lib.mime_types import guess_type
 from zerver.lib.parallel import run_parallel
 from zerver.lib.thumbnail import BadImageError
-from zerver.lib.upload import upload_emoji_image, write_avatar_images, write_jdenticon_avatars
+from zerver.lib.upload import upload_emoji_image, write_avatar_images, write_generated_avatars
 from zerver.lib.upload.s3 import S3UploadBackend, upload_content_to_s3
 from zerver.models import Attachment, RealmEmoji, UserProfile
 
@@ -50,7 +50,7 @@ def _transfer_avatar_to_s3(user: UserProfile) -> None:
                 open(file_path + ".png", "rb") as f,
                 open(file_path + "-medium.png", "rb") as f_medium,
             ):
-                write_jdenticon_avatars(
+                write_generated_avatars(
                     user_avatar_path(user, future=False),
                     user,
                     image_data=f.read(),

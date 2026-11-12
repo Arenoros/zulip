@@ -13,7 +13,7 @@ from zerver.lib.avatar_hash import (
     user_avatar_path,
 )
 from zerver.lib.thumbnail import DEFAULT_AVATAR_SIZE, MEDIUM_AVATAR_SIZE
-from zerver.lib.upload import get_avatar_url, write_jdenticon_avatars
+from zerver.lib.upload import get_avatar_url, write_generated_avatars
 from zerver.lib.url_encoding import append_url_query_string
 from zerver.models import UserProfile
 from zerver.models.users import is_cross_realm_bot_email
@@ -232,7 +232,7 @@ def generate_and_upload_jdenticon_avatar(
     image_data_medium = generate_avatar_jdenticon(jdenticon_key, medium=True)
     file_path = user_avatar_path(user_profile, future)
 
-    write_jdenticon_avatars(
+    write_generated_avatars(
         file_path,
         user_profile,
         image_data=image_data,

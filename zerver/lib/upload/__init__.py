@@ -448,7 +448,7 @@ def write_avatar_images(
     )
 
 
-def write_jdenticon_avatars(
+def write_generated_avatars(
     file_path: str,
     user_profile: UserProfile,
     *,
