@@ -12,6 +12,7 @@ import pyvips
 import time_machine
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.utils.timezone import now as timezone_now
 from pyvips import at_least_libvips
 from pyvips import version as libvips_version
@@ -1763,6 +1764,44 @@ class AvatarTest(UploadSerializeMixin, ZulipTestCase):
             self.assertEqual(
                 f.read(), generate_avatar_initials("Prince Hamlet", hamlet.id, medium=False)
             )
+
+    def test_convert_jdenticon_avatars_to_initials(self) -> None:
+        realm = get_realm("zulip")
+        self.assertEqual(realm.default_avatar_source, Realm.AVATAR_FROM_JDENTICON)
+        cordelia = self.example_user("cordelia")
+        self.assertEqual(cordelia.avatar_source, UserProfile.AVATAR_FROM_JDENTICON)
+
+        self.login("hamlet")
+        with get_test_image_file("img.png") as image_file:
+            self.client_post("/json/users/me/avatar", {"file": image_file})
+        othello = self.example_user("othello")
+        othello.avatar_source = UserProfile.AVATAR_FROM_GRAVATAR
+        othello.save(update_fields=["avatar_source"])
+
+        with mock.patch("builtins.print") as mock_print:
+            call_command("convert_jdenticon_avatars_to_initials", "--realm=zulip")
+        mock_print.assert_called_once()
+
+        realm.refresh_from_db()
+        self.assertEqual(realm.default_avatar_source, Realm.AVATAR_FROM_INITIALS)
+        cordelia.refresh_from_db()
+        self.assertEqual(cordelia.avatar_source, UserProfile.AVATAR_FROM_INITIALS)
+        self.assertEqual(cordelia.avatar_version, 2)
+        with open(avatar_disk_path(cordelia), "rb") as f:
+            self.assertEqual(
+                f.read(), generate_avatar_initials(cordelia.full_name, cordelia.id, medium=False)
+            )
+
+        # Uploaded pictures and Gravatars are left alone.
+        self.assertEqual(self.example_user("hamlet").avatar_source, UserProfile.AVATAR_FROM_USER)
+        self.assertEqual(
+            self.example_user("othello").avatar_source, UserProfile.AVATAR_FROM_GRAVATAR
+        )
+        self.assertFalse(
+            UserProfile.objects.filter(
+                realm=realm, avatar_source=UserProfile.AVATAR_FROM_JDENTICON
+            ).exists()
+        )
 
     def test_avatar_empty_content_type(self) -> None:
         """
