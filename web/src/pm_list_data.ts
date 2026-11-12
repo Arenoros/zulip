@@ -55,6 +55,57 @@ export type DisplayObject = {
     includes_deactivated_user: boolean;
 };
 
+function get_display_object(
+    user_ids_string: string,
+    active_user_ids_string: string | undefined,
+): DisplayObject {
+    const user_ids = people.user_ids_string_to_ids_array(user_ids_string);
+    const recipients_string = people.format_recipients(user_ids_string, "narrow");
+
+    const num_unread = unread.num_unread_for_user_ids_string(user_ids_string);
+    const has_unread_mention = unread.num_unread_mentions_for_user_ids_strings(user_ids_string) > 0;
+    const is_group = user_ids_string.includes(",");
+    const is_active = user_ids_string === active_user_ids_string;
+    const includes_deactivated_user = user_ids.some(
+        (id) => !people.is_active_user_or_system_bot(id),
+    );
+
+    let user_circle_class: string | undefined;
+    let status_emoji_info: UserStatusEmojiInfo | undefined;
+    let is_bot = false;
+    let is_current_user = false;
+
+    if (!is_group) {
+        const user_id = Number.parseInt(user_ids_string, 10);
+        user_circle_class = buddy_data.get_user_circle_class(user_id, includes_deactivated_user);
+        const recipient_user_obj = people.get_by_user_id(user_id);
+
+        if (recipient_user_obj.is_bot) {
+            is_bot = true;
+        } else {
+            is_current_user = people.is_my_user_id(user_id);
+            status_emoji_info = user_status.get_status_emoji(user_id);
+        }
+    }
+
+    const display_object: DisplayObject = {
+        recipients: recipients_string,
+        user_ids_string,
+        unread: num_unread,
+        is_zero: num_unread === 0,
+        is_active,
+        url: hash_util.pm_with_url(user_ids_string),
+        status_emoji_info,
+        user_circle_class,
+        is_group,
+        is_bot,
+        has_unread_mention,
+        includes_deactivated_user,
+        is_current_user,
+    };
+    return display_object;
+}
+
 export function get_conversations(search_string = ""): DisplayObject[] {
     const conversations = pm_conversations.recent.get();
     const display_objects: DisplayObject[] = [];
@@ -86,54 +137,7 @@ export function get_conversations(search_string = ""): DisplayObject[] {
             continue;
         }
 
-        const recipients_string = people.format_recipients(user_ids_string, "narrow");
-
-        const num_unread = unread.num_unread_for_user_ids_string(user_ids_string);
-        const has_unread_mention =
-            unread.num_unread_mentions_for_user_ids_strings(user_ids_string) > 0;
-        const is_group = user_ids_string.includes(",");
-        const is_active = user_ids_string === active_user_ids_string;
-        const includes_deactivated_user = user_ids.some(
-            (id) => !people.is_active_user_or_system_bot(id),
-        );
-
-        let user_circle_class: string | undefined;
-        let status_emoji_info: UserStatusEmojiInfo | undefined;
-        let is_bot = false;
-        let is_current_user = false;
-
-        if (!is_group) {
-            const user_id = Number.parseInt(user_ids_string, 10);
-            user_circle_class = buddy_data.get_user_circle_class(
-                user_id,
-                includes_deactivated_user,
-            );
-            const recipient_user_obj = people.get_by_user_id(user_id);
-
-            if (recipient_user_obj.is_bot) {
-                is_bot = true;
-            } else {
-                is_current_user = people.is_my_user_id(user_id);
-                status_emoji_info = user_status.get_status_emoji(user_id);
-            }
-        }
-
-        const display_object: DisplayObject = {
-            recipients: recipients_string,
-            user_ids_string,
-            unread: num_unread,
-            is_zero: num_unread === 0,
-            is_active,
-            url: hash_util.pm_with_url(user_ids_string),
-            status_emoji_info,
-            user_circle_class,
-            is_group,
-            is_bot,
-            has_unread_mention,
-            includes_deactivated_user,
-            is_current_user,
-        };
-        display_objects.push(display_object);
+        display_objects.push(get_display_object(user_ids_string, active_user_ids_string));
     }
 
     return display_objects;
