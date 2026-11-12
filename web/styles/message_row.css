@@ -580,6 +580,13 @@
     display: contents;
 }
 
+/* Only the bubble layout spells out the sending state in words. */
+.message-sending-notice,
+.failed-message-notice,
+.failed-message-action-label {
+    display: none;
+}
+
 .message_controls {
     grid-area: controls;
     /* Let the controls occupy the entire height

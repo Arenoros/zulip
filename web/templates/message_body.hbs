@@ -42,6 +42,9 @@
 {{#if (and (not msg/failed_request) msg/locally_echoed)}}
     <span data-tooltip-template-id="slow-send-spinner-tooltip-template" class="fa fa-circle-o-notch slow-send-spinner{{#unless msg/show_slow_send_spinner }} hidden{{/unless}}"></span>
 {{/if}}
+{{#if msg/locally_echoed}}
+    <span class="message-sending-notice"><i class="zulip-icon zulip-icon-clock" aria-hidden="true"></i> {{t "Sending…" }}</span>
+{{/if}}
 
 <div class="message_controls no-select">
     {{#if msg/locally_echoed}}

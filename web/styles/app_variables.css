@@ -885,6 +885,23 @@
         hsl(349deg 60% 48%),
         hsl(5deg 100% 75.1%)
     );
+    --color-message-bubble-error: var(--color-message-bubble-unread);
+    --color-message-bubble-focus: light-dark(
+        hsl(238deg 49% 56.9%),
+        hsl(237deg 100% 78%)
+    );
+    --color-background-mention-message-bubble: light-dark(
+        hsl(46deg 100% 94.1%),
+        hsl(46deg 29% 17.6%)
+    );
+    --color-background-self-mention-in-bubble: light-dark(
+        hsl(45deg 100% 89.2%),
+        hsl(43deg 51% 23.9%)
+    );
+    --color-background-mention-in-bubble: light-dark(
+        hsl(231deg 56% 92.9%),
+        hsl(231deg 23% 29.4%)
+    );
     --color-message-bubble-star: light-dark(
         hsl(41deg 100% 34.5%),
         hsl(44deg 99% 48.2%)

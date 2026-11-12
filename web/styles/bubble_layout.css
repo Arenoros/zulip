@@ -96,16 +96,19 @@
         opacity: 0;
     }
 
-    .message_row:not(.direct_mention, .group_mention) {
+    /* Mentions color the bubble instead of the row. */
+    .message_row {
         background-color: transparent;
     }
 
     .messagebox-content:not(.is-me-message) {
         /* 3px at 15px/1em */
         padding-top: 0.2em;
+        /* The status row holds the notice of a failed send. */
         grid-template-areas:
             ".      sender    sender sender   sender sender"
             "avatar message   edited controls time   .     "
+            ".      status    status status   status .     "
             ".      more      .      .        .      .     "
             ".      reactions .      .        .      .     "
             ".      reminders .      .        .      .     ";
@@ -118,7 +121,9 @@
                 )
             )
             max-content max-content max-content minmax(0, 1fr);
-        grid-template-rows: repeat(5, auto);
+        grid-template-rows: repeat(6, auto);
+        /* For the floating message controls. */
+        position: relative;
 
         &.content_edit_mode {
             grid-template-columns:
@@ -135,11 +140,6 @@
 
         .message-avatar .inline_profile_picture {
             margin-top: 0;
-        }
-
-        /* Keep the star of a starred message next to the bubble. */
-        .star_container {
-            order: -1;
         }
 
         .message_content:not(.collapsed) {
@@ -225,15 +225,214 @@
         }
     }
 
-    .messagebox-content:not(.is-me-message) .message_edit_notice {
-        align-self: center;
-        /* 11px at 15px/1em */
-        font-size: 0.7333em;
-        text-transform: lowercase;
-        opacity: 1;
-        color: var(--color-text-message-bubble-caption);
-        /* 6px at 11px/1em */
-        padding: 0 0.5455em;
+    /* Message states */
+
+    .messagebox-content:not(.is-me-message) {
+        .message_edit_notice {
+            align-self: center;
+            /* 11px at 15px/1em */
+            font-size: 0.7333em;
+            text-transform: lowercase;
+            opacity: 1;
+            color: var(--color-text-message-bubble-caption);
+            /* 6px at 11px/1em */
+            padding: 0 0.5455em;
+        }
+
+        .message_reactions {
+            justify-self: start;
+            /* 4px at 15px/1em */
+            margin-top: 0.2667em;
+        }
+
+        .message-reminders {
+            justify-self: start;
+        }
+
+        /* Only the star of a starred message stays next to the bubble;
+           hovering shows all the controls in a panel floating over the
+           top edge of the bubble. */
+        .message_controls {
+            align-self: center;
+        }
+
+        .message_control_button {
+            display: none;
+        }
+
+        .star_container:not(.empty-star) {
+            display: flex;
+        }
+
+        .actions_hover {
+            order: 1;
+        }
+    }
+
+    .messagebox:hover,
+    .has_actions_popover .messagebox {
+        .messagebox-content:not(.is-me-message)
+            .message_controls:not(:has(.failed_message_action)) {
+            position: absolute;
+            top: 0;
+            left: 4px;
+            translate: 0 -60%;
+            z-index: 2;
+            align-self: start;
+            height: auto;
+            padding: 2px;
+            gap: 2px;
+            border: 1px solid var(--color-border-message-bubble);
+            border-radius: 8px;
+            background-color: var(--color-background-message-bubble);
+            box-shadow: 0 2px 6px hsl(0deg 0% 0% / 15%);
+
+            .message_control_button {
+                display: flex;
+                /* 32px at 16px/1em */
+                width: 2em;
+                height: 2em;
+            }
+        }
+    }
+
+    .own-message .messagebox:hover,
+    .own-message.has_actions_popover .messagebox {
+        .messagebox-content:not(.is-me-message)
+            .message_controls:not(:has(.failed_message_action)) {
+            left: auto;
+            right: 4px;
+        }
+    }
+
+    .messagebox-content:not(.is-me-message) .message_edit .edit-content-container {
+        border: 2px solid var(--color-message-bubble-focus);
+        border-radius: 8px;
+    }
+
+    .selected_message .messagebox-content:not(.is-me-message) {
+        outline: 0;
+
+        .message_content:not(.collapsed) {
+            outline: 2px solid var(--color-message-bubble-focus);
+            outline-offset: 2px;
+        }
+
+        .message-time {
+            visibility: visible;
+        }
+    }
+
+    .direct_mention,
+    .group_mention {
+        .messagebox-content:not(.is-me-message)
+            .message_content:not(.collapsed) {
+            border-color: var(--color-background-mention-message-bubble);
+            background-color: var(--color-background-mention-message-bubble);
+        }
+    }
+
+    .messagebox-content:not(.is-me-message) .message_content {
+        .user-mention,
+        .user-group-mention {
+            background-color: var(--color-background-mention-in-bubble);
+        }
+
+        .user-mention-me {
+            background-color: var(--color-background-self-mention-in-bubble);
+        }
+    }
+
+    .locally-echoed .messagebox-content:not(.is-me-message) {
+        .slow-send-spinner {
+            display: none !important;
+        }
+
+        .message-sending-notice {
+            grid-area: time;
+            justify-self: start;
+            align-self: center;
+            display: flex;
+            align-items: center;
+            gap: 0.25em;
+            /* 8px at 12px/1em */
+            padding: 0 0.6667em;
+            font-size: 0.8em;
+            color: var(--color-text-message-bubble-caption);
+        }
+
+        .message-time {
+            display: none;
+        }
+
+        .message_content:not(.collapsed) {
+            opacity: 0.6;
+        }
+
+        .message_controls:not(:has(.failed_message_action)) {
+            display: none;
+        }
+
+        &:has(.failed_message_action) {
+            .message-sending-notice {
+                display: none;
+            }
+
+            .message_content:not(.collapsed) {
+                opacity: 1;
+                border-color: var(--color-message-bubble-error);
+            }
+        }
+
+        .message_controls:has(.failed_message_action) {
+            grid-area: status;
+            justify-self: start;
+            align-items: baseline;
+            gap: 0.5em;
+            /* 4px at 15px/1em */
+            padding-top: 0.2667em;
+            /* 13px at 15px/1em */
+            font-size: 0.8667em;
+            color: var(--color-message-bubble-error);
+
+            .failed-message-notice {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.25em;
+            }
+
+            .message_control_button {
+                display: flex;
+                flex: none;
+                width: auto;
+                height: auto;
+            }
+
+            .failed_message_action + .failed_message_action::before {
+                content: "\00B7";
+                margin-right: 0.5em;
+            }
+
+            .message-controls-icon {
+                padding: 0;
+                color: inherit;
+                text-decoration: underline;
+                cursor: pointer;
+
+                .zulip-icon {
+                    display: none;
+                }
+
+                &.rotating {
+                    animation: none;
+                    opacity: 0.5;
+                }
+            }
+
+            .failed-message-action-label {
+                display: inline;
+            }
+        }
     }
 
     .own-message {
@@ -241,6 +440,7 @@
             grid-template-areas:
                 ". .    .        .      sender   "
                 ". time controls edited message  "
+                ". .    .        .      status   "
                 ". .    .        .      more     "
                 ". .    .        .      reactions"
                 ". .    .        .      reminders";
@@ -281,13 +481,12 @@
                 justify-self: end;
             }
 
-            .message_reactions {
+            .message_reactions,
+            .message-reminders,
+            .message-sending-notice,
+            .message_controls:has(.failed_message_action) {
                 justify-self: end;
                 justify-content: flex-end;
-            }
-
-            .star_container {
-                order: 0;
             }
         }
 
