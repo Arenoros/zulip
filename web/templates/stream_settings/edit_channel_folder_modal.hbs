@@ -11,6 +11,12 @@
     </label>
     <textarea id="edit_channel_folder_description" class="modal-textarea" name="channel_folder_description" maxlength="{{ max_channel_folder_description_length }}" {{#unless can_manage_folder}} disabled {{/unless}}>{{~description~}}</textarea>
 </div>
+{{#if can_manage_folder}}
+{{> ../settings/group_setting_value_pill_input
+  setting_name="can_administer_group"
+  label=(t "Who can administer this folder")
+  prefix="id_channel_folder_"}}
+{{/if}}
 <div>
     <div>
         <h3 class="folder-channels-list-header">

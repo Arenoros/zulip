@@ -135,6 +135,7 @@ export function dispatch_normal_event(event) {
                     channel_folders.add(event.channel_folder);
                     inbox_ui.complete_rerender();
                     recent_view_ui.complete_rerender();
+                    stream_list.update_streams_sidebar();
                     settings_folders.populate_channel_folders();
                     stream_ui_updates.update_folder_dropdown_visibility();
                     break;
@@ -144,8 +145,18 @@ export function dispatch_normal_event(event) {
                     if (event.data.name !== undefined) {
                         inbox_ui.complete_rerender();
                         recent_view_ui.complete_rerender();
-                        stream_list.update_streams_sidebar();
                         stream_settings_ui.update_channel_folder_name(event.channel_folder_id);
+                    }
+
+                    // The left sidebar shows the names of folders, and
+                    // the folders without channels that the user
+                    // administers.
+                    if (
+                        event.data.name !== undefined ||
+                        event.data.is_archived !== undefined ||
+                        event.data.can_administer_group !== undefined
+                    ) {
+                        stream_list.update_streams_sidebar();
                     }
 
                     if (event.data.is_archived !== undefined) {

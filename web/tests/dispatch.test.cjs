@@ -615,10 +615,11 @@ run_test("channel_folders", ({override}) => {
     {
         const stub = make_stub();
         override(stream_ui_updates, "update_folder_dropdown_visibility", stub.f);
+        override(stream_list, "update_streams_sidebar", stub.f);
 
         dispatch(event);
 
-        assert.equal(stub.num_calls, 1);
+        assert.equal(stub.num_calls, 2);
         const folders = channel_folders.get_channel_folders();
         assert.equal(folders.length, 1);
         assert.equal(folders[0].id, event.channel_folder.id);
@@ -655,6 +656,7 @@ run_test("channel_folders", ({override}) => {
             event.data.rendered_description.replace("<p>", "").replace("</p>", ""),
         );
         assert.equal(folders[0].is_archived, event.data.is_archived);
+        assert.equal(folders[0].can_administer_group, event.data.can_administer_group);
     }
 
     event = event_fixtures.channel_folder__reorder;

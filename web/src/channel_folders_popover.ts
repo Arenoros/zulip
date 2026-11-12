@@ -6,13 +6,13 @@ import render_left_sidebar_folder_popover from "../templates/popovers/left_sideb
 import render_left_sidebar_menu_popover from "../templates/popovers/left_sidebar_menu_popover.hbs";
 
 import * as channel from "./channel.ts";
+import * as channel_folders from "./channel_folders.ts";
 import * as channel_folders_ui from "./channel_folders_ui.ts";
 import * as keydown_util from "./keydown_util.ts";
 import * as left_sidebar_navigation_area from "./left_sidebar_navigation_area.ts";
 import * as pm_list from "./pm_list.ts";
 import * as popover_menus from "./popover_menus.ts";
 import * as settings_config from "./settings_config.ts";
-import * as settings_data from "./settings_data.ts";
 import {current_user} from "./state_data.ts";
 import * as stream_list from "./stream_list.ts";
 import * as stream_settings_ui from "./stream_settings_ui.ts";
@@ -253,7 +253,8 @@ export function initialize(): void {
                     instance.setContent(
                         ui_util.parse_html(
                             render_left_sidebar_folder_popover({
-                                can_manage_folder: settings_data.can_user_manage_folder(),
+                                can_manage_folder:
+                                    channel_folders.can_user_manage_folder(folder_id),
                             }),
                         ),
                     );
@@ -281,6 +282,20 @@ export function initialize(): void {
             on_folder_sidebar_menu_icon_press(this, e);
         },
     );
+
+    $("#subscribe-to-more-streams").on("click", ".create-channel-folder-link", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        channel_folders_ui.add_channel_folder();
+    });
+
+    $("#subscribe-to-more-streams").on("keydown", ".create-channel-folder-link", (e) => {
+        if (keydown_util.is_enter_event(e)) {
+            e.preventDefault();
+            e.stopPropagation();
+            channel_folders_ui.add_channel_folder();
+        }
+    });
 
     $("#streams_list").on(
         "keydown",

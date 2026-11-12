@@ -1044,6 +1044,7 @@ function setup_page(callback: () => void): void {
             realm_has_archived_channels,
             has_billing_access: settings_data.user_has_billing_access(),
             is_admin: current_user.is_admin,
+            can_create_channel_folders: settings_data.user_can_create_channel_folders(),
             disable_push_notifications: !realm.realm_push_notifications_enabled,
             push_notifications_tooltip: realm.realm_push_notifications_enabled
                 ? undefined

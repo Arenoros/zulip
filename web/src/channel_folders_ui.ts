@@ -1,4 +1,5 @@
 import {$} from "jquery";
+import _ from "lodash";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
 import * as z from "zod/mini";
@@ -16,21 +17,24 @@ import * as confirm_dialog from "./confirm_dialog.ts";
 import * as dialog_widget from "./dialog_widget.ts";
 import * as dropdown_widget from "./dropdown_widget.ts";
 import type {DropdownWidget, DropdownWidgetOptions} from "./dropdown_widget.ts";
+import * as group_setting_pill from "./group_setting_pill.ts";
 import {$t, $t_html} from "./i18n.ts";
 import * as ListWidget from "./list_widget.ts";
 import type {ListWidget as ListWidgetType} from "./list_widget.ts";
 import * as modals from "./modals.ts";
 import * as people from "./people.ts";
-import * as settings_data from "./settings_data.ts";
+import * as settings_components from "./settings_components.ts";
 import {realm} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import type {StreamSubscription} from "./sub_store.ts";
+import type {GroupSettingPillContainer} from "./typeahead_helper.ts";
 import * as ui_report from "./ui_report.ts";
 import * as util from "./util.ts";
 
 let channel_folder_stream_list_widget: ListWidgetType<StreamSubscription> | undefined;
 let stream_list_widget_stream_ids: Set<number> | undefined;
 let add_channel_folder_widget: DropdownWidget | undefined;
+let can_administer_group_widget: GroupSettingPillContainer | undefined;
 
 export function add_channel_folder(on_create?: (folder_id: number) => void): void {
     const modal_content_html = render_create_channel_folder_modal({
@@ -69,6 +73,10 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
                         date_created: 0,
                         creator_id: people.my_current_user_id(),
                         order: id,
+                        can_administer_group: {
+                            direct_members: [people.my_current_user_id()],
+                            direct_subgroups: [],
+                        },
                     };
                     channel_folders.add(channel_folder);
                     on_create?.(id);
@@ -189,10 +197,10 @@ export function handle_archiving_channel_folder(folder_id: number): void {
     });
 }
 
-function format_channel_item_html(stream: StreamSubscription): string {
+function format_channel_item_html(stream: StreamSubscription, can_manage_folder: boolean): string {
     return render_channel_list_item({
         stream,
-        can_manage_folder: settings_data.can_user_manage_folder(),
+        can_manage_folder,
     });
 }
 
@@ -200,11 +208,12 @@ function render_channel_list(streams: StreamSubscription[], folder_id: number): 
     const $container = $("#edit_channel_folder .folder-stream-list");
     $container.empty();
     stream_list_widget_stream_ids = new Set(channel_folders.get_stream_ids_in_folder(folder_id));
+    const can_manage_folder = channel_folders.can_user_manage_folder(folder_id);
     channel_folder_stream_list_widget = ListWidget.create($container, streams, {
         name: `edit-channel-folder-stream-list`,
         get_item: ListWidget.default_get_item,
         modifier_html(item) {
-            return format_channel_item_html(item);
+            return format_channel_item_html(item, can_manage_folder);
         },
         filter: {
             $element: $("#edit_channel_folder .stream-list-container .stream-search"),
@@ -277,7 +286,11 @@ function get_edit_modal_folder_id_if_open(): number | undefined {
 function get_channel_folder_candidates(folder_id: number): dropdown_widget.Option[] {
     return stream_data
         .get_unsorted_subs()
-        .filter((stream) => stream.folder_id !== folder_id)
+        .filter(
+            (stream) =>
+                stream.folder_id !== folder_id &&
+                channel_folders.can_user_move_channel_to_folder(stream, folder_id),
+        )
         .map((stream) => ({
             name: stream.name,
             unique_id: stream.stream_id,
@@ -406,16 +419,51 @@ export function update_channel_folder_channels_list(
     }
 }
 
+function render_can_administer_group_widget(folder: channel_folders.ChannelFolder): void {
+    const $pill_container = $("#id_channel_folder_can_administer_group");
+    const pill_widget = group_setting_pill.create_pills(
+        $pill_container,
+        "can_administer_group",
+        "channel_folder",
+    );
+    group_setting_pill.set_up_pill_typeahead({
+        pill_widget,
+        $pill_container,
+        opts: {setting_name: "can_administer_group", setting_type: "channel_folder"},
+    });
+    settings_components.set_group_setting_widget_value(pill_widget, folder.can_administer_group);
+
+    // The dialog only notices changes to its form fields.
+    const enable_submit_button = (): void => {
+        $("#edit_channel_folder .dialog_submit_button").prop("disabled", false);
+    };
+    pill_widget.onPillCreate(enable_submit_button);
+    pill_widget.onPillRemove(enable_submit_button);
+    can_administer_group_widget = pill_widget;
+}
+
 function update_channel_folder(folder_id: number): void {
     const url = "/json/channel_folders/" + folder_id.toString();
     const new_name = $<HTMLInputElement>("input#edit_channel_folder_name").val()!.trim();
     const new_description = $<HTMLTextAreaElement>("textarea#edit_channel_folder_description")
         .val()!
         .trim();
-    const data = {
+    const data: Record<string, string> = {
         name: new_name,
         description: new_description,
     };
+    assert(can_administer_group_widget !== undefined);
+    const old_can_administer_group =
+        channel_folders.get_channel_folder_by_id(folder_id).can_administer_group;
+    const new_can_administer_group = settings_components.get_group_setting_widget_value(
+        can_administer_group_widget,
+    );
+    if (!_.isEqual(new_can_administer_group, old_can_administer_group)) {
+        data["can_administer_group"] = JSON.stringify({
+            new: new_can_administer_group,
+            old: old_can_administer_group,
+        });
+    }
     const opts = {
         success_continuation() {
             // Update the channel folders data so that
@@ -432,7 +480,7 @@ function update_channel_folder(folder_id: number): void {
 export function handle_editing_channel_folder(folder_id: number): void {
     const folder = channel_folders.get_channel_folder_by_id(folder_id);
     const subs = channel_folders.get_sorted_streams_in_folder(folder_id);
-    const can_manage_folder = settings_data.can_user_manage_folder();
+    const can_manage_folder = channel_folders.can_user_manage_folder(folder_id);
 
     const modal_content_html = render_edit_channel_folder_modal({
         name: folder.name,
@@ -472,6 +520,7 @@ export function handle_editing_channel_folder(folder_id: number): void {
         on_hidden() {
             stream_list_widget_stream_ids = undefined;
             add_channel_folder_widget = undefined;
+            can_administer_group_widget = undefined;
         },
         hide_footer: !can_manage_folder,
         update_submit_disabled_state_on_change: can_manage_folder,
@@ -479,6 +528,7 @@ export function handle_editing_channel_folder(folder_id: number): void {
             render_channel_list(subs, folder_id);
             if (can_manage_folder) {
                 render_add_channel_folder_widget();
+                render_can_administer_group_widget(folder);
             }
         },
     });

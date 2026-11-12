@@ -425,8 +425,8 @@ export function guests_can_access_all_other_users(): boolean {
     return everyone_group.name === "role:everyone";
 }
 
-export function can_user_manage_folder(): boolean {
-    return current_user.is_admin;
+export function user_can_create_channel_folders(): boolean {
+    return !page_params.is_spectator && !current_user.is_guest;
 }
 
 export function two_tier_billing_enabled(): boolean {

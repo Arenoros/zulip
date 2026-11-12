@@ -2,12 +2,20 @@
 
 const assert = require("node:assert/strict");
 
+const {make_user_group} = require("./lib/example_group.cjs");
+const {make_realm} = require("./lib/example_realm.cjs");
 const {make_stream} = require("./lib/example_stream.cjs");
 const {zrequire} = require("./lib/namespace.cjs");
 const {run_test} = require("./lib/test.cjs");
 
 const channel_folders = zrequire("channel_folders");
+const {set_current_user, set_realm} = zrequire("state_data");
 const stream_data = zrequire("stream_data");
+const user_groups = zrequire("user_groups");
+
+const current_user = {};
+set_current_user(current_user);
+set_realm(make_realm());
 
 run_test("basics", () => {
     const params = {};
@@ -179,4 +187,96 @@ run_test("basics", () => {
     // Remove a stream to test case of an inaccessible stream.
     stream_data.delete_sub(stream_3.stream_id);
     assert.deepEqual(channel_folders.get_folders_with_accessible_channels(), [frontend_folder]);
+});
+
+run_test("administering folders", ({override}) => {
+    const me_id = 30;
+    const designers = make_user_group({
+        name: "Designers",
+        id: 101,
+        members: [me_id],
+    });
+    const researchers = make_user_group({
+        name: "Researchers",
+        id: 102,
+        members: [31],
+    });
+    user_groups.initialize({realm_user_groups: [designers, researchers]});
+    override(current_user, "user_id", me_id);
+    override(current_user, "is_admin", false);
+    override(current_user, "is_guest", false);
+
+    function make_folder(id, name, can_administer_group) {
+        return {
+            name,
+            description: "",
+            rendered_description: "",
+            creator_id: null,
+            date_created: 1596710000,
+            id,
+            is_archived: false,
+            order: id,
+            can_administer_group,
+        };
+    }
+    const mine = make_folder(11, "Mine", {direct_members: [me_id], direct_subgroups: []});
+    const design = make_folder(12, "Design", designers.id);
+    const research = make_folder(13, "Research", researchers.id);
+    channel_folders.initialize({channel_folders: [mine, design, research]});
+
+    assert.equal(channel_folders.is_user_appointed_administrator(mine.id), true);
+    assert.equal(channel_folders.is_user_appointed_administrator(design.id), true);
+    assert.equal(channel_folders.is_user_appointed_administrator(research.id), false);
+    assert.equal(channel_folders.can_user_manage_folder(mine.id), true);
+    assert.equal(channel_folders.can_user_manage_folder(research.id), false);
+
+    // Organization administrators administer every folder without
+    // being appointed, and guests none.
+    override(current_user, "is_admin", true);
+    assert.equal(channel_folders.is_user_appointed_administrator(research.id), false);
+    assert.equal(channel_folders.can_user_manage_folder(research.id), true);
+    override(current_user, "is_admin", false);
+    override(current_user, "is_guest", true);
+    assert.equal(channel_folders.can_user_manage_folder(mine.id), false);
+    override(current_user, "is_guest", false);
+
+    const administered_channel = make_stream({
+        stream_id: 21,
+        name: "administered",
+        folder_id: null,
+        can_administer_channel_group: {direct_members: [me_id], direct_subgroups: []},
+    });
+    const other_channel = make_stream({
+        stream_id: 22,
+        name: "other",
+        folder_id: null,
+        can_administer_channel_group: researchers.id,
+    });
+
+    // A channel in no folder is moved by those who administer the
+    // channel and the folder it is moved to.
+    const can_move = channel_folders.can_user_move_channel_to_folder;
+    assert.equal(can_move(administered_channel, null), true);
+    assert.equal(can_move(administered_channel, mine.id), true);
+    assert.equal(can_move(administered_channel, research.id), false);
+    assert.equal(can_move(other_channel, mine.id), false);
+
+    // A channel in a folder is moved by those who administer its
+    // folder and the folder it is moved to, if any.
+    other_channel.folder_id = mine.id;
+    assert.equal(can_move(other_channel, mine.id), true);
+    assert.equal(can_move(other_channel, null), true);
+    assert.equal(can_move(other_channel, design.id), true);
+    assert.equal(can_move(other_channel, research.id), false);
+    administered_channel.folder_id = research.id;
+    assert.equal(can_move(administered_channel, research.id), true);
+    assert.equal(can_move(administered_channel, null), false);
+    assert.equal(can_move(administered_channel, mine.id), false);
+
+    channel_folders.update({
+        channel_folder_id: research.id,
+        data: {can_administer_group: designers.id},
+    });
+    assert.equal(channel_folders.can_user_manage_folder(research.id), true);
+    assert.equal(can_move(administered_channel, mine.id), true);
 });

@@ -25,6 +25,8 @@ state_data.set_realm(
         realm_empty_topic_display_name: "general chat",
     }),
 );
+const current_user = {user_id: 5, is_admin: false, is_guest: false};
+state_data.set_current_user(current_user);
 
 // Start with always filtering out inactive streams.
 const user_settings = {
@@ -394,6 +396,63 @@ test("basics", ({override}) => {
     assert.deepEqual(sorted_sections[1].default_visible_streams, [clarinet.stream_id]);
     assert.deepEqual(sorted_sections[1].muted_streams, []);
     assert.deepEqual(sorted_sections[1].inactive_streams, []);
+});
+
+test("folders without channels", ({override}) => {
+    override(user_settings, "web_left_sidebar_show_channel_folders", true);
+    add_all_subs();
+    const administered_folder = {
+        name: "Mine",
+        description: "",
+        id: 21,
+        order: 0,
+        can_administer_group: {direct_members: [current_user.user_id], direct_subgroups: []},
+    };
+    const other_folder = {
+        name: "Theirs",
+        description: "",
+        id: 22,
+        order: 4,
+        can_administer_group: {direct_members: [6], direct_subgroups: []},
+    };
+    channel_folders.add(administered_folder);
+    channel_folders.add(other_folder);
+
+    // A folder without channels is shown to those appointed to
+    // administer it, after the folders with channels to read.
+    assert.deepEqual(
+        sort_groups("").sections.map((section) => section.id),
+        [
+            "pinned-streams",
+            backend_folder.id.toString(),
+            frontend_folder.id.toString(),
+            "normal-streams",
+            administered_folder.id.toString(),
+            expect_demoted_folder.id.toString(),
+        ],
+    );
+    const section = sort_groups("").sections[4];
+    assert.equal(section.section_title, "MINE");
+    assert.equal(section.folder_id, administered_folder.id);
+    assert.deepEqual(section.default_visible_streams, []);
+
+    // A search only shows what it found.
+    assert.equal(
+        sort_groups("mine").sections.some(
+            (section) => section.folder_id === administered_folder.id,
+        ),
+        false,
+    );
+
+    override(user_settings, "web_left_sidebar_show_channel_folders", false);
+    assert.equal(
+        sort_groups("").sections.some((section) => section.folder_id === administered_folder.id),
+        false,
+    );
+
+    channel_folders.initialize({
+        channel_folders: [frontend_folder, backend_folder, expect_demoted_folder],
+    });
 });
 
 test("current_section_id_for_stream", ({override}) => {

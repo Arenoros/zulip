@@ -304,6 +304,7 @@ export const channel_folder_schema = z.object({
     date_created: z.number(),
     is_archived: z.boolean(),
     order: z.number(),
+    can_administer_group: group_setting_value_schema,
 });
 
 export const navigation_view_schema = z.object({
@@ -634,6 +635,7 @@ export const realm_schema = z.object({
         realm: z.record(z.string(), group_permission_setting_schema),
         stream: z.record(z.string(), group_permission_setting_schema),
         group: z.record(z.string(), group_permission_setting_schema),
+        channel_folder: z.record(z.string(), group_permission_setting_schema),
     }),
     server_thumbnail_formats: z.array(thumbnail_format_schema),
     server_typing_started_expiry_period_milliseconds: z.number(),

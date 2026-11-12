@@ -3,6 +3,8 @@ import type * as z from "zod/mini";
 
 import {FoldDict} from "./fold_dict.ts";
 import type {ChannelFolderUpdateEvent} from "./server_event_types.ts";
+import * as settings_data from "./settings_data.ts";
+import {current_user} from "./state_data.ts";
 import type {StateData, channel_folder_schema} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import type {StreamSubscription} from "./sub_store.ts";
@@ -133,6 +135,10 @@ export function update(event: ChannelFolderUpdateEvent): void {
     if (event.data.is_archived !== undefined) {
         update_channel_folder(folder_id, "is_archived", event.data.is_archived);
     }
+
+    if (event.data.can_administer_group !== undefined) {
+        get_channel_folder_by_id(folder_id).can_administer_group = event.data.can_administer_group;
+    }
 }
 
 export function get_streams_in_folder(folder_id: number): StreamSubscription[] {
@@ -191,4 +197,39 @@ export function get_folders_with_accessible_channels(): ChannelFolder[] {
     }
 
     return get_channel_folders().filter((folder) => channel_folder_ids.has(folder.id));
+}
+
+// Whether the current user is among those appointed to administer
+// the folder. Organization administrators administer every folder
+// without being appointed.
+export function is_user_appointed_administrator(folder_id: number): boolean {
+    return settings_data.user_has_permission_for_group_setting(
+        get_channel_folder_by_id(folder_id).can_administer_group,
+        "can_administer_group",
+        "channel_folder",
+    );
+}
+
+export function can_user_manage_folder(folder_id: number): boolean {
+    return current_user.is_admin || is_user_appointed_administrator(folder_id);
+}
+
+// Mirrors check_can_move_channel_to_folder on the server.
+export function can_user_move_channel_to_folder(
+    sub: StreamSubscription,
+    folder_id: number | null,
+): boolean {
+    if (sub.folder_id === folder_id) {
+        return true;
+    }
+
+    if (sub.folder_id === null) {
+        if (!stream_data.can_administer_channel(sub)) {
+            return false;
+        }
+    } else if (!can_user_manage_folder(sub.folder_id)) {
+        return false;
+    }
+
+    return folder_id === null || can_user_manage_folder(folder_id);
 }

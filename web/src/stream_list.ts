@@ -463,7 +463,12 @@ export function build_stream_list(force_rerender: boolean): void {
             section.default_visible_streams.length === 0 &&
             section.muted_streams.length === 0 &&
             section.inactive_streams.length === 0;
-        $(`#stream-list-${section.id}-container`).toggleClass("no-display", is_empty);
+        // A folder without channels is only among the sections when
+        // the user administers it.
+        $(`#stream-list-${section.id}-container`).toggleClass(
+            "no-display",
+            is_empty && section.folder_id === null,
+        );
 
         for (const stream_id of section.default_visible_streams) {
             add_sidebar_li(stream_id, $(`#stream-list-${section.id}`));
@@ -727,15 +732,10 @@ export function update_subscribe_to_more_streams_link(): void {
         .unsubscribed_subs()
         .filter((sub) => !sub.is_archived && stream_data.can_toggle_subscription(sub)).length;
 
-    const can_create_streams =
-        settings_data.user_can_create_private_streams() ||
-        settings_data.user_can_create_public_streams() ||
-        settings_data.user_can_create_web_public_streams();
-
     $("#subscribe-to-more-streams").html(
         render_subscribe_to_more_streams({
             can_subscribe_stream_count,
-            can_create_streams,
+            can_create_channel_folders: settings_data.user_can_create_channel_folders(),
             exactly_one_unsubscribed_stream: can_subscribe_stream_count === 1,
         }),
     );

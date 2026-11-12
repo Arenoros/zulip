@@ -414,20 +414,32 @@ export function folder_filter_includes_channel(sub: StreamSubscription): boolean
 
 export function set_up_folder_dropdown_widget(sub?: StreamSubscription): DropdownWidget {
     const folder_options = (): dropdown_widget.Option[] => {
-        const folders = channel_folders.get_channel_folders();
-        const can_manage_folder = current_user.is_admin;
-        const manage_folder_icon_label = can_manage_folder
-            ? $t({defaultMessage: "Manage folder"})
-            : $t({defaultMessage: "Preview folder"});
-        const options: dropdown_widget.Option[] = folders.map((folder) => ({
-            name: folder.name,
-            unique_id: folder.id,
-            has_delete_icon: can_manage_folder,
-            manage_folder_icon: can_manage_folder ? "folder-cog" : "preview",
-            has_manage_folder_icon: true,
-            delete_icon_label: $t({defaultMessage: "Delete folder"}),
-            manage_folder_icon_label,
-        }));
+        // An existing channel can only be moved to the folders that
+        // the user is allowed to move it to.
+        const folders = channel_folders
+            .get_channel_folders()
+            .filter(
+                (folder) =>
+                    sub === undefined ||
+                    channel_folders.can_user_move_channel_to_folder(sub, folder.id),
+            );
+        const options: dropdown_widget.Option[] = folders.map((folder) => {
+            const can_manage_folder = channel_folders.can_user_manage_folder(folder.id);
+            return {
+                name: folder.name,
+                unique_id: folder.id,
+                has_delete_icon: can_manage_folder,
+                manage_folder_icon: can_manage_folder ? "folder-cog" : "preview",
+                has_manage_folder_icon: true,
+                delete_icon_label: $t({defaultMessage: "Delete folder"}),
+                manage_folder_icon_label: can_manage_folder
+                    ? $t({defaultMessage: "Manage folder"})
+                    : $t({defaultMessage: "Preview folder"}),
+            };
+        });
+        if (sub !== undefined && !channel_folders.can_user_move_channel_to_folder(sub, null)) {
+            return options;
+        }
 
         const disabled_option = {
             make_italic: true,

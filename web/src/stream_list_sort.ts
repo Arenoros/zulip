@@ -297,6 +297,28 @@ export function sort_groups(
         }
     }
 
+    if (user_settings.web_left_sidebar_show_channel_folders && search_term === "") {
+        // A folder with none of the user's channels is still shown to
+        // those appointed to administer it, so that a folder does not
+        // disappear when it is created or emptied.
+        for (const folder of channel_folders.get_channel_folders()) {
+            if (
+                !folder_sections.has(folder.id) &&
+                channel_folders.is_user_appointed_administrator(folder.id)
+            ) {
+                folder_sections.set(folder.id, {
+                    id: folder.id.toString(),
+                    folder_id: folder.id,
+                    section_title: folder.name.toUpperCase(),
+                    default_visible_streams: [],
+                    muted_streams: [],
+                    inactive_streams: [],
+                    order: folder.order,
+                });
+            }
+        }
+    }
+
     function sort_by_order(folder_sections: StreamListSection[]): StreamListSection[] {
         return folder_sections.toSorted(
             (section_a, section_b) => section_a.order! - section_b.order!,

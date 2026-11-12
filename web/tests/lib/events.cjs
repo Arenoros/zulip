@@ -201,6 +201,7 @@ exports.fixtures = {
             description: "Channels for new frontend discussions",
             rendered_description: "<p>Channels for new frontend discussions</p>",
             is_archived: true,
+            can_administer_group: 3,
         },
     },
 

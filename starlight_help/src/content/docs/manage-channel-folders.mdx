@@ -2,7 +2,7 @@
 title: Manage channel folders
 ---
 
-import {TabItem, Tabs} from "@astrojs/starlight/components";
+import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
 
 import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import NavigationSteps from "../../components/NavigationSteps.astro";
@@ -12,6 +12,7 @@ import MoveChannelToFolder from "../include/_MoveChannelToFolder.mdx";
 import SelectChannelViewGeneral from "../include/_SelectChannelViewGeneral.mdx";
 
 import FolderCogIcon from "~icons/zulip-icon/folder-cog";
+import MoreVerticalIcon from "~icons/zulip-icon/more-vertical";
 import TrashIcon from "~icons/zulip-icon/trash";
 
 <ChannelFoldersIntro />
@@ -22,20 +23,11 @@ import TrashIcon from "~icons/zulip-icon/trash";
 
 ## Create a new channel folder
 
-<AdminOnly />
+Everyone other than [guests](/help/guest-users) can create channel folders. You
+become the administrator of each folder you create, and can appoint other
+administrators.
 
 <Tabs>
-  <TabItem label="Via organization settings">
-    <FlattenedSteps>
-      <NavigationSteps target="settings/channel-folder-settings" />
-
-      1. Click **Add a new channel folder**.
-      1. Fill out channel folder information as desired, and click **Create**.
-      1. In the **Name** column, click and drag the vertical dots to reorder channel
-         folders.
-    </FlattenedSteps>
-  </TabItem>
-
   <TabItem label="Via channel settings">
     <FlattenedSteps>
       <NavigationSteps target="relative/channel/all" />
@@ -49,21 +41,35 @@ import TrashIcon from "~icons/zulip-icon/trash";
       1. Fill out the requested information, and click **Create**.
     </FlattenedSteps>
   </TabItem>
+
+  <TabItem label="Via organization settings">
+    <AdminOnly />
+
+    <FlattenedSteps>
+      <NavigationSteps target="settings/channel-folder-settings" />
+
+      1. Click **Add a new channel folder**.
+      1. Fill out channel folder information as desired, and click **Create**.
+      1. In the **Name** column, click and drag the vertical dots to reorder channel
+         folders.
+    </FlattenedSteps>
+  </TabItem>
 </Tabs>
 
 ## Manage a channel folder
 
-<AdminOnly />
+The administrators of a channel folder can change its name and description,
+and choose who else can administer it. Organization administrators can manage
+every channel folder.
 
 <Tabs>
-  <TabItem label="Via organization settings">
-    <FlattenedSteps>
-      <NavigationSteps target="settings/channel-folder-settings" />
-
-      1. In the **Actions** column, click the **manage folder** (<FolderCogIcon />)
-         icon for the channel folder you want to manage.
+  <TabItem label="Via left sidebar">
+    <Steps>
+      1. Hover over the name of a channel folder in the left sidebar.
+      1. Click on the **ellipsis** (<MoreVerticalIcon />), and
+         click **Manage folder**.
       1. Edit channel folder information as desired, and click **Save changes**.
-    </FlattenedSteps>
+    </Steps>
   </TabItem>
 
   <TabItem label="Via channel settings">
@@ -79,23 +85,26 @@ import TrashIcon from "~icons/zulip-icon/trash";
       1. Edit channel folder information as desired, and click **Save changes**.
     </FlattenedSteps>
   </TabItem>
+
+  <TabItem label="Via organization settings">
+    <AdminOnly />
+
+    <FlattenedSteps>
+      <NavigationSteps target="settings/channel-folder-settings" />
+
+      1. In the **Actions** column, click the **manage folder** (<FolderCogIcon />)
+         icon for the channel folder you want to manage.
+      1. Edit channel folder information as desired, and click **Save changes**.
+    </FlattenedSteps>
+  </TabItem>
 </Tabs>
 
 ## Delete a channel folder
 
-<AdminOnly />
+The administrators of a channel folder and organization administrators can
+delete it.
 
 <Tabs>
-  <TabItem label="Via organization settings">
-    <FlattenedSteps>
-      <NavigationSteps target="settings/channel-folder-settings" />
-
-      1. In the **Actions** column, click the **delete** (<TrashIcon />) icon
-         for the channel folder you want to delete.
-      1. Approve by clicking **Confirm**.
-    </FlattenedSteps>
-  </TabItem>
-
   <TabItem label="Via channel settings">
     <FlattenedSteps>
       <NavigationSteps target="relative/channel/all" />
@@ -106,6 +115,18 @@ import TrashIcon from "~icons/zulip-icon/trash";
 
       1. Under **Settings**, click the **delete** (<TrashIcon />) icon for the
          channel folder you want to delete in the **Channel folder** dropdown.
+      1. Approve by clicking **Confirm**.
+    </FlattenedSteps>
+  </TabItem>
+
+  <TabItem label="Via organization settings">
+    <AdminOnly />
+
+    <FlattenedSteps>
+      <NavigationSteps target="settings/channel-folder-settings" />
+
+      1. In the **Actions** column, click the **delete** (<TrashIcon />) icon
+         for the channel folder you want to delete.
       1. Approve by clicking **Confirm**.
     </FlattenedSteps>
   </TabItem>

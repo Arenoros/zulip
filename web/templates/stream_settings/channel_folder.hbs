@@ -12,7 +12,7 @@
         <div class="dropdown_widget_with_label_wrapper channel-folder-widget-container">
             {{> ../dropdown_widget widget_name=channel_folder_widget_name}}
 
-            {{#if is_admin}}
+            {{#if can_create_channel_folders}}
                 {{> ../components/action_button
                   label=(t "Create new folder")
                   variant="subtle"

@@ -501,6 +501,7 @@ export function show_settings_for(node: HTMLElement): void {
         is_business_type_org:
             realm.realm_org_type === settings_config.all_org_type_values.business.code,
         is_admin: current_user.is_admin,
+        can_create_channel_folders: settings_data.user_can_create_channel_folders(),
         push_notifications_tooltip: get_push_notifications_tooltip(),
         org_level_message_retention_setting: get_display_text_for_realm_message_retention_setting(),
         group_setting_labels: settings_config.all_group_setting_labels.stream,

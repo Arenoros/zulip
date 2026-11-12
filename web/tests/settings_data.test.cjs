@@ -695,12 +695,17 @@ run_test("should_mask_unread_count", ({override}) => {
     assert.equal(settings_data.should_mask_unread_count(sub_muted, unmuted_unread_count), false);
 });
 
-run_test("can_user_manage_folder", ({override}) => {
-    override(current_user, "is_admin", false);
-    assert.equal(settings_data.can_user_manage_folder(), false);
+run_test("user_can_create_channel_folders", ({override}) => {
+    override(current_user, "is_guest", false);
+    assert.equal(settings_data.user_can_create_channel_folders(), true);
 
-    override(current_user, "is_admin", true);
-    assert.equal(settings_data.can_user_manage_folder(), true);
+    override(current_user, "is_guest", true);
+    assert.equal(settings_data.user_can_create_channel_folders(), false);
+
+    override(current_user, "is_guest", false);
+    page_params.is_spectator = true;
+    assert.equal(settings_data.user_can_create_channel_folders(), false);
+    page_params.is_spectator = false;
 });
 
 run_test("two_tier_billing_enabled", ({override}) => {

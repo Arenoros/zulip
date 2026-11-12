@@ -1,6 +1,17 @@
 "use strict";
 
 exports.server_supported_permission_settings = {
+    channel_folder: {
+        can_administer_group: {
+            require_system_group: false,
+            allow_internet_group: false,
+            allow_nobody_group: true,
+            allow_everyone_group: false,
+            default_group_name: "role:administrators",
+            default_for_system_groups: null,
+            allowed_system_groups: [],
+        },
+    },
     stream: {
         can_add_subscribers_group: {
             require_system_group: false,
