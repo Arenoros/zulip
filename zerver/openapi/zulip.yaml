@@ -13682,10 +13682,17 @@ paths:
                           [`POST /register`](/api/register-queue) endpoint to determine
                           the maximum channel name length.
 
-                          The name of a channel to create cannot contain `/`.
+                          The name chosen for a channel to create cannot contain `/`.
+                          With `folder_id`, the channel is named after the folder, and
+                          the name here can be given with or without the name of the
+                          folder and the `/` after it.
 
-                          **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
-                          name of a channel to create could contain `/`.
+                          **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), the
+                          name of a channel did not include the name of its channel
+                          folder.
+
+                          Before Zulip 13.0 (feature level ZF-b1a4e0), the name of a
+                          channel to create could contain `/`.
                       description:
                         type: string
                         description: |
@@ -19380,9 +19387,12 @@ paths:
                         description: |
                           Present if `realm` is present in `fetch_event_types`.
 
-                          The maximum allowed length for a channel name, in Unicode code
-                          points. Clients should use this property rather than hardcoding
-                          field sizes.
+                          The maximum allowed length for the name chosen for a channel,
+                          in Unicode code points. Clients should use this property rather
+                          than hardcoding field sizes.
+
+                          The name of a channel in a channel folder is longer than this
+                          by the name of the folder and a `/`.
 
                           **Changes**: New in Zulip 4.0 (feature level 53). Previously,
                           this required `stream` in `fetch_event_types`, was called
@@ -25374,14 +25384,20 @@ paths:
                   example: "Discuss Italian history and travel destinations."
                 new_name:
                   description: |
-                    The new name for the channel, which cannot contain `/`.
+                    The new name chosen for the channel, which cannot contain `/`.
+                    For a channel in a channel folder, it can be given with or
+                    without the name of the folder and the `/` after it.
 
                     Clients should use the `max_stream_name_length` returned by the
                     [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel name length.
 
-                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
-                    new name could contain `/`.
+                    **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), the
+                    name of a channel did not include the name of its channel
+                    folder.
+
+                    Before Zulip 13.0 (feature level ZF-b1a4e0), the new name could
+                    contain `/`.
 
                     Removed unnecessary JSON-encoding of this parameter in
                     Zulip 4.0 (feature level 64).
@@ -25472,7 +25488,14 @@ paths:
                     this parameter does not require permission to administer the
                     channel that is in a channel folder, only access to its metadata.
 
-                    **Changes**: Before Zulip 13.0 (feature level ZF-9d40b3), permission
+                    Moving a channel renames it, since the name of a channel
+                    includes the name of its channel folder. The request fails if
+                    another channel has the name that the channel would get.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), moving
+                    a channel did not rename it.
+
+                    Before Zulip 13.0 (feature level ZF-9d40b3), permission
                     to administer the channel was required and sufficient to move it.
 
                     New in Zulip 11.0 (feature level 389).
@@ -26281,14 +26304,21 @@ paths:
                 name:
                   type: string
                   description: |
-                    The name of the new channel, which cannot contain `/`.
+                    The name chosen for the new channel, which cannot contain `/`.
+                    With `folder_id`, the channel is named after the folder, and
+                    the name here can be given with or without the name of the
+                    folder and the `/` after it.
 
                     Clients should use the `max_stream_name_length` returned by the
                     [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel name length.
 
-                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
-                    name could contain `/`.
+                    **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), the
+                    name of a channel did not include the name of its channel
+                    folder.
+
+                    Before Zulip 13.0 (feature level ZF-b1a4e0), the name could
+                    contain `/`.
                   example: "music"
                 description:
                   type: string
@@ -27746,8 +27776,16 @@ paths:
 
                     Value cannot be an empty string or contain `/`.
 
-                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
-                    new name could contain `/`.
+                    Renaming a channel folder renames the channels in it, since
+                    the name of a channel includes the name of its channel folder.
+                    The request fails if another channel has the name that one
+                    of these channels would get.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1),
+                    renaming a channel folder did not rename the channels in it.
+
+                    Before Zulip 13.0 (feature level ZF-b1a4e0), the new name could
+                    contain `/`.
                   type: string
                   example: backend
                 description:
@@ -28839,6 +28877,15 @@ components:
           type: string
           description: |
             The name of the channel.
+
+            The name of a channel in a [channel folder](/help/channel-folders)
+            is the name of the folder, a `/`, and the name chosen for the
+            channel, like `engineering/design`. This lets channels in different
+            folders have the same name after the `/`, while every channel keeps
+            a name that no other channel in the organization has.
+
+            **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), the name
+            of a channel did not include the name of its channel folder.
         is_archived:
           type: boolean
           description: |
@@ -29956,6 +30003,13 @@ components:
           type: string
           description: |
             The name of a channel.
+
+            The name of a channel in a [channel folder](/help/channel-folders)
+            is the name of the folder, a `/`, and the name chosen for the
+            channel, like `engineering/design`.
+
+            **Changes**: Before Zulip 13.0 (feature level ZF-c2f9d1), the name
+            of a channel did not include the name of its channel folder.
         description:
           type: string
           description: |

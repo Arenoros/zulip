@@ -75,20 +75,22 @@ from zerver.lib.streams import (
     access_stream_to_change_folder,
     access_web_public_stream,
     channel_events_topic_name,
+    check_and_qualify_new_channel_name,
     check_channel_creation_permissions,
     check_stream_name_available,
     create_stream_if_needed,
     do_get_streams,
     filter_stream_authorization_for_adding_subscribers,
     get_anonymous_group_membership_dict_for_streams,
+    get_channel_name_in_folder,
     get_stream_permission_policy_key,
     list_to_streams,
+    qualify_channel_name,
     stream_to_dict,
     user_has_content_access,
     validate_can_create_topic_group_setting_for_protected_history_streams,
     validate_topics_policy,
 )
-from zerver.lib.string_validation import check_new_stream_name
 from zerver.lib.subscription_info import gather_subscriptions
 from zerver.lib.topic import (
     get_topic_history_for_public_stream,
@@ -300,6 +302,9 @@ def change_stream_folder(
         check_can_move_channel_to_folder(
             user_profile, stream, folder, can_administer_channel=can_administer_channel
         )
+        new_name = get_channel_name_in_folder(stream, folder)
+        if new_name.lower() != stream.name.lower():
+            check_stream_name_available(user_profile.realm, new_name)
     do_change_stream_folder(stream, folder, acting_user=user_profile)
 
 
@@ -487,10 +492,9 @@ def update_stream_backend(
     if description is not None:
         do_change_stream_description(stream, description, acting_user=user_profile)
     if new_name is not None:
-        new_name = new_name.strip()
+        new_name = check_and_qualify_new_channel_name(new_name.strip(), stream.folder)
         if stream.name == new_name:
             raise JsonableError(_("Channel already has that name."))
-        check_new_stream_name(new_name)
         if stream.name.lower() != new_name.lower():
             # Check that the stream name is available (unless we are
             # are only changing the casing of the stream name).
@@ -731,12 +735,12 @@ def create_channel(
     realm = user_profile.realm
     request_settings_dict = locals()
 
-    check_new_stream_name(name)
-    check_stream_name_available(realm, name)
-
     folder: ChannelFolder | None = None
     if folder_id is not None:
         folder = get_channel_folder_by_id(folder_id, realm)
+
+    name = check_and_qualify_new_channel_name(name, folder)
+    check_stream_name_available(realm, name)
 
     if description is None:
         description = ""
@@ -899,11 +903,12 @@ def add_subscriptions_backend(
     for stream_obj in streams_raw:
         # 'color' field is optional
         # check for its presence in the streams_raw first
+        stream_name = qualify_channel_name(stream_obj.name.strip(), folder)
         if stream_obj.color is not None:
-            color_map[stream_obj.name] = stream_obj.color
+            color_map[stream_name] = stream_obj.color
 
         stream_dict_copy: StreamDict = {}
-        stream_dict_copy["name"] = stream_obj.name.strip()
+        stream_dict_copy["name"] = stream_name
 
         if stream_obj.description is not None:
             stream_dict_copy["description"] = stream_obj.description

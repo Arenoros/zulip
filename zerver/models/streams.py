@@ -31,10 +31,15 @@ class StreamTopicsPolicyEnum(Enum):
 
 
 class Stream(models.Model):
+    # The limit for the name chosen for a channel. The name of a
+    # channel in a folder is "<folder name>/<chosen name>", which
+    # keeps names of channels unique in the organization while
+    # different folders can have channels with the same chosen name.
     MAX_NAME_LENGTH = 60
+    MAX_QUALIFIED_NAME_LENGTH = ChannelFolder.MAX_NAME_LENGTH + 1 + MAX_NAME_LENGTH
     MAX_DESCRIPTION_LENGTH = 1024
 
-    name = models.CharField(max_length=MAX_NAME_LENGTH, db_index=True)
+    name = models.CharField(max_length=MAX_QUALIFIED_NAME_LENGTH, db_index=True)
     realm = models.ForeignKey(Realm, db_index=True, on_delete=CASCADE)
     date_created = models.DateTimeField(default=timezone_now)
     creator = models.ForeignKey(UserProfile, null=True, on_delete=models.SET_NULL)

@@ -20,6 +20,7 @@ from zerver.lib.channel_folders import (
     access_channel_folder_for_administration,
     check_channel_folder_in_use,
     check_channel_folder_name,
+    check_channel_names_available_for_folder_name,
     get_channel_folders_in_realm,
 )
 from zerver.lib.exceptions import JsonableError
@@ -97,6 +98,7 @@ def update_channel_folder(
 
     if name is not None and channel_folder.name != name:
         check_channel_folder_name(name, user_profile.realm)
+        check_channel_names_available_for_folder_name(channel_folder, name)
         do_change_channel_folder_name(channel_folder, name, acting_user=user_profile)
 
     if description is not None and channel_folder.description != description:

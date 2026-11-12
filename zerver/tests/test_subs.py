@@ -3171,7 +3171,7 @@ class StreamAdminTest(ZulipTestCase):
             {"folder_id": orjson.dumps(channel_folder.id).decode()},
         )
         self.assert_json_success(result)
-        stream = get_stream("test_stream", iago.realm)
+        stream = get_stream("Frontend/test_stream", iago.realm)
         self.assertEqual(stream.folder_id, channel_folder.id)
 
         result = self.client_patch(
@@ -4007,12 +4007,12 @@ class SubscriptionRestApiTest(ZulipTestCase):
         user = self.example_user("hamlet")
         self.login_user(user)
 
-        long_stream_name = "a" * 61
+        long_stream_name = "a" * (Stream.MAX_QUALIFIED_NAME_LENGTH + 1)
         request = {
             "subscriptions": orjson.dumps([long_stream_name]).decode(),
         }
         result = self.api_delete(user, "/api/v1/users/me/subscriptions", request)
-        self.assert_json_error(result, "Channel name too long (limit: 60 characters).")
+        self.assert_json_error(result, "Channel name too long (limit: 121 characters).")
 
     def test_delete_stream_name_contains_null(self) -> None:
         user = self.example_user("hamlet")

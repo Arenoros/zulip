@@ -308,8 +308,8 @@ class TestCreateStreams(ZulipTestCase):
             extra_post_data=extra_post_data,
         )
         self.assert_json_success(result)
-        stream = get_stream("testchannel", user_profile.realm)
-        self.assertEqual(stream.name, "testchannel")
+        stream = get_stream("sports/testchannel", user_profile.realm)
+        self.assertEqual(stream.folder_id, channel_folder.id)
         self.assertEqual(stream.description, "test channel")
         for setting_name in Stream.stream_permission_group_settings:
             setting_value = getattr(stream, setting_name)
@@ -1152,9 +1152,9 @@ class TestCreateStreams(ZulipTestCase):
             extra_post_data,
             subdomain="zulip",
         )
-        stream = get_stream("new_stream", realm)
+        stream = get_stream("Backend/new_stream", realm)
         self.assertEqual(stream.folder, channel_folder)
-        stream = get_stream("new_stream_2", realm)
+        stream = get_stream("Backend/new_stream_2", realm)
         self.assertEqual(stream.folder, channel_folder)
 
         subscriptions = [

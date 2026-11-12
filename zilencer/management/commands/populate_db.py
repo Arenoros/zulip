@@ -1114,7 +1114,7 @@ class Command(ZulipBaseCommand):
                 acting_user=iago,
             )
             zulip_stream_dict: dict[str, dict[str, Any]] = {
-                "devel": {
+                "Engineering/devel": {
                     "description": "For developing",
                     "folder_id": engineering_channel_folder.id,
                 },
@@ -1123,22 +1123,22 @@ class Command(ZulipBaseCommand):
                     "description": f"Share your favorite video games!  {raw_emojis[2]}",
                     "creator": shiva,
                 },
-                "announce": {
+                "Information/announce": {
                     "description": "For announcements",
                     "can_send_message_group": admins_system_group,
                     "folder_id": information_channel_folder.id,
                 },
                 "design": {"description": "For design", "creator": hamlet},
-                "support": {
+                "Information/support": {
                     "description": "For support",
                     "folder_id": information_channel_folder.id,
                 },
                 "social": {"description": "For socializing"},
-                "test": {
+                "Engineering/test": {
                     "description": "For testing `code`",
                     "folder_id": engineering_channel_folder.id,
                 },
-                "errors": {
+                "Engineering/errors": {
                     "description": "For errors",
                     "folder_id": engineering_channel_folder.id,
                 },
@@ -1194,7 +1194,7 @@ class Command(ZulipBaseCommand):
             bulk_create_streams(zulip_realm, zulip_stream_dict)
             # Now that we've created the new_stream_announcements_stream, configure it properly.
             # By default, 'New stream' & 'Zulip update' announcements are sent to the same stream.
-            announce_stream = get_stream("announce", zulip_realm)
+            announce_stream = get_stream("Information/announce", zulip_realm)
             zulip_realm.new_stream_announcements_stream = announce_stream
             zulip_realm.zulip_update_announcements_stream = announce_stream
             zulip_realm.save(
@@ -1205,7 +1205,12 @@ class Command(ZulipBaseCommand):
             )
 
             # Add a few default streams
-            for default_stream_name in ["design", "devel", "social", "support"]:
+            for default_stream_name in [
+                "design",
+                "Engineering/devel",
+                "social",
+                "Information/support",
+            ]:
                 DefaultStream.objects.create(
                     realm=zulip_realm, stream=get_stream(default_stream_name, zulip_realm)
                 )

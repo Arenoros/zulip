@@ -1101,6 +1101,35 @@ def get_web_public_streams_queryset(realm: Realm) -> QuerySet[Stream]:
     )
 
 
+def get_short_channel_name(name: str, folder: ChannelFolder | None) -> str:
+    """The name chosen for a channel, without the name of its folder."""
+    if folder is None:
+        return name
+    return name.removeprefix(f"{folder.name}/")
+
+
+def get_qualified_channel_name(short_name: str, folder: ChannelFolder | None) -> str:
+    if folder is None:
+        return short_name
+    return f"{folder.name}/{short_name}"
+
+
+def get_channel_name_in_folder(stream: Stream, folder: ChannelFolder | None) -> str:
+    return get_qualified_channel_name(get_short_channel_name(stream.name, stream.folder), folder)
+
+
+def qualify_channel_name(name: str, folder: ChannelFolder | None) -> str:
+    # Clients can send the name of a channel in a folder with or
+    # without the name of the folder.
+    return get_qualified_channel_name(get_short_channel_name(name, folder).strip(), folder)
+
+
+def check_and_qualify_new_channel_name(name: str, folder: ChannelFolder | None) -> str:
+    name = qualify_channel_name(name, folder)
+    check_new_stream_name(get_short_channel_name(name, folder))
+    return name
+
+
 def check_stream_name_available(realm: Realm, name: str) -> None:
     check_stream_name(name)
     try:
@@ -1741,8 +1770,10 @@ def list_to_streams(
 
         assert request_settings_dict is not None
         stream_names = [stream_dict["name"] for stream_dict in missing_stream_dicts]
-        for stream_name in stream_names:
-            check_new_stream_name(stream_name)
+        for stream_dict in missing_stream_dicts:
+            check_new_stream_name(
+                get_short_channel_name(stream_dict["name"], stream_dict.get("folder"))
+            )
 
         stream_group_settings_map, anonymous_group_membership = (
             access_requested_group_permissions_for_streams(

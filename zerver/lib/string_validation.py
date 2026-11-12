@@ -39,10 +39,10 @@ def check_stream_name(stream_name: str) -> None:
     if stream_name.strip() == "":
         raise JsonableError(_("Channel name can't be empty."))
 
-    if len(stream_name) > Stream.MAX_NAME_LENGTH:
+    if len(stream_name) > Stream.MAX_QUALIFIED_NAME_LENGTH:
         raise JsonableError(
             _("Channel name too long (limit: {max_length} characters).").format(
-                max_length=Stream.MAX_NAME_LENGTH
+                max_length=Stream.MAX_QUALIFIED_NAME_LENGTH
             )
         )
 
@@ -56,6 +56,19 @@ def check_stream_name(stream_name: str) -> None:
 
 
 def check_new_stream_name(stream_name: str) -> None:
+    """Checks a name chosen for a channel, which is without the name
+    of the folder of the channel.
+    """
+    if stream_name.strip() == "":
+        raise JsonableError(_("Channel name can't be empty."))
+
+    if len(stream_name) > Stream.MAX_NAME_LENGTH:
+        raise JsonableError(
+            _("Channel name too long (limit: {max_length} characters).").format(
+                max_length=Stream.MAX_NAME_LENGTH
+            )
+        )
+
     # A slash is reserved for separating the name of a folder from
     # the name of a channel in it.
     if "/" in stream_name:

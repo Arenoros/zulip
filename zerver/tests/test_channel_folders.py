@@ -17,7 +17,7 @@ from zerver.actions.streams import (
 from zerver.actions.user_groups import check_add_user_group
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.types import UserGroupMembersData
-from zerver.models import ChannelFolder, NamedUserGroup, RealmAuditLog, Stream, UserProfile
+from zerver.models import ChannelFolder, Message, NamedUserGroup, RealmAuditLog, Stream, UserProfile
 from zerver.models.groups import SystemGroups
 from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.models.realms import get_realm
@@ -873,3 +873,216 @@ class ReorderChannelFolderTest(ChannelFoldersTestCase):
             "/json/channel_folders", info={"order": orjson.dumps(order).decode()}
         )
         self.assert_json_error(result, "Invalid order mapping.")
+
+
+class ChannelNamesInFoldersTest(ZulipTestCase):
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.iago = self.example_user("iago")
+        self.realm = self.iago.realm
+        self.development_folder = check_add_channel_folder(
+            self.realm, "Development", "", acting_user=self.iago
+        )
+        self.support_folder = check_add_channel_folder(
+            self.realm, "Support", "", acting_user=self.iago
+        )
+        self.login_user(self.iago)
+
+    def create_channel(self, name: str, folder: ChannelFolder | None) -> "TestHttpResponse":
+        extra_post_data = {}
+        if folder is not None:
+            extra_post_data["folder_id"] = orjson.dumps(folder.id).decode()
+        return self.create_channel_via_post(self.iago, name=name, extra_post_data=extra_post_data)
+
+    def make_channel_in_folder(self, short_name: str, folder: ChannelFolder) -> Stream:
+        channel = self.make_stream(short_name)
+        do_change_stream_folder(channel, folder, acting_user=self.iago)
+        return channel
+
+    def test_creating_channels_with_same_name_in_different_folders(self) -> None:
+        self.assert_json_success(self.create_channel("General", self.development_folder))
+        self.assert_json_success(self.create_channel("General", self.support_folder))
+        self.assert_json_success(self.create_channel("General", None))
+
+        development_general = get_stream("Development/General", self.realm)
+        support_general = get_stream("Support/General", self.realm)
+        general = get_stream("General", self.realm)
+        self.assertEqual(development_general.folder_id, self.development_folder.id)
+        self.assertEqual(support_general.folder_id, self.support_folder.id)
+        self.assertIsNone(general.folder_id)
+
+        # Each of them is found by its name.
+        for channel in [development_general, support_general, general]:
+            result = self.client_get("/json/get_stream_id", {"stream": channel.name})
+            self.assertEqual(self.assert_json_success(result)["stream_id"], channel.id)
+            message_id = self.send_stream_message(self.iago, channel.name)
+            self.assertEqual(Message.objects.get(id=message_id).recipient_id, channel.recipient_id)
+
+        # Names are unique in a folder without regard to case.
+        result = self.create_channel("general", self.support_folder)
+        self.assert_json_error(result, "Channel 'Support/general' already exists", status_code=409)
+
+    def test_names_for_creating_channel_in_folder(self) -> None:
+        # The name can be given with the name of the folder.
+        self.assert_json_success(self.create_channel("Support/Billing", self.support_folder))
+        self.assertEqual(
+            get_stream("Support/Billing", self.realm).folder_id, self.support_folder.id
+        )
+
+        result = self.create_channel("Development/Billing", self.support_folder)
+        self.assert_json_error(result, "Channel name can't contain '/'.")
+
+        result = self.create_channel("Support/", self.support_folder)
+        self.assert_json_error(result, "Channel name can't be empty.")
+
+        result = self.create_channel("a" * 61, self.support_folder)
+        self.assert_json_error(result, "Channel name too long (limit: 60 characters).")
+
+        # The limit is for the name without the name of the folder.
+        self.assert_json_success(self.create_channel("a" * 60, self.support_folder))
+        self.assertTrue(
+            Stream.objects.filter(realm=self.realm, name="Support/" + "a" * 60).exists()
+        )
+
+    def test_creating_channels_in_folder_by_subscribing(self) -> None:
+        folder_id = orjson.dumps(self.support_folder.id).decode()
+        self.subscribe_via_post(self.iago, ["General", "Support/Billing"], {"folder_id": folder_id})
+        for name in ["Support/General", "Support/Billing"]:
+            channel = get_stream(name, self.realm)
+            self.assertEqual(channel.folder_id, self.support_folder.id)
+            self.assertIn(self.iago, self.users_subscribed_to_stream(name, self.realm))
+
+        # The same request subscribes to the channels once they exist.
+        hamlet = self.example_user("hamlet")
+        self.subscribe_via_post(hamlet, ["General"], {"folder_id": folder_id})
+        self.assertIn(hamlet, self.users_subscribed_to_stream("Support/General", self.realm))
+        self.assertFalse(Stream.objects.filter(realm=self.realm, name="General").exists())
+
+        result = self.subscribe_via_post(
+            self.iago, ["Development/General"], {"folder_id": folder_id}, allow_fail=True
+        )
+        self.assert_json_error(result, "Channel name can't contain '/'.")
+
+    def test_renaming_channel_in_folder(self) -> None:
+        channel = self.make_channel_in_folder("General", self.support_folder)
+        self.make_channel_in_folder("Taken", self.support_folder)
+
+        result = self.client_patch(f"/json/streams/{channel.id}", {"new_name": "Billing"})
+        self.assert_json_success(result)
+        channel.refresh_from_db()
+        self.assertEqual(channel.name, "Support/Billing")
+
+        # The new name can be given with the name of the folder.
+        result = self.client_patch(f"/json/streams/{channel.id}", {"new_name": "Support/Refunds"})
+        self.assert_json_success(result)
+        channel.refresh_from_db()
+        self.assertEqual(channel.name, "Support/Refunds")
+
+        result = self.client_patch(f"/json/streams/{channel.id}", {"new_name": "Refunds"})
+        self.assert_json_error(result, "Channel already has that name.")
+
+        result = self.client_patch(
+            f"/json/streams/{channel.id}", {"new_name": "Development/Refunds"}
+        )
+        self.assert_json_error(result, "Channel name can't contain '/'.")
+
+        result = self.client_patch(f"/json/streams/{channel.id}", {"new_name": "taken"})
+        self.assert_json_error(result, "Channel 'Support/taken' already exists", status_code=409)
+        channel.refresh_from_db()
+        self.assertEqual(channel.name, "Support/Refunds")
+
+    def test_moving_channel_renames_it(self) -> None:
+        channel = self.make_stream("General")
+        self.subscribe(self.iago, "General")
+        last_message_id = self.get_last_message().id
+
+        def move_channel(folder: ChannelFolder | None, expected_name: str) -> None:
+            old_name = channel.name
+            folder_id = None if folder is None else folder.id
+            with self.capture_send_event_calls(expected_num_events=2) as events:
+                result = self.client_patch(
+                    f"/json/streams/{channel.id}", {"folder_id": orjson.dumps(folder_id).decode()}
+                )
+            self.assert_json_success(result)
+            self.assertEqual(events[0]["event"]["property"], "folder_id")
+            self.assertEqual(events[0]["event"]["value"], folder_id)
+            self.assertEqual(events[1]["event"]["property"], "name")
+            self.assertEqual(events[1]["event"]["value"], expected_name)
+
+            channel.refresh_from_db()
+            self.assertEqual(channel.name, expected_name)
+            self.assertEqual(channel.folder_id, folder_id)
+            # The channel is still found by its ID.
+            result = self.client_get(f"/json/streams/{channel.id}")
+            self.assertEqual(self.assert_json_success(result)["stream"]["name"], expected_name)
+
+            audit_log = RealmAuditLog.objects.filter(
+                event_type=AuditLogEventType.CHANNEL_NAME_CHANGED, modified_stream=channel
+            ).latest("id")
+            self.assertEqual(audit_log.acting_user, self.iago)
+            self.assertEqual(
+                audit_log.extra_data,
+                {RealmAuditLog.OLD_VALUE: old_name, RealmAuditLog.NEW_VALUE: expected_name},
+            )
+
+        move_channel(self.support_folder, "Support/General")
+        move_channel(self.development_folder, "Development/General")
+        move_channel(None, "General")
+
+        # Unlike renaming a channel, moving it posts no message in it.
+        self.assertEqual(self.get_last_message().id, last_message_id)
+
+    def test_moving_channel_to_folder_with_channel_of_same_name(self) -> None:
+        self.make_channel_in_folder("General", self.support_folder)
+        channel = self.make_stream("general")
+
+        result = self.client_patch(
+            f"/json/streams/{channel.id}",
+            {"folder_id": orjson.dumps(self.support_folder.id).decode()},
+        )
+        self.assert_json_error(result, "Channel 'Support/general' already exists", status_code=409)
+        channel.refresh_from_db()
+        self.assertEqual(channel.name, "general")
+        self.assertIsNone(channel.folder_id)
+
+    def test_renaming_folder_renames_its_channels(self) -> None:
+        general = self.make_channel_in_folder("General", self.support_folder)
+        archived = self.make_channel_in_folder("Billing", self.support_folder)
+        do_deactivate_stream(archived, acting_user=self.iago)
+        other = self.make_channel_in_folder("General", self.development_folder)
+        self.subscribe(self.iago, "Support/General")
+        last_message_id = self.get_last_message().id
+
+        with self.capture_send_event_calls(expected_num_events=3) as events:
+            result = self.client_patch(
+                f"/json/channel_folders/{self.support_folder.id}", {"name": "Help"}
+            )
+        self.assert_json_success(result)
+        self.assertEqual(events[0]["event"]["type"], "channel_folder")
+        self.assertEqual(
+            {(event["event"]["stream_id"], event["event"]["value"]) for event in events[1:]},
+            {(general.id, "Help/General"), (archived.id, "Help/Billing")},
+        )
+
+        for channel, expected_name in [
+            (general, "Help/General"),
+            (archived, "Help/Billing"),
+            (other, "Development/General"),
+        ]:
+            channel.refresh_from_db()
+            self.assertEqual(channel.name, expected_name)
+        # No messages are posted about the channels being renamed.
+        self.assertEqual(self.get_last_message().id, last_message_id)
+
+        # A channel can have such a name from before it was reserved
+        # for channels in folders.
+        self.make_stream("Care/general")
+        result = self.client_patch(
+            f"/json/channel_folders/{self.support_folder.id}", {"name": "Care"}
+        )
+        self.assert_json_error(result, "Channel 'Care/general' already exists", status_code=409)
+        self.support_folder.refresh_from_db()
+        self.assertEqual(self.support_folder.name, "Help")
+        general.refresh_from_db()
+        self.assertEqual(general.name, "Help/General")

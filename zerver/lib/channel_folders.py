@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 from django.utils.translation import gettext as _
 
-from zerver.lib.exceptions import CannotAdministerChannelError, JsonableError
+from zerver.lib.exceptions import CannotAdministerChannelError, ChannelExistsError, JsonableError
 from zerver.lib.markdown import markdown_convert
-from zerver.lib.streams import get_web_public_streams_queryset
+from zerver.lib.streams import get_short_channel_name, get_web_public_streams_queryset
 from zerver.lib.string_validation import check_string_is_printable
 from zerver.lib.timestamp import datetime_to_timestamp
 from zerver.lib.types import UserGroupMembersData, UserGroupMembersDict
@@ -15,6 +15,7 @@ from zerver.lib.user_groups import (
     user_has_permission_for_group_setting,
 )
 from zerver.models import ChannelFolder, Realm, Stream, UserGroup, UserProfile
+from zerver.models.streams import bulk_get_streams
 
 
 @dataclass
@@ -47,6 +48,19 @@ def check_channel_folder_name(name: str, realm: Realm) -> None:
 
     if ChannelFolder.objects.filter(name__iexact=name, realm=realm, is_archived=False).exists():
         raise JsonableError(_("Channel folder name already in use"))
+
+
+def check_channel_names_available_for_folder_name(channel_folder: ChannelFolder, name: str) -> None:
+    """Renaming a folder renames the channels in it."""
+    new_channel_names = {
+        f"{name}/{get_short_channel_name(channel_name, channel_folder)}"
+        for channel_name in Stream.objects.filter(folder=channel_folder).values_list(
+            "name", flat=True
+        )
+    }
+    for channel in bulk_get_streams(channel_folder.realm, new_channel_names).values():
+        if channel.folder_id != channel_folder.id:
+            raise ChannelExistsError(channel.name)
 
 
 def render_channel_folder_description(text: str, realm: Realm, *, acting_user: UserProfile) -> str:

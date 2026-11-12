@@ -55,6 +55,7 @@ from zerver.lib.streams import (
     can_access_stream_metadata_user_ids,
     check_basic_stream_access,
     get_anonymous_group_membership_dict_for_streams,
+    get_channel_name_in_folder,
     get_stream_permission_policy_key,
     get_stream_post_policy_value_based_on_group_setting,
     get_users_dict_with_metadata_access_to_streams_via_permission_groups,
@@ -1941,6 +1942,7 @@ def do_change_stream_folder(
     stream: Stream, folder: ChannelFolder | None, *, acting_user: UserProfile
 ) -> None:
     old_folder_id = stream.folder_id
+    new_name = get_channel_name_in_folder(stream, folder)
     stream.folder = folder
     stream.save(update_fields=["folder"])
     RealmAuditLog.objects.create(
@@ -1961,4 +1963,10 @@ def do_change_stream_folder(
         stream_id=stream.id,
         name=stream.name,
     )
-    send_event_on_commit(stream.realm, event, can_access_stream_metadata_user_ids(stream))
+    notify_user_ids = can_access_stream_metadata_user_ids(stream)
+    send_event_on_commit(stream.realm, event, notify_user_ids)
+
+    if new_name != stream.name:
+        rename_stream_without_notice(
+            stream, new_name, acting_user=acting_user, notify_user_ids=notify_user_ids
+        )

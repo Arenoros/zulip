@@ -5400,17 +5400,24 @@ class SubscribeActionTest(BaseAction):
         check_message("events[1]", events[1])
 
         channel_folder = check_add_channel_folder(realm, "Frontend", "", acting_user=iago)
-        with self.verify_action(include_subscribers=include_subscribers) as events:
+        # Moving a channel renames it to have the name of its folder.
+        with self.verify_action(include_subscribers=include_subscribers, num_events=2) as events:
             do_change_stream_folder(stream, channel_folder, acting_user=iago)
         check_stream_update("events[0]", events[0])
         self.assertEqual(events[0]["property"], "folder_id")
         self.assertEqual(events[0]["value"], channel_folder.id)
+        check_stream_update("events[1]", events[1])
+        self.assertEqual(events[1]["property"], "name")
+        self.assertEqual(events[1]["value"], "Frontend/test_stream")
 
-        with self.verify_action(include_subscribers=include_subscribers) as events:
+        with self.verify_action(include_subscribers=include_subscribers, num_events=2) as events:
             do_change_stream_folder(stream, None, acting_user=iago)
         check_stream_update("events[0]", events[0])
         self.assertEqual(events[0]["property"], "folder_id")
         self.assertIsNone(events[0]["value"])
+        check_stream_update("events[1]", events[1])
+        self.assertEqual(events[1]["property"], "name")
+        self.assertEqual(events[1]["value"], "test_stream")
 
         # Update stream privacy - make stream web-public
         with self.verify_action(include_subscribers=include_subscribers, num_events=2) as events:

@@ -4,6 +4,7 @@ from django.db import transaction
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
+from zerver.actions.streams import rename_stream_without_notice
 from zerver.lib.channel_folders import get_channel_folders_data, render_channel_folder_description
 from zerver.lib.event_types import (
     ChannelFolderAddEvent,
@@ -13,6 +14,11 @@ from zerver.lib.event_types import (
     ChannelFolderUpdateEvent,
 )
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.streams import (
+    bulk_can_access_stream_metadata_user_ids,
+    get_qualified_channel_name,
+    get_short_channel_name,
+)
 from zerver.lib.types import UserGroupMembersData
 from zerver.lib.user_groups import (
     convert_to_user_group_members_dict,
@@ -25,6 +31,7 @@ from zerver.models import (
     NamedUserGroup,
     Realm,
     RealmAuditLog,
+    Stream,
     UserGroup,
     UserGroupMembership,
     UserProfile,
@@ -102,6 +109,10 @@ def do_change_channel_folder_name(
     channel_folder: ChannelFolder, name: str, *, acting_user: UserProfile
 ) -> None:
     old_value = channel_folder.name
+    channels = list(Stream.objects.filter(folder=channel_folder).select_related("realm"))
+    short_channel_names = {
+        channel.id: get_short_channel_name(channel.name, channel_folder) for channel in channels
+    }
     channel_folder.name = name
     channel_folder.save(update_fields=["name"])
 
@@ -118,6 +129,15 @@ def do_change_channel_folder_name(
     )
 
     do_send_channel_folder_update_event(channel_folder, ChannelFolderDataForUpdate(name=name))
+
+    notify_user_ids = bulk_can_access_stream_metadata_user_ids(channels)
+    for channel in channels:
+        rename_stream_without_notice(
+            channel,
+            get_qualified_channel_name(short_channel_names[channel.id], channel_folder),
+            acting_user=acting_user,
+            notify_user_ids=notify_user_ids[channel.id],
+        )
 
 
 @transaction.atomic(durable=True)
