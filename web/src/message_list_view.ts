@@ -162,6 +162,14 @@ function same_year(earlier_msg: Message | undefined, later_msg: Message | undefi
     );
 }
 
+// In the bubble layout, a pause longer than this between two messages
+// from the same sender starts a new message series.
+const MESSAGE_SERIES_MAX_PAUSE_SECONDS = 5 * 60;
+
+function within_message_series_pause(earlier_msg: Message, later_msg: Message): boolean {
+    return later_msg.timestamp - earlier_msg.timestamp <= MESSAGE_SERIES_MAX_PAUSE_SECONDS;
+}
+
 function same_sender(a: MessageContainer | undefined, b: MessageContainer | undefined): boolean {
     if (a === undefined || b === undefined) {
         return false;
@@ -973,6 +981,7 @@ export class MessageListView {
         let current_group_message_containers: MessageContainer[] = [];
 
         let prev_message_container: MessageContainer | undefined;
+        const bubble_layout = this.is_bubble_layout();
 
         const add_message_container_to_group = (message_container: MessageContainer): void => {
             current_group_message_containers.push(message_container);
@@ -1047,7 +1056,8 @@ export class MessageListView {
                 !prev_message_container.status_message &&
                 same_day(prev_message_container.msg, message) &&
                 prev_message_container.msg.historical === message.historical &&
-                prev_message_container.msg.sender_id === message.sender_id
+                prev_message_container.msg.sender_id === message.sender_id &&
+                (!bubble_layout || within_message_series_pause(prev_message_container.msg, message))
             ) {
                 include_sender = false;
             }
@@ -1105,7 +1115,9 @@ export class MessageListView {
                 !first_msg_container.msg.is_me_message &&
                 same_day(last_msg_container?.msg, first_msg_container.msg) &&
                 same_sender(last_msg_container, first_msg_container) &&
-                first_msg_container.msg.historical === last_msg_container?.msg.historical
+                first_msg_container.msg.historical === last_msg_container?.msg.historical &&
+                (!this.is_bubble_layout() ||
+                    within_message_series_pause(last_msg_container.msg, first_msg_container.msg))
             ) {
                 first_msg_container.include_sender = false;
             }

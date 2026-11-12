@@ -28,6 +28,12 @@ mock_esm("../src/people", {
     small_avatar_url: () => "fake/small/avatar/url",
     get_muted_user_avatar_url: () => "fake/muted_user/avatar/url",
     maybe_get_user_by_id: noop,
+    pm_with_user_ids: () => [5],
+    sorted_other_user_ids: (user_ids) => user_ids,
+    get_display_full_names: () => ["Alice"],
+    get_full_name: () => "Alice",
+    is_valid_bot_user: () => false,
+    is_direct_message_conversation_with_self: () => false,
 });
 
 const {Filter} = zrequire("../src/filter");
@@ -35,6 +41,10 @@ const {MessageListView} = zrequire("../src/message_list_view");
 const message_list = zrequire("message_list");
 const {MessageListData} = zrequire("message_list_data");
 const muted_users = zrequire("muted_users");
+const {initialize_user_settings} = zrequire("user_settings");
+
+const user_settings = {web_direct_message_bubbles: false};
+initialize_user_settings({user_settings});
 
 let next_timestamp = 1500000000;
 
@@ -1236,6 +1246,77 @@ test("set_subscription_dividers_and_markers ignores non-channel narrows", () => 
     assert.doesNotThrow(() => {
         view.set_subscription_dividers_and_markers([], "bottom");
     });
+});
+
+test("message series in the bubble layout", ({override}) => {
+    // In the bubble layout, a message from the same sender more than
+    // five minutes after the previous one starts a new series, both
+    // within a batch of messages and where two batches meet.
+    const ten_am = new Date(2026, 10, 9, 10, 0).getTime() / 1000;
+    function dm_at(minutes) {
+        return {
+            id: Number(_.uniqueId()),
+            type: "private",
+            is_private: true,
+            is_stream: false,
+            sender_id: 5,
+            to_user_ids: "5",
+            display_recipient: [{id: 5, email: "alice@example.com", full_name: "Alice"}],
+            timestamp: ten_am + minutes * 60,
+            historical: false,
+            clean_reactions: new Map(),
+            submessages: [],
+        };
+    }
+
+    function make_view(terms) {
+        const list = new message_list.MessageList({
+            data: new MessageListData({excludes_muted_topics: false, filter: new Filter(terms)}),
+            is_node_test: true,
+        });
+        return list.view;
+    }
+
+    function senders_shown(view) {
+        return view._message_groups.flatMap((group) =>
+            group.message_containers.map((container) => container.include_sender),
+        );
+    }
+
+    const conversation = [{operator: "dm", operand: [5]}];
+    const dm_feed = [{operator: "is", operand: "dm"}];
+    const messages = [dm_at(0), dm_at(4), dm_at(8), dm_at(14)];
+
+    override(user_settings, "web_direct_message_bubbles", true);
+    let view = make_view(conversation);
+    assert.ok(view.is_bubble_layout());
+    view._message_groups = view.build_message_groups(messages);
+    assert.deepEqual(senders_shown(view), [true, false, false, true]);
+
+    view.merge_message_groups(view.build_message_groups([dm_at(18)]), "bottom");
+    view.merge_message_groups(view.build_message_groups([dm_at(24)]), "bottom");
+    assert.deepEqual(senders_shown(view), [true, false, false, true, false, true]);
+
+    view = make_view(conversation);
+    view._message_groups = view.build_message_groups([dm_at(30)]);
+    view.merge_message_groups(view.build_message_groups([dm_at(20), dm_at(22)]), "top");
+    assert.deepEqual(senders_shown(view), [true, false, true]);
+    view.merge_message_groups(view.build_message_groups([dm_at(16)]), "top");
+    assert.deepEqual(senders_shown(view), [true, false, false, true]);
+
+    // Views of more than one conversation, and the classic layout,
+    // ignore pauses.
+    view = make_view(dm_feed);
+    assert.ok(!view.is_bubble_layout());
+    view._message_groups = view.build_message_groups(messages);
+    assert.deepEqual(senders_shown(view), [true, false, false, false]);
+
+    override(user_settings, "web_direct_message_bubbles", false);
+    view = make_view(conversation);
+    assert.ok(!view.is_bubble_layout());
+    view._message_groups = view.build_message_groups(messages);
+    view.merge_message_groups(view.build_message_groups([dm_at(24)]), "bottom");
+    assert.deepEqual(senders_shown(view), [true, false, false, false, false]);
 });
 
 test("render_windows", ({mock_template}) => {
