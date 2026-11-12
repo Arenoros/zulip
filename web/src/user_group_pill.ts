@@ -10,6 +10,7 @@ import type {
     CombinedPillContainer,
     GroupSettingPillContainer,
 } from "./typeahead_helper.ts";
+import type {GroupSettingType} from "./types.ts";
 import type {UserGroup} from "./user_groups.ts";
 import * as user_groups from "./user_groups.ts";
 
@@ -123,7 +124,7 @@ export function filter_taken_groups(
 export function typeahead_source(
     pill_widget: CombinedPillContainer | GroupSettingPillContainer | UserGroupPillWidget,
     setting_name?: string,
-    setting_type?: "realm" | "stream" | "group",
+    setting_type?: GroupSettingType,
 ): UserGroupPillData[] {
     let groups;
     if (setting_name !== undefined) {

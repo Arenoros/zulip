@@ -6,6 +6,7 @@ import assert from "minimalistic-assert";
 import render_input_pill from "../templates/input_pill.hbs";
 
 import * as keydown_util from "./keydown_util.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as ui_util from "./ui_util.ts";
 import * as util from "./util.ts";
 
@@ -14,7 +15,7 @@ import * as util from "./util.ts";
 export type InputPillConfig = {
     exclude_inaccessible_users?: boolean;
     setting_name?: string;
-    setting_type?: "realm" | "stream" | "group";
+    setting_type?: GroupSettingType;
     user_id?: number;
 };
 

@@ -8,12 +8,13 @@ import {page_params} from "./page_params.ts";
 import * as settings_config from "./settings_config.ts";
 import {realm} from "./state_data.ts";
 import type {GroupPermissionSetting, GroupSettingValue} from "./state_data.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as user_groups from "./user_groups.ts";
 import type {UserGroup} from "./user_groups.ts";
 
 export function get_group_permission_setting_config(
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): GroupPermissionSetting | undefined {
     const permission_settings_dict = realm.server_supported_permission_settings;
 
@@ -99,7 +100,7 @@ export type StreamGroupSettingName = z.infer<typeof stream_group_setting_name_sc
 
 export function get_realm_user_groups_for_setting(
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
     for_new_settings_ui = false,
 ): UserGroup[] {
     const group_setting_config = get_group_permission_setting_config(setting_name, setting_type);
@@ -135,7 +136,7 @@ export function get_realm_user_groups_for_setting(
 
 export function get_realm_user_groups_for_dropdown_list_widget(
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): dropdown_widget.Option[] {
     const allowed_setting_groups = get_realm_user_groups_for_setting(setting_name, setting_type);
 
@@ -182,7 +183,7 @@ export function get_assigned_permission_object(
     setting_name: RealmGroupSettingName | StreamGroupSettingName | GroupGroupSettingName,
     group_id: number,
     can_edit_settings: boolean,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): AssignedGroupPermission | undefined {
     // This function returns an object of type AssignedGroupPermission
     // containing details about whether the user can edit the setting,

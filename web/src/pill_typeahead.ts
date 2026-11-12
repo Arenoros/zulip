@@ -10,6 +10,7 @@ import type {StreamPillData, StreamPillWidget} from "./stream_pill.ts";
 import * as typeahead from "./typeahead.ts";
 import * as typeahead_helper from "./typeahead_helper.ts";
 import type {CombinedPillContainer, GroupSettingPillContainer} from "./typeahead_helper.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as user_group_pill from "./user_group_pill.ts";
 import type {UserGroupPillData} from "./user_group_pill.ts";
 import type {UserGroup} from "./user_groups.ts";
@@ -167,7 +168,7 @@ export function set_up_group_setting_typeahead(
     pills: GroupSettingPillContainer,
     opts: {
         setting_name: string;
-        setting_type: "realm" | "stream" | "group";
+        setting_type: GroupSettingType;
         group?: UserGroup | undefined;
     },
 ): void {

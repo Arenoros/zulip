@@ -7,6 +7,7 @@ import type {User} from "./people.ts";
 import * as settings_config from "./settings_config.ts";
 import {current_user, realm} from "./state_data.ts";
 import type {CurrentUser, GroupSettingValue} from "./state_data.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as user_groups from "./user_groups.ts";
 import {user_settings} from "./user_settings.ts";
 
@@ -57,7 +58,7 @@ export function user_can_change_logo(): boolean {
 export function user_has_permission_for_group_setting(
     setting_value: GroupSettingValue,
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
     user: CurrentUser | User = current_user,
 ): boolean {
     const settings_config = group_permission_settings.get_group_permission_setting_config(

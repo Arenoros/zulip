@@ -14,6 +14,7 @@ import type {
     CombinedPillContainer,
     GroupSettingPillContainer,
 } from "./typeahead_helper.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as user_status from "./user_status.ts";
 
 // This will be used for pills for things like composing
@@ -137,7 +138,7 @@ export function typeahead_source(
     pill_widget: UserPillWidget | CombinedPillContainer | GroupSettingPillContainer,
     exclude_bots?: boolean,
     setting_name?: string,
-    setting_type?: "realm" | "stream" | "group",
+    setting_type?: GroupSettingType,
 ): UserPillData[] {
     let users = exclude_bots ? people.get_realm_active_human_users() : people.get_realm_users();
     if (setting_name !== undefined) {

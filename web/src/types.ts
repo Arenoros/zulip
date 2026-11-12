@@ -17,6 +17,9 @@ export const anonymous_group_schema = z.object({
 
 export const group_setting_value_schema = z.union([z.number(), anonymous_group_schema]);
 
+// What a setting whose value is a group-setting value belongs to.
+export type GroupSettingType = "realm" | "stream" | "group";
+
 export const COMPONENT_INTENT_VALUES = [
     "neutral",
     "brand",

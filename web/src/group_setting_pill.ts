@@ -6,6 +6,7 @@ import type {InputPillConfig} from "./input_pill.ts";
 import * as people from "./people.ts";
 import * as pill_typeahead from "./pill_typeahead.ts";
 import type {GroupSettingPill, GroupSettingPillContainer} from "./typeahead_helper.ts";
+import type {GroupSettingType} from "./types.ts";
 import * as user_group_pill from "./user_group_pill.ts";
 import type {UserGroupPill} from "./user_group_pill.ts";
 import * as user_groups from "./user_groups.ts";
@@ -16,7 +17,7 @@ import type {UserPill} from "./user_pill.ts";
 function check_group_allowed_for_setting(
     group_item: UserGroupPill,
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): boolean {
     const group_setting_config = group_permission_settings.get_group_permission_setting_config(
         setting_name,
@@ -44,7 +45,7 @@ function check_group_allowed_for_setting(
 function check_user_allowed_for_setting(
     user_item: UserPill,
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): boolean {
     const group_setting_config = group_permission_settings.get_group_permission_setting_config(
         setting_name,
@@ -123,7 +124,7 @@ export function generate_pill_html(item: GroupSettingPill): string {
 export function create_pills(
     $pill_container: JQuery,
     setting_name: string,
-    setting_type: "realm" | "stream" | "group",
+    setting_type: GroupSettingType,
 ): GroupSettingPillContainer {
     const pill_widget = input_pill.create<GroupSettingPill>({
         $container: $pill_container,
@@ -149,7 +150,7 @@ export function set_up_pill_typeahead({
     $pill_container: JQuery;
     opts: {
         setting_name: string;
-        setting_type: "realm" | "stream" | "group";
+        setting_type: GroupSettingType;
         group?: UserGroup | undefined;
     };
 }): void {
