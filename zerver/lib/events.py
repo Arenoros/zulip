@@ -1534,6 +1534,12 @@ def apply_event(
                                     stream["stream_id"]
                                 ]
 
+            if event["property"] == "name":
+                state["unsubscribed"].sort(key=lambda elt: elt["name"])
+                state["never_subscribed"].sort(key=lambda elt: elt["name"])
+                if "streams" in state:
+                    state["streams"].sort(key=lambda elt: elt["name"])
+
     elif event["type"] == "default_streams":
         state["realm_default_streams"] = event["default_streams"]
     elif event["type"] == "default_stream_groups":

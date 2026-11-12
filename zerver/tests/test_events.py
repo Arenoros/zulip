@@ -4104,7 +4104,8 @@ class NormalActionsTest(BaseAction):
     def test_rename_stream(self) -> None:
         for i, include_streams in enumerate([True, False]):
             old_name = f"old name{i}"
-            new_name = f"new name{i}"
+            # The new name comes before names of other channels.
+            new_name = f"A new name{i}"
 
             stream = self.make_stream(old_name)
             self.subscribe(self.user_profile, stream.name)
