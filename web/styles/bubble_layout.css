@@ -125,12 +125,13 @@
         /* For the floating message controls. */
         position: relative;
 
-        /* The editor, and bubbles with code blocks, tables, spoilers
-           or widgets, take the whole column. */
+        /* The editor, and bubbles with code blocks, tables, spoilers,
+           widgets or a condensed message, take the whole column. */
         &.content_edit_mode,
         &:has(
                 > .message_content:not(.collapsed)
-                    :is(.codehilite, table, .spoiler-block, .widget-content)
+                    :is(.codehilite, table, .spoiler-block, .widget-content),
+                > .message_content.condensed:not(.collapsed)
             ) {
             grid-template-columns:
                 var(--bubble-avatar-column-width)
@@ -500,6 +501,80 @@
             background-color: var(--color-background-quote-in-bubble);
         }
 
+        /* The text of a condensed message fades out into the bubble,
+           under the "Show more" button. */
+        &.condensed {
+            mask-image: none;
+
+            &::after {
+                content: "";
+                position: absolute;
+                inset: auto 0 0;
+                /* The button's line, and a fade above it; 51px
+                   at 15px/1em */
+                height: 3.4em;
+                background-color: inherit;
+                mask-image: linear-gradient(
+                    to bottom,
+                    hsl(0deg 0% 0% / 0%),
+                    hsl(0deg 0% 0%) 44%
+                );
+            }
+        }
+    }
+
+    .messagebox-content:not(.is-me-message) {
+        .message_length_controller:not(:empty) {
+            /* 4px at 15px/1em */
+            margin-top: 0.2667em;
+        }
+
+        .message_length_toggle {
+            width: auto;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+            color: var(--color-link-message-bubble);
+            font-variant: normal;
+            font-weight: 600;
+
+            &:hover,
+            &:active {
+                background-color: transparent;
+                text-decoration: underline;
+                scale: none;
+            }
+        }
+
+        .message_content.condensed ~ .message_length_controller {
+            grid-area: message;
+            align-self: end;
+            justify-self: start;
+            /* Above the faded text. */
+            position: relative;
+            /* The padding of the bubble, 7px 12px at 15px/1em */
+            margin: 0 0.8em 0.4667em;
+        }
+
+        /* A collapsed message is replaced by a dashed frame with the
+           button to show it. */
+        .message_content.collapsed ~ .message_length_controller {
+            justify-self: start;
+            display: flex;
+            align-items: center;
+            /* 36px at 15px/1em */
+            min-height: 2.4em;
+            margin: 0;
+            /* 12px at 15px/1em */
+            padding: 0 0.8em;
+            border: 1px dashed var(--color-border-rendered-markdown-table);
+            border-radius: 8px;
+
+            .message_length_toggle {
+                margin: 0;
+            }
+        }
     }
 
     .own-message {
@@ -518,7 +593,8 @@
             &.content_edit_mode,
             &:has(
                     > .message_content:not(.collapsed)
-                        :is(.codehilite, table, .spoiler-block, .widget-content)
+                        :is(.codehilite, table, .spoiler-block, .widget-content),
+                    > .message_content.condensed:not(.collapsed)
                 ) {
                 grid-template-columns:
                     minmax(0, 1fr) max-content max-content max-content
@@ -555,9 +631,18 @@
             .message_reactions,
             .message-reminders,
             .message-sending-notice,
-            .message_controls:has(.failed_message_action) {
+            .message_controls:has(.failed_message_action),
+            .message_length_controller {
                 justify-self: end;
                 justify-content: flex-end;
+            }
+
+            .message_content.collapsed ~ .message_length_controller {
+                justify-self: end;
+            }
+
+            .message_content.condensed ~ .message_length_controller .message_length_toggle {
+                color: var(--color-link-own-message-bubble);
             }
         }
 
