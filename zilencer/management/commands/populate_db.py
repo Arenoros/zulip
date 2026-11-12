@@ -1305,7 +1305,9 @@ def generate_and_send_messages(
     stream_ids = Stream.objects.filter(realm=realm).values_list("id", flat=True)
     recipient_streams: list[int] = [
         recipient.id
-        for recipient in Recipient.objects.filter(type=Recipient.STREAM, type_id__in=stream_ids)
+        for recipient in Recipient.objects.filter(
+            type=Recipient.STREAM, type_id__in=stream_ids
+        ).order_by("id")
     ]
     recipient_direct_message_groups: list[int] = [
         h.id for h in Recipient.objects.filter(type=Recipient.DIRECT_MESSAGE_GROUP)
@@ -1401,7 +1403,7 @@ def generate_and_send_messages(
         elif msg_type == MSG_TYPE_STREAM:
             # Pick a random subscriber to the stream
             message.sender = random.choice(
-                list(Subscription.objects.filter(recipient=message.recipient))
+                list(Subscription.objects.filter(recipient=message.recipient).order_by("id"))
             ).user_profile
             message.subject = random.choice(possible_topic_names[message.recipient.id])
             saved_data["subject"] = message.subject

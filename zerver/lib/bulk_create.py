@@ -203,7 +203,7 @@ def bulk_create_streams(realm: Realm, stream_dict: dict[str, dict[str, Any]]) ->
 
     recipients_to_create = [
         Recipient(type_id=stream["id"], type=Recipient.STREAM)
-        for stream in Stream.objects.filter(realm=realm).values("id", "name")
+        for stream in Stream.objects.filter(realm=realm).order_by("id").values("id", "name")
         if stream["name"].lower() not in existing_streams
     ]
     Recipient.objects.bulk_create(recipients_to_create)
