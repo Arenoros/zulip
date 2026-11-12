@@ -34,6 +34,9 @@ def check_channel_folder_name(name: str, realm: Realm) -> None:
     if name.strip() == "":
         raise JsonableError(_("Channel folder name can't be empty."))
 
+    if "/" in name:
+        raise JsonableError(_("Channel folder name can't contain '/'."))
+
     invalid_character_pos = check_string_is_printable(name)
     if invalid_character_pos is not None:
         raise JsonableError(

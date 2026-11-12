@@ -28,7 +28,7 @@ from zerver.lib.stream_subscription import (
     get_user_ids_for_streams,
 )
 from zerver.lib.stream_traffic import get_average_weekly_stream_traffic, get_streams_traffic
-from zerver.lib.string_validation import check_stream_name
+from zerver.lib.string_validation import check_new_stream_name, check_stream_name
 from zerver.lib.timestamp import datetime_to_timestamp
 from zerver.lib.topic import get_topic_display_name, messages_for_topic
 from zerver.lib.types import APIStreamDict, UserGroupMembersData
@@ -1741,6 +1741,9 @@ def list_to_streams(
 
         assert request_settings_dict is not None
         stream_names = [stream_dict["name"] for stream_dict in missing_stream_dicts]
+        for stream_name in stream_names:
+            check_new_stream_name(stream_name)
+
         stream_group_settings_map, anonymous_group_membership = (
             access_requested_group_permissions_for_streams(
                 stream_names,

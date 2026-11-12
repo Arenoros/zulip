@@ -88,6 +88,7 @@ from zerver.lib.streams import (
     validate_can_create_topic_group_setting_for_protected_history_streams,
     validate_topics_policy,
 )
+from zerver.lib.string_validation import check_new_stream_name
 from zerver.lib.subscription_info import gather_subscriptions
 from zerver.lib.topic import (
     get_topic_history_for_public_stream,
@@ -489,6 +490,7 @@ def update_stream_backend(
         new_name = new_name.strip()
         if stream.name == new_name:
             raise JsonableError(_("Channel already has that name."))
+        check_new_stream_name(new_name)
         if stream.name.lower() != new_name.lower():
             # Check that the stream name is available (unless we are
             # are only changing the casing of the stream name).
@@ -729,6 +731,7 @@ def create_channel(
     realm = user_profile.realm
     request_settings_dict = locals()
 
+    check_new_stream_name(name)
     check_stream_name_available(realm, name)
 
     folder: ChannelFolder | None = None

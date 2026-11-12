@@ -4072,6 +4072,18 @@ class SubscriptionAPITest(ZulipTestCase):
         result = self.subscribe_via_post(user, subscriptions, allow_fail=True, subdomain="zulip")
         self.assert_json_error(result, "Invalid character in channel name, at position 4.")
 
+    def test_slash_in_stream_name(self) -> None:
+        user = self.example_user("hamlet")
+
+        result = self.subscribe_via_post(user, ["new/stream"], allow_fail=True)
+        self.assert_json_error(result, "Channel name can't contain '/'.")
+        self.assertFalse(Stream.objects.filter(name="new/stream").exists())
+
+        # Channels that already have such a name keep working.
+        self.make_stream("old/stream")
+        self.subscribe_via_post(user, ["old/stream"])
+        self.assertIn(user, self.users_subscribed_to_stream("old/stream", user.realm))
+
     def test_invalid_stream_rename(self) -> None:
         """
         Renaming a stream with invalid characters.
@@ -4092,6 +4104,9 @@ class SubscriptionAPITest(ZulipTestCase):
         # Check for Cn characters
         result = self.client_patch(f"/json/streams/{stream.id}", {"new_name": "test\ufffeame"})
         self.assert_json_error(result, "Invalid character in channel name, at position 5.")
+        # Check for a slash
+        result = self.client_patch(f"/json/streams/{stream.id}", {"new_name": "test/name"})
+        self.assert_json_error(result, "Channel name can't contain '/'.")
 
     def test_successful_subscriptions_list(self) -> None:
         """

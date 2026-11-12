@@ -55,6 +55,13 @@ def check_stream_name(stream_name: str) -> None:
         )
 
 
+def check_new_stream_name(stream_name: str) -> None:
+    # A slash is reserved for separating the name of a folder from
+    # the name of a channel in it.
+    if "/" in stream_name:
+        raise JsonableError(_("Channel name can't contain '/'."))
+
+
 def check_stream_topic(topic_name: str) -> None:
     invalid_character_pos = check_string_is_printable(topic_name)
     if invalid_character_pos is not None:

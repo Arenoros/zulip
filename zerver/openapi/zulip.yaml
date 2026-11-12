@@ -13681,6 +13681,11 @@ paths:
                           Clients should use the `max_stream_name_length` returned by the
                           [`POST /register`](/api/register-queue) endpoint to determine
                           the maximum channel name length.
+
+                          The name of a channel to create cannot contain `/`.
+
+                          **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
+                          name of a channel to create could contain `/`.
                       description:
                         type: string
                         description: |
@@ -25369,13 +25374,16 @@ paths:
                   example: "Discuss Italian history and travel destinations."
                 new_name:
                   description: |
-                    The new name for the channel.
+                    The new name for the channel, which cannot contain `/`.
 
                     Clients should use the `max_stream_name_length` returned by the
                     [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel name length.
 
-                    **Changes**: Removed unnecessary JSON-encoding of this parameter in
+                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
+                    new name could contain `/`.
+
+                    Removed unnecessary JSON-encoding of this parameter in
                     Zulip 4.0 (feature level 64).
                   type: string
                   example: Italy
@@ -26273,11 +26281,14 @@ paths:
                 name:
                   type: string
                   description: |
-                    The name of the new channel.
+                    The name of the new channel, which cannot contain `/`.
 
                     Clients should use the `max_stream_name_length` returned by the
                     [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel name length.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
+                    name could contain `/`.
                   example: "music"
                 description:
                   type: string
@@ -27493,7 +27504,10 @@ paths:
                     by the [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel folder name length.
 
-                    Value cannot be an empty string.
+                    Value cannot be an empty string or contain `/`.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
+                    name could contain `/`.
                   type: string
                   example: marketing
                 description:
@@ -27730,7 +27744,10 @@ paths:
                     by the [`POST /register`](/api/register-queue) endpoint to determine
                     the maximum channel folder name length.
 
-                    Value cannot be an empty string.
+                    Value cannot be an empty string or contain `/`.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-b1a4e0), the
+                    new name could contain `/`.
                   type: string
                   example: backend
                 description:

@@ -350,6 +350,9 @@ class TestCreateStreams(ZulipTestCase):
         result = self.create_channel_via_post(user_profile, name="basketball")
         self.assert_json_error(result, "Channel 'basketball' already exists", status_code=409)
 
+        result = self.create_channel_via_post(user_profile, name="basket/ball")
+        self.assert_json_error(result, "Channel name can't contain '/'.")
+
         # Test creating channel with no subscribers
         post_data = {
             "name": "no-sub-channel",
