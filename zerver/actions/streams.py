@@ -1497,15 +1497,16 @@ def send_stream_posting_permission_update_notification(
         )
 
 
-@transaction.atomic(durable=True)
-def do_rename_stream(stream: Stream, new_name: str, user_profile: UserProfile) -> None:
+def rename_stream_without_notice(
+    stream: Stream, new_name: str, *, acting_user: UserProfile, notify_user_ids: set[int]
+) -> None:
     old_name = stream.name
     stream.name = new_name
     stream.save(update_fields=["name"])
 
     RealmAuditLog.objects.create(
         realm=stream.realm,
-        acting_user=user_profile,
+        acting_user=acting_user,
         modified_stream=stream,
         event_type=AuditLogEventType.CHANNEL_NAME_CHANGED,
         event_time=timezone_now(),
@@ -1540,7 +1541,18 @@ def do_rename_stream(stream: Stream, new_name: str, user_profile: UserProfile) -
         stream_id=stream.id,
         name=old_name,
     )
-    send_event_on_commit(stream.realm, event, can_access_stream_metadata_user_ids(stream))
+    send_event_on_commit(stream.realm, event, notify_user_ids)
+
+
+@transaction.atomic(durable=True)
+def do_rename_stream(stream: Stream, new_name: str, user_profile: UserProfile) -> None:
+    old_name = stream.name
+    rename_stream_without_notice(
+        stream,
+        new_name,
+        acting_user=user_profile,
+        notify_user_ids=can_access_stream_metadata_user_ids(stream),
+    )
     sender = get_system_bot(settings.NOTIFICATION_BOT, stream.realm_id)
     with override_language(stream.realm.default_language):
         maybe_send_channel_events_notice(
