@@ -29,6 +29,7 @@ from zerver.lib.streams import (
     can_access_stream_history_by_id,
     can_access_stream_history_by_name,
     get_archived_streams_queryset,
+    get_channel_folder_access_query,
     get_public_streams_queryset,
     get_stream_by_narrow_operand_access_unchecked,
     get_web_public_streams_queryset,
@@ -460,6 +461,12 @@ class NarrowBuilder:
             # Get all both subscribed and non-subscribed public channels
             # but exclude any private subscribed channels.
             recipient_queryset = get_public_streams_queryset(self.realm)
+            if self.user_profile is not None:
+                # Searching all public channels includes their history,
+                # so only channels in folders the user can see.
+                recipient_queryset = recipient_queryset.filter(
+                    get_channel_folder_access_query(self.user_profile, folder_field="folder")
+                )
         elif operand == "web-public":
             recipient_queryset = get_web_public_streams_queryset(self.realm)
         elif operand == "archived":
@@ -1004,6 +1011,11 @@ def get_base_query_for_search(
         stream_access_filters |= Q(can_subscribe_group_id__in=user_recursive_group_ids) | Q(
             can_add_subscribers_group_id__in=user_recursive_group_ids
         )
+    # Guests have no access through public channels or groups, so
+    # their groups are not needed here.
+    stream_access_filters &= get_channel_folder_access_query(
+        user_profile, folder_field="folder", user_recursive_group_ids=user_recursive_group_ids
+    )
     return query.filter(
         # Include direct messages.
         ~Q(recipient__type=Recipient.STREAM)

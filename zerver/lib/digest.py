@@ -26,6 +26,7 @@ from zerver.lib.logging_util import log_to_file
 from zerver.lib.message import get_last_message_id
 from zerver.lib.queue import queue_json_publish_rollback_unsafe
 from zerver.lib.send_email import FromAddress, send_future_email
+from zerver.lib.streams import public_channel_folder_query
 from zerver.lib.url_encoding import stream_narrow_url
 from zerver.models import (
     Message,
@@ -262,7 +263,15 @@ def get_hot_topics(
 
 def get_recently_created_streams(realm: Realm, threshold: datetime) -> list[Stream]:
     fields = ["id", "name", "is_web_public", "invite_only"]
-    return list(get_active_streams(realm).filter(date_created__gt=threshold).only(*fields))
+    # ponytail: digests leave out new channels in private folders for
+    # everyone; listing them for those who can see the folders needs
+    # the audience of each folder for each user.
+    return list(
+        get_active_streams(realm)
+        .filter(date_created__gt=threshold)
+        .filter(public_channel_folder_query(folder_field="folder"))
+        .only(*fields)
+    )
 
 
 def gather_new_streams(

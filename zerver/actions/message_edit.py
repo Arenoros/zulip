@@ -65,6 +65,7 @@ from zerver.lib.streams import (
     check_for_can_create_topic_group_violation,
     check_stream_access_based_on_can_send_message_group,
     get_stream_topics_policy,
+    limit_to_channel_folder_audience,
     notify_stream_is_recently_active_update,
     user_has_content_access,
 )
@@ -675,9 +676,10 @@ def update_user_topic_visibility_policies_on_move(
     )
 
     recursive_group_ids_by_user: dict[int, set[int]] = {}
-    if is_stream_edited and not target_stream.is_public():
+    if is_stream_edited and (not target_stream.is_public() or target_stream.folder_id is not None):
         # Do not compute group memberships for public streams as it
-        # is required only to check content access to private streams.
+        # is required only to check content access to private streams,
+        # and to the private folder a channel can be in.
         for group in get_user_id_annotated_recursive_membership_groups_for_users(
             [user_topic.user_profile_id for user_topic in orig_topic_user_topics]
         ):
@@ -1125,8 +1127,16 @@ def do_update_message(
         )
 
         if new_stream.is_public():
-            # If it's moving to a public stream, only non-subscribed guest users are losing access.
-            user_ids_losing_access = not_subscribed_to_new_stream_user_ids & guest_user_ids
+            # If it's moving to a public stream, only non-subscribed guest users,
+            # and those who cannot see the folder of the stream, are losing access.
+            user_ids_losing_access = (not_subscribed_to_new_stream_user_ids & guest_user_ids) | (
+                not_subscribed_to_new_stream_user_ids
+                - set(
+                    limit_to_channel_folder_audience(
+                        new_stream, not_subscribed_to_new_stream_user_ids
+                    )
+                )
+            )
         else:
             # If it's moving to a private stream, all non-subscribed users are losing access.
             user_ids_losing_access = not_subscribed_to_new_stream_user_ids

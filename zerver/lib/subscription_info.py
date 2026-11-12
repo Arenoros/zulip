@@ -20,6 +20,8 @@ from zerver.lib.stream_subscription import (
 )
 from zerver.lib.stream_traffic import get_average_weekly_stream_traffic, get_streams_traffic
 from zerver.lib.streams import (
+    bulk_can_access_stream_metadata_user_ids,
+    get_inaccessible_channel_folder_ids,
     get_stream_post_policy_value_based_on_group_setting,
     get_users_dict_with_metadata_access_to_streams_via_permission_groups,
     get_web_public_streams_queryset,
@@ -769,6 +771,15 @@ def bulk_get_subscriber_peer_info(
                 | users_with_metadata_access_via_permission_groups[stream.id]
             )
 
+        # Only those who can see the folder of a channel are its peers.
+        private_folder_streams = [
+            stream for stream in private_streams if stream.folder_id is not None
+        ]
+        if private_folder_streams:
+            private_peer_dict.update(
+                bulk_can_access_stream_metadata_user_ids(private_folder_streams)
+            )
+
     for stream_id in public_stream_ids:
         subscribed_user_ids = stream_user_ids.get(stream_id, set())
         subscribed_ids[stream_id] = subscribed_user_ids
@@ -891,6 +902,13 @@ def gather_subscriptions_helper(
         user_recursive_group_ids = set(
             get_recursive_membership_groups(user_profile).values_list("id", flat=True)
         )
+    inaccessible_folder_ids: set[int] = set()
+    if not user_profile.is_realm_admin and any(
+        stream["folder_id"] is not None for stream in all_stream_dicts
+    ):
+        inaccessible_folder_ids = get_inaccessible_channel_folder_ids(
+            user_profile, user_recursive_group_ids
+        )
     sub_unsub_stream_ids = set()
     for sub_dict in sub_dicts:
         stream_id = get_stream_id(sub_dict)
@@ -913,13 +931,16 @@ def gather_subscriptions_helper(
             can_administer_channel_group_id = raw_stream_dict["can_administer_channel_group_id"]
             can_add_subscribers_group_id = raw_stream_dict["can_add_subscribers_group_id"]
             can_subscribe_group_id = raw_stream_dict["can_subscribe_group_id"]
-            if has_metadata_access_to_previously_subscribed_stream(
-                user_profile,
-                stream_dict,
-                user_recursive_group_ids,
-                can_administer_channel_group_id,
-                can_add_subscribers_group_id,
-                can_subscribe_group_id,
+            if (
+                raw_stream_dict["folder_id"] not in inaccessible_folder_ids
+                and has_metadata_access_to_previously_subscribed_stream(
+                    user_profile,
+                    stream_dict,
+                    user_recursive_group_ids,
+                    can_administer_channel_group_id,
+                    can_add_subscribers_group_id,
+                    can_subscribe_group_id,
+                )
             ):
                 """
                 User who are no longer subscribed to a stream that they don't have
@@ -943,6 +964,8 @@ def gather_subscriptions_helper(
     ]
 
     for raw_stream_dict in never_subscribed_streams:
+        if raw_stream_dict["folder_id"] in inaccessible_folder_ids:
+            continue
         is_public = not raw_stream_dict["invite_only"]
         can_administer_channel_group_id = raw_stream_dict["can_administer_channel_group_id"]
         can_add_subscribers_group_id = raw_stream_dict["can_add_subscribers_group_id"]

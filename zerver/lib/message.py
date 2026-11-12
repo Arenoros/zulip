@@ -33,6 +33,8 @@ from zerver.lib.streams import (
     can_access_stream_history,
     get_web_public_streams_queryset,
     is_user_in_groups_granting_content_access,
+    limit_to_channel_folder_audience,
+    user_has_access_to_folder_of_channel,
 )
 from zerver.lib.topic import (
     MESSAGE__TOPIC,
@@ -568,6 +570,11 @@ def has_channel_content_access_helper(
         # allow_everyone_group=True.
         return False
 
+    if not user_has_access_to_folder_of_channel(
+        user_profile, stream, user_group_membership_details
+    ):
+        return False
+
     if user_group_membership_details.user_recursive_group_ids is None:
         user_group_membership_details.user_recursive_group_ids = set(
             get_recursive_membership_groups(user_profile).values_list("id", flat=True)
@@ -613,7 +620,13 @@ def has_message_access(
         # You can't access messages in deactivated streams
         return False
 
-    if stream.is_public() and user_profile.can_access_public_streams():
+    if (
+        stream.is_public()
+        and user_profile.can_access_public_streams()
+        and user_has_access_to_folder_of_channel(
+            user_profile, stream, user_group_membership_details
+        )
+    ):
         return True
 
     if not stream.is_history_public_to_subscribers():
@@ -714,7 +727,9 @@ def event_recipient_ids_for_action_on_messages(
     if exclude_long_term_idle_users:
         usermessage_rows = usermessage_rows.exclude(user_profile__long_term_idle=True)
     user_ids_with_usermessage_row_and_channel_access = set(
-        usermessage_rows.values_list("user_profile_id", flat=True)
+        limit_to_channel_folder_audience(
+            channel, usermessage_rows.values_list("user_profile_id", flat=True)
+        )
     )
     return user_ids_with_usermessage_row_and_channel_access | subscriber_ids
 
@@ -788,10 +803,16 @@ def bulk_access_stream_messages_query(
     assert stream.recipient_id is not None
     messages = messages.filter(realm_id=user_profile.realm_id, recipient_id=stream.recipient_id)
 
-    if stream.is_public() and user_profile.can_access_public_streams():
+    user_group_membership_details = UserGroupMembershipDetails(user_recursive_group_ids=None)
+    if (
+        stream.is_public()
+        and user_profile.can_access_public_streams()
+        and user_has_access_to_folder_of_channel(
+            user_profile, stream, user_group_membership_details
+        )
+    ):
         return messages
 
-    user_group_membership_details = UserGroupMembershipDetails(user_recursive_group_ids=None)
     has_content_access = has_channel_content_access_helper(
         stream, user_profile, user_group_membership_details, is_subscribed=None
     )

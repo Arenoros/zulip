@@ -51,9 +51,9 @@ from zerver.decorator import (
     require_realm_admin,
 )
 from zerver.lib.channel_folders import (
+    access_channel_folder_by_id,
     check_can_move_channel_to_folder,
     check_channel_can_be_in_folder,
-    get_channel_folder_by_id,
 )
 from zerver.lib.default_streams import get_default_stream_ids_for_realm
 from zerver.lib.email_mirror_helpers import encode_email_address, get_channel_email_token
@@ -82,6 +82,7 @@ from zerver.lib.streams import (
     check_and_qualify_new_channel_name,
     check_channel_creation_permissions,
     check_stream_name_available,
+    check_users_can_see_folders_of_channels,
     create_stream_if_needed,
     do_get_streams,
     filter_stream_authorization_for_adding_subscribers,
@@ -302,7 +303,7 @@ def change_stream_folder(
 ) -> None:
     folder: ChannelFolder | None = None
     if folder_id is not None:
-        folder = get_channel_folder_by_id(folder_id, user_profile.realm)
+        folder = access_channel_folder_by_id(folder_id, user_profile)
     if folder_id != stream.folder_id:
         check_can_move_channel_to_folder(
             user_profile, stream, folder, can_administer_channel=can_administer_channel
@@ -754,7 +755,7 @@ def create_channel(
 
     folder: ChannelFolder | None = None
     if folder_id is not None:
-        folder = get_channel_folder_by_id(folder_id, realm)
+        folder = access_channel_folder_by_id(folder_id, user_profile)
     check_channel_can_be_in_folder(
         folder, is_web_public=is_web_public, is_default_stream=is_default_stream
     )
@@ -849,6 +850,7 @@ def create_channel(
         )
 
     new_subscribers = bulk_principals_to_user_profiles(subscribers, user_profile)
+    check_users_can_see_folders_of_channels([new_channel], new_subscribers)
     bulk_add_subscriptions(
         realm,
         [new_channel],
@@ -915,7 +917,7 @@ def add_subscriptions_backend(
 
     folder: ChannelFolder | None = None
     if folder_id is not None:
-        folder = get_channel_folder_by_id(folder_id, realm)
+        folder = access_channel_folder_by_id(folder_id, user_profile)
     check_channel_can_be_in_folder(
         folder, is_web_public=is_web_public, is_default_stream=is_default_stream
     )
@@ -990,6 +992,8 @@ def add_subscriptions_backend(
         subscribers = bulk_principals_to_user_profiles(principals, user_profile)
     else:
         subscribers = {user_profile}
+
+    check_users_can_see_folders_of_channels(streams, subscribers)
 
     if is_default_stream:
         for stream in created_streams:

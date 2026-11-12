@@ -52,9 +52,11 @@ from zerver.lib.stream_subscription import (
 )
 from zerver.lib.stream_traffic import get_streams_traffic
 from zerver.lib.streams import (
+    bulk_can_access_stream_metadata_user_ids,
     can_access_stream_metadata_user_ids,
     check_basic_stream_access,
     get_anonymous_group_membership_dict_for_streams,
+    get_channel_folder_audience_user_ids,
     get_channel_name_in_folder,
     get_stream_permission_policy_key,
     get_stream_post_policy_value_based_on_group_setting,
@@ -636,17 +638,35 @@ def send_peer_subscriber_events(
     private_stream_ids = [
         stream_id for stream_id in altered_user_dict if stream_dict[stream_id].invite_only
     ]
+    # Public channels in a folder have the peers who can see the
+    # folder, which are computed for each channel like for private
+    # channels. Web-public channels are never in private folders.
+    public_folder_stream_ids = [
+        stream_id
+        for stream_id in altered_user_dict
+        if not stream_dict[stream_id].invite_only
+        and not stream_dict[stream_id].is_web_public
+        and stream_dict[stream_id].folder_id is not None
+    ]
     public_stream_ids = [
-        stream_id for stream_id in altered_user_dict if not stream_dict[stream_id].invite_only
+        stream_id
+        for stream_id in altered_user_dict
+        if not stream_dict[stream_id].invite_only and stream_id not in public_folder_stream_ids
     ]
     web_public_stream_ids = [
         stream_id for stream_id in public_stream_ids if stream_dict[stream_id].is_web_public
     ]
 
-    private_peer_dict = subscriber_peer_info.private_peer_dict
-    for stream_id in private_stream_ids:
+    peer_dict = dict(subscriber_peer_info.private_peer_dict)
+    if public_folder_stream_ids:
+        peer_dict.update(
+            bulk_can_access_stream_metadata_user_ids(
+                [stream_dict[stream_id] for stream_id in public_folder_stream_ids]
+            )
+        )
+    for stream_id in private_stream_ids + public_folder_stream_ids:
         altered_user_ids = altered_user_dict[stream_id]
-        peer_user_ids = private_peer_dict[stream_id] - altered_user_ids
+        peer_user_ids = peer_dict[stream_id] - altered_user_ids
 
         if peer_user_ids and altered_user_ids:
             event = peer_subscriber_event(op, [stream_id], sorted(altered_user_ids))
@@ -852,6 +872,23 @@ def bulk_add_subscriptions(
                 sub.push_notifications = True
             sub_info = SubInfo(user_profile, sub, stream)
             subs_to_add.append(sub_info)
+
+    # Only those who can see the folder of a channel can subscribe to
+    # it. Callers acting on a request check this to report it.
+    folder_ids = {stream.folder_id for stream in streams if stream.folder_id is not None}
+    if folder_ids:
+        folder_audience_user_ids = get_channel_folder_audience_user_ids(
+            ChannelFolder.objects.filter(id__in=folder_ids), realm.id
+        )
+        subs_to_add, subs_to_activate = (
+            [
+                sub_info
+                for sub_info in sub_infos
+                if sub_info.stream.folder_id is None
+                or sub_info.user.id in folder_audience_user_ids[sub_info.stream.folder_id]
+            ]
+            for sub_infos in [subs_to_add, subs_to_activate]
+        )
 
     if len(subs_to_add) == 0 and len(subs_to_activate) == 0:
         # We can return early if users are already subscribed to all the streams.

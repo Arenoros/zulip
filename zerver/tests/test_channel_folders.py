@@ -11,15 +11,21 @@ from zerver.actions.channel_folders import (
     try_reorder_realm_channel_folders,
 )
 from zerver.actions.default_streams import do_add_default_stream
+from zerver.actions.message_send import check_send_stream_message
 from zerver.actions.streams import (
+    bulk_add_subscriptions,
+    do_change_stream_description,
     do_change_stream_folder,
     do_change_stream_group_based_setting,
     do_deactivate_stream,
 )
 from zerver.actions.user_groups import check_add_user_group
+from zerver.lib.streams import create_stream_if_needed
+from zerver.lib.subscription_info import gather_subscriptions_helper
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.types import UserGroupMembersData
 from zerver.models import ChannelFolder, Message, NamedUserGroup, RealmAuditLog, Stream, UserProfile
+from zerver.models.clients import get_client
 from zerver.models.groups import SystemGroups
 from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.models.realms import get_realm
@@ -1175,11 +1181,12 @@ class PrivateChannelFoldersTest(ZulipTestCase):
         self.set_folder_setting("can_access_group", [self.cordelia])
         self.assertNotIn(self.folder.id, self.visible_folder_ids(self.polonius))
 
-        # Those who cannot see a folder cannot change it either.
+        # Those who cannot see a folder cannot change it either, and
+        # learn nothing about it from trying.
         result = self.api_patch(
             self.hamlet, f"/api/v1/channel_folders/{self.folder.id}", {"name": "Public"}
         )
-        self.assert_json_error(result, "Insufficient permission")
+        self.assert_json_error(result, "Invalid channel folder ID")
 
     def test_events_for_private_folder(self) -> None:
         self.set_folder_setting("can_access_group", [self.cordelia, self.polonius])
@@ -1273,3 +1280,220 @@ class PrivateChannelFoldersTest(ZulipTestCase):
             {"folder_id": orjson.dumps(public_folder.id).decode()},
         )
         self.assert_json_success(result)
+
+
+class PrivateFolderChannelAccessTest(ZulipTestCase):
+    """Channels in a private folder are only accessible to those who
+    can see the folder, in addition to the permissions of each channel.
+    """
+
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.iago = self.example_user("iago")
+        self.realm = self.iago.realm
+        self.cordelia = self.example_user("cordelia")
+        self.hamlet = self.example_user("hamlet")
+        self.polonius = self.example_user("polonius")
+        self.folder = check_add_channel_folder(self.realm, "Secret", "", acting_user=self.iago)
+        do_change_channel_folder_group_based_setting(
+            self.folder,
+            "can_access_group",
+            UserGroupMembersData(
+                direct_members=[self.cordelia.id, self.polonius.id], direct_subgroups=[]
+            ),
+            acting_user=self.iago,
+        )
+        self.channel = self.make_stream("plans")
+        do_change_stream_folder(self.channel, self.folder, acting_user=self.iago)
+        self.channel.refresh_from_db()
+        self.subscribe(self.iago, self.channel.name)
+        self.message_id = self.send_stream_message(self.iago, self.channel.name, "the plan")
+
+    def fetch_channel_messages(self, user: UserProfile, operand: str | int) -> "TestHttpResponse":
+        return self.api_get(
+            user,
+            "/api/v1/messages",
+            {
+                "anchor": "newest",
+                "num_before": 10,
+                "num_after": 0,
+                "narrow": orjson.dumps([{"operator": "channel", "operand": operand}]).decode(),
+            },
+        )
+
+    def registered_channel_ids(self, user: UserProfile) -> set[int]:
+        sub_info = gather_subscriptions_helper(user)
+        return (
+            {channel["stream_id"] for channel in sub_info.subscriptions}
+            | {channel["stream_id"] for channel in sub_info.unsubscribed}
+            | {channel["stream_id"] for channel in sub_info.never_subscribed}
+        )
+
+    def test_member_of_folder_accesses_public_channel(self) -> None:
+        result = self.api_get(self.cordelia, f"/api/v1/streams/{self.channel.id}")
+        self.assertEqual(self.assert_json_success(result)["stream"]["name"], self.channel.name)
+        result = self.fetch_channel_messages(self.cordelia, self.channel.id)
+        self.assertIn(
+            self.message_id, [m["id"] for m in self.assert_json_success(result)["messages"]]
+        )
+        self.assertIn(self.channel.id, self.registered_channel_ids(self.cordelia))
+        # They can send to it without subscribing, like to any public channel.
+        check_send_stream_message(
+            self.cordelia, get_client("test"), self.channel.name, "x", "my plan"
+        )
+
+        # A private channel in the folder still needs access to it.
+        private_channel = self.make_stream("private plans", invite_only=True)
+        do_change_stream_folder(private_channel, self.folder, acting_user=self.iago)
+        result = self.api_get(self.cordelia, f"/api/v1/streams/{private_channel.id}")
+        self.assert_json_error(result, "Invalid channel ID")
+
+    def test_others_cannot_see_channel(self) -> None:
+        for user in [self.hamlet, self.example_user("prospero")]:
+            result = self.api_get(user, f"/api/v1/streams/{self.channel.id}")
+            self.assert_json_error(result, "Invalid channel ID")
+            self.assertNotIn(self.channel.id, self.registered_channel_ids(user))
+
+        result = self.api_get(self.hamlet, "/api/v1/streams")
+        self.assertNotIn(
+            self.channel.id, [s["stream_id"] for s in self.assert_json_success(result)["streams"]]
+        )
+        result = self.api_get(self.hamlet, f"/api/v1/users/me/{self.channel.id}/topics")
+        self.assert_json_error(result, "Invalid channel ID")
+        result = self.api_get(self.hamlet, f"/api/v1/streams/{self.channel.id}/members")
+        self.assert_json_error(result, "Invalid channel ID")
+
+        # Messages, by ID, in the channel and in all public channels.
+        result = self.api_get(self.hamlet, f"/api/v1/messages/{self.message_id}")
+        self.assert_json_error(result, "Invalid message(s)")
+        result = self.fetch_channel_messages(self.hamlet, self.channel.id)
+        self.assertEqual(self.assert_json_success(result)["messages"], [])
+        result = self.api_get(
+            self.hamlet,
+            "/api/v1/messages",
+            {
+                "anchor": "newest",
+                "num_before": 100,
+                "num_after": 0,
+                "narrow": orjson.dumps([{"operator": "channels", "operand": "public"}]).decode(),
+            },
+        )
+        self.assertNotIn(
+            self.message_id, [m["id"] for m in self.assert_json_success(result)["messages"]]
+        )
+        result = self.api_get(
+            self.hamlet,
+            "/api/v1/messages",
+            {
+                "anchor": "newest",
+                "num_before": 100,
+                "num_after": 0,
+                "narrow": orjson.dumps([{"operator": "search", "operand": "plan"}]).decode(),
+            },
+        )
+        self.assertNotIn(
+            self.message_id, [m["id"] for m in self.assert_json_success(result)["messages"]]
+        )
+
+        # Nor send to it or subscribe to it.
+        result = self.api_post(
+            self.hamlet,
+            "/api/v1/messages",
+            {"type": "channel", "to": self.channel.name, "topic": "x", "content": "hi"},
+        )
+        self.assert_json_error(result, f"Not authorized to send to channel '{self.channel.name}'")
+        result = self.subscribe_via_post(self.hamlet, [self.channel.name], allow_fail=True)
+        self.assert_json_error(result, f"Unable to access channel ({self.channel.name}).")
+
+        # Nor create a channel in the folder.
+        result = self.create_channel_via_post(
+            self.hamlet,
+            name="more plans",
+            extra_post_data={"folder_id": orjson.dumps(self.folder.id).decode()},
+        )
+        self.assert_json_error(result, "Invalid channel folder ID")
+
+    def test_events_about_channel(self) -> None:
+        audience = {
+            self.iago.id,
+            self.example_user("desdemona").id,
+            self.cordelia.id,
+            self.polonius.id,
+        }
+
+        # The other event is the notice about the change in the channel.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            do_change_stream_description(self.channel, "Our plans", acting_user=self.iago)
+        # Guests only get events about channels they are subscribed to.
+        self.assertEqual(set(events[0]["users"]), audience - {self.polonius.id})
+
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            self.subscribe(self.cordelia, self.channel.name)
+        peer_add = [event for event in events if event["event"]["op"] == "peer_add"]
+        self.assertEqual(set(peer_add[0]["users"]), audience - {self.polonius.id, self.cordelia.id})
+
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            create_stream_if_needed(self.realm, "new plans", folder=self.folder)
+        self.assertEqual(set(events[0]["users"]), audience - {self.polonius.id})
+
+    def test_guest_in_folder_reads_subscribed_channel(self) -> None:
+        result = self.fetch_channel_messages(self.polonius, self.channel.id)
+        self.assertEqual(self.assert_json_success(result)["messages"], [])
+
+        self.subscribe(self.polonius, self.channel.name)
+        result = self.fetch_channel_messages(self.polonius, self.channel.id)
+        self.assertIn(
+            self.message_id, [m["id"] for m in self.assert_json_success(result)["messages"]]
+        )
+
+    def test_folder_administrator_needs_access_to_private_channel(self) -> None:
+        othello = self.example_user("othello")
+        do_change_channel_folder_group_based_setting(
+            self.folder,
+            "can_administer_group",
+            UserGroupMembersData(direct_members=[othello.id], direct_subgroups=[]),
+            acting_user=self.iago,
+        )
+        private_channel = self.make_stream("private plans", invite_only=True)
+        do_change_stream_folder(private_channel, self.folder, acting_user=self.iago)
+        self.subscribe(self.iago, private_channel.name)
+        message_id = self.send_stream_message(self.iago, private_channel.name)
+
+        result = self.api_get(othello, f"/api/v1/messages/{message_id}")
+        self.assert_json_error(result, "Invalid message(s)")
+        # The public channel of the folder is accessible to them.
+        result = self.api_get(othello, f"/api/v1/messages/{self.message_id}")
+        self.assert_json_success(result)
+
+    def test_subscribing_others_who_cannot_see_folder(self) -> None:
+        result = self.subscribe_via_post(
+            self.iago,
+            [self.channel.name],
+            {"principals": orjson.dumps([self.hamlet.id]).decode()},
+            allow_fail=True,
+        )
+        self.assert_json_error(
+            result,
+            f"{self.hamlet.full_name} cannot see the channel folder of #{self.channel.name}.",
+        )
+        self.assertNotIn(
+            self.hamlet, self.users_subscribed_to_stream(self.channel.name, self.realm)
+        )
+
+        result = self.create_channel_via_post(
+            self.iago,
+            subscribers=[self.iago.id, self.hamlet.id],
+            name="more plans",
+            extra_post_data={"folder_id": orjson.dumps(self.folder.id).decode()},
+        )
+        self.assert_json_error(
+            result, f"{self.hamlet.full_name} cannot see the channel folder of #Secret/more plans."
+        )
+        self.assertFalse(Stream.objects.filter(name="Secret/more plans").exists())
+
+        # Other ways to subscribe leave out those who cannot see the folder.
+        bulk_add_subscriptions(self.realm, [self.channel], [self.hamlet], acting_user=None)
+        self.assertNotIn(
+            self.hamlet, self.users_subscribed_to_stream(self.channel.name, self.realm)
+        )

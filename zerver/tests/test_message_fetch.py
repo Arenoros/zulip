@@ -5242,8 +5242,8 @@ AND UPPER(U0."topic_name"::text) = UPPER(("zerver_message"."subject"))) LIMIT 1)
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."message_id" = 0)\
 """
@@ -5254,8 +5254,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."message_id" = 0)\
 """
@@ -5266,8 +5266,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1))) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 2\
@@ -5279,8 +5279,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1))) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 11\
@@ -5292,8 +5292,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."message_id" <= 100) ORDER BY "zerver_usermessage"."message_id" DESC\
  LIMIT 11\
@@ -5305,15 +5305,15 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 (SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."message_id" <= 99) ORDER BY "zerver_usermessage"."message_id" DESC\
  LIMIT 10) UNION ALL (SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."message_id" >= 100) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 11)\
@@ -5333,8 +5333,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."recipient_id" = {hamlet_and_othello_recipient} AND "zerver_usermessage"."message_id" = 0)\
 """
@@ -5353,8 +5353,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."recipient_id" = {hamlet_and_othello_recipient} AND "zerver_usermessage"."message_id" = 0)\
 """
@@ -5373,8 +5373,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."recipient_id" = {hamlet_and_othello_recipient}) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5394,8 +5394,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_usermessage"."flags" & 2 != 0) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5409,8 +5409,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."sender_id" = {othello_id}) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5454,8 +5454,8 @@ WHERE ("zerver_message"."realm_id" = 2 AND "zerver_message"."recipient_id" IN ({
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND NOT ("zerver_message"."recipient_id" IN ({public_channels_recipients}))) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5475,8 +5475,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."is_channel_message" AND UPPER("zerver_message"."subject"::text) = UPPER('blah')) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5508,8 +5508,8 @@ WHERE ("zerver_message"."realm_id" = 2 AND "zerver_message"."recipient_id" = {sc
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."recipient_id" = {hamlet_recipient}) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5529,8 +5529,8 @@ WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND
 SELECT "zerver_message"."id" AS "id", "zerver_usermessage"."flags" AS "user_flags" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND "zerver_message"."recipient_id" = {scotland_recipient} AND "zerver_usermessage"."flags" & 2 != 0) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5558,8 +5558,8 @@ FROM unnest(string_to_array(ts_headline('zulip.english_us_search', escape_html("
  OFFSET 1)) AS "topic_matches" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND ("zerver_message"."search_tsvector" @@ plainto_tsquery('zulip.english_us_search', 'jumping')) = true) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\
@@ -5598,8 +5598,8 @@ FROM unnest(string_to_array(ts_headline('zulip.english_us_search', escape_html("
  OFFSET 1)) AS "topic_matches" \
 FROM "zerver_message" LEFT OUTER JOIN "zerver_usermessage" ON ("zerver_message"."id" = "zerver_usermessage"."message_id") INNER JOIN "zerver_recipient" ON ("zerver_message"."recipient_id" = "zerver_recipient"."id") \
 WHERE ("zerver_usermessage"."user_profile_id" = {hamlet_id} AND (NOT ("zerver_recipient"."type" = 2) OR EXISTS(SELECT 1 AS "a" \
-FROM "zerver_stream" U0 \
-WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups})) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
+FROM "zerver_stream" U0 LEFT OUTER JOIN "zerver_channelfolder" U4 ON (U0."folder_id" = U4."id") \
+WHERE (U0."recipient_id" = ("zerver_message"."recipient_id") AND (NOT U0."invite_only" OR U0."can_subscribe_group_id" IN {hamlet_groups} OR U0."can_add_subscribers_group_id" IN {hamlet_groups}) AND (U4."can_access_group_id" IN {hamlet_groups} OR U4."can_administer_group_id" IN {hamlet_groups} OR U0."folder_id" IS NULL)) LIMIT 1) OR EXISTS(SELECT 1 AS "a" \
 FROM "zerver_subscription" U0 \
 WHERE (U0."active" AND U0."recipient_id" = ("zerver_message"."recipient_id") AND U0."user_profile_id" = {hamlet_id}) LIMIT 1)) AND (UPPER("zerver_message"."content"::text) LIKE UPPER('%jumping%') OR ("zerver_message"."is_channel_message" AND UPPER("zerver_message"."subject"::text) LIKE UPPER('%jumping%'))) AND ("zerver_message"."search_tsvector" @@ plainto_tsquery('zulip.english_us_search', '"jumping" quickly')) = true) ORDER BY "zerver_usermessage"."message_id" ASC\
  LIMIT 10\

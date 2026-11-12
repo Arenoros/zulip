@@ -82,6 +82,7 @@ from zerver.lib.streams import (
     check_for_can_create_topic_group_violation,
     ensure_stream,
     get_stream_topics_policy,
+    is_channel_folder_private,
     notify_stream_is_recently_active_update,
     subscribed_to_stream,
     user_has_metadata_access,
@@ -1402,7 +1403,12 @@ def do_send_messages(
             # assert needed because stubs for django are missing
             assert send_request.stream is not None
             stream_update_fields = []
-            if send_request.stream.is_public():
+            # Messages in channels of a private folder only go to
+            # their subscribers, like those of private channels.
+            if send_request.stream.is_public() and not (
+                send_request.stream.folder_id is not None
+                and is_channel_folder_private(send_request.stream.folder_id)
+            ):
                 event.realm_id = send_request.stream.realm_id
                 event.stream_name = send_request.stream.name
                 # Tornado uses these to exclude guest users' clients

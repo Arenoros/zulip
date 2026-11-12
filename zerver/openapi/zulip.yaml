@@ -13666,9 +13666,13 @@ paths:
 
         Note that the ability to subscribe oneself and/or other users
         to a specified channel depends on the [channel's permissions
-        settings](/help/channel-permissions).
+        settings](/help/channel-permissions). Users who cannot see the
+        channel folder of a channel cannot be subscribed to it.
 
-        **Changes**: Before Zulip 10.0 (feature level 362),
+        **Changes**: Before Zulip 13.0 (feature level ZF-d2b9e4), any user
+        could be subscribed to a channel regardless of its channel folder.
+
+        Before Zulip 10.0 (feature level 362),
         subscriptions in archived channels could not be modified.
 
         Before Zulip 10.0 (feature level 357), the

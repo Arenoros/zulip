@@ -137,10 +137,14 @@ def get_channel_folders_for_user(
     return sorted(get_channel_folders_data(folders), key=lambda folder: folder.order)
 
 
-def get_channel_folder_by_id(channel_folder_id: int, realm: Realm) -> ChannelFolder:
+def access_channel_folder_by_id(channel_folder_id: int, user_profile: UserProfile) -> ChannelFolder:
+    """Folders the user cannot see are reported like those that do not
+    exist.
+    """
     try:
-        channel_folder = ChannelFolder.objects.get(id=channel_folder_id, realm=realm)
-        return channel_folder
+        return ChannelFolder.objects.filter(get_channel_folder_access_query(user_profile)).get(
+            id=channel_folder_id, realm_id=user_profile.realm_id
+        )
     except ChannelFolder.DoesNotExist:
         raise JsonableError(_("Invalid channel folder ID"))
 
@@ -148,7 +152,7 @@ def get_channel_folder_by_id(channel_folder_id: int, realm: Realm) -> ChannelFol
 def access_channel_folder_for_administration(
     channel_folder_id: int, user_profile: UserProfile
 ) -> ChannelFolder:
-    channel_folder = get_channel_folder_by_id(channel_folder_id, user_profile.realm)
+    channel_folder = access_channel_folder_by_id(channel_folder_id, user_profile)
     if not user_can_administer_channel_folder(user_profile, channel_folder):
         raise JsonableError(_("Insufficient permission"))
     return channel_folder
@@ -185,7 +189,7 @@ def check_channel_can_be_in_folder(
     """
     if channel_folder is None or not (is_web_public or is_default_stream):
         return
-    if not is_channel_folder_private(channel_folder):
+    if not is_channel_folder_private(channel_folder.id):
         return
     if is_web_public:
         raise JsonableError(_("Web-public channels cannot be in a private channel folder."))

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any, TypedDict
 
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import Exists, OuterRef, Q, QuerySet, prefetch_related_objects
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
@@ -486,7 +486,7 @@ def create_stream_if_needed(
             send_stream_creation_event(
                 realm,
                 stream,
-                notify_user_ids,
+                limit_to_channel_folder_audience(stream, notify_user_ids),
                 anonymous_group_membership=anonymous_group_membership,
             )
         else:
@@ -494,9 +494,10 @@ def create_stream_if_needed(
             send_stream_creation_event(
                 realm,
                 stream,
-                list(
+                limit_to_channel_folder_audience(
+                    stream,
                     realm_admin_ids
-                    | get_user_ids_with_metadata_access_via_permission_groups(stream)
+                    | get_user_ids_with_metadata_access_via_permission_groups(stream),
                 ),
                 anonymous_group_membership=anonymous_group_membership,
             )
@@ -699,7 +700,9 @@ def access_stream_for_send_message(
         # Even guest users can write to web-public streams.
         return {"is_subscribed": None}
 
-    if not (stream.invite_only or sender.is_guest):
+    if not (stream.invite_only or sender.is_guest) and user_has_access_to_folder_of_channel(
+        sender, stream, user_group_membership_details
+    ):
         # This is a public stream and sender is not a guest user
         return {"is_subscribed": None}
 
@@ -726,7 +729,7 @@ def access_stream_for_send_message(
 
         if is_user_in_groups_granting_content_access(
             stream, user_group_membership_details.user_recursive_group_ids
-        ):
+        ) and user_has_access_to_folder_of_channel(sender, stream, user_group_membership_details):
             return {"is_subscribed": is_subscribed}
 
     # All other cases are an error.
@@ -804,6 +807,11 @@ def user_has_metadata_access(
     if user_profile.is_guest:
         return False
 
+    if not user_has_access_to_folder_of_channel(
+        user_profile, stream, user_group_membership_details
+    ):
+        return False
+
     if stream.is_public():
         return True
 
@@ -841,6 +849,11 @@ def user_has_content_access(
         return True
 
     if user_profile.is_guest:
+        return False
+
+    if not user_has_access_to_folder_of_channel(
+        user_profile, stream, user_group_membership_details
+    ):
         return False
 
     if stream.is_public():
@@ -1005,6 +1018,8 @@ def check_basic_stream_access(
             stream.can_administer_channel_group_id,
             stream.can_add_subscribers_group_id,
             stream.can_subscribe_group_id,
+        ) and user_has_access_to_folder_of_channel(
+            user_profile, stream, user_group_membership_details
         ):
             return True
 
@@ -1263,6 +1278,24 @@ def bulk_can_access_stream_metadata_user_ids(streams: list[Stream]) -> dict[int,
                 | users_dict_with_metadata_access_to_streams_via_permission_groups[stream.id]
             )
 
+    # Web-public channels are never in private folders.
+    folder_streams = [
+        stream for stream in streams if stream.folder_id is not None and not stream.is_web_public
+    ]
+    if len(folder_streams) > 0:
+        channel_folders = ChannelFolder.objects.filter(
+            id__in={stream.folder_id for stream in folder_streams}
+        )
+        folder_audience_user_ids = get_channel_folder_audience_user_ids(
+            channel_folders, folder_streams[0].realm_id
+        )
+        subscriber_ids = get_user_ids_for_streams({stream.id for stream in folder_streams})
+        for stream in folder_streams:
+            assert stream.folder_id is not None
+            result[stream.id] = (
+                result[stream.id] & folder_audience_user_ids[stream.folder_id]
+            ) | subscriber_ids[stream.id]
+
     return result
 
 
@@ -1289,7 +1322,13 @@ def can_access_stream_history(user_profile: UserProfile, stream: Stream) -> bool
     if stream.is_web_public:
         return True
 
-    if stream.is_history_realm_public() and not user_profile.is_guest:
+    if (
+        stream.is_history_realm_public()
+        and not user_profile.is_guest
+        and user_has_access_to_folder_of_channel(
+            user_profile, stream, UserGroupMembershipDetails(user_recursive_group_ids=None)
+        )
+    ):
         return True
 
     if stream.is_history_public_to_subscribers():
@@ -1543,18 +1582,61 @@ def user_can_administer_channel_folder(
     )
 
 
-def get_channel_folder_access_query(user_profile: UserProfile) -> Q:
+def get_channel_folder_access_query(
+    user_profile: UserProfile,
+    *,
+    folder_field: str = "",
+    user_recursive_group_ids: Collection[int] | None = None,
+) -> Q:
     """A filter for the channel folders the user can see, in the same
-    query.
+    query unless the groups of the user are passed. With folder_field,
+    it filters the rows that refer to a channel folder through that
+    field, keeping those with no folder.
     """
     if user_profile.is_realm_admin:
         return Q()
 
-    group_ids = get_recursive_membership_groups(user_profile).values("id")
-    query = Q(can_access_group__in=group_ids)
+    prefix = f"{folder_field}__" if folder_field else ""
+    group_ids: object = (
+        get_recursive_membership_groups(user_profile).values("id")
+        if user_recursive_group_ids is None
+        else user_recursive_group_ids
+    )
+    query = Q(**{f"{prefix}can_access_group__in": group_ids})
     if not user_profile.is_guest:
-        query |= Q(can_administer_group__in=group_ids)
+        query |= Q(**{f"{prefix}can_administer_group__in": group_ids})
+    if folder_field:
+        query |= Q(**{f"{folder_field}__isnull": True})
     return query
+
+
+def user_has_access_to_folder_of_channel(
+    user_profile: UserProfile,
+    stream: Stream,
+    user_group_membership_details: UserGroupMembershipDetails,
+) -> bool:
+    """A channel in a private folder is only accessible to those who can
+    see the folder. This does not need to be checked for subscribers,
+    since losing access to a folder unsubscribes from its channels.
+    """
+    if stream.folder_id is None or user_profile.is_realm_admin:
+        return True
+
+    if user_group_membership_details.user_recursive_group_ids is None:
+        user_group_membership_details.user_recursive_group_ids = set(
+            get_recursive_membership_groups(user_profile).values_list("id", flat=True)
+        )
+    user_recursive_group_ids = user_group_membership_details.user_recursive_group_ids
+
+    channel_folder = stream.folder
+    assert channel_folder is not None
+    if channel_folder.can_access_group_id in user_recursive_group_ids:
+        return True
+    # Guests cannot administer channel folders.
+    return (
+        not user_profile.is_guest
+        and channel_folder.can_administer_group_id in user_recursive_group_ids
+    )
 
 
 def get_channel_folder_audience_user_ids(
@@ -1597,9 +1679,75 @@ def get_channel_folder_audience_user_ids(
     }
 
 
-def is_channel_folder_private(channel_folder: ChannelFolder) -> bool:
-    return not NamedUserGroup.objects.filter(
-        id=channel_folder.can_access_group_id, name=SystemGroups.EVERYONE, is_system_group=True
+def get_inaccessible_channel_folder_ids(
+    user_profile: UserProfile, user_recursive_group_ids: set[int]
+) -> set[int]:
+    """The channel folders in the realm that the user cannot see, for
+    callers that already have the groups of the user. Organization
+    administrators can see every folder.
+    """
+    assert not user_profile.is_realm_admin
+    return {
+        folder_id
+        for folder_id, can_access_group_id, can_administer_group_id in ChannelFolder.objects.filter(
+            realm_id=user_profile.realm_id
+        ).values_list("id", "can_access_group_id", "can_administer_group_id")
+        if can_access_group_id not in user_recursive_group_ids
+        and (user_profile.is_guest or can_administer_group_id not in user_recursive_group_ids)
+    }
+
+
+def check_users_can_see_folders_of_channels(
+    streams: Collection[Stream], users: Collection[UserProfile]
+) -> None:
+    folder_ids = {stream.folder_id for stream in streams if stream.folder_id is not None}
+    if not folder_ids:
+        return
+    folder_audience_user_ids = get_channel_folder_audience_user_ids(
+        ChannelFolder.objects.filter(id__in=folder_ids), next(iter(streams)).realm_id
+    )
+    for stream in [stream for stream in streams if stream.folder_id is not None]:
+        for user in users:
+            assert stream.folder_id is not None
+            if user.id not in folder_audience_user_ids[stream.folder_id]:
+                raise JsonableError(
+                    _("{user_name} cannot see the channel folder of #{channel_name}.").format(
+                        user_name=user.full_name, channel_name=stream.name
+                    )
+                )
+
+
+def limit_to_channel_folder_audience(stream: Stream, user_ids: Iterable[int]) -> list[int]:
+    """Of these users, those who can see the folder of the channel."""
+    if stream.folder_id is None:
+        return list(user_ids)
+    assert stream.folder is not None
+    audience_user_ids = get_channel_folder_audience_user_ids([stream.folder], stream.realm_id)[
+        stream.folder_id
+    ]
+    return [user_id for user_id in user_ids if user_id in audience_user_ids]
+
+
+def public_channel_folder_query(*, folder_field: str = "") -> Q:
+    """A filter for public channel folders. With folder_field, it
+    filters the rows that refer to a channel folder through that
+    field, keeping those with no folder.
+    """
+    prefix = f"{folder_field}__" if folder_field else ""
+    query = Q(
+        **{
+            f"{prefix}can_access_group__named_user_group__name": SystemGroups.EVERYONE,
+            f"{prefix}can_access_group__named_user_group__is_system_group": True,
+        }
+    )
+    if folder_field:
+        query |= Q(**{f"{folder_field}__isnull": True})
+    return query
+
+
+def is_channel_folder_private(channel_folder_id: int) -> bool:
+    return not ChannelFolder.objects.filter(
+        public_channel_folder_query(), id=channel_folder_id
     ).exists()
 
 
@@ -1619,6 +1767,7 @@ def get_metadata_access_streams(
     )
 
     metadata_access_streams: list[Stream] = []
+    prefetch_related_objects(list(streams), "folder")
 
     for stream in streams:
         is_subscribed = stream.recipient_id in subscribed_recipient_ids
@@ -1656,6 +1805,7 @@ def get_content_access_streams(
     )
 
     content_access_streams: list[Stream] = []
+    prefetch_related_objects(list(streams), "folder")
 
     for stream in streams:
         is_subscribed = stream.recipient_id in subscribed_recipient_ids
@@ -2163,7 +2313,9 @@ def get_streams_for_user(
         # All accessible public channels will already have been
         # included if include_can_access_content is True.
         if not include_can_access_content and include_public:
-            invite_only_check = Q(invite_only=False)
+            invite_only_check = Q(invite_only=False) & get_channel_folder_access_query(
+                user_profile, folder_field="folder"
+            )
             add_filter_option(invite_only_check)
 
         # All accessible web-public channels will already have been
