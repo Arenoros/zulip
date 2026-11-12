@@ -22,10 +22,22 @@
         display: none;
     }
 
+    /* The new messages divider marks unread messages instead. */
+    .unread_marker {
+        display: none;
+    }
+
     .recipient_row .message_row {
         border-left: 0;
         border-right: 0;
         border-bottom: 0;
+    }
+
+    .message_row {
+        grid-template:
+            "message_divider_unread_marker message_feed_divider_content" auto
+            ".                             new_messages_divider" auto
+            "message_unread_marker         messagebox" auto / 2px minmax(0, 1fr);
     }
 
     .message_feed_divider {
@@ -51,6 +63,37 @@
                 display: none;
             }
         }
+    }
+
+    .new-messages-divider {
+        grid-area: new_messages_divider;
+        display: grid;
+        grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
+        align-items: center;
+        padding: 8px 0;
+        font-size: calc(12em / 14);
+        font-weight: 600;
+        line-height: 17px;
+        color: var(--color-message-bubble-unread);
+        transition: opacity 2s ease-out;
+
+        &::before,
+        &::after {
+            content: " ";
+            height: 0;
+            border-bottom: 1px solid currentcolor;
+        }
+
+        .new-messages-divider-label {
+            /* Same as .date_row_text */
+            padding: 0 var(--date-divider-text-padding);
+        }
+    }
+
+    /* Once read, the divider fades out but keeps its space, so that
+       the messages below don't move. */
+    .message_row:not(.unread) .new-messages-divider {
+        opacity: 0;
     }
 
     .message_row:not(.direct_mention, .group_mention) {

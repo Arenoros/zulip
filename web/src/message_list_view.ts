@@ -82,6 +82,7 @@ export type MessageContainer = {
     timestr: string;
     topic_url?: string;
     want_date_divider: boolean;
+    want_new_messages_divider: boolean;
     want_subscription_status_divider: boolean;
 };
 
@@ -990,7 +991,7 @@ export class MessageListView {
         }
     }
 
-    build_message_groups(messages: Message[]): MessageGroup[] {
+    build_message_groups(messages: Message[], messages_are_new = false): MessageGroup[] {
         const new_message_groups: MessageGroup[] = [];
 
         let current_group: MessageGroup;
@@ -998,6 +999,12 @@ export class MessageListView {
 
         let prev_message_container: MessageContainer | undefined;
         const bubble_layout = this.is_bubble_layout();
+        // The bubble layout marks where unread messages start, but not
+        // for messages that arrive while the conversation is open.
+        const new_messages_divider_id =
+            bubble_layout && !messages_are_new
+                ? this.list.data.first_unread_message_id()
+                : undefined;
 
         const add_message_container_to_group = (message_container: MessageContainer): void => {
             current_group_message_containers.push(message_container);
@@ -1037,6 +1044,8 @@ export class MessageListView {
             let date_divider_html;
             const want_subscription_status_divider = false;
             const year_changed = !same_year(message, prev_message_container?.msg);
+            const want_new_messages_divider =
+                message.unread && message.id === new_messages_divider_id;
 
             if (
                 prev_message_container &&
@@ -1080,7 +1089,9 @@ export class MessageListView {
                 same_day(prev_message_container.msg, message) &&
                 prev_message_container.msg.historical === message.historical &&
                 prev_message_container.msg.sender_id === message.sender_id &&
-                (!bubble_layout || within_message_series_pause(prev_message_container.msg, message))
+                (!bubble_layout ||
+                    within_message_series_pause(prev_message_container.msg, message)) &&
+                !want_new_messages_divider
             ) {
                 include_sender = false;
             }
@@ -1096,6 +1107,7 @@ export class MessageListView {
                 ...(topic_url && {topic_url}),
                 ...(pm_with_url && {pm_with_url}),
                 want_date_divider,
+                want_new_messages_divider,
                 want_subscription_status_divider,
                 date_divider_html,
                 year_changed,
@@ -1140,7 +1152,8 @@ export class MessageListView {
                 same_sender(last_msg_container, first_msg_container) &&
                 first_msg_container.msg.historical === last_msg_container?.msg.historical &&
                 (!this.is_bubble_layout() ||
-                    within_message_series_pause(last_msg_container.msg, first_msg_container.msg))
+                    within_message_series_pause(last_msg_container.msg, first_msg_container.msg)) &&
+                !first_msg_container.want_new_messages_divider
             ) {
                 first_msg_container.include_sender = false;
             }
@@ -1444,7 +1457,7 @@ export class MessageListView {
             }
         };
 
-        const new_message_groups = this.build_message_groups(messages);
+        const new_message_groups = this.build_message_groups(messages, messages_are_new);
         const message_containers = new_message_groups.flatMap((group) => group.message_containers);
         this.set_subscription_dividers_and_markers(new_message_groups, where);
         const message_actions = this.merge_message_groups(new_message_groups, where);

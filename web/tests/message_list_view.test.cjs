@@ -1321,7 +1321,7 @@ test("message series in the bubble layout", ({override}) => {
 
 const bubble_test_ten_am = new Date(2026, 10, 9, 10, 0).getTime() / 1000;
 
-function bubble_test_dm_at(minutes) {
+function bubble_test_dm_at(minutes, unread = false) {
     return {
         id: Number(_.uniqueId()),
         type: "private",
@@ -1332,6 +1332,7 @@ function bubble_test_dm_at(minutes) {
         display_recipient: [{id: 5, email: "alice@example.com", full_name: "Alice"}],
         timestamp: bubble_test_ten_am + minutes * 60,
         historical: false,
+        unread,
         clean_reactions: new Map(),
         submessages: [],
     };
@@ -1375,6 +1376,51 @@ test("date dividers in the bubble layout", ({override}) => {
         result.map((container) => container.want_date_divider),
         [false, false],
     );
+});
+
+test("new messages divider in the bubble layout", ({override}) => {
+    // The first unread message gets a new messages divider and starts
+    // a series, both within a batch and where a newer batch joins.
+    const messages = [
+        bubble_test_dm_at(0),
+        bubble_test_dm_at(1),
+        bubble_test_dm_at(2, true),
+        bubble_test_dm_at(3, true),
+    ];
+
+    override(user_settings, "web_direct_message_bubbles", true);
+    let view = make_bubble_test_view();
+    override(view.list.data, "first_unread_message_id", () => messages[2].id);
+    view._message_groups = view.build_message_groups(messages);
+    const result = rendered_containers(view);
+    assert.deepEqual(
+        result.map((container) => container.want_new_messages_divider),
+        [false, false, true, false],
+    );
+    assert.deepEqual(
+        result.map((container) => container.include_sender),
+        [true, false, true, false],
+    );
+
+    view = make_bubble_test_view();
+    const newer = [bubble_test_dm_at(4, true)];
+    override(view.list.data, "first_unread_message_id", () => newer[0].id);
+    view._message_groups = view.build_message_groups(messages.slice(0, 2));
+    view.merge_message_groups(view.build_message_groups(newer), "bottom");
+    assert.deepEqual(
+        rendered_containers(view).map((container) => container.include_sender),
+        [true, false, true],
+    );
+
+    // Messages that arrive while the conversation is open get no divider.
+    view = make_bubble_test_view();
+    view._message_groups = view.build_message_groups(messages, true);
+    assert.ok(rendered_containers(view).every((container) => !container.want_new_messages_divider));
+
+    override(user_settings, "web_direct_message_bubbles", false);
+    view = make_bubble_test_view();
+    view._message_groups = view.build_message_groups(messages);
+    assert.ok(rendered_containers(view).every((container) => !container.want_new_messages_divider));
 });
 
 test("render_windows", ({mock_template}) => {

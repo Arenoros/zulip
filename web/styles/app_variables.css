@@ -881,6 +881,10 @@
         hsl(0deg 0% 38%),
         hsl(0deg 0% 63.9%)
     );
+    --color-message-bubble-unread: light-dark(
+        hsl(349deg 60% 48%),
+        hsl(5deg 100% 75.1%)
+    );
     --color-message-bubble-star: light-dark(
         hsl(41deg 100% 34.5%),
         hsl(44deg 99% 48.2%)
