@@ -1,0 +1,232 @@
+/* The bubble layout of a single direct message conversation: one's own
+   messages on the right, messages from others on the left with the
+   sender's avatar and name at the start of each message series. */
+.message-list.bubble-layout {
+    /* 32px at 15px/1em */
+    --message-box-avatar-width: 2.1333em;
+    --message-box-avatar-height: var(--message-box-avatar-width);
+    /* The avatar and a 10px gap, 42px at 15px/1em */
+    --bubble-avatar-column-width: 2.8em;
+    /* The share of the feed's width that bubbles leave free on the
+       side opposite to the sender's. */
+    --bubble-free-edge: 15%;
+    --color-message-star-action: var(--color-message-bubble-star);
+
+    @container message-lists (width < $cq_sm_min) {
+        --bubble-free-edge: 12%;
+    }
+
+    .recipient_row .message_row {
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+    }
+
+    .message_row:not(.direct_mention, .group_mention) {
+        background-color: transparent;
+    }
+
+    .messagebox-content:not(.is-me-message) {
+        /* 3px at 15px/1em */
+        padding-top: 0.2em;
+        grid-template-areas:
+            ".      sender    sender sender   sender sender"
+            "avatar message   edited controls time   .     "
+            ".      more      .      .        .      .     "
+            ".      reactions .      .        .      .     "
+            ".      reminders .      .        .      .     ";
+        grid-template-columns:
+            var(--bubble-avatar-column-width)
+            fit-content(
+                calc(
+                    100% - var(--bubble-free-edge) -
+                        var(--bubble-avatar-column-width)
+                )
+            )
+            max-content max-content max-content minmax(0, 1fr);
+        grid-template-rows: repeat(5, auto);
+
+        &.content_edit_mode {
+            grid-template-columns:
+                var(--bubble-avatar-column-width)
+                minmax(
+                    0,
+                    calc(
+                        100% - var(--bubble-free-edge) -
+                            var(--bubble-avatar-column-width)
+                    )
+                )
+                max-content max-content max-content minmax(0, 1fr);
+        }
+
+        .message-avatar .inline_profile_picture {
+            margin-top: 0;
+        }
+
+        /* Keep the star of a starred message next to the bubble. */
+        .star_container {
+            order: -1;
+        }
+
+        .message_content:not(.collapsed) {
+            justify-self: start;
+            margin-top: 0;
+            /* 7px 12px at 15px/1em */
+            padding: 0.4667em 0.8em;
+            border: 1px solid var(--color-border-message-bubble);
+            border-radius: 8px;
+            background-color: var(--color-background-message-bubble);
+            color: var(--color-text-message-bubble);
+            /* Content wider than the column, such as a long formula,
+               scrolls inside the bubble. */
+            max-width: 100%;
+            --color-markdown-link: var(--color-link-message-bubble);
+            --color-markdown-link-hover: var(--color-link-message-bubble);
+            --color-markdown-link-decoration: color-mix(
+                in oklch,
+                var(--color-link-message-bubble) 30%,
+                transparent
+            );
+            --color-markdown-link-decoration-hover: color-mix(
+                in oklch,
+                var(--color-link-message-bubble) 70%,
+                transparent
+            );
+
+            > :last-child {
+                margin-bottom: 0;
+            }
+        }
+
+        .message-time {
+            justify-self: start;
+            align-self: center;
+            /* 8px at 12px/1em */
+            padding: 0 0.6667em;
+            font-size: 0.8em;
+            font-weight: 400;
+            line-height: var(--base-line-height-unitless);
+            letter-spacing: normal;
+            color: var(--color-text-message-bubble-caption);
+            visibility: hidden;
+
+            @media (hover: none) {
+                visibility: visible;
+            }
+        }
+
+        &:hover .message-time {
+            visibility: visible;
+        }
+    }
+
+    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+        /* 16px at 15px/1em */
+        padding-top: 1.0667em;
+
+        .message-sender-and-time {
+            grid-area: sender;
+            justify-self: start;
+            display: flex;
+            align-items: baseline;
+            /* 8px at 15px/1em */
+            gap: 0.5333em;
+            min-width: 0;
+            /* 4px at 15px/1em */
+            padding-bottom: 0.2667em;
+        }
+
+        .message_sender {
+            font-size: 0.8em;
+            line-height: var(--base-line-height-unitless);
+
+            .sender_name {
+                font-weight: 600;
+            }
+        }
+
+        .message-time {
+            padding: 0;
+            visibility: visible;
+        }
+    }
+
+    .own-message {
+        .messagebox-content:not(.is-me-message) {
+            grid-template-areas:
+                ". .    .        .      sender   "
+                ". time controls edited message  "
+                ". .    .        .      more     "
+                ". .    .        .      reactions"
+                ". .    .        .      reminders";
+            grid-template-columns:
+                minmax(0, 1fr) max-content max-content max-content
+                fit-content(calc(100% - var(--bubble-free-edge)));
+
+            &.content_edit_mode {
+                grid-template-columns:
+                    minmax(0, 1fr) max-content max-content max-content
+                    minmax(0, calc(100% - var(--bubble-free-edge)));
+            }
+
+            .message-avatar {
+                display: none;
+            }
+
+            .message_content:not(.collapsed) {
+                justify-self: end;
+                border-color: var(--color-background-own-message-bubble);
+                background-color: var(--color-background-own-message-bubble);
+                color: var(--color-text-own-message-bubble);
+                --color-markdown-link: var(--color-link-own-message-bubble);
+                --color-markdown-link-hover: var(--color-link-own-message-bubble);
+                --color-markdown-link-decoration: color-mix(
+                    in oklch,
+                    var(--color-link-own-message-bubble) 30%,
+                    transparent
+                );
+                --color-markdown-link-decoration-hover: color-mix(
+                    in oklch,
+                    var(--color-link-own-message-bubble) 70%,
+                    transparent
+                );
+            }
+
+            .message-time {
+                justify-self: end;
+            }
+
+            .message_reactions {
+                justify-self: end;
+                justify-content: flex-end;
+            }
+
+            .star_container {
+                order: 0;
+            }
+        }
+
+        &.messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+            .message-sender-and-time {
+                justify-self: end;
+            }
+
+            /* One's own name stays for screen readers only. */
+            .sender_name,
+            .zulip-icon-bot {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
+            }
+        }
+    }
+}
+
+@media (width < $sm_min) {
+    .without-container-query-support .message-list.bubble-layout {
+        --bubble-free-edge: 12%;
+    }
+}

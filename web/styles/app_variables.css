@@ -848,6 +848,43 @@
         hsl(0deg 0% 100%),
         hsl(0deg 0% 13.5%)
     );
+    /* Bubble layout of direct message conversations. */
+    --color-background-message-bubble: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 17.3%)
+    );
+    --color-border-message-bubble: light-dark(
+        hsl(0deg 0% 89%),
+        hsl(0deg 0% 17.3%)
+    );
+    --color-text-message-bubble: light-dark(
+        hsl(0deg 0% 14.1%),
+        hsl(0deg 0% 91%)
+    );
+    --color-link-message-bubble: light-dark(
+        hsl(213deg 75% 40.4%),
+        hsl(212deg 100% 74.3%)
+    );
+    --color-background-own-message-bubble: light-dark(
+        hsl(230deg 64% 94.5%),
+        hsl(237deg 28% 28.2%)
+    );
+    --color-text-own-message-bubble: light-dark(
+        hsl(0deg 0% 14.1%),
+        hsl(236deg 100% 97.3%)
+    );
+    --color-link-own-message-bubble: light-dark(
+        hsl(238deg 46% 42.4%),
+        hsl(228deg 100% 88.2%)
+    );
+    --color-text-message-bubble-caption: light-dark(
+        hsl(0deg 0% 38%),
+        hsl(0deg 0% 63.9%)
+    );
+    --color-message-bubble-star: light-dark(
+        hsl(41deg 100% 34.5%),
+        hsl(44deg 99% 48.2%)
+    );
     --color-selected-message-outline: light-dark(
         hsl(217deg 64% 59% / 60%),
         hsl(217deg 64% 59% / 70%)

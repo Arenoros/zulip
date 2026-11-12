@@ -574,6 +574,12 @@
     }
 }
 
+/* The sender and the time are laid out together only in the
+   bubble layout; see bubble_layout.css. */
+.message-sender-and-time {
+    display: contents;
+}
+
 .message_controls {
     grid-area: controls;
     /* Let the controls occupy the entire height
