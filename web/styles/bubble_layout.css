@@ -577,6 +577,25 @@
         }
     }
 
+    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+        .zulip-icon-bot {
+            display: none;
+        }
+
+        .message-sender-bot-label {
+            display: inline-block;
+            /* 4px at 12px/1em */
+            margin-inline-start: 0.3333em;
+            /* 0 4px at 11px/1em */
+            padding: 0 0.3636em;
+            border: 1px solid var(--color-border-rendered-markdown-table);
+            border-radius: 4px;
+            /* 11px at 12px/1em */
+            font-size: 0.9167em;
+            color: var(--color-text-message-bubble-caption);
+        }
+    }
+
     /* /me messages have a small avatar and no bubble. */
     .messagebox-includes-sender .messagebox-content.is-me-message {
         /* 20px at 15px/1em */

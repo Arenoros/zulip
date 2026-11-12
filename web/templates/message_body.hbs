@@ -17,6 +17,7 @@
             {{#unless is_hidden}}
                 {{#if sender_is_bot}}
                     <i class="zulip-icon zulip-icon-bot" aria-label="{{t 'Bot' }}"></i>
+                    <span class="message-sender-bot-label">{{t "Bot" }}</span>
                 {{/if}}
                 {{#if status_message}}
                     <span class="message_content rendered_markdown status-message{{#if msg/hide_link_previews}} hide-link-previews{{/if}}">{{rendered_markdown status_message}}</span>

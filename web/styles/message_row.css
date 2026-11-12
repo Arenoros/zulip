@@ -580,10 +580,12 @@
     display: contents;
 }
 
-/* Only the bubble layout spells out the sending state in words. */
+/* Only the bubble layout spells out the sending state and bot
+   senders in words. */
 .message-sending-notice,
 .failed-message-notice,
-.failed-message-action-label {
+.failed-message-action-label,
+.message-sender-bot-label {
     display: none;
 }
 
