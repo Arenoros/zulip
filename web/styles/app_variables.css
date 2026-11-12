@@ -524,6 +524,7 @@
     /* 35px at 14px/1em */
     --message-box-avatar-width: 2.5em;
     --message-box-avatar-height: var(--message-box-avatar-width);
+    --border-radius-user-avatar: 50%;
     /* 46px at 14px/1em */
     --message-box-avatar-column-width: 3.2857em;
     /* Increase the margin here to account for the

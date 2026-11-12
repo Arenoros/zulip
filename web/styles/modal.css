@@ -345,7 +345,7 @@
         width: 180px;
         background-size: cover;
         background-position: center;
-        border-radius: 5px;
+        border-radius: var(--border-radius-user-avatar);
         box-shadow: 0 0 0 1px hsl(0deg 0% 0% / 20%);
 
         &.guest-avatar::after {
@@ -698,7 +698,7 @@
                 width: 1.25em; /* 20px at 16px font-size at 14px em */
                 position: relative;
                 right: 8px;
-                border-radius: 4px;
+                border-radius: var(--border-radius-user-avatar);
             }
 
             margin: 2px 0;

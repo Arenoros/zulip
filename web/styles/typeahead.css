@@ -222,7 +222,7 @@
     border-radius: 4px;
 
     .typeahead-image-avatar {
-        border-radius: 4px;
+        border-radius: var(--border-radius-user-avatar);
         /* Override bootstrap img */
         vertical-align: baseline;
     }

@@ -311,8 +311,10 @@ input.settings_text_input {
         content: " ";
         background-color: hsl(0deg 0% 47%);
         position: absolute;
-        bottom: -30%;
-        right: -30%;
+        /* The round picture clips this square to a segment
+           of the circle. */
+        bottom: -14%;
+        right: -14%;
         width: 50%;
         height: 50%;
         transform: rotate(45deg);

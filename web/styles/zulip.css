@@ -1050,7 +1050,7 @@ div.focused-message-list.is-conversation-view .recipient_row {
        on the image itself. */
     line-height: 1;
     vertical-align: top;
-    border-radius: 4px;
+    border-radius: var(--border-radius-user-avatar);
     overflow: hidden;
 
     &.guest-avatar::after {
@@ -2619,7 +2619,7 @@ body:not(.spectator-view) {
         width: 1.5em; /* 24px at 16px em */
         height: 1.5em; /* 24px at 16px em */
         background-size: cover;
-        border-radius: 4px;
+        border-radius: var(--border-radius-user-avatar);
         background-color: var(--color-background-image-loader);
         border: 1px solid var(--color-border-personal-menu-avatar);
         overflow: hidden;
@@ -2650,6 +2650,7 @@ body:not(.spectator-view) {
 
     > img {
         opacity: 0.5;
+        border-radius: var(--border-radius-user-avatar);
     }
 
     .deactivated-user-icon {
@@ -2662,6 +2663,11 @@ body:not(.spectator-view) {
         bottom: -1px;
         right: -2px;
     }
+}
+
+.inline_profile_picture.deactivated:not(.guest-avatar) {
+    /* Let the icon extend past the round picture. */
+    overflow: visible;
 }
 
 .scroll-to-time {

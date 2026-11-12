@@ -1111,6 +1111,7 @@ input[type="checkbox"] {
 
     #current_bot_avatar_image {
         margin: 5px 0 8px;
+        border-radius: var(--border-radius-user-avatar);
     }
 
     .edit_bot_avatar_preview_text {
@@ -1127,6 +1128,7 @@ input[type="checkbox"] {
     height: 100px;
     width: 100px;
     margin: 2px 0 8px;
+    border-radius: var(--border-radius-user-avatar);
 }
 
 #add-alert-word {
@@ -1351,7 +1353,7 @@ label.preferences-radio-choice-label {
     .avatar {
         height: 2.625em; /* 42px / 16px em */
         width: 2.625em; /* 42px / 16px em */
-        border-radius: 0.25em; /* 4px / 16px em */
+        border-radius: var(--border-radius-user-avatar);
     }
 }
 

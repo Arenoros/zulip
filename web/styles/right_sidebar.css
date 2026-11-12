@@ -189,13 +189,6 @@
             /* TODO: Express this as part of the grid on
                .selectable_sidebar_block. */
             margin-right: var(--right-sidebar-avatar-right-margin);
-
-            &:not(:has(.user-circle-offline)) .user-profile-picture {
-                /* The over-avatar user circle width is 15.5px at 20px/1em;
-                   we adjust the border radius here to avoid any pixels
-                   from the avatar bleeding through. */
-                border-bottom-right-radius: 0.3875em; /* 7.75px at 20px/1em */
-            }
         }
 
         .user-profile-picture {

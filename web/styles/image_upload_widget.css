@@ -162,9 +162,17 @@
 
 /* CSS related to settings page user avatar upload widget only */
 #user-avatar-upload-widget {
+    border-radius: var(--border-radius-user-avatar);
+
     .image-block {
         width: 200px;
         height: 200px;
+    }
+
+    .image-delete-button {
+        /* Keep the button inside the round picture. */
+        top: 34px;
+        right: 34px;
     }
 }
 

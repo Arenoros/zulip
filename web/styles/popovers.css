@@ -854,7 +854,7 @@ ul.popover-group-menu-member-list {
     .popover-menu-user-avatar {
         width: var(--length-user-popover-menu-avatar);
         height: var(--length-user-popover-menu-avatar);
-        border-radius: 4px;
+        border-radius: var(--border-radius-user-avatar);
         background-size: cover;
         background-position: center;
     }
@@ -865,8 +865,15 @@ ul.popover-group-menu-member-list {
            the avatar itself does not scale. */
         font-size: var(--length-user-status-circle-popover-menu);
         line-height: 1;
-        right: -1px;
-        bottom: -1px;
+        /* Center the dot on the edge of the round avatar, which is
+           (1 - cos 45deg) / 2 = 0.146 of the avatar's width away from
+           the corner of its box; 1px is the dot's border. */
+        right: calc(
+            var(--length-user-popover-menu-avatar) * 0.146 - 0.5em - 1px
+        );
+        bottom: calc(
+            var(--length-user-popover-menu-avatar) * 0.146 - 0.5em - 1px
+        );
         background-color: var(--color-background-popover-menu);
         border: solid 1px var(--color-background-popover-menu);
         border-radius: 50%;
@@ -949,7 +956,7 @@ ul.popover-group-menu-member-list {
     .avatar-image {
         width: 64px;
         height: 64px;
-        border-radius: 4px;
+        border-radius: var(--border-radius-user-avatar);
         background-size: cover;
         background-position: center;
     }
@@ -960,8 +967,10 @@ ul.popover-group-menu-member-list {
         left: unset;
         font-size: var(--length-user-status-circle);
         line-height: 1;
-        right: -1px;
-        bottom: -1px;
+        /* Center the dot on the edge of the round 64px avatar; see
+           .popover-menu-user-presence. */
+        right: calc(64px * 0.146 - 0.5em - 1px);
+        bottom: calc(64px * 0.146 - 0.5em - 1px);
         background-color: var(--color-background-popover-menu);
         border: solid 1px var(--color-background-popover-menu);
         border-radius: 50%;
