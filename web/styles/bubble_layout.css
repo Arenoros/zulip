@@ -577,6 +577,67 @@
         }
     }
 
+    /* /me messages have a small avatar and no bubble. */
+    .messagebox-includes-sender .messagebox-content.is-me-message {
+        /* 20px at 15px/1em */
+        --message-box-avatar-width: 1.3333em;
+        --message-box-avatar-height: var(--message-box-avatar-width);
+        /* The avatar and an 8px gap, 28px at 15px/1em */
+        --bubble-avatar-column-width: 1.8667em;
+        /* 16px at 15px/1em */
+        padding-top: 1.0667em;
+        grid-template-areas:
+            "avatar sender    time controls ."
+            ".      more      .    .        ."
+            ".      reactions .    .        ."
+            ".      reminders .    .        .";
+        grid-template-columns:
+            var(--bubble-avatar-column-width)
+            fit-content(
+                calc(
+                    100% - var(--bubble-free-edge) -
+                        var(--bubble-avatar-column-width)
+                )
+            )
+            max-content max-content minmax(0, 1fr);
+        grid-template-rows: repeat(4, auto);
+
+        .status-message {
+            font-style: italic;
+        }
+
+        .message-time {
+            justify-self: start;
+            /* 8px at 12px/1em */
+            padding: 0 0.6667em;
+            font-size: 0.8em;
+            font-weight: 400;
+            letter-spacing: normal;
+            color: var(--color-text-message-bubble-caption);
+        }
+    }
+
+    .own-message.messagebox-includes-sender .messagebox-content.is-me-message {
+        grid-template-areas:
+            ". controls time sender   "
+            ". .        .    more     "
+            ". .        .    reactions"
+            ". .        .    reminders";
+        grid-template-columns:
+            minmax(0, 1fr) max-content max-content
+            fit-content(calc(100% - var(--bubble-free-edge)));
+
+        .message-avatar {
+            display: none;
+        }
+
+        .message-time,
+        .message_reactions,
+        .message-reminders {
+            justify-self: end;
+        }
+    }
+
     .own-message {
         .messagebox-content:not(.is-me-message) {
             grid-template-areas:
