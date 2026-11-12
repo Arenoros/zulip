@@ -225,6 +225,17 @@
         }
     }
 
+    .messagebox-content:not(.is-me-message) .message_edit_notice {
+        align-self: center;
+        /* 11px at 15px/1em */
+        font-size: 0.7333em;
+        text-transform: lowercase;
+        opacity: 1;
+        color: var(--color-text-message-bubble-caption);
+        /* 6px at 11px/1em */
+        padding: 0 0.5455em;
+    }
+
     .own-message {
         .messagebox-content:not(.is-me-message) {
             grid-template-areas:

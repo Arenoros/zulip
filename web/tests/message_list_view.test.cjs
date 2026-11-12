@@ -1378,6 +1378,35 @@ test("date dividers in the bubble layout", ({override}) => {
     );
 });
 
+test("edited notices in the bubble layout", ({override}) => {
+    // Bubbles have the edited notice next to them, also at the start
+    // of a series; /me messages keep theirs.
+    override(user_settings, "web_direct_message_bubbles", true);
+    const view = make_bubble_test_view();
+    assert.deepEqual(view.get_edited_notice_locations(true, false, false), {
+        message_edit_notices_in_left_col: true,
+        message_edit_notices_alongside_sender: false,
+        message_edit_notices_for_status_message: false,
+    });
+    assert.deepEqual(view.get_edited_notice_locations(false, true, false), {
+        message_edit_notices_in_left_col: false,
+        message_edit_notices_alongside_sender: false,
+        message_edit_notices_for_status_message: false,
+    });
+    assert.deepEqual(view.get_edited_notice_locations(true, false, true), {
+        message_edit_notices_in_left_col: false,
+        message_edit_notices_alongside_sender: false,
+        message_edit_notices_for_status_message: true,
+    });
+
+    override(user_settings, "web_direct_message_bubbles", false);
+    assert.deepEqual(view.get_edited_notice_locations(true, false, false), {
+        message_edit_notices_in_left_col: false,
+        message_edit_notices_alongside_sender: true,
+        message_edit_notices_for_status_message: false,
+    });
+});
+
 test("new messages divider in the bubble layout", ({override}) => {
     // The first unread message gets a new messages divider and starts
     // a series, both within a batch and where a newer batch joins.

@@ -1406,6 +1406,14 @@ export class MessageListView {
     } {
         // Based on the variables that define the overall message's HTML layout, set
         // variables defining where the message-edited notices should be placed.
+        if (!status_message && this.is_bubble_layout()) {
+            // Bubbles have the notice next to them, not on the sender line.
+            return {
+                message_edit_notices_in_left_col: !is_hidden,
+                message_edit_notices_alongside_sender: false,
+                message_edit_notices_for_status_message: false,
+            };
+        }
         return {
             message_edit_notices_in_left_col: !include_sender && !is_hidden,
             message_edit_notices_alongside_sender: include_sender && !status_message,
