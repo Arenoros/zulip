@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import orjson
@@ -19,7 +20,15 @@ from zerver.actions.streams import (
     do_change_stream_group_based_setting,
     do_deactivate_stream,
 )
-from zerver.actions.user_groups import check_add_user_group
+from zerver.actions.user_groups import (
+    add_subgroups_to_user_group,
+    bulk_add_members_to_user_groups,
+    bulk_remove_members_from_user_groups,
+    check_add_user_group,
+    remove_subgroups_from_user_group,
+)
+from zerver.actions.users import do_change_user_role
+from zerver.lib.exceptions import JsonableError
 from zerver.lib.streams import create_stream_if_needed
 from zerver.lib.subscription_info import gather_subscriptions_helper
 from zerver.lib.test_classes import ZulipTestCase
@@ -1496,4 +1505,153 @@ class PrivateFolderChannelAccessTest(ZulipTestCase):
         bulk_add_subscriptions(self.realm, [self.channel], [self.hamlet], acting_user=None)
         self.assertNotIn(
             self.hamlet, self.users_subscribed_to_stream(self.channel.name, self.realm)
+        )
+
+
+class ChannelFolderAccessChangesTest(ZulipTestCase):
+    """Losing access to a private folder unsubscribes from its channels
+    and closes them, and gaining access opens them.
+    """
+
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.iago = self.example_user("iago")
+        self.realm = self.iago.realm
+        self.cordelia = self.example_user("cordelia")
+        self.hamlet = self.example_user("hamlet")
+        self.designers = check_add_user_group(
+            self.realm, "designers", [self.cordelia], acting_user=self.iago
+        )
+        self.folder = check_add_channel_folder(self.realm, "Secret", "", acting_user=self.iago)
+        do_change_channel_folder_group_based_setting(
+            self.folder, "can_access_group", self.designers, acting_user=self.iago
+        )
+        self.channel = self.make_stream("plans")
+        do_change_stream_folder(self.channel, self.folder, acting_user=self.iago)
+        self.channel.refresh_from_db()
+        self.subscribe(self.cordelia, self.channel.name)
+        self.message_id = self.send_stream_message(self.cordelia, self.channel.name)
+
+    def events_for(self, events: list[Mapping[str, Any]], user: UserProfile) -> list[str]:
+        return [
+            f"{event['event']['type']}/{event['event']['op']}"
+            for event in events
+            if user.id in event["users"]
+        ]
+
+    def assert_lost_access(self, user: UserProfile) -> None:
+        self.assertNotIn(user, self.users_subscribed_to_stream(self.channel.name, self.realm))
+        result = self.api_get(user, f"/api/v1/messages/{self.message_id}")
+        self.assert_json_error(result, "Invalid message(s)")
+        result = self.api_get(user, f"/api/v1/streams/{self.channel.id}")
+        self.assert_json_error(result, "Invalid channel ID")
+        with self.assertRaisesRegex(JsonableError, "Not authorized to send to channel"):
+            check_send_stream_message(user, get_client("test"), self.channel.name, "x", "hi")
+
+    def test_removing_user_from_group(self) -> None:
+        with self.capture_send_event_calls(expected_num_events=5) as events:
+            bulk_remove_members_from_user_groups(
+                [self.designers], [self.cordelia.id], acting_user=self.iago
+            )
+        # The channel is closed before the folder is removed.
+        self.assertEqual(
+            self.events_for(events, self.cordelia),
+            [
+                "user_group/remove_members",
+                "subscription/remove",
+                "stream/delete",
+                "channel_folder/remove",
+            ],
+        )
+        self.assert_lost_access(self.cordelia)
+        # Those who can still see the channel learn it lost a subscriber.
+        self.assertEqual(self.events_for(events, self.iago)[-1], "subscription/peer_remove")
+
+        with self.capture_send_event_calls(expected_num_events=4) as events:
+            bulk_add_members_to_user_groups(
+                [self.designers], [self.cordelia.id], acting_user=self.iago
+            )
+        # The folder comes before the channel; nobody is subscribed again.
+        self.assertEqual(
+            self.events_for(events, self.cordelia),
+            [
+                "user_group/add_members",
+                "channel_folder/add",
+                "stream/create",
+                "subscription/peer_add",
+            ],
+        )
+        self.assertNotIn(
+            self.cordelia, self.users_subscribed_to_stream(self.channel.name, self.realm)
+        )
+        self.assert_json_success(self.api_get(self.cordelia, f"/api/v1/messages/{self.message_id}"))
+
+    def test_changing_who_can_see_folder(self) -> None:
+        do_change_channel_folder_group_based_setting(
+            self.folder,
+            "can_access_group",
+            UserGroupMembersData(direct_members=[self.hamlet.id], direct_subgroups=[]),
+            acting_user=self.iago,
+        )
+        self.assert_lost_access(self.cordelia)
+        self.assert_json_success(self.api_get(self.hamlet, f"/api/v1/messages/{self.message_id}"))
+
+    def test_removing_subgroup(self) -> None:
+        everyone_designing = check_add_user_group(
+            self.realm, "everyone designing", [], acting_user=self.iago
+        )
+        add_subgroups_to_user_group(everyone_designing, [self.designers], acting_user=self.iago)
+        do_change_channel_folder_group_based_setting(
+            self.folder, "can_access_group", everyone_designing, acting_user=self.iago
+        )
+        self.assert_json_success(self.api_get(self.cordelia, f"/api/v1/messages/{self.message_id}"))
+
+        remove_subgroups_from_user_group(
+            everyone_designing, [self.designers], acting_user=self.iago
+        )
+        self.assert_lost_access(self.cordelia)
+
+    def test_changing_role(self) -> None:
+        do_change_user_role(
+            self.hamlet, UserProfile.ROLE_REALM_ADMINISTRATOR, acting_user=None, notify=False
+        )
+        self.subscribe(self.hamlet, self.channel.name)
+
+        with self.capture_send_event_calls(expected_num_events=8) as events:
+            do_change_user_role(
+                self.hamlet, UserProfile.ROLE_MEMBER, acting_user=None, notify=False
+            )
+        hamlet_events = self.events_for(events, self.hamlet)
+        self.assertLess(
+            hamlet_events.index("stream/delete"), hamlet_events.index("channel_folder/remove")
+        )
+        self.assert_lost_access(self.hamlet)
+
+    def test_moving_channel_into_private_folder(self) -> None:
+        channel = self.make_stream("open plans")
+        self.subscribe(self.hamlet, channel.name)
+        self.subscribe(self.cordelia, channel.name)
+
+        with self.capture_send_event_calls(expected_num_events=6) as events:
+            do_change_stream_folder(channel, self.folder, acting_user=self.iago)
+        # The subscriber who cannot see the folder is unsubscribed, and
+        # the others who cannot see it any more are told.
+        self.assertNotIn(self.hamlet, self.users_subscribed_to_stream(channel.name, self.realm))
+        self.assertIn(self.cordelia, self.users_subscribed_to_stream(channel.name, self.realm))
+        self.assertEqual(
+            self.events_for(events, self.hamlet), ["subscription/remove", "stream/delete"]
+        )
+        othello = self.example_user("othello")
+        self.assertEqual(self.events_for(events, othello), ["stream/delete"])
+        self.assertEqual(
+            self.events_for(events, self.cordelia),
+            ["subscription/peer_remove", "stream/update", "stream/update"],
+        )
+
+        # Moving it out gives it back to everyone.
+        with self.capture_send_event_calls(expected_num_events=4) as events:
+            do_change_stream_folder(channel, None, acting_user=self.iago)
+        self.assertEqual(
+            self.events_for(events, othello), ["stream/create", "subscription/peer_add"]
         )

@@ -1,12 +1,13 @@
 from collections import defaultdict
-from collections.abc import Iterable
-from dataclasses import asdict
+from collections.abc import Collection, Iterable
+from dataclasses import asdict, dataclass
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
-from zerver.actions.streams import rename_stream_without_notice
+from zerver.actions.streams import bulk_remove_subscriptions, rename_stream_without_notice
 from zerver.lib.channel_folders import get_channel_folders_data, render_channel_folder_description
 from zerver.lib.event_types import (
     ChannelFolderAddEvent,
@@ -15,13 +16,18 @@ from zerver.lib.event_types import (
     ChannelFolderRemoveEvent,
     ChannelFolderReorderEvent,
     ChannelFolderUpdateEvent,
+    SubscriptionPeerAddEvent,
 )
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.stream_subscription import get_user_ids_for_streams
 from zerver.lib.streams import (
     bulk_can_access_stream_metadata_user_ids,
+    get_anonymous_group_membership_dict_for_streams,
     get_channel_folder_audience_user_ids,
     get_qualified_channel_name,
     get_short_channel_name,
+    send_stream_creation_event,
+    send_stream_deletion_event,
 )
 from zerver.lib.types import UserGroupMembersData
 from zerver.lib.user_groups import (
@@ -44,6 +50,134 @@ from zerver.models import (
 from zerver.models.groups import SystemGroups
 from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.tornado.django_api import send_event_on_commit
+
+
+@dataclass
+class ChannelFolderAudiences:
+    """Who could see some channel folders and their channels, before a
+    change that can change it.
+    """
+
+    realm: Realm
+    channel_folders: list[ChannelFolder]
+    folder_user_ids: dict[int, set[int]]
+    channels: list[Stream]
+    channel_user_ids: dict[int, set[int]]
+
+
+def get_channel_folder_audiences(
+    realm: Realm, channel_folders: Collection[ChannelFolder]
+) -> ChannelFolderAudiences:
+    channel_folders = list(channel_folders)
+    if len(channel_folders) == 0:
+        return ChannelFolderAudiences(realm, [], {}, [], {})
+    channels = list(Stream.objects.filter(folder__in=channel_folders).select_related("folder"))
+    return ChannelFolderAudiences(
+        realm=realm,
+        channel_folders=channel_folders,
+        folder_user_ids=get_channel_folder_audience_user_ids(channel_folders, realm.id),
+        channels=channels,
+        channel_user_ids=bulk_can_access_stream_metadata_user_ids(channels),
+    )
+
+
+def get_channel_folders_using_groups(
+    realm: Realm, group_ids: Collection[int]
+) -> list[ChannelFolder]:
+    return list(
+        ChannelFolder.objects.filter(realm=realm).filter(
+            Q(can_access_group_id__in=group_ids) | Q(can_administer_group_id__in=group_ids)
+        )
+    )
+
+
+def update_access_to_channel_folders(
+    old_audiences: ChannelFolderAudiences, *, acting_user: UserProfile | None
+) -> None:
+    """Tells users who became able or unable to see the folders, and
+    their channels. Users who can no longer see a folder are
+    unsubscribed from its channels, which also closes these channels in
+    their clients and stops delivering messages to them.
+    """
+    realm = old_audiences.realm
+    if len(old_audiences.channel_folders) == 0:
+        return
+
+    new_folder_user_ids = get_channel_folder_audience_user_ids(
+        old_audiences.channel_folders, realm.id
+    )
+    gained_folder_user_ids = {
+        folder_id: user_ids - old_audiences.folder_user_ids[folder_id]
+        for folder_id, user_ids in new_folder_user_ids.items()
+    }
+    lost_folder_user_ids = {
+        folder_id: old_audiences.folder_user_ids[folder_id] - user_ids
+        for folder_id, user_ids in new_folder_user_ids.items()
+    }
+
+    # Clients learn about a folder before the channels in it, and
+    # forget it after them.
+    for channel_folder in old_audiences.channel_folders:
+        if gained_folder_user_ids[channel_folder.id]:
+            send_channel_folder_add_event(channel_folder, gained_folder_user_ids[channel_folder.id])
+
+    unsubscribed: set[tuple[int, int]] = set()
+    channels_by_folder: dict[int, list[Stream]] = defaultdict(list)
+    for channel in old_audiences.channels:
+        assert channel.folder_id is not None
+        channels_by_folder[channel.folder_id].append(channel)
+    for folder_id, channels in channels_by_folder.items():
+        if lost_folder_user_ids[folder_id]:
+            removed, _not_subscribed = bulk_remove_subscriptions(
+                realm,
+                UserProfile.objects.filter(id__in=lost_folder_user_ids[folder_id]),
+                channels,
+                acting_user=acting_user,
+            )
+            unsubscribed |= {(user.id, channel.id) for user, channel in removed}
+
+    if old_audiences.channels:
+        new_channel_user_ids = bulk_can_access_stream_metadata_user_ids(old_audiences.channels)
+        subscriber_ids = get_user_ids_for_streams(
+            {channel.id for channel in old_audiences.channels}
+        )
+        anonymous_group_membership = get_anonymous_group_membership_dict_for_streams(
+            old_audiences.channels
+        )
+        for channel in old_audiences.channels:
+            old_user_ids = old_audiences.channel_user_ids[channel.id]
+            new_user_ids = new_channel_user_ids[channel.id]
+            # Unsubscribing already told those who were subscribed.
+            user_ids_losing_access = {
+                user_id
+                for user_id in old_user_ids - new_user_ids
+                if (user_id, channel.id) not in unsubscribed
+            }
+            if user_ids_losing_access:
+                send_stream_deletion_event(realm, user_ids_losing_access, [channel])
+            user_ids_gaining_access = new_user_ids - old_user_ids
+            if user_ids_gaining_access:
+                send_stream_creation_event(
+                    realm,
+                    channel,
+                    list(user_ids_gaining_access),
+                    anonymous_group_membership=anonymous_group_membership,
+                )
+                send_event_on_commit(
+                    realm,
+                    SubscriptionPeerAddEvent(
+                        stream_ids=[channel.id], user_ids=sorted(subscriber_ids[channel.id])
+                    ),
+                    user_ids_gaining_access,
+                )
+
+    for channel_folder in old_audiences.channel_folders:
+        if lost_folder_user_ids[channel_folder.id]:
+            send_event_on_commit(
+                realm,
+                ChannelFolderRemoveEvent(channel_folder_id=channel_folder.id),
+                lost_folder_user_ids[channel_folder.id],
+            )
 
 
 @transaction.atomic(durable=True)
@@ -264,9 +398,7 @@ def do_change_channel_folder_group_based_setting(
     old_user_group = getattr(channel_folder, setting_name)
     old_setting_api_value = get_group_setting_value_for_api(old_user_group)
     realm = acting_user.realm
-    old_audience_user_ids = get_channel_folder_audience_user_ids([channel_folder], realm.id)[
-        channel_folder.id
-    ]
+    old_audiences = get_channel_folder_audiences(realm, [channel_folder])
 
     if isinstance(new_setting_value, NamedUserGroup):
         user_group: UserGroup = new_setting_value
@@ -309,12 +441,7 @@ def do_change_channel_folder_group_based_setting(
             {setting_name: convert_to_user_group_members_dict(new_setting_api_value)}
         ),
     )
-    send_event_on_commit(realm, event, old_audience_user_ids & new_audience_user_ids)
-    if new_audience_user_ids - old_audience_user_ids:
-        send_channel_folder_add_event(channel_folder, new_audience_user_ids - old_audience_user_ids)
-    if old_audience_user_ids - new_audience_user_ids:
-        send_event_on_commit(
-            realm,
-            ChannelFolderRemoveEvent(channel_folder_id=channel_folder.id),
-            old_audience_user_ids - new_audience_user_ids,
-        )
+    send_event_on_commit(
+        realm, event, old_audiences.folder_user_ids[channel_folder.id] & new_audience_user_ids
+    )
+    update_access_to_channel_folders(old_audiences, acting_user=acting_user)

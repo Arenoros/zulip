@@ -7,6 +7,11 @@ from django.db import transaction
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
+from zerver.actions.channel_folders import (
+    get_channel_folder_audiences,
+    get_channel_folders_using_groups,
+    update_access_to_channel_folders,
+)
 from zerver.lib.event_types import (
     BaseEvent,
     Group,
@@ -363,9 +368,19 @@ def bulk_add_members_to_user_groups(
     supergroups = get_recursive_supergroups_union_for_groups(
         [user_group.id for user_group in user_groups]
     )
-    streams = list(
-        get_metadata_access_streams_via_group_ids([group.id for group in supergroups], realm)
+    # Channels in folders that use these groups are handled with the
+    # folders, since who can see them depends on who can see the folder.
+    old_folder_audiences = get_channel_folder_audiences(
+        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
     )
+    folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
+    streams = [
+        stream
+        for stream in get_metadata_access_streams_via_group_ids(
+            [group.id for group in supergroups], realm
+        )
+        if stream.id not in folder_channel_ids
+    ]
     old_stream_metadata_user_ids = bulk_can_access_stream_metadata_user_ids(streams)
     memberships = [
         UserGroupMembership(user_group_id=user_group.id, user_profile_id=user_id)
@@ -436,6 +451,8 @@ def bulk_add_members_to_user_groups(
             user_ids_gaining_metadata_access,
         )
 
+    update_access_to_channel_folders(old_folder_audiences, acting_user=acting_user)
+
 
 @transaction.atomic(savepoint=False)
 def bulk_remove_members_from_user_groups(
@@ -457,9 +474,19 @@ def bulk_remove_members_from_user_groups(
     supergroups = get_recursive_supergroups_union_for_groups(
         [user_group.id for user_group in user_groups]
     )
-    streams = list(
-        get_metadata_access_streams_via_group_ids([group.id for group in supergroups], realm)
+    # Channels in folders that use these groups are handled with the
+    # folders, since who can see them depends on who can see the folder.
+    old_folder_audiences = get_channel_folder_audiences(
+        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
     )
+    folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
+    streams = [
+        stream
+        for stream in get_metadata_access_streams_via_group_ids(
+            [group.id for group in supergroups], realm
+        )
+        if stream.id not in folder_channel_ids
+    ]
     old_stream_metadata_user_ids = bulk_can_access_stream_metadata_user_ids(streams)
 
     UserGroupMembership.objects.filter(
@@ -513,6 +540,8 @@ def bulk_remove_members_from_user_groups(
             [stream],
         )
 
+    update_access_to_channel_folders(old_folder_audiences, acting_user=acting_user)
+
 
 def do_send_subgroups_update_event(
     event_name: Literal["add_subgroups", "remove_subgroups"],
@@ -541,9 +570,19 @@ def add_subgroups_to_user_group(
 
     realm = user_group.realm
     supergroups = get_recursive_supergroups_union_for_groups([user_group.id])
-    streams = list(
-        get_metadata_access_streams_via_group_ids([group.id for group in supergroups], realm)
+    # Channels in folders that use these groups are handled with the
+    # folders, since who can see them depends on who can see the folder.
+    old_folder_audiences = get_channel_folder_audiences(
+        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
     )
+    folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
+    streams = [
+        stream
+        for stream in get_metadata_access_streams_via_group_ids(
+            [group.id for group in supergroups], realm
+        )
+        if stream.id not in folder_channel_ids
+    ]
     old_stream_metadata_user_ids = bulk_can_access_stream_metadata_user_ids(streams)
 
     group_memberships = [
@@ -621,6 +660,8 @@ def add_subgroups_to_user_group(
             user_ids_gaining_metadata_access,
         )
 
+    update_access_to_channel_folders(old_folder_audiences, acting_user=acting_user)
+
 
 @transaction.atomic(savepoint=False)
 def remove_subgroups_from_user_group(
@@ -634,9 +675,19 @@ def remove_subgroups_from_user_group(
 
     realm = user_group.realm
     supergroups = get_recursive_supergroups_union_for_groups([user_group.id])
-    streams = list(
-        get_metadata_access_streams_via_group_ids([group.id for group in supergroups], realm)
+    # Channels in folders that use these groups are handled with the
+    # folders, since who can see them depends on who can see the folder.
+    old_folder_audiences = get_channel_folder_audiences(
+        realm, get_channel_folders_using_groups(realm, [group.id for group in supergroups])
     )
+    folder_channel_ids = {channel.id for channel in old_folder_audiences.channels}
+    streams = [
+        stream
+        for stream in get_metadata_access_streams_via_group_ids(
+            [group.id for group in supergroups], realm
+        )
+        if stream.id not in folder_channel_ids
+    ]
     old_stream_metadata_user_ids = bulk_can_access_stream_metadata_user_ids(streams)
 
     GroupGroupMembership.objects.filter(supergroup=user_group, subgroup__in=subgroups).delete()
@@ -695,6 +746,8 @@ def remove_subgroups_from_user_group(
             list(user_ids_losing_metadata_access),
             [stream],
         )
+
+    update_access_to_channel_folders(old_folder_audiences, acting_user=acting_user)
 
 
 @transaction.atomic(savepoint=False)

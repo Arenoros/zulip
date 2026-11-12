@@ -1979,6 +1979,7 @@ def do_change_stream_folder(
     stream: Stream, folder: ChannelFolder | None, *, acting_user: UserProfile
 ) -> None:
     old_folder_id = stream.folder_id
+    old_user_ids = can_access_stream_metadata_user_ids(stream)
     new_name = get_channel_name_in_folder(stream, folder)
     stream.folder = folder
     stream.save(update_fields=["folder"])
@@ -1994,16 +1995,50 @@ def do_change_stream_folder(
         },
     )
 
+    # Subscribers who cannot see the new folder are unsubscribed, which
+    # also tells them that the channel is gone.
+    unsubscribed_user_ids: set[int] = set()
+    if folder is not None:
+        folder_user_ids = get_channel_folder_audience_user_ids([folder], stream.realm_id)[folder.id]
+        removed, _not_subscribed = bulk_remove_subscriptions(
+            stream.realm,
+            UserProfile.objects.filter(
+                id__in=get_user_ids_for_streams({stream.id})[stream.id] - folder_user_ids
+            ),
+            [stream],
+            acting_user=acting_user,
+        )
+        unsubscribed_user_ids = {user.id for user, _channel in removed}
+    new_user_ids = can_access_stream_metadata_user_ids(stream)
+
     event = StreamUpdateEvent(
         property="folder_id",
         value=stream.folder_id,
         stream_id=stream.id,
         name=stream.name,
     )
-    notify_user_ids = can_access_stream_metadata_user_ids(stream)
-    send_event_on_commit(stream.realm, event, notify_user_ids)
+    send_event_on_commit(stream.realm, event, old_user_ids & new_user_ids)
 
     if new_name != stream.name:
         rename_stream_without_notice(
-            stream, new_name, acting_user=acting_user, notify_user_ids=notify_user_ids
+            stream, new_name, acting_user=acting_user, notify_user_ids=old_user_ids & new_user_ids
+        )
+
+    user_ids_losing_access = old_user_ids - new_user_ids - unsubscribed_user_ids
+    if user_ids_losing_access:
+        send_stream_deletion_event(stream.realm, user_ids_losing_access, [stream])
+    if new_user_ids - old_user_ids:
+        send_stream_creation_event(
+            stream.realm,
+            stream,
+            list(new_user_ids - old_user_ids),
+            anonymous_group_membership=get_anonymous_group_membership_dict_for_streams([stream]),
+        )
+        send_event_on_commit(
+            stream.realm,
+            SubscriptionPeerAddEvent(
+                stream_ids=[stream.id],
+                user_ids=sorted(get_user_ids_for_streams({stream.id})[stream.id]),
+            ),
+            new_user_ids - old_user_ids,
         )

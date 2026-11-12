@@ -12,6 +12,10 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import get_language
 
+from zerver.actions.channel_folders import (
+    get_channel_folder_audiences,
+    update_access_to_channel_folders,
+)
 from zerver.actions.message_delete import (
     DeactivateUserActions,
     delete_deactivated_user_messages,
@@ -76,6 +80,7 @@ from zerver.lib.users import (
 )
 from zerver.lib.workplace_users import check_any_group_used_for_workplace_users_group
 from zerver.models import (
+    ChannelFolder,
     Draft,
     GroupGroupMembership,
     NamedUserGroup,
@@ -563,8 +568,13 @@ def send_stream_events_for_role_update(
         include_web_public=True,
     )
 
-    old_accessible_stream_ids = {stream.id for stream in old_accessible_streams}
-    current_accessible_stream_ids = {stream.id for stream in current_accessible_streams}
+    # Channels in folders are handled with their folders.
+    old_accessible_stream_ids = {
+        stream.id for stream in old_accessible_streams if stream.folder_id is None
+    }
+    current_accessible_stream_ids = {
+        stream.id for stream in current_accessible_streams if stream.folder_id is None
+    }
 
     now_accessible_stream_ids = current_accessible_stream_ids - old_accessible_stream_ids
     if now_accessible_stream_ids:
@@ -629,6 +639,10 @@ def do_change_user_role(
         user_profile,
         include_web_public=True,
         include_all=True,
+    )
+    # Organization administrators can see every channel folder.
+    old_folder_audiences = get_channel_folder_audiences(
+        user_profile.realm, ChannelFolder.objects.filter(realm_id=user_profile.realm_id)
     )
 
     user_profile.role = value
@@ -734,6 +748,7 @@ def do_change_user_role(
         ),
     )
 
+    update_access_to_channel_folders(old_folder_audiences, acting_user=acting_user)
     send_stream_events_for_role_update(user_profile, previously_accessible_streams)
 
 

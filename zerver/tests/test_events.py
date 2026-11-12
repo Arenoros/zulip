@@ -6079,6 +6079,46 @@ class ChannelFolderActionTest(BaseAction):
             )
         check_channel_folder_update("events[0]", events[0], {"can_access_group"})
 
+    def test_losing_and_gaining_access_to_channel_folder(self) -> None:
+        iago = self.example_user("iago")
+        realm = self.user_profile.realm
+        designers = check_add_user_group(realm, "designers", [self.user_profile], acting_user=iago)
+        channel_folder = check_add_channel_folder(realm, "Secret", "", acting_user=iago)
+        do_change_channel_folder_group_based_setting(
+            channel_folder, "can_access_group", designers, acting_user=iago
+        )
+        stream = self.make_stream("plans")
+        do_change_stream_folder(stream, channel_folder, acting_user=iago)
+        self.subscribe(self.user_profile, stream.name)
+
+        with self.verify_action(num_events=4) as events:
+            bulk_remove_members_from_user_groups(
+                [designers], [self.user_profile.id], acting_user=iago
+            )
+        check_subscription_remove("events[1]", events[1])
+        check_stream_delete("events[2]", events[2])
+        check_channel_folder_remove("events[3]", events[3])
+
+        with self.verify_action(num_events=4) as events:
+            bulk_add_members_to_user_groups([designers], [self.user_profile.id], acting_user=iago)
+        check_channel_folder_add("events[1]", events[1])
+        check_stream_create("events[2]", events[2])
+        check_subscription_peer_add("events[3]", events[3])
+
+        # A channel moved into a folder the user cannot see.
+        other_stream = self.make_stream("open plans")
+        self.subscribe(self.user_profile, other_stream.name)
+        do_change_channel_folder_group_based_setting(
+            channel_folder,
+            "can_access_group",
+            UserGroupMembersData(direct_members=[iago.id], direct_subgroups=[]),
+            acting_user=iago,
+        )
+        with self.verify_action(num_events=2) as events:
+            do_change_stream_folder(other_stream, channel_folder, acting_user=iago)
+        check_subscription_remove("events[0]", events[0])
+        check_stream_delete("events[1]", events[1])
+
     def test_channel_folders_reordering_event(self) -> None:
         frontend_folder = check_add_channel_folder(
             self.user_profile.realm,
