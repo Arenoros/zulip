@@ -6,8 +6,10 @@ from django.utils.translation import gettext as _
 from zerver.lib.exceptions import CannotAdministerChannelError, ChannelExistsError, JsonableError
 from zerver.lib.markdown import markdown_convert
 from zerver.lib.streams import (
+    get_channel_folder_access_query,
     get_short_channel_name,
     get_web_public_streams_queryset,
+    is_channel_folder_private,
     user_can_administer_channel_folder,
 )
 from zerver.lib.string_validation import check_string_is_printable
@@ -17,7 +19,7 @@ from zerver.lib.user_groups import (
     get_group_setting_value_for_register_api,
     get_members_and_subgroups_of_groups,
 )
-from zerver.models import ChannelFolder, Realm, Stream, UserGroup, UserProfile
+from zerver.models import ChannelFolder, DefaultStream, Realm, Stream, UserGroup, UserProfile
 from zerver.models.streams import bulk_get_streams
 
 
@@ -32,6 +34,7 @@ class ChannelFolderData:
     date_created: int
     is_archived: bool
     can_administer_group: int | UserGroupMembersDict
+    can_access_group: int | UserGroupMembersDict
 
 
 def check_channel_folder_name(name: str, realm: Realm) -> None:
@@ -106,6 +109,9 @@ def get_channel_folder_data(
         can_administer_group=get_group_setting_value_for_register_api(
             channel_folder.can_administer_group_id, anonymous_group_membership
         ),
+        can_access_group=get_group_setting_value_for_register_api(
+            channel_folder.can_access_group_id, anonymous_group_membership
+        ),
     )
 
 
@@ -119,10 +125,12 @@ def get_channel_folders_data(channel_folders: Collection[ChannelFolder]) -> list
     ]
 
 
-def get_channel_folders_in_realm(
-    realm: Realm, include_archived: bool = False
+def get_channel_folders_for_user(
+    user_profile: UserProfile, include_archived: bool = False
 ) -> list[ChannelFolderData]:
-    folders = ChannelFolder.objects.filter(realm=realm)
+    folders = ChannelFolder.objects.filter(realm_id=user_profile.realm_id).filter(
+        get_channel_folder_access_query(user_profile)
+    )
     if not include_archived:
         folders = folders.exclude(is_archived=True)
 
@@ -167,6 +175,28 @@ def check_can_move_channel_to_folder(
 
     if new_folder is not None and not user_can_administer_channel_folder(user_profile, new_folder):
         raise JsonableError(_("Insufficient permission"))
+
+
+def check_channel_can_be_in_folder(
+    channel_folder: ChannelFolder | None, *, is_web_public: bool, is_default_stream: bool
+) -> None:
+    """Channels that everyone can see cannot be in a private folder,
+    like they cannot be private channels.
+    """
+    if channel_folder is None or not (is_web_public or is_default_stream):
+        return
+    if not is_channel_folder_private(channel_folder):
+        return
+    if is_web_public:
+        raise JsonableError(_("Web-public channels cannot be in a private channel folder."))
+    raise JsonableError(_("Default channels cannot be in a private channel folder."))
+
+
+def check_channel_folder_can_be_private(channel_folder: ChannelFolder) -> None:
+    if Stream.objects.filter(folder=channel_folder, is_web_public=True).exists():
+        raise JsonableError(_("A channel folder with web-public channels cannot be private."))
+    if DefaultStream.objects.filter(stream__folder=channel_folder).exists():
+        raise JsonableError(_("A channel folder with default channels cannot be private."))
 
 
 def get_channel_folders_for_spectators(realm: Realm) -> list[ChannelFolderData]:

@@ -27,7 +27,17 @@ class ChannelFolder(models.Model):
     # to the administrators of the organization.
     can_administer_group = models.ForeignKey(UserGroup, on_delete=models.RESTRICT, related_name="+")
 
+    # Who can see the folder and the channels in it, in addition to
+    # its administrators and the administrators of the organization.
+    # A folder is private unless this is the role:everyone group.
+    can_access_group = models.ForeignKey(UserGroup, on_delete=models.RESTRICT, related_name="+")
+
     channel_folder_permission_group_settings = {
+        "can_access_group": GroupPermissionSetting(
+            allow_nobody_group=True,
+            allow_everyone_group=True,
+            default_group_name=SystemGroups.EVERYONE,
+        ),
         "can_administer_group": GroupPermissionSetting(
             allow_nobody_group=True,
             allow_everyone_group=False,

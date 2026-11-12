@@ -132,6 +132,7 @@ class ChannelFolderForChannelFolderAddEvent(BaseEventModel):
     creator_id: int | None
     is_archived: bool
     can_administer_group: int | UserGroupMembersDict
+    can_access_group: int | UserGroupMembersDict
 
 
 class ChannelFolderAddEvent(BaseEvent):
@@ -147,6 +148,13 @@ class ChannelFolderDataForUpdate(BaseEventModel):
     rendered_description: str | None = None
     is_archived: bool | None = None
     can_administer_group: int | UserGroupMembersDict | None = None
+    can_access_group: int | UserGroupMembersDict | None = None
+
+
+class ChannelFolderRemoveEvent(BaseEvent):
+    type: Literal["channel_folder"] = "channel_folder"
+    op: Literal["remove"] = "remove"
+    channel_folder_id: int
 
 
 class ChannelFolderReorderEvent(BaseEvent):

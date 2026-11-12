@@ -18,14 +18,16 @@ from zerver.actions.channel_folders import (
 from zerver.decorator import require_non_guest_user, require_realm_admin
 from zerver.lib.channel_folders import (
     access_channel_folder_for_administration,
+    check_channel_folder_can_be_private,
     check_channel_folder_in_use,
     check_channel_folder_name,
     check_channel_names_available_for_folder_name,
-    get_channel_folders_in_realm,
+    get_channel_folders_for_user,
 )
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.response import json_success
 from zerver.lib.typed_endpoint import PathOnly, typed_endpoint
+from zerver.lib.types import UserGroupMembersData
 from zerver.lib.user_groups import (
     GroupSettingChangeRequest,
     access_user_group_api_value_for_setting,
@@ -45,12 +47,29 @@ def create_channel_folder(
     request: HttpRequest,
     user_profile: UserProfile,
     *,
+    can_access_group: Json[int | UserGroupMembersData] | None = None,
     description: Annotated[str, StringConstraints(max_length=ChannelFolder.MAX_DESCRIPTION_LENGTH)],
     name: Annotated[str, StringConstraints(max_length=ChannelFolder.MAX_NAME_LENGTH)],
 ) -> HttpResponse:
     realm = user_profile.realm
     check_channel_folder_name(name, realm)
-    channel_folder = check_add_channel_folder(realm, name, description, acting_user=user_profile)
+    can_access_group_value = None
+    if can_access_group is not None:
+        can_access_group_value = access_user_group_api_value_for_setting(
+            can_access_group,
+            realm,
+            setting_name="can_access_group",
+            permission_configuration=ChannelFolder.channel_folder_permission_group_settings[
+                "can_access_group"
+            ],
+        )
+    channel_folder = check_add_channel_folder(
+        realm,
+        name,
+        description,
+        acting_user=user_profile,
+        can_access_group=can_access_group_value,
+    )
 
     return json_success(request, data={"channel_folder_id": channel_folder.id})
 
@@ -62,7 +81,7 @@ def get_channel_folders(
     *,
     include_archived: Json[bool] = False,
 ) -> HttpResponse:
-    channel_folders = get_channel_folders_in_realm(user_profile.realm, include_archived)
+    channel_folders = get_channel_folders_for_user(user_profile, include_archived)
     return json_success(
         request,
         data={"channel_folders": [asdict(folder) for folder in channel_folders]},
@@ -86,6 +105,7 @@ def update_channel_folder(
     request: HttpRequest,
     user_profile: UserProfile,
     *,
+    can_access_group: Json[GroupSettingChangeRequest] | None = None,
     can_administer_group: Json[GroupSettingChangeRequest] | None = None,
     channel_folder_id: PathOnly[int],
     description: Annotated[
@@ -138,6 +158,12 @@ def update_channel_folder(
         if validate_group_setting_value_change(
             current_setting_api_value, new_setting_value, expected_current_setting_value
         ):
+            if (
+                setting_name == "can_access_group"
+                and new_setting_value
+                != get_system_user_group_by_name(SystemGroups.EVERYONE, user_profile.realm_id).id
+            ):
+                check_channel_folder_can_be_private(channel_folder)
             with transaction.atomic(durable=True):
                 user_group_api_value_for_setting = access_user_group_api_value_for_setting(
                     new_setting_value,

@@ -50,7 +50,11 @@ from zerver.decorator import (
     require_non_guest_user,
     require_realm_admin,
 )
-from zerver.lib.channel_folders import check_can_move_channel_to_folder, get_channel_folder_by_id
+from zerver.lib.channel_folders import (
+    check_can_move_channel_to_folder,
+    check_channel_can_be_in_folder,
+    get_channel_folder_by_id,
+)
 from zerver.lib.default_streams import get_default_stream_ids_for_realm
 from zerver.lib.email_mirror_helpers import encode_email_address, get_channel_email_token
 from zerver.lib.exceptions import (
@@ -176,6 +180,7 @@ def add_default_stream(
     (stream, _sub) = access_stream_by_id(user_profile, stream_id)
     if stream.invite_only:
         raise JsonableError(_("Private channels cannot be made default."))
+    check_channel_can_be_in_folder(stream.folder, is_web_public=False, is_default_stream=True)
     do_add_default_stream(stream)
     return json_success(request)
 
@@ -305,6 +310,11 @@ def change_stream_folder(
         new_name = get_channel_name_in_folder(stream, folder)
         if new_name.lower() != stream.name.lower():
             check_stream_name_available(user_profile.realm, new_name)
+        check_channel_can_be_in_folder(
+            folder,
+            is_web_public=stream.is_web_public,
+            is_default_stream=stream.id in get_default_stream_ids_for_realm(stream.realm_id),
+        )
     do_change_stream_folder(stream, folder, acting_user=user_profile)
 
 
@@ -397,6 +407,13 @@ def update_stream_backend(
     # Ensure that a stream cannot be both a default stream for new users and private
     if proposed_is_private and proposed_is_default_stream:
         raise JsonableError(_("A default channel cannot be private."))
+
+    if is_web_public is not None or is_default_stream is not None:
+        check_channel_can_be_in_folder(
+            stream.folder,
+            is_web_public=proposed_is_web_public,
+            is_default_stream=proposed_is_default_stream,
+        )
 
     # Ensure that a moderation request channel isn't set to public.
     if not proposed_is_private and user_profile.realm.moderation_request_channel == stream:
@@ -738,6 +755,9 @@ def create_channel(
     folder: ChannelFolder | None = None
     if folder_id is not None:
         folder = get_channel_folder_by_id(folder_id, realm)
+    check_channel_can_be_in_folder(
+        folder, is_web_public=is_web_public, is_default_stream=is_default_stream
+    )
 
     name = check_and_qualify_new_channel_name(name, folder)
     check_stream_name_available(realm, name)
@@ -896,6 +916,9 @@ def add_subscriptions_backend(
     folder: ChannelFolder | None = None
     if folder_id is not None:
         folder = get_channel_folder_by_id(folder_id, realm)
+    check_channel_can_be_in_folder(
+        folder, is_web_public=is_web_public, is_default_stream=is_default_stream
+    )
 
     if default_push_notifications and not user_profile.is_realm_admin:
         raise JsonableError(_("Insufficient permission"))

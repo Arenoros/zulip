@@ -26,7 +26,7 @@ from zerver.lib.avatar import avatar_url
 from zerver.lib.bot_config import load_bot_config_template
 from zerver.lib.channel_folders import (
     get_channel_folders_for_spectators,
-    get_channel_folders_in_realm,
+    get_channel_folders_for_user,
 )
 from zerver.lib.compatibility import is_outdated_server
 from zerver.lib.default_streams import get_default_stream_ids_for_realm
@@ -864,7 +864,7 @@ def fetch_initial_state_data(
             ]
         else:
             state["channel_folders"] = [
-                asdict(folder) for folder in get_channel_folders_in_realm(user_profile.realm, True)
+                asdict(folder) for folder in get_channel_folders_for_user(user_profile, True)
             ]
 
     if want("update_message_flags") and want("message"):
@@ -2048,6 +2048,12 @@ def apply_event(
             for channel_folder in state["channel_folders"]:
                 if channel_folder["id"] == event["channel_folder_id"]:
                     channel_folder.update(event["data"])
+        elif event["op"] == "remove":
+            state["channel_folders"] = [
+                channel_folder
+                for channel_folder in state["channel_folders"]
+                if channel_folder["id"] != event["channel_folder_id"]
+            ]
         elif event["op"] == "reorder":
             order_mapping = {_[1]: _[0] for _ in enumerate(event["order"])}
             for channel_folder in state["channel_folders"]:

@@ -167,6 +167,14 @@ export function dispatch_normal_event(event) {
                     }
                     settings_folders.update_folder_row(event);
                     break;
+                case "remove":
+                    channel_folders.remove(event.channel_folder_id);
+                    inbox_ui.complete_rerender();
+                    recent_view_ui.complete_rerender();
+                    stream_list.update_streams_sidebar();
+                    settings_folders.populate_channel_folders();
+                    stream_ui_updates.update_folder_dropdown_visibility();
+                    break;
                 case "reorder":
                     channel_folders.reorder(event.order);
                     stream_list.update_streams_sidebar();

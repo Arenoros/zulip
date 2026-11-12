@@ -29,6 +29,7 @@ import * as stream_data from "./stream_data.ts";
 import type {StreamSubscription} from "./sub_store.ts";
 import type {GroupSettingPillContainer} from "./typeahead_helper.ts";
 import * as ui_report from "./ui_report.ts";
+import * as user_groups from "./user_groups.ts";
 import * as util from "./util.ts";
 
 let channel_folder_stream_list_widget: ListWidgetType<StreamSubscription> | undefined;
@@ -77,6 +78,7 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
                             direct_members: [people.my_current_user_id()],
                             direct_subgroups: [],
                         },
+                        can_access_group: user_groups.get_user_group_from_name("role:everyone")!.id,
                     };
                     channel_folders.add(channel_folder);
                     on_create?.(id);

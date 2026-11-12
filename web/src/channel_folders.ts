@@ -37,6 +37,13 @@ export function add(channel_folder: ChannelFolder): void {
     }
 }
 
+export function remove(folder_id: number): void {
+    const channel_folder = get_channel_folder_by_id(folder_id);
+    channel_folder_name_dict.delete(channel_folder.name);
+    channel_folder_by_id_dict.delete(folder_id);
+    active_channel_folder_ids.delete(folder_id);
+}
+
 export function initialize(params: StateData["channel_folders"]): void {
     channel_folder_name_dict = new FoldDict();
     channel_folder_by_id_dict = new Map<number, ChannelFolder>();
@@ -138,6 +145,10 @@ export function update(event: ChannelFolderUpdateEvent): void {
 
     if (event.data.can_administer_group !== undefined) {
         get_channel_folder_by_id(folder_id).can_administer_group = event.data.can_administer_group;
+    }
+
+    if (event.data.can_access_group !== undefined) {
+        get_channel_folder_by_id(folder_id).can_access_group = event.data.can_access_group;
     }
 }
 

@@ -7002,9 +7002,14 @@ paths:
                             - type: object
                               additionalProperties: false
                               description: |
-                                Event sent to users in an organization when a channel folder is created.
+                                Event sent to the users who can see a channel folder when it
+                                is created, and to users who become able to see it.
 
-                                **Changes**: New in Zulip 11.0 (feature level 389).
+                                **Changes**: Before Zulip 13.0 (feature level ZF-d1a7c3),
+                                this event was sent to every user when a channel folder was
+                                created, and only then.
+
+                                New in Zulip 11.0 (feature level 389).
                               properties:
                                 id:
                                   $ref: "#/components/schemas/EventIdSchema"
@@ -7038,15 +7043,20 @@ paths:
                                           "direct_members": [9],
                                           "direct_subgroups": [],
                                         },
+                                      "can_access_group": 2,
                                     },
                                   "id": 0,
                                 }
                             - type: object
                               additionalProperties: false
                               description: |
-                                Event sent to users in an organization when a channel folder is updated.
+                                Event sent to the users who can see a channel folder when it
+                                is updated.
 
-                                **Changes**: New in Zulip 11.0 (feature level 389).
+                                **Changes**: Before Zulip 13.0 (feature level ZF-d1a7c3),
+                                this event was sent to every user.
+
+                                New in Zulip 11.0 (feature level 389).
                               properties:
                                 id:
                                   $ref: "#/components/schemas/EventIdSchema"
@@ -7100,6 +7110,15 @@ paths:
                                             the channel folder. Only present if it changed.
 
                                             **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
+                                    can_access_group:
+                                      allOf:
+                                        - $ref: "#/components/schemas/GroupSettingValue"
+                                        - description: |
+                                            The new [group-setting value](/api/group-setting-values)
+                                            defining the set of users who can see the channel
+                                            folder. Only present if it changed.
+
+                                            **Changes**: New in Zulip 13.0 (feature level ZF-d1a7c3).
                               example:
                                 {
                                   "type": "channel_folder",
@@ -7110,9 +7129,14 @@ paths:
                             - type: object
                               additionalProperties: false
                               description: |
-                                Event sent to users in an organization when channel folders are reordered.
+                                Event sent to users in an organization when channel folders are
+                                reordered. The order contains only the channel folders the user
+                                can see.
 
-                                **Changes**: New in Zulip 11.0 (feature level 418).
+                                **Changes**: Before Zulip 13.0 (feature level ZF-d1a7c3), the
+                                order contained every channel folder.
+
+                                New in Zulip 11.0 (feature level 418).
                               properties:
                                 id:
                                   $ref: "#/components/schemas/EventIdSchema"
@@ -7136,6 +7160,36 @@ paths:
                                   "type": "channel_folder",
                                   "op": "reorder",
                                   "order": [3, 1, 2],
+                                  "id": 0,
+                                }
+                            - type: object
+                              additionalProperties: false
+                              description: |
+                                Event sent to users who can no longer see a channel folder.
+                                Clients should remove the channel folder.
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-d1a7c3).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - channel_folder
+                                op:
+                                  type: string
+                                  enum:
+                                    - remove
+                                channel_folder_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the channel folder.
+                              example:
+                                {
+                                  "type": "channel_folder",
+                                  "op": "remove",
+                                  "channel_folder_id": 2,
                                   "id": 0,
                                 }
                       queue_id:
@@ -25488,6 +25542,9 @@ paths:
                     this parameter does not require permission to administer the
                     channel that is in a channel folder, only access to its metadata.
 
+                    Web-public channels and default channels cannot be moved
+                    to a private channel folder.
+
                     Moving a channel renames it, since the name of a channel
                     includes the name of its channel folder. The request fails if
                     another channel has the name that the channel would get.
@@ -27519,6 +27576,13 @@ paths:
         organization administrators could create channel folders.
 
         New in Zulip 11.0 (feature level 389).
+      x-curl-examples-parameters:
+        oneOf:
+          - type: include
+            parameters:
+              enum:
+                - name
+                - description
       requestBody:
         required: true
         content:
@@ -27553,8 +27617,22 @@ paths:
                     folder is desired.
                   type: string
                   example: Channels for marketing.
+                can_access_group:
+                  allOf:
+                    - $ref: "#/components/schemas/GroupSettingValue"
+                    - description: |
+                        A [group-setting value](/api/group-setting-values) defining
+                        the set of users who can see the channel folder and the
+                        channels in it. Defaults to the `role:everyone` system
+                        group, which makes the channel folder public.
+
+                        **Changes**: New in Zulip 13.0 (feature level ZF-d1a7c3).
+                      example: 2
               required:
                 - name
+            encoding:
+              can_access_group:
+                contentType: application/json
       responses:
         "200":
           description: |
@@ -27658,6 +27736,7 @@ paths:
                               "name": "Frontend",
                               "is_archived": false,
                               "can_administer_group": 12,
+                              "can_access_group": 2,
                             },
                             {
                               "description": "Channels for **backend** discussions",
@@ -27669,6 +27748,11 @@ paths:
                               "is_archived": false,
                               "can_administer_group":
                                 {"direct_members": [1], "direct_subgroups": []},
+                              "can_access_group":
+                                {
+                                  "direct_members": [1],
+                                  "direct_subgroups": [13],
+                                },
                             },
                           ],
                       }
@@ -27819,8 +27903,25 @@ paths:
                           "old": 15,
                         }
                     - $ref: "#/components/schemas/GroupSettingValueUpdate"
+                can_access_group:
+                  allOf:
+                    - description: |
+                        The set of users who can see the channel folder and the
+                        channels in it, expressed as an [update to a group-setting
+                        value][update-group-setting].
+
+                        A channel folder with web-public channels or default
+                        channels cannot be made private.
+
+                        [update-group-setting]: /api/group-setting-values#updating-group-setting-values
+
+                        **Changes**: New in Zulip 13.0 (feature level ZF-d1a7c3).
+                      example: {"new": 2, "old": 15}
+                    - $ref: "#/components/schemas/GroupSettingValueUpdate"
             encoding:
               can_administer_group:
+                contentType: application/json
+              can_access_group:
                 contentType: application/json
       responses:
         "200":
@@ -31646,6 +31747,25 @@ components:
                 listed here. Guests cannot administer channel folders.
 
                 **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
+
+                [setting-values]: /api/group-setting-values
+        can_access_group:
+          allOf:
+            - $ref: "#/components/schemas/GroupSettingValue"
+            - description: |
+                A [group-setting value][setting-values] defining the set of users
+                who can see this channel folder and the channels in it. Each
+                channel in the folder is further limited by its own permissions.
+
+                A channel folder is private unless this is the `role:everyone`
+                system group. The administrators of the channel folder and
+                organization administrators can see it without being listed
+                here. Users receive channel folders they cannot see neither in
+                [`POST /register`](/api/register-queue) nor in
+                [`GET /channel_folders`](/api/get-channel-folders).
+
+                **Changes**: New in Zulip 13.0 (feature level ZF-d1a7c3).
+                Previously, every channel folder was visible to everyone.
 
                 [setting-values]: /api/group-setting-values
     JsonResponseBase:

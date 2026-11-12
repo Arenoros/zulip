@@ -7,8 +7,10 @@ from zerver.actions.channel_folders import (
     check_add_channel_folder,
     do_archive_channel_folder,
     do_change_channel_folder_group_based_setting,
+    do_change_channel_folder_name,
     try_reorder_realm_channel_folders,
 )
+from zerver.actions.default_streams import do_add_default_stream
 from zerver.actions.streams import (
     do_change_stream_folder,
     do_change_stream_group_based_setting,
@@ -1086,3 +1088,188 @@ class ChannelNamesInFoldersTest(ZulipTestCase):
         self.assertEqual(self.support_folder.name, "Help")
         general.refresh_from_db()
         self.assertEqual(general.name, "Help/General")
+
+
+class PrivateChannelFoldersTest(ZulipTestCase):
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.iago = self.example_user("iago")
+        self.realm = self.iago.realm
+        self.cordelia = self.example_user("cordelia")
+        self.hamlet = self.example_user("hamlet")
+        self.othello = self.example_user("othello")
+        self.polonius = self.example_user("polonius")
+        self.folder = check_add_channel_folder(self.realm, "Secret", "", acting_user=self.iago)
+
+    def set_folder_setting(self, setting_name: str, users: list[UserProfile]) -> None:
+        do_change_channel_folder_group_based_setting(
+            self.folder,
+            setting_name,
+            UserGroupMembersData(direct_members=[user.id for user in users], direct_subgroups=[]),
+            acting_user=self.iago,
+        )
+
+    def visible_folder_ids(self, user: UserProfile) -> list[int]:
+        result = self.api_get(user, "/api/v1/channel_folders")
+        return [folder["id"] for folder in self.assert_json_success(result)["channel_folders"]]
+
+    def audience_ids(self) -> set[int]:
+        realm_admins = {self.iago.id, self.example_user("desdemona").id}
+        return realm_admins | {self.cordelia.id, self.polonius.id}
+
+    def test_creating_private_folder(self) -> None:
+        self.login_user(self.hamlet)
+        params = {
+            "name": "Design",
+            "description": "",
+            "can_access_group": orjson.dumps(
+                {"direct_members": [self.cordelia.id], "direct_subgroups": []}
+            ).decode(),
+        }
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            result = self.client_post("/json/channel_folders/create", params)
+        folder = ChannelFolder.objects.get(id=self.assert_json_success(result)["channel_folder_id"])
+        self.assertEqual(
+            list(folder.can_access_group.direct_members.values_list("id", flat=True)),
+            [self.cordelia.id],
+        )
+        # The creator sees the folder as its administrator.
+        self.assertEqual(
+            set(events[0]["users"]),
+            {self.iago.id, self.example_user("desdemona").id, self.cordelia.id, self.hamlet.id},
+        )
+
+        moderators = NamedUserGroup.objects.get(
+            name=SystemGroups.MODERATORS, realm_for_sharding=self.realm, is_system_group=True
+        )
+        params = {
+            "name": "Moderation",
+            "description": "",
+            "can_access_group": orjson.dumps(moderators.id).decode(),
+        }
+        result = self.client_post("/json/channel_folders/create", params)
+        folder = ChannelFolder.objects.get(id=self.assert_json_success(result)["channel_folder_id"])
+        self.assertEqual(folder.can_access_group_id, moderators.id)
+
+        # Folders are public by default.
+        result = self.client_post(
+            "/json/channel_folders/create", {"name": "Open", "description": ""}
+        )
+        folder = ChannelFolder.objects.get(id=self.assert_json_success(result)["channel_folder_id"])
+        self.assertEqual(folder.can_access_group.named_user_group.name, SystemGroups.EVERYONE)
+
+    def test_who_can_see_private_folder(self) -> None:
+        self.set_folder_setting("can_access_group", [self.cordelia, self.polonius])
+        self.set_folder_setting("can_administer_group", [self.othello])
+
+        # Those allowed, including guests, administrators of the folder
+        # and administrators of the organization see the folder.
+        for user in [self.cordelia, self.polonius, self.othello, self.iago]:
+            self.assertIn(self.folder.id, self.visible_folder_ids(user))
+        for user in [self.hamlet, self.example_user("prospero")]:
+            self.assertNotIn(self.folder.id, self.visible_folder_ids(user))
+
+        # Guests cannot see a folder by administering it.
+        self.set_folder_setting("can_administer_group", [self.othello, self.polonius])
+        self.set_folder_setting("can_access_group", [self.cordelia])
+        self.assertNotIn(self.folder.id, self.visible_folder_ids(self.polonius))
+
+        # Those who cannot see a folder cannot change it either.
+        result = self.api_patch(
+            self.hamlet, f"/api/v1/channel_folders/{self.folder.id}", {"name": "Public"}
+        )
+        self.assert_json_error(result, "Insufficient permission")
+
+    def test_events_for_private_folder(self) -> None:
+        self.set_folder_setting("can_access_group", [self.cordelia, self.polonius])
+
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            do_change_channel_folder_name(self.folder, "Hidden", acting_user=self.iago)
+        self.assertEqual(set(events[0]["users"]), self.audience_ids())
+
+        other_folder = check_add_channel_folder(self.realm, "Open", "", acting_user=self.iago)
+        all_folder_ids = list(
+            ChannelFolder.objects.filter(realm=self.realm)
+            .order_by("-id")
+            .values_list("id", flat=True)
+        )
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            try_reorder_realm_channel_folders(self.realm, all_folder_ids)
+        orders = {tuple(event["event"]["order"]): set(event["users"]) for event in events}
+        self.assertEqual(orders[tuple(all_folder_ids)], self.audience_ids())
+        visible_order = tuple(
+            folder_id for folder_id in all_folder_ids if folder_id != self.folder.id
+        )
+        self.assertIn(self.hamlet.id, orders[visible_order])
+        self.assertIn(other_folder.id, visible_order)
+
+    def test_channels_everyone_can_see_cannot_be_in_private_folder(self) -> None:
+        self.login_user(self.iago)
+        web_public = self.make_stream("public news", is_web_public=True)
+        do_change_stream_folder(web_public, self.folder, acting_user=self.iago)
+        params = {
+            "can_access_group": orjson.dumps(
+                {"new": {"direct_members": [self.cordelia.id], "direct_subgroups": []}}
+            ).decode()
+        }
+        result = self.client_patch(f"/json/channel_folders/{self.folder.id}", params)
+        self.assert_json_error(
+            result, "A channel folder with web-public channels cannot be private."
+        )
+
+        do_change_stream_folder(web_public, None, acting_user=self.iago)
+        default_channel = self.make_stream("welcome")
+        do_add_default_stream(default_channel)
+        do_change_stream_folder(default_channel, self.folder, acting_user=self.iago)
+        result = self.client_patch(f"/json/channel_folders/{self.folder.id}", params)
+        self.assert_json_error(result, "A channel folder with default channels cannot be private.")
+
+        do_change_stream_folder(default_channel, None, acting_user=self.iago)
+        self.assert_json_success(
+            self.client_patch(f"/json/channel_folders/{self.folder.id}", params)
+        )
+
+        # Nor can such channels be put in the private folder.
+        folder_id = orjson.dumps(self.folder.id).decode()
+        for channel, error in [
+            (web_public, "Web-public channels cannot be in a private channel folder."),
+            (default_channel, "Default channels cannot be in a private channel folder."),
+        ]:
+            result = self.client_patch(f"/json/streams/{channel.id}", {"folder_id": folder_id})
+            self.assert_json_error(result, error)
+
+        result = self.create_channel_via_post(
+            self.iago,
+            name="announcements",
+            is_web_public=True,
+            extra_post_data={"folder_id": folder_id},
+        )
+        self.assert_json_error(result, "Web-public channels cannot be in a private channel folder.")
+        result = self.subscribe_via_post(
+            self.iago,
+            ["announcements"],
+            {"folder_id": folder_id, "is_default_stream": "true"},
+            allow_fail=True,
+        )
+        self.assert_json_error(result, "Default channels cannot be in a private channel folder.")
+
+        # A channel in the private folder cannot become one.
+        channel = self.make_stream("plans")
+        do_change_stream_folder(channel, self.folder, acting_user=self.iago)
+        result = self.client_patch(
+            f"/json/streams/{channel.id}", {"is_web_public": "true", "is_private": "false"}
+        )
+        self.assert_json_error(result, "Web-public channels cannot be in a private channel folder.")
+        result = self.client_patch(f"/json/streams/{channel.id}", {"is_default_stream": "true"})
+        self.assert_json_error(result, "Default channels cannot be in a private channel folder.")
+        result = self.client_post("/json/default_streams", {"stream_id": channel.id})
+        self.assert_json_error(result, "Default channels cannot be in a private channel folder.")
+
+        # All of this is fine in a public folder.
+        public_folder = check_add_channel_folder(self.realm, "Open", "", acting_user=self.iago)
+        result = self.client_patch(
+            f"/json/streams/{web_public.id}",
+            {"folder_id": orjson.dumps(public_folder.id).decode()},
+        )
+        self.assert_json_success(result)

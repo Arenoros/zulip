@@ -183,7 +183,14 @@ exports.fixtures = {
             creator_id: 10,
             is_archived: false,
             can_administer_group: {direct_members: [10], direct_subgroups: []},
+            can_access_group: 2,
         },
+    },
+
+    channel_folder__remove: {
+        type: "channel_folder",
+        op: "remove",
+        channel_folder_id: 1,
     },
 
     channel_folder__reorder: {
@@ -202,6 +209,7 @@ exports.fixtures = {
             rendered_description: "<p>Channels for new frontend discussions</p>",
             is_archived: true,
             can_administer_group: 3,
+            can_access_group: {direct_members: [10], direct_subgroups: []},
         },
     },
 

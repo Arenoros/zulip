@@ -192,6 +192,7 @@ from zerver.lib.event_schema import (
     check_call_ring,
     check_call_rings,
     check_channel_folder_add,
+    check_channel_folder_remove,
     check_channel_folder_reorder,
     check_channel_folder_update,
     check_custom_profile_fields,
@@ -6033,6 +6034,50 @@ class ChannelFolderActionTest(BaseAction):
                 acting_user=iago,
             )
         check_channel_folder_update("events[0]", events[0], {"can_administer_group"})
+
+    def test_channel_folder_access_events(self) -> None:
+        iago = self.example_user("iago")
+        channel_folder = check_add_channel_folder(
+            self.user_profile.realm, "Frontend", "", acting_user=iago
+        )
+        moderators_group = NamedUserGroup.objects.get(
+            name=SystemGroups.MODERATORS, realm_for_sharding=self.user_profile.realm
+        )
+
+        # Users who can no longer see the folder are told to remove it.
+        with self.verify_action() as events:
+            do_change_channel_folder_group_based_setting(
+                channel_folder, "can_access_group", moderators_group, acting_user=iago
+            )
+        check_channel_folder_remove("events[0]", events[0])
+        self.assertEqual(events[0]["channel_folder_id"], channel_folder.id)
+
+        # Users who become able to see the folder get all of it.
+        with self.verify_action() as events:
+            do_change_channel_folder_group_based_setting(
+                channel_folder,
+                "can_access_group",
+                UserGroupMembersData(
+                    direct_members=[self.user_profile.id],
+                    direct_subgroups=[moderators_group.id],
+                ),
+                acting_user=iago,
+            )
+        check_channel_folder_add("events[0]", events[0])
+        self.assertEqual(
+            events[0]["channel_folder"]["can_access_group"],
+            {"direct_members": [self.user_profile.id], "direct_subgroups": [moderators_group.id]},
+        )
+
+        # Users who can still see the folder get the new setting.
+        with self.verify_action() as events:
+            do_change_channel_folder_group_based_setting(
+                channel_folder,
+                "can_access_group",
+                UserGroupMembersData(direct_members=[self.user_profile.id], direct_subgroups=[]),
+                acting_user=iago,
+            )
+        check_channel_folder_update("events[0]", events[0], {"can_access_group"})
 
     def test_channel_folders_reordering_event(self) -> None:
         frontend_folder = check_add_channel_folder(

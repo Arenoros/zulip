@@ -305,6 +305,7 @@ export const channel_folder_schema = z.object({
     is_archived: z.boolean(),
     order: z.number(),
     can_administer_group: group_setting_value_schema,
+    can_access_group: group_setting_value_schema,
 });
 
 export const navigation_view_schema = z.object({

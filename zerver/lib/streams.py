@@ -1543,6 +1543,66 @@ def user_can_administer_channel_folder(
     )
 
 
+def get_channel_folder_access_query(user_profile: UserProfile) -> Q:
+    """A filter for the channel folders the user can see, in the same
+    query.
+    """
+    if user_profile.is_realm_admin:
+        return Q()
+
+    group_ids = get_recursive_membership_groups(user_profile).values("id")
+    query = Q(can_access_group__in=group_ids)
+    if not user_profile.is_guest:
+        query |= Q(can_administer_group__in=group_ids)
+    return query
+
+
+def get_channel_folder_audience_user_ids(
+    channel_folders: Collection[ChannelFolder], realm_id: int
+) -> dict[int, set[int]]:
+    """The active users who can see each of the channel folders."""
+    group_ids = {channel_folder.can_access_group_id for channel_folder in channel_folders} | {
+        channel_folder.can_administer_group_id for channel_folder in channel_folders
+    }
+    # A group can be a subgroup of several of these groups, so map
+    # each subgroup to every root it is reachable from.
+    subgroup_root_ids_dict: dict[int, set[int]] = defaultdict(set)
+    for group in get_root_id_annotated_recursive_subgroups_for_groups(group_ids, realm_id):
+        subgroup_root_ids_dict[group.id].add(group.root_id)  # type: ignore[attr-defined]  # root_id is an annotated field.
+
+    group_members_dict: dict[int, set[int]] = defaultdict(set)
+    guest_ids = set()
+    for user_group_id, user_profile_id, role in UserGroupMembership.objects.filter(
+        user_group_id__in=list(subgroup_root_ids_dict), user_profile__is_active=True
+    ).values_list("user_group_id", "user_profile_id", "user_profile__role"):
+        if role == UserProfile.ROLE_GUEST:
+            guest_ids.add(user_profile_id)
+        for root_id in subgroup_root_ids_dict[user_group_id]:
+            group_members_dict[root_id].add(user_profile_id)
+
+    realm_admin_ids = set(
+        UserProfile.objects.filter(
+            realm_id=realm_id,
+            is_active=True,
+            role__in=[UserProfile.ROLE_REALM_OWNER, UserProfile.ROLE_REALM_ADMINISTRATOR],
+        ).values_list("id", flat=True)
+    )
+
+    # Guests cannot administer channel folders.
+    return {
+        channel_folder.id: realm_admin_ids
+        | group_members_dict[channel_folder.can_access_group_id]
+        | (group_members_dict[channel_folder.can_administer_group_id] - guest_ids)
+        for channel_folder in channel_folders
+    }
+
+
+def is_channel_folder_private(channel_folder: ChannelFolder) -> bool:
+    return not NamedUserGroup.objects.filter(
+        id=channel_folder.can_access_group_id, name=SystemGroups.EVERYONE, is_system_group=True
+    ).exists()
+
+
 def get_metadata_access_streams(
     user_profile: UserProfile,
     streams: Collection[Stream],

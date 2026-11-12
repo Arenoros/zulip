@@ -657,6 +657,7 @@ run_test("channel_folders", ({override}) => {
         );
         assert.equal(folders[0].is_archived, event.data.is_archived);
         assert.equal(folders[0].can_administer_group, event.data.can_administer_group);
+        assert.equal(folders[0].can_access_group, event.data.can_access_group);
     }
 
     event = event_fixtures.channel_folder__reorder;
@@ -693,6 +694,24 @@ run_test("channel_folders", ({override}) => {
         // new order is [2, 3, 1]
         assert.equal(folder_1.order, 0);
         assert.equal(folder_2.order, 1);
+    }
+
+    event = event_fixtures.channel_folder__remove;
+    {
+        const stub = make_stub();
+        override(stream_list, "update_streams_sidebar", stub.f);
+        override(stream_ui_updates, "update_folder_dropdown_visibility", stub.f);
+
+        dispatch(event);
+
+        assert.equal(stub.num_calls, 2);
+        assert.deepEqual(
+            channel_folders
+                .get_channel_folders(true)
+                .map((folder) => folder.id)
+                .toSorted(),
+            [2, 3],
+        );
     }
 
     blueslip.expect("error", "Unexpected event type channel_folder/other");

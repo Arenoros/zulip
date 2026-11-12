@@ -72,6 +72,7 @@ from zerver.lib.types import UserGroupMembersData
 from zerver.lib.user_groups import UserGroupMembershipDetails, get_group_setting_value_for_api
 from zerver.models import (
     Attachment,
+    ChannelFolder,
     DefaultStream,
     DefaultStreamGroup,
     Message,
@@ -3183,9 +3184,12 @@ class StreamAdminTest(ZulipTestCase):
         self.assertIsNone(stream.folder_id)
 
         # Test invalid value.
+        missing_folder_id = (
+            ChannelFolder.objects.order_by("-id").values_list("id", flat=True)[0] + 1
+        )
         result = self.client_patch(
             f"/json/streams/{stream.id}",
-            {"folder_id": orjson.dumps(99).decode()},
+            {"folder_id": orjson.dumps(missing_folder_id).decode()},
         )
         self.assert_json_error(result, "Invalid channel folder ID")
 

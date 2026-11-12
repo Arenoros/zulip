@@ -27,6 +27,7 @@ from zerver.lib.event_types import (
     CallRingEvent,
     CallRingsEvent,
     ChannelFolderAddEvent,
+    ChannelFolderRemoveEvent,
     ChannelFolderReorderEvent,
     ChannelFolderUpdateEvent,
     CustomProfileFieldsEvent,
@@ -179,6 +180,7 @@ check_call_missed_seen = make_checker(CallMissedSeenEvent)
 check_call_ring = make_checker(CallRingEvent)
 check_call_rings = make_checker(CallRingsEvent)
 check_channel_folder_add = make_checker(ChannelFolderAddEvent)
+check_channel_folder_remove = make_checker(ChannelFolderRemoveEvent)
 check_channel_folder_reorder = make_checker(ChannelFolderReorderEvent)
 check_custom_profile_fields = make_checker(CustomProfileFieldsEvent)
 check_default_stream_groups = make_checker(DefaultStreamGroupsEvent)
