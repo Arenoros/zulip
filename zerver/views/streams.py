@@ -50,7 +50,7 @@ from zerver.decorator import (
     require_non_guest_user,
     require_realm_admin,
 )
-from zerver.lib.channel_folders import get_channel_folder_by_id
+from zerver.lib.channel_folders import check_can_move_channel_to_folder, get_channel_folder_by_id
 from zerver.lib.default_streams import get_default_stream_ids_for_realm
 from zerver.lib.email_mirror_helpers import encode_email_address, get_channel_email_token
 from zerver.lib.exceptions import (
@@ -72,6 +72,7 @@ from zerver.lib.streams import (
     access_stream_by_name,
     access_stream_for_delete_or_update_requiring_metadata_access,
     access_stream_for_send_message,
+    access_stream_to_change_folder,
     access_web_public_stream,
     channel_events_topic_name,
     check_channel_creation_permissions,
@@ -284,6 +285,23 @@ TopicsPolicy = Annotated[
 ]
 
 
+def change_stream_folder(
+    user_profile: UserProfile,
+    stream: Stream,
+    folder_id: int | None,
+    *,
+    can_administer_channel: bool,
+) -> None:
+    folder: ChannelFolder | None = None
+    if folder_id is not None:
+        folder = get_channel_folder_by_id(folder_id, user_profile.realm)
+    if folder_id != stream.folder_id:
+        check_can_move_channel_to_folder(
+            user_profile, stream, folder, can_administer_channel=can_administer_channel
+        )
+    do_change_stream_folder(stream, folder, acting_user=user_profile)
+
+
 @typed_endpoint
 def update_stream_backend(
     request: HttpRequest,
@@ -313,6 +331,17 @@ def update_stream_backend(
     stream_id: PathOnly[int],
     topics_policy: TopicsPolicy = None,
 ) -> HttpResponse:
+    if not isinstance(folder_id, MissingType) and {*request.GET, *request.POST} == {"folder_id"}:
+        # Moving a channel does not require administering it, unlike
+        # everything else here. To keep it that way for parameters
+        # added later, this only applies to requests with nothing else
+        # in them, whether this endpoint knows the parameter or not.
+        stream, can_administer_channel = access_stream_to_change_folder(user_profile, stream_id)
+        change_stream_folder(
+            user_profile, stream, folder_id, can_administer_channel=can_administer_channel
+        )
+        return json_success(request)
+
     # Most settings updates only require metadata access, not content
     # access. We will check for content access further when and where
     # required.
@@ -467,10 +496,7 @@ def update_stream_backend(
         do_rename_stream(stream, new_name, user_profile)
 
     if not isinstance(folder_id, MissingType):
-        folder: ChannelFolder | None = None
-        if folder_id is not None:
-            folder = get_channel_folder_by_id(folder_id, user_profile.realm)
-        do_change_stream_folder(stream, folder, acting_user=user_profile)
+        change_stream_folder(user_profile, stream, folder_id, can_administer_channel=True)
 
     nobody_group = system_groups_name_dict[SystemGroups.NOBODY]
     request_settings_dict = locals()

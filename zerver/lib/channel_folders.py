@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from django.utils.translation import gettext as _
 
-from zerver.lib.exceptions import JsonableError
+from zerver.lib.exceptions import CannotAdministerChannelError, JsonableError
 from zerver.lib.markdown import markdown_convert
 from zerver.lib.streams import get_web_public_streams_queryset
 from zerver.lib.string_validation import check_string_is_printable
@@ -137,6 +137,29 @@ def access_channel_folder_for_administration(
     if not user_can_administer_channel_folder(user_profile, channel_folder):
         raise JsonableError(_("Insufficient permission"))
     return channel_folder
+
+
+def check_can_move_channel_to_folder(
+    user_profile: UserProfile,
+    channel: Stream,
+    new_folder: ChannelFolder | None,
+    *,
+    can_administer_channel: bool,
+) -> None:
+    """Moving a channel is up to the administrators of the folders it
+    moves between, since they decide what is in their folders. A
+    channel that is in no folder is moved by those who administer the
+    channel.
+    """
+    old_folder = channel.folder
+    if old_folder is None:
+        if not can_administer_channel:
+            raise CannotAdministerChannelError
+    elif not user_can_administer_channel_folder(user_profile, old_folder):
+        raise JsonableError(_("Insufficient permission"))
+
+    if new_folder is not None and not user_can_administer_channel_folder(user_profile, new_folder):
+        raise JsonableError(_("Insufficient permission"))
 
 
 def get_channel_folders_for_spectators(realm: Realm) -> list[ChannelFolderData]:

@@ -3,7 +3,10 @@ from typing import TypedDict
 import orjson
 from typing_extensions import override
 
-from zerver.actions.channel_folders import check_add_channel_folder
+from zerver.actions.channel_folders import (
+    check_add_channel_folder,
+    do_change_channel_folder_group_based_setting,
+)
 from zerver.actions.realm_settings import (
     do_change_realm_permission_group_setting,
     do_set_realm_property,
@@ -929,6 +932,12 @@ class ChannelAdministerPermissionTest(ZulipTestCase):
 
         channel_folder = check_add_channel_folder(
             self.realm, "Frontend", "", acting_user=self.admin
+        )
+        # Moving a channel into a folder also requires administering
+        # the folder, which is tested separately; let every member do
+        # that here.
+        do_change_channel_folder_group_based_setting(
+            channel_folder, "can_administer_group", self.members_group, acting_user=self.admin
         )
 
         for stream in [public_stream, private_stream]:

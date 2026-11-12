@@ -25455,7 +25455,19 @@ paths:
                     A `null` value indicates the user wants to remove the channel from its
                     current channel folder.
 
-                    **Changes**: New in Zulip 11.0 (feature level 389).
+                    Moving a channel requires permission to administer the channel
+                    folder it is in and the channel folder it is moved to. Moving a
+                    channel that is in no channel folder requires permission to
+                    administer the channel instead.
+
+                    Unlike the other parameters of this endpoint, a request with only
+                    this parameter does not require permission to administer the
+                    channel that is in a channel folder, only access to its metadata.
+
+                    **Changes**: Before Zulip 13.0 (feature level ZF-9d40b3), permission
+                    to administer the channel was required and sufficient to move it.
+
+                    New in Zulip 11.0 (feature level 389).
                   type: integer
                   nullable: true
                   example: 1

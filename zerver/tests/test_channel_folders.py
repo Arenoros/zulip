@@ -6,12 +6,18 @@ from typing_extensions import override
 from zerver.actions.channel_folders import (
     check_add_channel_folder,
     do_archive_channel_folder,
+    do_change_channel_folder_group_based_setting,
     try_reorder_realm_channel_folders,
 )
-from zerver.actions.streams import do_change_stream_folder, do_deactivate_stream
+from zerver.actions.streams import (
+    do_change_stream_folder,
+    do_change_stream_group_based_setting,
+    do_deactivate_stream,
+)
 from zerver.actions.user_groups import check_add_user_group
 from zerver.lib.test_classes import ZulipTestCase
-from zerver.models import ChannelFolder, NamedUserGroup, RealmAuditLog
+from zerver.lib.types import UserGroupMembersData
+from zerver.models import ChannelFolder, NamedUserGroup, RealmAuditLog, Stream, UserProfile
 from zerver.models.groups import SystemGroups
 from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.models.realms import get_realm
@@ -626,6 +632,176 @@ class ChannelFolderAdministratorsTest(ChannelFoldersTestCase):
         do_archive_channel_folder(frontend_folder, acting_user=iago)
         do_archive_channel_folder(backend_folder, acting_user=iago)
         result = self.client_post(f"/json/user_groups/{leadership_group.id}/deactivate")
+        self.assert_json_success(result)
+
+
+class MoveChannelBetweenFoldersTest(ZulipTestCase):
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.realm = get_realm("zulip")
+        self.hamlet = self.example_user("hamlet")
+        self.cordelia = self.example_user("cordelia")
+        self.othello = self.example_user("othello")
+        # Hamlet and Cordelia each administer a folder, and Othello
+        # administers a channel that is in no folder.
+        self.design_folder = check_add_channel_folder(
+            self.realm, "Design", "", acting_user=self.hamlet
+        )
+        self.research_folder = check_add_channel_folder(
+            self.realm, "Research", "", acting_user=self.cordelia
+        )
+        self.channel = self.make_channel_administered_by_othello("sketches")
+        self.url = f"/json/streams/{self.channel.id}"
+
+    def make_channel_administered_by_othello(self, name: str, invite_only: bool = False) -> Stream:
+        channel = self.make_stream(name, invite_only=invite_only)
+        do_change_stream_group_based_setting(
+            channel,
+            "can_administer_channel_group",
+            UserGroupMembersData(direct_members=[self.othello.id], direct_subgroups=[]),
+            acting_user=self.othello,
+        )
+        return channel
+
+    def move_channel(
+        self, user: UserProfile, folder: ChannelFolder | None, **extra: str
+    ) -> "TestHttpResponse":
+        self.login_user(user)
+        folder_id = None if folder is None else folder.id
+        return self.client_patch(self.url, {"folder_id": orjson.dumps(folder_id).decode(), **extra})
+
+    def assert_channel_folder(self, folder: ChannelFolder | None) -> None:
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.folder, folder)
+
+    def set_folder_administrators(self, folder: ChannelFolder, users: list[UserProfile]) -> None:
+        do_change_channel_folder_group_based_setting(
+            folder,
+            "can_administer_group",
+            UserGroupMembersData(direct_members=[user.id for user in users], direct_subgroups=[]),
+            acting_user=self.example_user("iago"),
+        )
+
+    def test_moving_channel_into_folder(self) -> None:
+        # Administering the folder is not enough to move a channel
+        # that is in no folder into it.
+        result = self.move_channel(self.hamlet, self.design_folder)
+        self.assert_json_error(result, "You do not have permission to administer this channel.")
+
+        # Administering the channel is not enough either.
+        result = self.move_channel(self.othello, self.design_folder)
+        self.assert_json_error(result, "Insufficient permission")
+        self.assert_channel_folder(None)
+
+        self.set_folder_administrators(self.design_folder, [self.hamlet, self.othello])
+        result = self.move_channel(self.othello, self.design_folder)
+        self.assert_json_success(result)
+        self.assert_channel_folder(self.design_folder)
+
+    def test_moving_channel_between_folders(self) -> None:
+        do_change_stream_folder(self.channel, self.design_folder, acting_user=self.othello)
+
+        # Moving a channel takes administering both folders, and not
+        # the channel.
+        for user in [self.hamlet, self.cordelia, self.othello]:
+            result = self.move_channel(user, self.research_folder)
+            self.assert_json_error(result, "Insufficient permission")
+        self.assert_channel_folder(self.design_folder)
+
+        self.set_folder_administrators(self.research_folder, [self.cordelia, self.hamlet])
+        result = self.move_channel(self.hamlet, self.research_folder)
+        self.assert_json_success(result)
+        self.assert_channel_folder(self.research_folder)
+
+        # Organization administrators administer every folder.
+        result = self.move_channel(self.example_user("iago"), self.design_folder)
+        self.assert_json_success(result)
+        self.assert_channel_folder(self.design_folder)
+
+    def test_moving_channel_out_of_folder(self) -> None:
+        do_change_stream_folder(self.channel, self.design_folder, acting_user=self.othello)
+
+        # Administering the channel is not enough to move it out of
+        # its folder.
+        result = self.move_channel(self.othello, None)
+        self.assert_json_error(result, "Insufficient permission")
+        result = self.move_channel(self.cordelia, None)
+        self.assert_json_error(result, "Insufficient permission")
+        self.assert_channel_folder(self.design_folder)
+
+        # An administrator of the folder can move the channel out of
+        # it without administering the channel.
+        result = self.move_channel(self.hamlet, None)
+        self.assert_json_success(result)
+        self.assert_channel_folder(None)
+
+    def test_moving_channel_with_other_changes(self) -> None:
+        do_change_stream_folder(self.channel, self.design_folder, acting_user=self.othello)
+
+        # Administering the folder of a channel allows nothing but
+        # moving the channel.
+        for extra in [{"description": "Changed"}, {"unknown_parameter": "value"}]:
+            result = self.move_channel(self.hamlet, None, **extra)
+            self.assert_json_error(result, "You do not have permission to administer this channel.")
+        self.login_user(self.hamlet)
+        result = self.client_patch(
+            f"{self.url}?description=Changed", {"folder_id": orjson.dumps(None).decode()}
+        )
+        self.assert_json_error(result, "You do not have permission to administer this channel.")
+        self.assert_channel_folder(self.design_folder)
+        self.assertEqual(self.channel.description, "")
+
+        # Those who administer the channel still need to administer
+        # its folder to move it together with another change.
+        result = self.move_channel(self.othello, None, description="Changed")
+        self.assert_json_error(result, "Insufficient permission")
+        self.assert_channel_folder(self.design_folder)
+
+        self.set_folder_administrators(self.design_folder, [self.othello])
+        result = self.move_channel(self.othello, None, description="Changed")
+        self.assert_json_success(result)
+        self.assert_channel_folder(None)
+        self.assertEqual(self.channel.description, "Changed")
+
+    def test_moving_channel_without_access_to_it(self) -> None:
+        private_channel = self.make_channel_administered_by_othello("secret", invite_only=True)
+        self.subscribe(self.othello, private_channel.name)
+        do_change_stream_folder(private_channel, self.design_folder, acting_user=self.othello)
+
+        # An administrator of a folder cannot move a channel that they
+        # cannot see out of it.
+        self.login_user(self.hamlet)
+        result = self.client_patch(
+            f"/json/streams/{private_channel.id}", {"folder_id": orjson.dumps(None).decode()}
+        )
+        self.assert_json_error(result, "Invalid channel ID")
+        result = self.client_patch(
+            "/json/streams/999999", {"folder_id": orjson.dumps(None).decode()}
+        )
+        self.assert_json_error(result, "Invalid channel ID")
+        private_channel.refresh_from_db()
+        self.assertEqual(private_channel.folder, self.design_folder)
+
+        self.subscribe(self.hamlet, private_channel.name)
+        result = self.client_patch(
+            f"/json/streams/{private_channel.id}", {"folder_id": orjson.dumps(None).decode()}
+        )
+        self.assert_json_success(result)
+        private_channel.refresh_from_db()
+        self.assertIsNone(private_channel.folder)
+
+    def test_keeping_channel_in_its_folder(self) -> None:
+        do_change_stream_folder(self.channel, self.design_folder, acting_user=self.othello)
+
+        # Asking for the folder the channel is already in is not a move.
+        result = self.move_channel(self.othello, self.design_folder, description="Changed")
+        self.assert_json_success(result)
+        self.assert_channel_folder(self.design_folder)
+
+        result = self.move_channel(self.hamlet, self.research_folder)
+        self.assert_json_error(result, "Insufficient permission")
+        result = self.move_channel(self.hamlet, self.design_folder)
         self.assert_json_success(result)
 
 

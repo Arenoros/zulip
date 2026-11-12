@@ -913,6 +913,41 @@ def access_stream_for_delete_or_update_requiring_metadata_access(
     return (stream, sub)
 
 
+def access_stream_to_change_folder(
+    user_profile: UserProfile, stream_id: int
+) -> tuple[Stream, bool]:
+    """Returns the channel, and whether the user can administer it.
+
+    Unlike for other changes to a channel, administering the channel
+    is not required here, because the administrators of the folder
+    of a channel can move it too. The caller checks who can move it.
+    """
+    error = _("Invalid channel ID")
+    try:
+        stream = Stream.objects.select_related("folder").get(
+            id=stream_id, realm_id=user_profile.realm_id
+        )
+    except Stream.DoesNotExist:
+        raise JsonableError(error)
+
+    if user_profile.is_realm_admin:
+        return stream, True
+
+    assert stream.recipient_id is not None
+    is_subscribed = Subscription.objects.filter(
+        user_profile=user_profile, recipient_id=stream.recipient_id, active=True
+    ).exists()
+    if not user_has_metadata_access(
+        user_profile,
+        stream,
+        UserGroupMembershipDetails(user_recursive_group_ids=None),
+        is_subscribed=is_subscribed,
+    ):
+        raise JsonableError(error)
+
+    return stream, can_administer_accessible_channel(stream, user_profile)
+
+
 def has_metadata_access_to_channel_via_groups(
     user_profile: UserProfile,
     user_recursive_group_ids: set[int],
