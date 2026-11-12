@@ -360,6 +360,7 @@ def json_change_settings(
         Json[int], check_int_in_validator(UserProfile.WEB_CHANNEL_DEFAULT_VIEW_CHOICES)
     ]
     | None = None,
+    web_direct_message_bubbles: Json[bool] | None = None,
     web_escape_navigates_to_home_view: Json[bool] | None = None,
     web_font_size_px: Json[int] | None = None,
     web_home_view: Annotated[str, check_string_in_validator(web_home_view_options)] | None = None,

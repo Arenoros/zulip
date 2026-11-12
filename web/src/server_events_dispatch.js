@@ -1037,6 +1037,7 @@ export function dispatch_normal_event(event) {
                 "user_list_style",
                 "web_animate_image_previews",
                 "web_channel_default_view",
+                "web_direct_message_bubbles",
                 "web_escape_navigates_to_home_view",
                 "web_home_view",
                 "web_mark_read_on_scroll_policy",

@@ -799,6 +799,7 @@ def update_realm_user_settings_defaults(
         Annotated[int, check_int_in_validator(UserProfile.WEB_CHANNEL_DEFAULT_VIEW_CHOICES)]
     ]
     | None = None,
+    web_direct_message_bubbles: Json[bool] | None = None,
     web_escape_navigates_to_home_view: Json[bool] | None = None,
     web_font_size_px: Json[int] | None = None,
     web_home_view: Literal["recent", "inbox", "all_messages"] | None = None,

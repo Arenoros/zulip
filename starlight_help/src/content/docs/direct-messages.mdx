@@ -5,6 +5,7 @@ title: Direct messages
 import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
 
 import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import NavigationSteps from "../../components/NavigationSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import DmFeedInstructions from "../include/_DmFeedInstructions.mdx";
 import FindDmConversationLeftSidebar from "../include/_FindDmConversationLeftSidebar.mdx";
@@ -168,6 +169,23 @@ Deleting a section does not delete the conversations in it.
       1. Click on the **ellipsis** (<MoreVerticalIcon />).
       1. Click **Rename section** or **Delete section**.
     </Steps>
+  </TabItem>
+</Tabs>
+
+## Show direct messages as chat bubbles
+
+By default, the Zulip web and desktop apps show 1:1 and group DM conversations
+as chat bubbles, with your own messages on the right and messages from others
+on the left. The [direct message feed](#go-to-direct-message-feed) and channels
+are not shown as bubbles.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <NavigationSteps target="settings/preferences" />
+
+      1. Under **Information**, toggle **Show direct messages as chat bubbles**.
+    </FlattenedSteps>
   </TabItem>
 </Tabs>
 

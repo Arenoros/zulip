@@ -1356,6 +1356,13 @@ exports.fixtures = {
         value: 1,
     },
 
+    user_settings__web_direct_message_bubbles: {
+        type: "user_settings",
+        op: "update",
+        property: "web_direct_message_bubbles",
+        value: false,
+    },
+
     user_settings__web_escape_navigates_to_home_view: {
         type: "user_settings",
         op: "update",

@@ -75,6 +75,15 @@
       show_reset_button=for_realm_settings}}
 
     {{> settings_checkbox
+      setting_name="web_direct_message_bubbles"
+      is_checked=settings_object.web_direct_message_bubbles
+      label=settings_label.web_direct_message_bubbles
+      render_only=settings_render_only.web_direct_message_bubbles
+      help_link="/help/direct-messages#show-direct-messages-as-chat-bubbles"
+      prefix=prefix
+      show_reset_button=for_realm_settings}}
+
+    {{> settings_checkbox
       setting_name="web_inbox_show_channel_folders"
       is_checked=settings_object.web_inbox_show_channel_folders
       label=settings_label.web_inbox_show_channel_folders

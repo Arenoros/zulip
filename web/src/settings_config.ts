@@ -681,6 +681,7 @@ export const preferences_settings_labels = {
     ),
     receives_typing_notifications: $t({defaultMessage: "Show when other users are typing"}),
     starred_message_counts: $t({defaultMessage: "Show counts for starred messages"}),
+    web_direct_message_bubbles: $t({defaultMessage: "Show direct messages as chat bubbles"}),
     web_inbox_show_channel_folders: $t({
         defaultMessage: "Group channels by folder in the inbox",
     }),

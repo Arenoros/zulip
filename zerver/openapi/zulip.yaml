@@ -16339,6 +16339,15 @@ paths:
                     called `default_view`, which was new in Zulip 4.0 (feature level 42).
                   type: string
                   example: all_messages
+                web_direct_message_bubbles:
+                  description: |
+                    Whether the web app shows [direct message
+                    conversations](/help/direct-messages#show-direct-messages-as-chat-bubbles)
+                    as chat bubbles.
+
+                    **Changes**: New in Zulip 13.0 (feature level ZF-8b8939).
+                  type: boolean
+                  example: true
                 web_escape_navigates_to_home_view:
                   description: |
                     Whether the escape key navigates to the
@@ -16773,6 +16782,8 @@ paths:
               translate_emoticons:
                 contentType: application/json
               display_emoji_reaction_users:
+                contentType: application/json
+              web_direct_message_bubbles:
                 contentType: application/json
               web_escape_navigates_to_home_view:
                 contentType: application/json
@@ -20560,6 +20571,14 @@ paths:
 
                               New in Zulip 8.0 (feature level 219). Previously, this was
                               called `default_view`, which was new in Zulip 4.0 (feature level 42).
+                          web_direct_message_bubbles:
+                            type: boolean
+                            description: |
+                              Whether the web app shows [direct message
+                              conversations](/help/direct-messages#show-direct-messages-as-chat-bubbles)
+                              as chat bubbles.
+
+                              **Changes**: New in Zulip 13.0 (feature level ZF-8b8939).
                           web_escape_navigates_to_home_view:
                             type: boolean
                             description: |
@@ -23013,6 +23032,14 @@ paths:
 
                               New in Zulip 8.0 (feature level 219). Previously, this was
                               called `default_view`, which was new in Zulip 4.0 (feature level 42).
+                          web_direct_message_bubbles:
+                            type: boolean
+                            description: |
+                              Whether the web app shows [direct message
+                              conversations](/help/direct-messages#show-direct-messages-as-chat-bubbles)
+                              as chat bubbles.
+
+                              **Changes**: New in Zulip 13.0 (feature level ZF-8b8939).
                           web_escape_navigates_to_home_view:
                             type: boolean
                             description: |
@@ -24368,6 +24395,15 @@ paths:
                     Unnecessary JSON-encoding of this parameter was removed in Zulip 4.0 (feature level 64).
                   type: string
                   example: all_messages
+                web_direct_message_bubbles:
+                  description: |
+                    Whether the web app shows [direct message
+                    conversations](/help/direct-messages#show-direct-messages-as-chat-bubbles)
+                    as chat bubbles.
+
+                    **Changes**: New in Zulip 13.0 (feature level ZF-8b8939).
+                  type: boolean
+                  example: true
                 web_escape_navigates_to_home_view:
                   description: |
                     Whether the escape key navigates to the
@@ -24900,6 +24936,8 @@ paths:
               translate_emoticons:
                 contentType: application/json
               display_emoji_reaction_users:
+                contentType: application/json
+              web_direct_message_bubbles:
                 contentType: application/json
               web_escape_navigates_to_home_view:
                 contentType: application/json

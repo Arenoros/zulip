@@ -300,6 +300,10 @@ class UserBaseSettings(models.Model):
     # of the Zulip web app.
     web_inbox_show_channel_folders = models.BooleanField(default=True, db_default=True)
 
+    # UI setting to show direct message conversations in the Zulip
+    # web app as chat bubbles.
+    web_direct_message_bubbles = models.BooleanField(default=True, db_default=True)
+
     # Who in the organization has access to users' actual email
     # addresses.  Controls whether the UserProfile.email field is
     # the same as UserProfile.delivery_email, or is instead a fake
@@ -382,6 +386,7 @@ class UserBaseSettings(models.Model):
         user_list_style=int,
         web_animate_image_previews=str,
         web_channel_default_view=int,
+        web_direct_message_bubbles=bool,
         web_escape_navigates_to_home_view=bool,
         web_font_size_px=int,
         web_home_view=str,

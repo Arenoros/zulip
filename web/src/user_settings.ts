@@ -75,6 +75,7 @@ export const user_settings_schema = z.object({
     user_list_style: z.number(),
     web_animate_image_previews: z.enum(["always", "on_hover", "never"]),
     web_channel_default_view: z.number(),
+    web_direct_message_bubbles: z.boolean(),
     web_escape_navigates_to_home_view: z.boolean(),
     web_font_size_px: z.number(),
     web_home_view: z.enum(["inbox", "recent", "all_messages"]),

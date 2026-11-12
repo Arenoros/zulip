@@ -1341,6 +1341,11 @@ run_test("user_settings", ({override}) => {
     assert.equal(called_create_initial_sidebar_rows, true);
     assert.equal(called_update_streams_sidebar, true);
 
+    event = event_fixtures.user_settings__web_direct_message_bubbles;
+    override(user_settings, "web_direct_message_bubbles", true);
+    dispatch(event);
+    assert_same(user_settings.web_direct_message_bubbles, false);
+
     event = event_fixtures.user_settings__web_font_size_px;
     override(user_settings, "web_font_size_px", 14);
     assert_same(event.value, 16);
