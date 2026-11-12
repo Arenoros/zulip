@@ -25,12 +25,19 @@ from zerver.actions.message_send import internal_send_private_message
 from zerver.actions.realm_icon import do_change_icon_source
 from zerver.actions.realm_logo import do_change_logo_source
 from zerver.actions.realm_settings import do_change_realm_plan_type, do_set_realm_property
-from zerver.actions.user_settings import do_scrub_avatar_images
+from zerver.actions.user_settings import (
+    do_change_full_name,
+    do_scrub_avatar_images,
+    set_avatar_to_default,
+)
 from zerver.lib.attachments import validate_attachment_request
 from zerver.lib.avatar import (
     DEFAULT_AVATAR_FILE,
+    INITIALS_AVATAR_COLORS,
     avatar_url,
+    generate_avatar_initials,
     get_avatar_field,
+    get_avatar_initials,
     get_static_avatar_url,
 )
 from zerver.lib.cache import cache_delete, cache_get, get_realm_used_upload_space_cache_key
@@ -45,6 +52,7 @@ from zerver.lib.test_helpers import (
     get_test_image_file,
     ratelimit_rule,
 )
+from zerver.lib.thumbnail import DEFAULT_AVATAR_SIZE, MEDIUM_AVATAR_SIZE
 from zerver.lib.upload import MAX_FILE_NAME_LENGTH, sanitize_name, upload_message_attachment
 from zerver.lib.upload.base import ZulipUploadBackend
 from zerver.lib.upload.local import LocalUploadBackend
@@ -1675,6 +1683,86 @@ class AvatarTest(UploadSerializeMixin, ZulipTestCase):
         self.assertFalse(os.path.isfile(avatar_path_id))
         self.assertFalse(os.path.isfile(avatar_original_path_id))
         self.assertFalse(os.path.isfile(avatar_medium_path_id))
+
+    def test_get_avatar_initials(self) -> None:
+        self.assertEqual(get_avatar_initials("King Hamlet"), "KH")
+        self.assertEqual(get_avatar_initials("Иванов Игорь Петрович"), "ИИ")
+        self.assertEqual(get_avatar_initials("aaron"), "AA")
+        self.assertEqual(get_avatar_initials("x"), "X")
+        # Only letters count in a name of one word.
+        self.assertEqual(get_avatar_initials("r2d2"), "RD")
+        # Words that do not start with a letter are skipped.
+        self.assertEqual(get_avatar_initials("Иванов Игорь (ОТК)"), "ИИ")
+        self.assertEqual(get_avatar_initials("Polonius (guest)"), "PO")
+        self.assertEqual(get_avatar_initials("😀 Zoe"), "ZO")
+        self.assertEqual(get_avatar_initials("ßeta tester"), "ST")
+        self.assertEqual(get_avatar_initials("123 456"), "?")
+
+    def test_initials_avatar(self) -> None:
+        """
+        In a realm whose default avatar source is initials, a new user
+        gets a picture of their initials, which follows their name.
+        """
+        realm = get_realm("zulip")
+        do_set_realm_property(
+            realm, "default_avatar_source", Realm.AVATAR_FROM_INITIALS, acting_user=None
+        )
+
+        user = do_create_user("jerry@zulip.com", "password", realm, "Jerry Mouse", acting_user=None)
+        self.assertEqual(user.avatar_source, UserProfile.AVATAR_FROM_INITIALS)
+        self.assertEqual(
+            avatar_url(user),
+            get_avatar_field(
+                user_id=user.id,
+                realm_id=realm.id,
+                email=user.delivery_email,
+                avatar_source=UserProfile.AVATAR_FROM_USER,
+                avatar_version=1,
+                medium=False,
+                client_gravatar=True,
+            ),
+        )
+
+        background = INITIALS_AVATAR_COLORS[user.id % len(INITIALS_AVATAR_COLORS)][0]
+        for medium, size in [(False, DEFAULT_AVATAR_SIZE), (True, MEDIUM_AVATAR_SIZE)]:
+            with open(avatar_disk_path(user, medium=medium), "rb") as f:
+                image_data = f.read()
+            self.assertEqual(image_data, generate_avatar_initials("Jerry Mouse", user.id, medium))
+            image = pyvips.Image.new_from_buffer(image_data, "")
+            self.assertEqual((image.width, image.height), (size, size))
+            self.assertEqual(image(0, 0)[:3], list(bytes.fromhex(background[1:])))
+
+        # Renaming the user redraws the picture under a new version.
+        with self.capture_send_event_calls(expected_num_events=2) as events:
+            do_change_full_name(user, "Tom Cat", acting_user=None, notify=False)
+        self.assertEqual(events[0]["event"]["person"]["full_name"], "Tom Cat")
+        self.assertEqual(
+            events[1]["event"]["person"]["avatar_source"], UserProfile.AVATAR_FROM_INITIALS
+        )
+        self.assertEqual(events[1]["event"]["person"]["avatar_version"], 2)
+        user.refresh_from_db()
+        self.assertEqual(user.avatar_source, UserProfile.AVATAR_FROM_INITIALS)
+        self.assertEqual(user.avatar_version, 2)
+        with open(avatar_disk_path(user), "rb") as f:
+            self.assertEqual(f.read(), generate_avatar_initials("Tom Cat", user.id, medium=False))
+
+        # A user with another kind of picture keeps it when renamed.
+        hamlet = self.example_user("hamlet")
+        self.assertEqual(hamlet.avatar_source, UserProfile.AVATAR_FROM_JDENTICON)
+        do_change_full_name(hamlet, "Prince Hamlet", acting_user=None, notify=False)
+        hamlet.refresh_from_db()
+        self.assertEqual(hamlet.avatar_source, UserProfile.AVATAR_FROM_JDENTICON)
+        self.assertEqual(hamlet.avatar_version, 1)
+
+        # Resetting a picture to the default draws the initials.
+        set_avatar_to_default(hamlet, acting_user=None)
+        hamlet.refresh_from_db()
+        self.assertEqual(hamlet.avatar_source, UserProfile.AVATAR_FROM_INITIALS)
+        self.assertEqual(hamlet.avatar_version, 2)
+        with open(avatar_disk_path(hamlet), "rb") as f:
+            self.assertEqual(
+                f.read(), generate_avatar_initials("Prince Hamlet", hamlet.id, medium=False)
+            )
 
     def test_avatar_empty_content_type(self) -> None:
         """

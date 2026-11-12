@@ -3,6 +3,7 @@ import os
 import subprocess
 from urllib.parse import urljoin
 
+import pyvips
 from django.conf import settings
 from django.contrib.staticfiles.storage import staticfiles_storage
 
@@ -21,6 +22,27 @@ from zerver.models.users import is_cross_realm_bot_email
 STATIC_AVATARS_DIR = "images/static_avatars/"
 
 DEFAULT_AVATAR_FILE = "images/default-avatar.png"
+
+# Avatars that the server draws and stores like an uploaded one.
+GENERATED_AVATAR_SOURCES = [
+    UserProfile.AVATAR_FROM_JDENTICON,
+    UserProfile.AVATAR_FROM_INITIALS,
+]
+
+INITIALS_AVATAR_FONT_FILE = "fonts/SourceSans3-Semibold.ttf"
+INITIALS_AVATAR_FONT = "Source Sans 3 Semi-Bold"
+# The font size of the initials, as a fraction of the avatar width.
+INITIALS_AVATAR_FONT_SCALE = 0.4
+# Background and letter colors. A user gets the pair at their user ID
+# modulo the number of pairs, so that the color survives a rename.
+INITIALS_AVATAR_COLORS = [
+    ("#c9cff7", "#2b2e6e"),
+    ("#f5d0b5", "#6b3410"),
+    ("#bfe3d0", "#1f5236"),
+    ("#f3c4d2", "#6e1f3a"),
+    ("#c6e2f5", "#16466b"),
+    ("#e6dcb0", "#5a4a0e"),
+]
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +138,7 @@ def get_avatar_field(
     avatar source, and then we'll add version info to try to avoid
     stale caches.
     """
-    if avatar_source in [UserProfile.AVATAR_FROM_USER, UserProfile.AVATAR_FROM_JDENTICON]:
+    if avatar_source == UserProfile.AVATAR_FROM_USER or avatar_source in GENERATED_AVATAR_SOURCES:
         hash_key = user_avatar_base_path_from_ids(user_id, avatar_version, realm_id)
         return get_avatar_url(hash_key, medium=medium)
 
@@ -239,3 +261,68 @@ def generate_and_upload_jdenticon_avatar(
         image_data_medium=image_data_medium,
         future=future,
     )
+
+
+def get_avatar_initials(full_name: str) -> str:
+    # Words that start with something other than a letter, like "(guest)"
+    # or an emoji, are not part of how a person is addressed.
+    words = [word for word in full_name.split() if word[0].isalpha()]
+    if len(words) == 0:
+        return "?"
+    if len(words) == 1:
+        letters = [character for character in words[0] if character.isalpha()][:2]
+    else:
+        letters = [words[0][0], words[1][0]]
+    # Uppercasing can lengthen a letter, as in "ß" becoming "SS".
+    return "".join(letter.upper()[0] for letter in letters)
+
+
+def generate_avatar_initials(full_name: str, user_id: int, medium: bool) -> bytes:
+    from zerver.lib.storage import static_path
+
+    size = MEDIUM_AVATAR_SIZE if medium else DEFAULT_AVATAR_SIZE
+    background, color = INITIALS_AVATAR_COLORS[user_id % len(INITIALS_AVATAR_COLORS)]
+    font = f"{INITIALS_AVATAR_FONT} {round(size * INITIALS_AVATAR_FONT_SCALE)}px"
+    font_file = static_path(INITIALS_AVATAR_FONT_FILE)
+    # Without the file, the text would silently be drawn in another font.
+    assert os.path.exists(font_file)
+
+    def draw(text: str) -> pyvips.Image:
+        return pyvips.Image.text(text, font=font, fontfile=font_file)
+
+    def solid(image: pyvips.Image, hex_color: str) -> pyvips.Image:
+        return image.new_from_image(list(bytes.fromhex(hex_color[1:]))).copy(
+            interpretation=pyvips.Interpretation.SRGB
+        )
+
+    # Center the letters by the height of a capital letter, so that
+    # letters with descenders sit on the same line as the others.
+    capital = draw("H")
+    letters = draw(get_avatar_initials(full_name))
+    left = (size - letters.width) // 2
+    top = (size - capital.height) // 2 + letters.get("yoffset") - capital.get("yoffset")
+
+    avatar = solid(pyvips.Image.black(size, size), background)
+    ink = solid(letters, color).bandjoin(letters)
+    return avatar.composite2(ink, pyvips.BlendMode.OVER, x=left, y=top).write_to_buffer(".png")
+
+
+def generate_and_upload_initials_avatar(user_profile: UserProfile, future: bool) -> None:
+    write_generated_avatars(
+        user_avatar_path(user_profile, future),
+        user_profile,
+        image_data=generate_avatar_initials(user_profile.full_name, user_profile.id, medium=False),
+        image_data_medium=generate_avatar_initials(
+            user_profile.full_name, user_profile.id, medium=True
+        ),
+        future=future,
+    )
+
+
+def generate_and_upload_generated_avatar(
+    user_profile: UserProfile, avatar_source: str, realm_uuid: str, future: bool
+) -> None:
+    if avatar_source == UserProfile.AVATAR_FROM_JDENTICON:
+        generate_and_upload_jdenticon_avatar(user_profile, realm_uuid, future)
+    elif avatar_source == UserProfile.AVATAR_FROM_INITIALS:
+        generate_and_upload_initials_avatar(user_profile, future)

@@ -548,9 +548,12 @@ paths:
 
                                             - "G" = Hosted by Gravatar
                                             - "J" = Generated using Jdenticon
+                                            - "I" = Generated from the user's initials
                                             - "U" = Uploaded by user
 
-                                            **Changes**: The "J" value is new in Zulip 12.0 (feature level 466).
+                                            **Changes**: The "I" value is new in Zulip 13.0 (feature level ZF-5c1a7e).
+
+                                            The "J" value is new in Zulip 12.0 (feature level 466).
                                         avatar_url_medium:
                                           type: string
                                           description: |
@@ -5816,11 +5819,14 @@ paths:
 
                                         - "G" = Hosted by Gravatar
                                         - "J" = Generated using Jdenticon
+                                        - "I" = Generated from the user's initials
 
                                         Note that "U" is not a supported value here, since there is
                                         no such thing as a "default" user-uploaded avatar.
 
-                                        **Changes**: New in Zulip 12.0 (feature level 456).
+                                        **Changes**: The "I" value is new in Zulip 13.0 (feature level ZF-5c1a7e).
+
+                                        New in Zulip 12.0 (feature level 456).
                                     default_code_block_language:
                                       type: string
                                       description: |
@@ -22460,11 +22466,14 @@ paths:
 
                           - "G" = Hosted by Gravatar
                           - "J" = Generated using Jdenticon
+                          - "I" = Generated from the user's initials
 
                           Note that "U" is not a supported value here, since there is
                           no such thing as a "default" user-uploaded avatar.
 
-                          **Changes**: New in Zulip 12.0 (feature level 456).
+                          **Changes**: The "I" value is new in Zulip 13.0 (feature level ZF-5c1a7e).
+
+                          New in Zulip 12.0 (feature level 456).
                       jitsi_server_url:
                         type: string
                         deprecated: true
@@ -23407,9 +23416,12 @@ paths:
 
                           - "G" = Hosted by Gravatar
                           - "J" = Generated using Jdenticon
+                          - "I" = Generated from the user's initials
                           - "U" = Uploaded by user
 
-                          **Changes**: The "J" value is new in Zulip 12.0 (feature level 466).
+                          **Changes**: The "I" value is new in Zulip 13.0 (feature level ZF-5c1a7e).
+
+                          The "J" value is new in Zulip 12.0 (feature level 466).
                           The avatar data source type for the current user.
                       avatar_url_medium:
                         type: string

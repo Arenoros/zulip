@@ -5,6 +5,7 @@ from glob import glob
 import magic
 from django.conf import settings
 
+from zerver.lib.avatar import GENERATED_AVATAR_SOURCES
 from zerver.lib.avatar_hash import user_avatar_path
 from zerver.lib.mime_types import guess_type
 from zerver.lib.parallel import run_parallel
@@ -45,7 +46,7 @@ def _transfer_avatar_to_s3(user: UserProfile) -> None:
                     future=False,
                 )
         else:
-            assert user.avatar_source == UserProfile.AVATAR_FROM_JDENTICON
+            assert user.avatar_source in GENERATED_AVATAR_SOURCES
             with (
                 open(file_path + ".png", "rb") as f,
                 open(file_path + "-medium.png", "rb") as f_medium,

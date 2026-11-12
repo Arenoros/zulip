@@ -668,10 +668,12 @@ class UserProfile(AbstractBaseUser, PermissionsMixin, UserBaseSettings):
 
     AVATAR_FROM_GRAVATAR = "G"
     AVATAR_FROM_JDENTICON = "J"
+    AVATAR_FROM_INITIALS = "I"
     AVATAR_FROM_USER = "U"
     AVATAR_SOURCES = (
         (AVATAR_FROM_GRAVATAR, "Hosted by Gravatar"),
         (AVATAR_FROM_JDENTICON, "Generated using Jdenticon"),
+        (AVATAR_FROM_INITIALS, "Generated from initials"),
         (AVATAR_FROM_USER, "Uploaded by user"),
     )
     DEFAULT_AVATAR_SOURCE = AVATAR_FROM_JDENTICON

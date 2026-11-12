@@ -11,7 +11,11 @@ from confirmation.models import Confirmation, create_confirmation_link
 from confirmation.settings import STATUS_REVOKED, STATUS_USED
 from zerver.actions.message_send import send_user_profile_update_notification
 from zerver.actions.presence import do_update_user_presence
-from zerver.lib.avatar import avatar_url, generate_and_upload_jdenticon_avatar
+from zerver.lib.avatar import (
+    avatar_url,
+    generate_and_upload_generated_avatar,
+    generate_and_upload_initials_avatar,
+)
 from zerver.lib.cache import (
     bulk_flush_users,
     cache_delete,
@@ -263,6 +267,12 @@ def do_change_full_name(
         get_user_ids_who_can_access_user(user_profile),
     )
 
+    if user_profile.avatar_source == UserProfile.AVATAR_FROM_INITIALS:
+        generate_and_upload_initials_avatar(user_profile, future=True)
+        do_change_avatar_fields(
+            user_profile, UserProfile.AVATAR_FROM_INITIALS, acting_user=acting_user
+        )
+
     if notify:
         changes: list[UserProfileChangeDict] = [
             UserProfileChangeDict(
@@ -426,10 +436,9 @@ def set_avatar_to_default(user_profile: UserProfile, *, acting_user: UserProfile
     if user_profile.avatar_source == default_avatar_source:  # nocoverage
         return
 
-    if default_avatar_source == UserProfile.AVATAR_FROM_JDENTICON:
-        generate_and_upload_jdenticon_avatar(
-            user_profile, realm_uuid=str(user_profile.realm.uuid), future=True
-        )
+    generate_and_upload_generated_avatar(
+        user_profile, default_avatar_source, str(user_profile.realm.uuid), future=True
+    )
     do_change_avatar_fields(user_profile, default_avatar_source, acting_user=acting_user)
 
 

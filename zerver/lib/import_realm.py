@@ -32,7 +32,7 @@ from zerver.actions.realm_settings import (
     do_set_realm_zulip_update_announcements_stream,
 )
 from zerver.actions.user_settings import set_avatar_to_default
-from zerver.lib.avatar import generate_and_upload_jdenticon_avatar
+from zerver.lib.avatar import GENERATED_AVATAR_SOURCES, generate_and_upload_generated_avatar
 from zerver.lib.avatar_hash import user_avatar_base_path_from_ids
 from zerver.lib.bulk_create import bulk_set_stream_recipient_fields
 from zerver.lib.export import Field, Path, Record, TableName, date_fields_for_table
@@ -2074,10 +2074,14 @@ def do_import_realm(
     # is deterministically generated using a combination of user ID and realm UUID
     # as input value. Since user ID possibly changes on import, the resulting
     # Jdenticon would differ. We regenerate it here using the current user ID.
+    # Avatars with initials are not exported either, and take their color
+    # from the user ID.
     for user_profile in UserProfile.objects.filter(
-        avatar_source=UserProfile.AVATAR_FROM_JDENTICON, realm=realm
+        avatar_source__in=GENERATED_AVATAR_SOURCES, realm=realm
     ):
-        generate_and_upload_jdenticon_avatar(user_profile, str(realm.uuid), future=False)
+        generate_and_upload_generated_avatar(
+            user_profile, user_profile.avatar_source, str(realm.uuid), future=False
+        )
 
     # We need to have this check as the emoji files may not
     # be present in import data from other services.

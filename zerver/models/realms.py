@@ -761,9 +761,11 @@ class Realm(models.Model):
     # Avatar source for new users
     AVATAR_FROM_GRAVATAR = "G"
     AVATAR_FROM_JDENTICON = "J"
+    AVATAR_FROM_INITIALS = "I"
     AVATAR_SOURCES = (
         (AVATAR_FROM_GRAVATAR, "Hosted by Gravatar"),
         (AVATAR_FROM_JDENTICON, "Generated using Jdenticon"),
+        (AVATAR_FROM_INITIALS, "Generated from initials"),
     )
     default_avatar_source = models.CharField(
         default=AVATAR_FROM_JDENTICON, choices=AVATAR_SOURCES, max_length=1
