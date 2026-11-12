@@ -2079,6 +2079,12 @@ export function get_group_assigned_user_group_permissions(group: UserGroup): {
 }
 
 export function set_channel_folder_dropdown_value(sub: StreamSubscription): void {
+    // The dropdown now shows the folder of the channel, so the
+    // channel keeps its name.
+    $("#id_folder_id")
+        .closest(".channel-folder-subsection")
+        .find(".channel-name-in-folder-note")
+        .text("");
     if (sub.folder_id === null) {
         set_dropdown_list_widget_setting_value("folder_id", settings_config.no_folder_selected);
         return;

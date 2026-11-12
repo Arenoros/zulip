@@ -17,6 +17,7 @@ import * as blueslip from "./blueslip.ts";
 import type {Bot} from "./bot_data.ts";
 import * as browser_history from "./browser_history.ts";
 import * as channel from "./channel.ts";
+import * as channel_folders from "./channel_folders.ts";
 import * as channel_folders_ui from "./channel_folders_ui.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
 import {show_copied_confirmation} from "./copied_tooltip.ts";
@@ -109,7 +110,7 @@ export function open_stream_edit_modal(stream_id: number, open_modal_button_id: 
     const is_archived = stream.is_archived;
 
     const template_data = {
-        stream_name: stream.name,
+        stream_name: channel_folders.get_short_channel_name(stream),
         stream_description: stream.description,
         max_stream_name_length: realm.max_stream_name_length,
         max_stream_description_length: realm.max_stream_description_length,
@@ -170,7 +171,7 @@ export function save_stream_info(): void {
         .val()!
         .trim();
 
-    if (new_name !== sub.name) {
+    if (new_name !== channel_folders.get_short_channel_name(sub)) {
         data.new_name = new_name;
     }
     if (new_description !== sub.description) {
@@ -185,7 +186,9 @@ export function save_stream_info(): void {
                 $("#dialog_error").hide().empty();
 
                 assert(data.new_name !== undefined);
-                const existing_stream = stream_data.get_sub_by_name(data.new_name);
+                const existing_stream = stream_data.get_sub_by_name(
+                    channel_folders.get_qualified_channel_name(data.new_name, sub.folder_id),
+                );
 
                 let rendered_error;
                 if (existing_stream) {

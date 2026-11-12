@@ -7,7 +7,7 @@
                 {{> stream_privacy . }}
             </span>
 
-            <span class="stream-name">{{name}}</span>
+            <span class="stream-name">{{#if folder_prefix}}<span class="channel-folder-prefix">{{folder_prefix}}</span>{{/if}}{{short_name}}</span>
 
             <div class="left-sidebar-controls">
                 <div class="channel-search-topics-button" tabindex="0" data-tippy-content="{{t 'Search topics' }}" data-stream-id="{{id}}">

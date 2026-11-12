@@ -280,3 +280,38 @@ run_test("administering folders", ({override}) => {
     assert.equal(channel_folders.can_user_manage_folder(research.id), true);
     assert.equal(can_move(administered_channel, mine.id), true);
 });
+
+run_test("names of channels in folders", () => {
+    const design = {
+        name: "Design",
+        description: "",
+        rendered_description: "",
+        creator_id: null,
+        date_created: 1596710000,
+        id: 31,
+        is_archived: false,
+        order: 31,
+        can_administer_group: 1,
+    };
+    channel_folders.initialize({channel_folders: [design]});
+
+    const in_folder = make_stream({stream_id: 41, name: "Design/sketches", folder_id: design.id});
+    assert.equal(channel_folders.get_folder_prefix_of_channel_name(in_folder), "Design/");
+    assert.equal(channel_folders.get_short_channel_name(in_folder), "sketches");
+
+    const in_no_folder = make_stream({stream_id: 42, name: "Design/sketches", folder_id: null});
+    assert.equal(channel_folders.get_folder_prefix_of_channel_name(in_no_folder), "");
+    assert.equal(channel_folders.get_short_channel_name(in_no_folder), "Design/sketches");
+
+    // The name of a channel can be behind the name of its folder
+    // while events about a renamed folder are arriving.
+    const renamed_folder = make_stream({stream_id: 43, name: "Art/sketches", folder_id: design.id});
+    assert.equal(channel_folders.get_folder_prefix_of_channel_name(renamed_folder), "");
+    assert.equal(channel_folders.get_short_channel_name(renamed_folder), "Art/sketches");
+
+    assert.equal(
+        channel_folders.get_qualified_channel_name("sketches", design.id),
+        "Design/sketches",
+    );
+    assert.equal(channel_folders.get_qualified_channel_name("sketches", null), "sketches");
+});

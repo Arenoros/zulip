@@ -571,7 +571,8 @@ test_ui("rename_stream", ({mock_template, override, override_rewire}) => {
 
     mock_template("stream_sidebar_row.hbs", false, (payload) => {
         assert.deepEqual(payload, {
-            name: "Development",
+            folder_prefix: "",
+            short_name: "Development",
             id: 1000,
             url: "#narrow/channel/1000-Development",
             is_muted: false,
@@ -658,7 +659,7 @@ test_ui("create_initial_sidebar_rows", ({override, override_rewire, mock_templat
 
     override_rewire(stream_list, "update_count_in_dom", noop);
 
-    mock_template("stream_sidebar_row.hbs", false, (data) => "<div>stub-html-" + data.name);
+    mock_template("stream_sidebar_row.hbs", false, (data) => "<div>stub-html-" + data.short_name);
 
     // Test this code with stubs above...
     stream_list.create_initial_sidebar_rows();

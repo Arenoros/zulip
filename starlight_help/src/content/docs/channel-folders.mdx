@@ -13,6 +13,24 @@ import MoreVerticalIcon from "~icons/zulip-icon/more-vertical";
 
 <ChannelFoldersIntro />
 
+## Names of channels in folders
+
+The name of a channel in a folder starts with the name of the folder, like
+`Engineering/design`. This lets channels in different folders have the same
+name after the name of the folder, like `Engineering/general` and
+`Marketing/general`. Neither the name of a folder nor the part of a channel
+name after it can contain `/`.
+
+The left sidebar shows a channel in the section of its folder without the name
+of the folder. Everywhere else, including search, channel links, and channel
+settings, the channel is shown with its full name.
+
+Moving a channel to another folder or renaming a folder renames the channels
+involved. Links to these channels and their messages keep working.
+[Integrations](/help/integrations-overview) and [bots](/help/bots-overview)
+that send messages to a channel by its name need to be updated to use its new
+name.
+
 ## Move a channel to a folder
 
 <MoveChannelToFolder />

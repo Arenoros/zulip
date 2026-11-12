@@ -1643,6 +1643,10 @@
     }
 }
 
+#subscription_overlay .channel-name-in-folder-note {
+    color: var(--color-text-settings-field-hint);
+}
+
 #deactivation-confirm-modal {
     .alert {
         padding-right: 14px;

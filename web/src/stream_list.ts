@@ -343,6 +343,7 @@ export let stream_list_section_container_html = function (
         section_title: section.section_title,
         plus_icon_url: can_create_streams ? get_section_channel_plus_icon_url(section) : undefined,
         show_folder_action_icon: !page_params.is_spectator && section.folder_id !== null,
+        is_folder_section: section.folder_id !== null,
     });
 };
 
@@ -837,12 +838,12 @@ export function set_in_home_view(stream_id: number, in_home: boolean): void {
 }
 
 function build_stream_sidebar_li(sub: StreamSubscription, for_modal = false): JQuery {
-    const name = sub.name;
     const is_muted = stream_data.is_muted(sub.stream_id);
     const can_post_messages = stream_data.can_post_messages_in_stream(sub);
     const url = hash_util.channel_url_by_user_setting(sub.stream_id);
     const args = {
-        name,
+        folder_prefix: channel_folders.get_folder_prefix_of_channel_name(sub),
+        short_name: channel_folders.get_short_channel_name(sub),
         id: sub.stream_id,
         url,
         is_muted,

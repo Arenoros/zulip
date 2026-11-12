@@ -6,6 +6,7 @@ import render_subscription_invites_warning_modal from "../templates/confirm_dial
 import render_channel_name_conflict_error from "../templates/stream_settings/channel_name_conflict_error.hbs";
 
 import * as channel from "./channel.ts";
+import * as channel_folders from "./channel_folders.ts";
 import * as channel_folders_ui from "./channel_folders_ui.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
 import type {DropdownWidget} from "./dropdown_widget.ts";
@@ -69,9 +70,31 @@ export function should_show_first_stream_created_modal(): boolean {
     return onboarding_steps.ONE_TIME_NOTICES_TO_DISPLAY.has("first_stream_created_banner");
 }
 
+// The name the new channel gets, which starts with the name of the
+// folder chosen for it.
+function get_new_channel_name(): string {
+    const short_name = $<HTMLInputElement>("input#create_stream_name").val()!.trim();
+    const folder_id = folder_widget?.value();
+    if (
+        short_name === "" ||
+        typeof folder_id !== "number" ||
+        folder_id === settings_config.no_folder_selected
+    ) {
+        return short_name;
+    }
+    return channel_folders.get_qualified_channel_name(short_name, folder_id);
+}
+
 export function maybe_update_error_message(): void {
-    const stream_name = $<HTMLInputElement>("input#create_stream_name").val()!.trim();
-    stream_name_error.pre_validate(stream_name);
+    stream_name_error.pre_validate(get_new_channel_name());
+}
+
+function update_channel_name_note(): void {
+    stream_settings_components.set_channel_name_in_folder_note(
+        $("#stream_creation_form"),
+        get_new_channel_name(),
+        $<HTMLInputElement>("input#create_stream_name").val()!.trim(),
+    );
 }
 
 class StreamSubscriptionError {
@@ -195,7 +218,7 @@ $("body").on("click", ".settings-sticky-footer #stream_creation_go_to_subscriber
     e.preventDefault();
     e.stopPropagation();
 
-    const stream_name = $<HTMLInputElement>("input#create_stream_name").val()!.trim();
+    const stream_name = get_new_channel_name();
     const is_stream_name_valid = stream_name_error.validate_for_submit(stream_name);
     const privacy_type = stream_settings_components.channel_creation_privacy_widget.value();
     let invite_only = false;
@@ -292,7 +315,7 @@ function update_announce_stream_state(): void {
 }
 
 function create_stream(): void {
-    const stream_name = $<HTMLInputElement>("input#create_stream_name").val()!.trim();
+    const stream_name = get_new_channel_name();
     const description = $<HTMLInputElement>("input#create_stream_description").val()!.trim();
     created_stream = stream_name;
 
@@ -478,6 +501,7 @@ export function new_stream_clicked(stream_name: string, folder_id: number | unde
     } else {
         folder_widget.render(-1);
     }
+    update_channel_name_note();
     $("#create_stream_name").trigger("focus");
 }
 
@@ -630,7 +654,7 @@ export function set_up_handlers(): void {
         e.preventDefault();
         clear_error_display();
 
-        const stream_name = $<HTMLInputElement>("input#create_stream_name").val()!.trim();
+        const stream_name = get_new_channel_name();
         const name_ok = stream_name_error.validate_for_submit(stream_name);
 
         if (!name_ok) {
@@ -716,7 +740,8 @@ export function set_up_handlers(): void {
             $channel_input.val(channel_name);
             $channel_input.addClass("input-validation-shake");
         }
-        stream_name_error.pre_validate(channel_name);
+        maybe_update_error_message();
+        update_channel_name_note();
     }
     $("input#create_stream_name").on("animationend", function () {
         $(this).removeClass("input-validation-shake");
@@ -750,7 +775,10 @@ export function set_up_handlers(): void {
 
     set_up_group_setting_widgets();
     settings_components.enable_opening_typeahead_on_clicking_label($container);
-    folder_widget = stream_settings_components.set_up_folder_dropdown_widget();
+    folder_widget = stream_settings_components.set_up_folder_dropdown_widget(undefined, () => {
+        maybe_update_error_message();
+        update_channel_name_note();
+    });
     stream_edit.set_up_channel_privacy_dropdown_widget(update_announce_stream_state);
 }
 
@@ -771,6 +799,8 @@ export function initialize(): void {
 export function set_channel_folder_dropdown_value(folder_id: number): void {
     assert(folder_widget !== undefined);
     folder_widget.render(folder_id);
+    maybe_update_error_message();
+    update_channel_name_note();
 }
 
 export function maybe_reset_channel_folder_dropdown(archived_folder_id: number): void {

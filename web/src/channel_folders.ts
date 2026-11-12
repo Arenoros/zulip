@@ -233,3 +233,24 @@ export function can_user_move_channel_to_folder(
 
     return folder_id === null || can_user_manage_folder(folder_id);
 }
+
+// The name of a channel in a folder is "<folder name>/<short name>",
+// which lets channels in different folders have the same short name.
+export function get_folder_prefix_of_channel_name(sub: StreamSubscription): string {
+    if (sub.folder_id === null) {
+        return "";
+    }
+    const prefix = `${get_channel_folder_by_id(sub.folder_id).name}/`;
+    return sub.name.startsWith(prefix) ? prefix : "";
+}
+
+export function get_short_channel_name(sub: StreamSubscription): string {
+    return sub.name.slice(get_folder_prefix_of_channel_name(sub).length);
+}
+
+export function get_qualified_channel_name(short_name: string, folder_id: number | null): string {
+    if (folder_id === null) {
+        return short_name;
+    }
+    return `${get_channel_folder_by_id(folder_id).name}/${short_name}`;
+}

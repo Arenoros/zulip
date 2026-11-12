@@ -1,4 +1,5 @@
 import {$} from "jquery";
+import assert from "minimalistic-assert";
 import * as z from "zod/mini";
 
 import render_unsubscribe_private_stream_modal from "../templates/confirm_dialog/confirm_unsubscribe_private_stream.hbs";
@@ -412,7 +413,29 @@ export function folder_filter_includes_channel(sub: StreamSubscription): boolean
     return filter_value === sub.folder_id;
 }
 
-export function set_up_folder_dropdown_widget(sub?: StreamSubscription): DropdownWidget {
+// Shows the name a channel gets from the folder chosen for it, when
+// that is not the name shown elsewhere in the form.
+export function set_channel_name_in_folder_note(
+    $container: JQuery,
+    channel_name: string,
+    shown_channel_name: string,
+): void {
+    $container
+        .find(".channel-name-in-folder-note")
+        .text(
+            channel_name === shown_channel_name
+                ? ""
+                : $t(
+                      {defaultMessage: "The name of the channel will be {channel_name}."},
+                      {channel_name},
+                  ),
+        );
+}
+
+export function set_up_folder_dropdown_widget(
+    sub?: StreamSubscription,
+    on_folder_chosen?: () => void,
+): DropdownWidget {
     const folder_options = (): dropdown_widget.Option[] => {
         // An existing channel can only be moved to the folders that
         // the user is allowed to move it to.
@@ -474,11 +497,25 @@ export function set_up_folder_dropdown_widget(sub?: StreamSubscription): Dropdow
             this_widget.render();
             if (sub !== undefined) {
                 const $edit_container = stream_settings_containers.get_edit_container(sub);
+                const current_sub = stream_data.get_sub_by_id(sub.stream_id);
                 settings_components.save_discard_stream_settings_widget_status_handler(
                     $edit_container.find(".stream-settings-subsection"),
-                    stream_data.get_sub_by_id(sub.stream_id),
+                    current_sub,
                 );
+                if (current_sub !== undefined) {
+                    const folder_id = this_widget.value();
+                    assert(typeof folder_id === "number");
+                    set_channel_name_in_folder_note(
+                        $edit_container,
+                        channel_folders.get_qualified_channel_name(
+                            channel_folders.get_short_channel_name(current_sub),
+                            folder_id === settings_config.no_folder_selected ? null : folder_id,
+                        ),
+                        current_sub.name,
+                    );
+                }
             }
+            on_folder_chosen?.();
         },
         item_button_click_callback(event) {
             event.preventDefault();

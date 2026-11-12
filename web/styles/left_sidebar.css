@@ -2319,6 +2319,11 @@ li.active-sub-filter {
     padding: 0 var(--left-sidebar-before-unread-count-padding) 0 0;
 }
 
+/* The header of the section of a folder shows the name of the folder. */
+.channel-folder-section .channel-folder-prefix {
+    display: none;
+}
+
 .conversation-partners-list {
     /* Clamp multi-line DMs to two lines. */
     display: -webkit-box;
