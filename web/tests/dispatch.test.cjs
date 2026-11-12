@@ -1343,8 +1343,12 @@ run_test("user_settings", ({override}) => {
 
     event = event_fixtures.user_settings__web_direct_message_bubbles;
     override(user_settings, "web_direct_message_bubbles", true);
+    called = false;
+    called_for_cached_msg_list = false;
     dispatch(event);
     assert_same(user_settings.web_direct_message_bubbles, false);
+    assert_same(called, true);
+    assert_same(called_for_cached_msg_list, true);
 
     event = event_fixtures.user_settings__web_font_size_px;
     override(user_settings, "web_font_size_px", 14);

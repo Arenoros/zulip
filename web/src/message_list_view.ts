@@ -48,6 +48,7 @@ import type {TopicLink} from "./types.ts";
 import * as typing_data from "./typing_data.ts";
 import * as typing_events from "./typing_events.ts";
 import * as ui_util from "./ui_util.ts";
+import {user_settings} from "./user_settings.ts";
 import * as user_topics from "./user_topics.ts";
 import type {AllVisibilityPolicies} from "./user_topics.ts";
 import * as util from "./util.ts";
@@ -583,6 +584,16 @@ export class MessageListView {
 
     is_current_message_list(): boolean {
         return this.list === message_lists.current;
+    }
+
+    is_bubble_layout(): boolean {
+        // Views that mix conversations keep the classic layout.
+        const filter = this.list.data.filter;
+        return (
+            filter.is_conversation_view() &&
+            filter.has_operator("dm") &&
+            user_settings.web_direct_message_bubbles
+        );
     }
 
     get_calculated_message_container_variables(
@@ -2067,6 +2078,7 @@ export class MessageListView {
         // jQuery data.  This does mean, however, that we need to be
         // mindful of memory leaks.
         this.$list.children().detach();
+        this.$list.toggleClass("bubble-layout", this.is_bubble_layout());
         this._rows.clear();
         this._message_groups = [];
         this.message_containers.clear();

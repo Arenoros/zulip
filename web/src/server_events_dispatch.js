@@ -1098,6 +1098,7 @@ export function dispatch_normal_event(event) {
                     stream_list.update_streams_sidebar(true);
                     break;
                 case "web_animate_image_previews":
+                case "web_direct_message_bubbles":
                     // Rerender the whole message list UI
                     for (const msg_list of message_lists.all_rendered_message_lists()) {
                         msg_list.rerender();
