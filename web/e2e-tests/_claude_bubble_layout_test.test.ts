@@ -14,12 +14,16 @@ function check(name: string, ok: boolean, detail = ""): void {
 const base_url = "http://zulip.zulipdev.com:9981/";
 
 // Seeds a direct message conversation between Desdemona and Iago with
-// fixed timestamps, including pauses longer than five minutes.
+// fixed timestamps, including pauses longer than five minutes, a
+// message from the day before, and unread messages starting in the
+// middle of a series.
 const seed_script = String.raw`import json
 from datetime import datetime, timedelta, timezone
 
+from django.db.models import F
+
 from zerver.actions.message_send import internal_send_private_message
-from zerver.models import Message
+from zerver.models import Message, UserMessage
 from zerver.models.realms import get_realm
 from zerver.models.users import get_user_by_delivery_email
 
@@ -57,6 +61,9 @@ plan = [
     (iago, 41, "@**Desdemona** please check the dashboard"),
 ]
 
+yesterday = internal_send_private_message(iago, desdemona, "A message from the day before.")
+Message.objects.filter(id=yesterday).update(date_sent=start - timedelta(days=1))
+
 ids = []
 for sender, minutes, content in plan:
     recipient = iago if sender == desdemona else desdemona
@@ -64,7 +71,16 @@ for sender, minutes, content in plan:
     Message.objects.filter(id=message_id).update(date_sent=start + timedelta(minutes=minutes))
     ids.append(message_id)
 
-print("SEEDED " + json.dumps({"ids": ids, "iago": iago.id, "desdemona": desdemona.id}))
+UserMessage.objects.filter(
+    user_profile=desdemona, message_id__in=[yesterday, *ids[:5]]
+).update(flags=F("flags").bitor(UserMessage.flags.read))
+
+print(
+    "SEEDED "
+    + json.dumps(
+        {"ids": ids, "yesterday": yesterday, "iago": iago.id, "desdemona": desdemona.id}
+    )
+)
 `;
 const shot_prefix = process.env["SHOT_PREFIX"] ?? "bubbles";
 // Only take the classic-layout screenshots, for comparing them with
@@ -209,6 +225,7 @@ async function visual_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
     const seeded = JSON.parse(output.split("SEEDED ")[1]!) as {
         ids: number[];
+        yesterday: number;
         iago: number;
         desdemona: number;
     };
@@ -218,6 +235,114 @@ async function visual_test(page: Page): Promise<void> {
     const can_hover = await page.evaluate(() => matchMedia("(hover: hover)").matches);
     console.log(`hover: ${can_hover}`);
     const conversation = `#narrow/dm/${seeded.iago}-Iago`;
+
+    // Viewing the conversation marks its messages as read, so check the
+    // dividers first. Every run views it here, so the classic
+    // screenshots below are always taken with the messages read.
+    await open_view(page, conversation);
+    const first_unread_id = seeded.ids[5]!;
+    const divider_gap = async (): Promise<number> =>
+        await page.evaluate((ids: number[]) => {
+            function bubble(id: number): DOMRect {
+                return document
+                    .querySelector(
+                        `.focused-message-list .message_row[data-message-id="${id}"] .message_content`,
+                    )!
+                    .getBoundingClientRect();
+            }
+            return bubble(ids[5]!).top - bubble(ids[4]!).bottom;
+        }, seeded.ids);
+    if (!classic_only) {
+        const dividers = await page.evaluate(() => {
+            const list = document.querySelector(".focused-message-list")!;
+            return {
+                headers_shown: [...list.querySelectorAll(".message_header")].filter(
+                    (header) => header.getBoundingClientRect().height > 0,
+                ).length,
+                unread_markers_shown: [...list.querySelectorAll(".unread_marker")].filter(
+                    (marker) => getComputedStyle(marker).display !== "none",
+                ).length,
+                new_messages: [...list.querySelectorAll(".new-messages-divider")].map((divider) => ({
+                    id: Number(divider.closest<HTMLElement>(".message_row")!.dataset["messageId"]),
+                    text: divider.textContent?.trim(),
+                })),
+                dates: [...list.querySelectorAll(".date-divider-content")].map((content) => {
+                    const divider = content.closest(".message_feed_divider")!.getBoundingClientRect();
+                    const label = content.getBoundingClientRect();
+                    return {
+                        id: Number(content.closest<HTMLElement>(".message_row")!.dataset["messageId"]),
+                        text: content.textContent?.trim(),
+                        off_center:
+                            label.left + label.width / 2 - (divider.left + divider.width / 2),
+                    };
+                }),
+            };
+        });
+        check("the recipient bar is hidden", dividers.headers_shown === 0, String(dividers.headers_shown));
+        check(
+            "unread markers are hidden",
+            dividers.unread_markers_shown === 0,
+            String(dividers.unread_markers_shown),
+        );
+        check(
+            "a new messages divider stands before the first unread message",
+            JSON.stringify(dividers.new_messages) ===
+                JSON.stringify([{id: first_unread_id, text: "New messages"}]),
+            JSON.stringify(dividers.new_messages),
+        );
+        check(
+            "each day starts with a date divider",
+            JSON.stringify(dividers.dates.map((date) => date.id)) ===
+                JSON.stringify([seeded.yesterday, seeded.ids[0]]),
+            JSON.stringify(dividers.dates),
+        );
+        check(
+            "dates are centered",
+            dividers.dates.every((date) => Math.abs(date.off_center) < 2),
+            JSON.stringify(dividers.dates.map((date) => date.off_center)),
+        );
+        const series_with_divider = (await rows_info(page))
+            .filter((row) => seeded.ids.includes(row.id))
+            .map((row) => row.includes_sender);
+        check(
+            "the first unread message starts a series",
+            JSON.stringify(series_with_divider) ===
+                JSON.stringify([true, false, true, false, true, true, true, true, true, false, true, true, true]),
+            JSON.stringify(series_with_divider),
+        );
+        await shot_list(page, "dividers");
+    }
+    const gap_while_unread = await divider_gap();
+    // Headless pages don't get window focus, which the web app needs
+    // before it marks visible messages as read.
+    await page.evaluate(() => {
+        window.dispatchEvent(new Event("focus"));
+        window.dispatchEvent(new Event("scroll"));
+    });
+    await page.keyboard.press("End");
+    await page.waitForFunction(
+        (id: number) =>
+            !document
+                .querySelector(`.focused-message-list .message_row[data-message-id="${id}"]`)!
+                .classList.contains("unread"),
+        {polling: 200},
+        first_unread_id,
+    );
+    if (!classic_only) {
+        // Let the fade finish.
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        const divider_opacity = await page.$eval(
+            ".focused-message-list .new-messages-divider",
+            (divider) => getComputedStyle(divider).opacity,
+        );
+        check("the divider fades out once read", divider_opacity === "0", divider_opacity);
+        const gap_after_reading = await divider_gap();
+        check(
+            "reading does not move the messages",
+            gap_after_reading === gap_while_unread,
+            `${gap_while_unread} ${gap_after_reading}`,
+        );
+    }
 
     // The classic layout in views that bubbles must not change.
     await set_setting(page, "web_direct_message_bubbles=false&color_scheme=3");
@@ -235,6 +360,9 @@ async function visual_test(page: Page): Promise<void> {
         return;
     }
 
+    await api(page, "POST", "/json/mark_all_as_read");
+    // Let the read flags reach the web app.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     await open_view(page, conversation);
     const has_class = await page.$eval(".focused-message-list", (list) =>
         list.classList.contains("bubble-layout"),
@@ -244,6 +372,7 @@ async function visual_test(page: Page): Promise<void> {
     const rows = (await rows_info(page)).filter((row) => seeded.ids.includes(row.id));
     check("all seeded messages are shown", rows.length === seeded.ids.length, String(rows.length));
 
+    // The messages are read by now, so there is no new messages divider.
     const series_starts = rows.map((row) => row.includes_sender);
     check(
         "a pause of more than five minutes starts a new series",
