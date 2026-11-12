@@ -32,6 +32,7 @@ from zerver.actions.channel_folders import (
     check_add_channel_folder,
     do_archive_channel_folder,
     do_change_channel_folder_description,
+    do_change_channel_folder_group_based_setting,
     do_change_channel_folder_name,
     do_unarchive_channel_folder,
     try_reorder_realm_channel_folders,
@@ -6002,6 +6003,28 @@ class ChannelFolderActionTest(BaseAction):
         check_channel_folder_update("events[0]", events[0], {"is_archived"})
         self.assertEqual(events[0]["channel_folder_id"], channel_folder.id)
         self.assertFalse(events[0]["data"]["is_archived"])
+
+        moderators_group = NamedUserGroup.objects.get(
+            name=SystemGroups.MODERATORS, realm_for_sharding=self.user_profile.realm
+        )
+        with self.verify_action() as events:
+            do_change_channel_folder_group_based_setting(
+                channel_folder, "can_administer_group", moderators_group, acting_user=iago
+            )
+        check_channel_folder_update("events[0]", events[0], {"can_administer_group"})
+        self.assertEqual(events[0]["data"]["can_administer_group"], moderators_group.id)
+
+        with self.verify_action() as events:
+            do_change_channel_folder_group_based_setting(
+                channel_folder,
+                "can_administer_group",
+                UserGroupMembersData(
+                    direct_members=[self.example_user("hamlet").id],
+                    direct_subgroups=[moderators_group.id],
+                ),
+                acting_user=iago,
+            )
+        check_channel_folder_update("events[0]", events[0], {"can_administer_group"})
 
     def test_channel_folders_reordering_event(self) -> None:
         frontend_folder = check_add_channel_folder(

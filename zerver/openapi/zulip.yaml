@@ -7033,6 +7033,11 @@ paths:
                                       "order": 1,
                                       "id": 2,
                                       "is_archived": false,
+                                      "can_administer_group":
+                                        {
+                                          "direct_members": [9],
+                                          "direct_subgroups": [],
+                                        },
                                     },
                                   "id": 0,
                                 }
@@ -7086,6 +7091,15 @@ paths:
                                       description: |
                                         Whether the channel folder is archived or not. Only present if
                                         the channel folder is archived or unarchived.
+                                    can_administer_group:
+                                      allOf:
+                                        - $ref: "#/components/schemas/GroupSettingValue"
+                                        - description: |
+                                            The new [group-setting value](/api/group-setting-values)
+                                            defining the set of users who have permission to administer
+                                            the channel folder. Only present if it changed.
+
+                                            **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
                               example:
                                 {
                                   "type": "channel_folder",
@@ -23580,6 +23594,14 @@ paths:
                               Configuration for group level group permission settings.
                             additionalProperties:
                               $ref: "#/components/schemas/GroupPermissionSetting"
+                          channel_folder:
+                            type: object
+                            description: |
+                              Configuration for channel folder level group permission settings.
+
+                              **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
+                            additionalProperties:
+                              $ref: "#/components/schemas/GroupPermissionSetting"
                       max_bulk_subscription_messages:
                         description: |
                           The maximum number of affected users for which the server will respect the
@@ -27434,11 +27456,16 @@ paths:
       operationId: create-channel-folder
       summary: Create a channel folder
       tags: ["channels"]
-      x-requires-administrator: true
       description: |
-        Create a new [channel folder](/help/channel-folders).
+        Create a new [channel folder](/help/channel-folders). The user
+        creating the folder becomes its administrator.
 
-        **Changes**: New in Zulip 11.0 (feature level 389).
+        Any user other than a guest can create channel folders.
+
+        **Changes**: Before Zulip 13.0 (feature level ZF-7c1e2a), only
+        organization administrators could create channel folders.
+
+        New in Zulip 11.0 (feature level 389).
       requestBody:
         required: true
         content:
@@ -27574,6 +27601,7 @@ paths:
                               "date_created": 1691057093,
                               "name": "Frontend",
                               "is_archived": false,
+                              "can_administer_group": 12,
                             },
                             {
                               "description": "Channels for **backend** discussions",
@@ -27583,6 +27611,8 @@ paths:
                               "date_created": 1791057093,
                               "name": "Backend",
                               "is_archived": false,
+                              "can_administer_group":
+                                {"direct_members": [1], "direct_subgroups": []},
                             },
                           ],
                       }
@@ -27649,15 +27679,28 @@ paths:
       operationId: update-channel-folder
       summary: Update a channel folder
       tags: ["channels"]
-      x-requires-administrator: true
       description: |
-        Update the name or description of a [channel folder](/help/channel-folders)
-        with the specified ID.
+        Update the name, description or administrators of a
+        [channel folder](/help/channel-folders) with the specified ID.
 
         This endpoint is also used to archive or unarchive the specified channel
         folder.
 
-        **Changes**: New in Zulip 11.0 (feature level 389).
+        Only organization administrators and users with permission to
+        administer the channel folder can use this endpoint.
+
+        **Changes**: Before Zulip 13.0 (feature level ZF-7c1e2a), only
+        organization administrators could update channel folders.
+
+        New in Zulip 11.0 (feature level 389).
+      x-curl-examples-parameters:
+        oneOf:
+          - type: include
+            parameters:
+              enum:
+                - name
+                - description
+                - is_archived
       parameters:
         - $ref: "#/components/parameters/ChannelFolderId"
       requestBody:
@@ -27692,6 +27735,26 @@ paths:
                     Whether to archive or unarchive the channel folder.
                   type: boolean
                   example: true
+                can_administer_group:
+                  allOf:
+                    - description: |
+                        The set of users who have permission to administer the
+                        channel folder expressed as an [update to a group-setting
+                        value][update-group-setting].
+
+                        [update-group-setting]: /api/group-setting-values#updating-group-setting-values
+
+                        **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
+                      example:
+                        {
+                          "new":
+                            {"direct_members": [10], "direct_subgroups": [11]},
+                          "old": 15,
+                        }
+                    - $ref: "#/components/schemas/GroupSettingValueUpdate"
+            encoding:
+              can_administer_group:
+                contentType: application/json
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
@@ -31487,6 +31550,21 @@ components:
           type: boolean
           description: |
             Whether the channel folder is archived or not.
+        can_administer_group:
+          allOf:
+            - $ref: "#/components/schemas/GroupSettingValue"
+            - description: |
+                A [group-setting value][setting-values] defining the set of users
+                who have permission to change this channel folder, including
+                this setting, and to archive it.
+
+                Organization administrators can administer every channel folder
+                as though they were in this group without being explicitly
+                listed here. Guests cannot administer channel folders.
+
+                **Changes**: New in Zulip 13.0 (feature level ZF-7c1e2a).
+
+                [setting-values]: /api/group-setting-values
     JsonResponseBase:
       type: object
       properties:

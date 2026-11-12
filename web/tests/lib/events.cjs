@@ -182,6 +182,7 @@ exports.fixtures = {
             date_created: 1681662420,
             creator_id: 10,
             is_archived: false,
+            can_administer_group: {direct_members: [10], direct_subgroups: []},
         },
     },
 

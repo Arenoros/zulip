@@ -24,6 +24,7 @@ from zerver.lib.types import (
     UserGroupMembersDict,
 )
 from zerver.models import (
+    ChannelFolder,
     GroupGroupMembership,
     NamedUserGroup,
     Realm,
@@ -261,6 +262,30 @@ def check_user_group_can_be_deactivated(user_group: NamedUserGroup) -> list[dict
             objections.append(
                 dict(type="channel", channel_id=stream.id, settings=objection_settings)
             )
+
+    channel_folder_setting_query = Q()
+    for setting_name in ChannelFolder.channel_folder_permission_group_settings:
+        channel_folder_setting_query |= Q(
+            **{f"{setting_name}__in": setting_group_ids_using_deactivating_user_group}
+        )
+
+    objections.extend(
+        dict(
+            type="channel_folder",
+            channel_folder_id=channel_folder.id,
+            settings=[
+                setting_name
+                for setting_name in ChannelFolder.channel_folder_permission_group_settings
+                if getattr(channel_folder, setting_name + "_id")
+                in setting_group_ids_using_deactivating_user_group
+            ],
+        )
+        for channel_folder in ChannelFolder.objects.filter(
+            realm_id=user_group.realm_id, is_archived=False
+        )
+        .filter(channel_folder_setting_query)
+        .order_by("id")
+    )
 
     group_setting_query = Q()
     for setting_name in NamedUserGroup.GROUP_PERMISSION_SETTINGS:
@@ -1236,6 +1261,7 @@ def get_server_supported_permission_settings() -> ServerSupportedPermissionSetti
         realm=Realm.REALM_PERMISSION_GROUP_SETTINGS,
         stream=Stream.stream_permission_group_settings,
         group=NamedUserGroup.GROUP_PERMISSION_SETTINGS,
+        channel_folder=ChannelFolder.channel_folder_permission_group_settings,
     )
 
 

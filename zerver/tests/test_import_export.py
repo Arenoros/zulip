@@ -21,6 +21,7 @@ from typing_extensions import override
 from analytics.models import UserCount
 from version import ZULIP_VERSION
 from zerver.actions.alert_words import do_add_alert_words
+from zerver.actions.channel_folders import check_add_channel_folder
 from zerver.actions.create_user import do_create_user
 from zerver.actions.custom_profile_fields import try_add_realm_custom_profile_field
 from zerver.actions.muted_users import do_mute_user
@@ -1771,11 +1772,8 @@ class RealmImportExportTest(ExportFile):
             flags=OnboardingUserMessage.flags.starred,
         )
 
-        channel_folder = ChannelFolder.objects.create(
-            realm=original_realm,
-            name="Frontend",
-            description="Frontend channels",
-            creator=self.example_user("iago"),
+        channel_folder = check_add_channel_folder(
+            original_realm, "Frontend", "Frontend channels", acting_user=self.example_user("iago")
         )
         stream.folder = channel_folder
         stream.save()

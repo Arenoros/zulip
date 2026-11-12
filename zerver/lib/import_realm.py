@@ -1669,6 +1669,10 @@ def do_import_realm(
             re_map_foreign_keys(
                 data, "zerver_channelfolder", "creator", related_table="user_profile"
             )
+            for setting_name in ChannelFolder.channel_folder_permission_group_settings:
+                re_map_foreign_keys(
+                    data, "zerver_channelfolder", setting_name, related_table="usergroup"
+                )
 
             # To correctly set .folder attribute for streams, we
             # would need to create ChannelFolder objects before

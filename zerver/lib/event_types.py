@@ -131,6 +131,7 @@ class ChannelFolderForChannelFolderAddEvent(BaseEventModel):
     date_created: int
     creator_id: int | None
     is_archived: bool
+    can_administer_group: int | UserGroupMembersDict
 
 
 class ChannelFolderAddEvent(BaseEvent):
@@ -145,6 +146,7 @@ class ChannelFolderDataForUpdate(BaseEventModel):
     description: str | None = None
     rendered_description: str | None = None
     is_archived: bool | None = None
+    can_administer_group: int | UserGroupMembersDict | None = None
 
 
 class ChannelFolderReorderEvent(BaseEvent):

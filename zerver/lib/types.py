@@ -377,6 +377,7 @@ class ServerSupportedPermissionSettings:
     realm: dict[str, GroupPermissionSetting]
     stream: dict[str, GroupPermissionSetting]
     group: dict[str, GroupPermissionSetting]
+    channel_folder: dict[str, GroupPermissionSetting]
 
 
 class RawUserDict(TypedDict):

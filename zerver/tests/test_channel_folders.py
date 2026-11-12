@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import orjson
 from typing_extensions import override
@@ -9,10 +9,16 @@ from zerver.actions.channel_folders import (
     try_reorder_realm_channel_folders,
 )
 from zerver.actions.streams import do_change_stream_folder, do_deactivate_stream
+from zerver.actions.user_groups import check_add_user_group
 from zerver.lib.test_classes import ZulipTestCase
-from zerver.models import ChannelFolder
+from zerver.models import ChannelFolder, NamedUserGroup, RealmAuditLog
+from zerver.models.groups import SystemGroups
+from zerver.models.realm_audit_logs import AuditLogEventType
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
+
+if TYPE_CHECKING:
+    from django.test.client import _MonkeyPatchedWSGIResponse as TestHttpResponse
 
 
 class ChannelFoldersTestCase(ZulipTestCase):
@@ -43,12 +49,12 @@ class ChannelFoldersTestCase(ZulipTestCase):
 
 class ChannelFolderCreationTest(ZulipTestCase):
     def test_creating_channel_folder(self) -> None:
-        self.login("shiva")
+        self.login("polonius")
         realm = get_realm("zulip")
 
         params = {"name": "Frontend", "description": ""}
         result = self.client_post("/json/channel_folders/create", params)
-        self.assert_json_error(result, "Must be an organization administrator")
+        self.assert_json_error(result, "Not allowed for guest users")
 
         self.login("iago")
         result = self.client_post("/json/channel_folders/create", params)
@@ -60,6 +66,22 @@ class ChannelFolderCreationTest(ZulipTestCase):
         self.assertEqual(channel_folder.id, channel_folder.order)
         response = orjson.loads(result.content)
         self.assertEqual(response["channel_folder_id"], channel_folder.id)
+
+        # A member can create a folder, and becomes its administrator.
+        shiva = self.example_user("shiva")
+        self.login_user(shiva)
+        result = self.client_post(
+            "/json/channel_folders/create", {"name": "Backend", "description": ""}
+        )
+        channel_folder_id = self.assert_json_success(result)["channel_folder_id"]
+        channel_folder = ChannelFolder.objects.get(id=channel_folder_id)
+        self.assertEqual(channel_folder.creator, shiva)
+        self.assertFalse(hasattr(channel_folder.can_administer_group, "named_user_group"))
+        self.assertEqual(
+            list(channel_folder.can_administer_group.direct_members.all()),
+            [shiva],
+        )
+        self.assertEqual(list(channel_folder.can_administer_group.direct_subgroups.all()), [])
 
     def test_creating_channel_folder_with_duplicate_name(self) -> None:
         self.login("iago")
@@ -163,6 +185,10 @@ class GetChannelFoldersTest(ChannelFoldersTestCase):
             )
             self.assertEqual(channel_folders[0]["is_archived"], frontend_folder.is_archived)
             self.assertEqual(channel_folders[0]["creator_id"], iago.id)
+            self.assertEqual(
+                channel_folders[0]["can_administer_group"],
+                {"direct_members": [iago.id], "direct_subgroups": []},
+            )
 
             self.assertEqual(channel_folders[1]["id"], backend_folder.id)
             self.assertEqual(channel_folders[1]["name"], "Backend")
@@ -248,7 +274,7 @@ class UpdateChannelFoldersTest(ChannelFoldersTestCase):
 
         params = {"name": "Web frontend"}
         result = self.client_patch(f"/json/channel_folders/{channel_folder_id}", params)
-        self.assert_json_error(result, "Must be an organization administrator")
+        self.assert_json_error(result, "Insufficient permission")
 
         self.login("iago")
 
@@ -294,7 +320,7 @@ class UpdateChannelFoldersTest(ChannelFoldersTestCase):
 
         params = {"description": "Channels for **frontend** discussions"}
         result = self.client_patch(f"/json/channel_folders/{channel_folder_id}", params)
-        self.assert_json_error(result, "Must be an organization administrator")
+        self.assert_json_error(result, "Insufficient permission")
 
         self.login("iago")
 
@@ -336,7 +362,7 @@ class UpdateChannelFoldersTest(ChannelFoldersTestCase):
 
         params = {"is_archived": orjson.dumps(True).decode()}
         result = self.client_patch(f"/json/channel_folders/{channel_folder_id}", params)
-        self.assert_json_error(result, "Must be an organization administrator")
+        self.assert_json_error(result, "Insufficient permission")
 
         self.login("iago")
 
@@ -375,6 +401,232 @@ class UpdateChannelFoldersTest(ChannelFoldersTestCase):
         self.assert_json_success(result)
         channel_folder = ChannelFolder.objects.get(id=channel_folder_id)
         self.assertTrue(channel_folder.is_archived)
+
+
+class ChannelFolderAdministratorsTest(ChannelFoldersTestCase):
+    def test_folder_administrator_can_update_folder(self) -> None:
+        realm = get_realm("zulip")
+        hamlet = self.example_user("hamlet")
+        self.login_user(hamlet)
+        result = self.client_post(
+            "/json/channel_folders/create", {"name": "Design", "description": ""}
+        )
+        channel_folder_id = self.assert_json_success(result)["channel_folder_id"]
+
+        # The creator administers the folder without being an
+        # organization administrator.
+        result = self.client_patch(
+            f"/json/channel_folders/{channel_folder_id}",
+            {"name": "Product design", "description": "Design channels"},
+        )
+        self.assert_json_success(result)
+        channel_folder = ChannelFolder.objects.get(id=channel_folder_id)
+        self.assertEqual(channel_folder.name, "Product design")
+        self.assertEqual(channel_folder.description, "Design channels")
+
+        result = self.client_patch(
+            f"/json/channel_folders/{channel_folder_id}",
+            {"is_archived": orjson.dumps(True).decode()},
+        )
+        self.assert_json_success(result)
+        channel_folder.refresh_from_db()
+        self.assertTrue(channel_folder.is_archived)
+
+        # Other members cannot change it, including its administrators.
+        cordelia = self.example_user("cordelia")
+        self.login_user(cordelia)
+        result = self.client_patch(
+            f"/json/channel_folders/{channel_folder_id}", {"name": "Cordelia's folder"}
+        )
+        self.assert_json_error(result, "Insufficient permission")
+        result = self.client_patch(
+            f"/json/channel_folders/{channel_folder_id}",
+            {
+                "can_administer_group": orjson.dumps(
+                    {"new": {"direct_members": [cordelia.id], "direct_subgroups": []}}
+                ).decode()
+            },
+        )
+        self.assert_json_error(result, "Insufficient permission")
+        self.assertEqual(
+            list(channel_folder.can_administer_group.direct_members.all()),
+            [hamlet],
+        )
+
+        # The creator still cannot change folders of other users, or
+        # the order of the folders.
+        self.login_user(hamlet)
+        frontend_folder = ChannelFolder.objects.get(name="Frontend", realm=realm)
+        result = self.client_patch(
+            f"/json/channel_folders/{frontend_folder.id}", {"name": "Hamlet's folder"}
+        )
+        self.assert_json_error(result, "Insufficient permission")
+        result = self.client_patch(
+            "/json/channel_folders",
+            {"order": orjson.dumps([channel_folder_id]).decode()},
+        )
+        self.assert_json_error(result, "Must be an organization administrator")
+
+    def test_changing_folder_administrators(self) -> None:
+        realm = get_realm("zulip")
+        iago = self.example_user("iago")
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        channel_folder = ChannelFolder.objects.get(name="Frontend", realm=realm)
+        url = f"/json/channel_folders/{channel_folder.id}"
+        leadership_group = check_add_user_group(realm, "leadership", [othello], acting_user=iago)
+        moderators_group = NamedUserGroup.objects.get(
+            name=SystemGroups.MODERATORS, realm_for_sharding=realm, is_system_group=True
+        )
+
+        def set_administrators(new: object, old: object = None) -> "TestHttpResponse":
+            value = {"new": new} if old is None else {"new": new, "old": old}
+            return self.client_patch(url, {"can_administer_group": orjson.dumps(value).decode()})
+
+        # An organization administrator can appoint administrators of
+        # a folder they did not create.
+        self.login("desdemona")
+        with self.capture_send_event_calls(expected_num_events=1) as events:
+            result = set_administrators(
+                {"direct_members": [hamlet.id], "direct_subgroups": [leadership_group.id]}
+            )
+        self.assert_json_success(result)
+        self.assertEqual(
+            events[0]["event"],
+            dict(
+                type="channel_folder",
+                op="update",
+                channel_folder_id=channel_folder.id,
+                data=dict(
+                    can_administer_group=dict(
+                        direct_members=[hamlet.id], direct_subgroups=[leadership_group.id]
+                    )
+                ),
+            ),
+        )
+        audit_log = RealmAuditLog.objects.filter(
+            event_type=AuditLogEventType.CHANNEL_FOLDER_GROUP_BASED_SETTING_CHANGED
+        ).last()
+        assert audit_log is not None
+        self.assertEqual(audit_log.modified_channel_folder, channel_folder)
+        self.assertEqual(
+            audit_log.extra_data,
+            {
+                RealmAuditLog.OLD_VALUE: {"direct_members": [iago.id], "direct_subgroups": []},
+                RealmAuditLog.NEW_VALUE: {
+                    "direct_members": [hamlet.id],
+                    "direct_subgroups": [leadership_group.id],
+                },
+                "property": "can_administer_group",
+            },
+        )
+
+        # Members of a group that administers the folder administer it,
+        # and the previous administrator does not anymore.
+        self.login_user(othello)
+        result = self.client_patch(url, {"name": "Web frontend"})
+        self.assert_json_success(result)
+        self.login_user(cordelia)
+        result = self.client_patch(url, {"name": "Cordelia's folder"})
+        self.assert_json_error(result, "Insufficient permission")
+
+        # A folder administrator can appoint other administrators.
+        self.login_user(hamlet)
+        result = set_administrators(moderators_group.id)
+        self.assert_json_success(result)
+        channel_folder.refresh_from_db()
+        self.assertEqual(channel_folder.can_administer_group_id, moderators_group.id)
+        result = self.client_patch(url, {"name": "Hamlet's folder"})
+        self.assert_json_error(result, "Insufficient permission")
+
+        # Requests that do not change the value send no events.
+        self.login("iago")
+        with self.capture_send_event_calls(expected_num_events=0):
+            result = set_administrators(moderators_group.id)
+        self.assert_json_success(result)
+
+        result = set_administrators(leadership_group.id, old=leadership_group.id)
+        self.assert_json_error(result, "'old' value does not match the expected value.")
+
+        everyone_group = NamedUserGroup.objects.get(
+            name=SystemGroups.EVERYONE, realm_for_sharding=realm, is_system_group=True
+        )
+        result = set_administrators(everyone_group.id)
+        self.assert_json_error(
+            result, "'can_administer_group' setting cannot be set to 'role:everyone' group."
+        )
+        result = set_administrators(999999)
+        self.assert_json_error(result, "Invalid user group")
+        result = set_administrators({"direct_members": [hamlet.id], "direct_subgroups": [999999]})
+        self.assert_json_error(result, "Invalid user group ID: 999999")
+
+        # Guests cannot administer folders, even when listed.
+        polonius = self.example_user("polonius")
+        result = set_administrators({"direct_members": [polonius.id], "direct_subgroups": []})
+        self.assert_json_success(result)
+        self.login_user(polonius)
+        result = self.client_patch(url, {"name": "Polonius's folder"})
+        self.assert_json_error(result, "Insufficient permission")
+
+        # An empty set of administrators leaves the folder to the
+        # administrators of the organization.
+        self.login("iago")
+        result = set_administrators({"direct_members": [], "direct_subgroups": []})
+        self.assert_json_success(result)
+        channel_folder.refresh_from_db()
+        nobody_group = NamedUserGroup.objects.get(
+            name=SystemGroups.NOBODY, realm_for_sharding=realm, is_system_group=True
+        )
+        self.assertEqual(channel_folder.can_administer_group_id, nobody_group.id)
+        result = self.client_patch(url, {"name": "Frontend"})
+        self.assert_json_success(result)
+
+    def test_user_group_administering_folder_cannot_be_deactivated(self) -> None:
+        realm = get_realm("zulip")
+        iago = self.example_user("iago")
+        othello = self.example_user("othello")
+        frontend_folder = ChannelFolder.objects.get(name="Frontend", realm=realm)
+        backend_folder = ChannelFolder.objects.get(name="Backend", realm=realm)
+        leadership_group = check_add_user_group(realm, "leadership", [othello], acting_user=iago)
+
+        self.login_user(iago)
+        for channel_folder, value in [
+            (frontend_folder, leadership_group.id),
+            (
+                backend_folder,
+                {"direct_members": [iago.id], "direct_subgroups": [leadership_group.id]},
+            ),
+        ]:
+            result = self.client_patch(
+                f"/json/channel_folders/{channel_folder.id}",
+                {"can_administer_group": orjson.dumps({"new": value}).decode()},
+            )
+            self.assert_json_success(result)
+
+        result = self.client_post(f"/json/user_groups/{leadership_group.id}/deactivate")
+        self.assert_json_error(result, "Cannot deactivate user group in use.")
+        self.assertEqual(
+            orjson.loads(result.content)["objections"],
+            [
+                {
+                    "type": "channel_folder",
+                    "channel_folder_id": frontend_folder.id,
+                    "settings": ["can_administer_group"],
+                },
+                {
+                    "type": "channel_folder",
+                    "channel_folder_id": backend_folder.id,
+                    "settings": ["can_administer_group"],
+                },
+            ],
+        )
+
+        # Archived folders do not keep a group from being deactivated.
+        do_archive_channel_folder(frontend_folder, acting_user=iago)
+        do_archive_channel_folder(backend_folder, acting_user=iago)
+        result = self.client_post(f"/json/user_groups/{leadership_group.id}/deactivate")
+        self.assert_json_success(result)
 
 
 class ReorderChannelFolderTest(ChannelFoldersTestCase):

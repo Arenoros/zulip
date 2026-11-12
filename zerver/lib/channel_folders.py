@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from django.utils.translation import gettext as _
@@ -7,7 +8,13 @@ from zerver.lib.markdown import markdown_convert
 from zerver.lib.streams import get_web_public_streams_queryset
 from zerver.lib.string_validation import check_string_is_printable
 from zerver.lib.timestamp import datetime_to_timestamp
-from zerver.models import ChannelFolder, Realm, Stream, UserProfile
+from zerver.lib.types import UserGroupMembersData, UserGroupMembersDict
+from zerver.lib.user_groups import (
+    get_group_setting_value_for_register_api,
+    get_members_and_subgroups_of_groups,
+    user_has_permission_for_group_setting,
+)
+from zerver.models import ChannelFolder, Realm, Stream, UserGroup, UserProfile
 
 
 @dataclass
@@ -20,6 +27,7 @@ class ChannelFolderData:
     creator_id: int | None
     date_created: int
     is_archived: bool
+    can_administer_group: int | UserGroupMembersDict
 
 
 def check_channel_folder_name(name: str, realm: Realm) -> None:
@@ -44,7 +52,27 @@ def render_channel_folder_description(text: str, realm: Realm, *, acting_user: U
     ).rendered_content
 
 
-def get_channel_folder_data(channel_folder: ChannelFolder) -> ChannelFolderData:
+def get_anonymous_group_membership_dict_for_channel_folders(
+    channel_folders: Collection[ChannelFolder],
+) -> dict[int, UserGroupMembersData]:
+    setting_group_ids = {
+        getattr(channel_folder, setting_name + "_id")
+        for channel_folder in channel_folders
+        for setting_name in ChannelFolder.channel_folder_permission_group_settings
+    }
+    anonymous_group_ids = UserGroup.objects.filter(
+        id__in=setting_group_ids, named_user_group=None
+    ).values_list("id", flat=True)
+    if len(anonymous_group_ids) == 0:
+        return {}
+
+    return get_members_and_subgroups_of_groups(anonymous_group_ids)
+
+
+def get_channel_folder_data(
+    channel_folder: ChannelFolder,
+    anonymous_group_membership: dict[int, UserGroupMembersData],
+) -> ChannelFolderData:
     date_created = datetime_to_timestamp(channel_folder.date_created)
     return ChannelFolderData(
         id=channel_folder.id,
@@ -55,7 +83,20 @@ def get_channel_folder_data(channel_folder: ChannelFolder) -> ChannelFolderData:
         date_created=date_created,
         creator_id=channel_folder.creator_id,
         is_archived=channel_folder.is_archived,
+        can_administer_group=get_group_setting_value_for_register_api(
+            channel_folder.can_administer_group_id, anonymous_group_membership
+        ),
     )
+
+
+def get_channel_folders_data(channel_folders: Collection[ChannelFolder]) -> list[ChannelFolderData]:
+    anonymous_group_membership = get_anonymous_group_membership_dict_for_channel_folders(
+        channel_folders
+    )
+    return [
+        get_channel_folder_data(channel_folder, anonymous_group_membership)
+        for channel_folder in channel_folders
+    ]
 
 
 def get_channel_folders_in_realm(
@@ -65,8 +106,7 @@ def get_channel_folders_in_realm(
     if not include_archived:
         folders = folders.exclude(is_archived=True)
 
-    channel_folders = [get_channel_folder_data(channel_folder) for channel_folder in folders]
-    return sorted(channel_folders, key=lambda folder: folder.order)
+    return sorted(get_channel_folders_data(folders), key=lambda folder: folder.order)
 
 
 def get_channel_folder_by_id(channel_folder_id: int, realm: Realm) -> ChannelFolder:
@@ -77,13 +117,34 @@ def get_channel_folder_by_id(channel_folder_id: int, realm: Realm) -> ChannelFol
         raise JsonableError(_("Invalid channel folder ID"))
 
 
+def user_can_administer_channel_folder(
+    user_profile: UserProfile, channel_folder: ChannelFolder
+) -> bool:
+    if user_profile.is_realm_admin:
+        return True
+
+    return user_has_permission_for_group_setting(
+        channel_folder.can_administer_group_id,
+        user_profile,
+        ChannelFolder.channel_folder_permission_group_settings["can_administer_group"],
+    )
+
+
+def access_channel_folder_for_administration(
+    channel_folder_id: int, user_profile: UserProfile
+) -> ChannelFolder:
+    channel_folder = get_channel_folder_by_id(channel_folder_id, user_profile.realm)
+    if not user_can_administer_channel_folder(user_profile, channel_folder):
+        raise JsonableError(_("Insufficient permission"))
+    return channel_folder
+
+
 def get_channel_folders_for_spectators(realm: Realm) -> list[ChannelFolderData]:
     folder_ids_for_web_public_streams = set(
         get_web_public_streams_queryset(realm).values_list("folder_id", flat=True)
     )
     folders = ChannelFolder.objects.filter(id__in=folder_ids_for_web_public_streams)
-    channel_folders = [get_channel_folder_data(channel_folder) for channel_folder in folders]
-    return sorted(channel_folders, key=lambda folder: folder.id)
+    return sorted(get_channel_folders_data(folders), key=lambda folder: folder.id)
 
 
 def check_channel_folder_in_use(channel_folder: ChannelFolder) -> bool:
