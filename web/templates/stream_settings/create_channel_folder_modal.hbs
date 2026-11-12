@@ -10,3 +10,8 @@
     </label>
     <textarea id="new_channel_folder_description" class="modal-textarea" name="channel_folder_description" maxlength="{{ max_channel_folder_description_length }}"></textarea>
 </div>
+{{> ../settings/group_setting_value_pill_input
+  setting_name="can_access_group"
+  label=(t "Who can see this folder")
+  help_link="/help/manage-channel-folders#make-a-channel-folder-private"
+  prefix="id_new_channel_folder_"}}

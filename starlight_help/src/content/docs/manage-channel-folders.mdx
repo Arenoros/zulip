@@ -59,7 +59,8 @@ administrators.
 ## Manage a channel folder
 
 The administrators of a channel folder can change its name and description,
-and choose who else can administer it. Organization administrators can manage
+choose [who can see it](#make-a-channel-folder-private), and choose who else can
+administer it. Organization administrators can manage
 every channel folder.
 
 Renaming a channel folder renames the channels in it, since the name of a
@@ -99,6 +100,46 @@ channel [starts with the name of its folder](/help/channel-folders#names-of-chan
          icon for the channel folder you want to manage.
       1. Edit channel folder information as desired, and click **Save changes**.
     </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Make a channel folder private
+
+By default, everyone in the organization can see a channel folder. You can
+make a folder private when you create it, or later, by choosing **Who can see
+this folder**. The administrators of the folder and organization administrators
+can always see it.
+
+In a private folder:
+
+* Only those who can see the folder can see its channels and their messages,
+  search them, and subscribe to them. Each channel also keeps its own
+  permissions; for example, a private channel in a private folder needs access
+  to both.
+* Users who can no longer see the folder, for example after they are removed
+  from the group that can see it, are unsubscribed from its channels and can
+  no longer read their messages. If they get access again, they can
+  subscribe again.
+* Moving a channel into the folder unsubscribes the subscribers who cannot see
+  the folder.
+* [Web-public channels](/help/public-access-option) and
+  [default channels](/help/set-default-channels-for-new-users) can't be in the
+  folder.
+
+Files uploaded in messages in public channels remain accessible to anyone
+in the organization who has a link to them, even if the channel is in a
+private folder.
+
+<Tabs>
+  <TabItem label="Via left sidebar">
+    <Steps>
+      1. Hover over the name of a channel folder in the left sidebar.
+      1. Click on the **ellipsis** (<MoreVerticalIcon />), and
+         click **Manage folder**.
+      1. Under **Who can see this folder**, add the users and groups who
+         should see it, and remove **Everyone**.
+      1. Click **Save changes**.
+    </Steps>
   </TabItem>
 </Tabs>
 

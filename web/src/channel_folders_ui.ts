@@ -25,6 +25,7 @@ import * as modals from "./modals.ts";
 import * as people from "./people.ts";
 import * as settings_components from "./settings_components.ts";
 import {realm} from "./state_data.ts";
+import type {GroupSettingValue} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import type {StreamSubscription} from "./sub_store.ts";
 import type {GroupSettingPillContainer} from "./typeahead_helper.ts";
@@ -35,7 +36,32 @@ import * as util from "./util.ts";
 let channel_folder_stream_list_widget: ListWidgetType<StreamSubscription> | undefined;
 let stream_list_widget_stream_ids: Set<number> | undefined;
 let add_channel_folder_widget: DropdownWidget | undefined;
-let can_administer_group_widget: GroupSettingPillContainer | undefined;
+type ChannelFolderGroupSetting = "can_access_group" | "can_administer_group";
+let group_setting_widgets = new Map<ChannelFolderGroupSetting, GroupSettingPillContainer>();
+
+function create_group_setting_widget(
+    $pill_container: JQuery,
+    setting_name: ChannelFolderGroupSetting,
+    value: GroupSettingValue,
+    on_change?: () => void,
+): GroupSettingPillContainer {
+    const pill_widget = group_setting_pill.create_pills(
+        $pill_container,
+        setting_name,
+        "channel_folder",
+    );
+    group_setting_pill.set_up_pill_typeahead({
+        pill_widget,
+        $pill_container,
+        opts: {setting_name, setting_type: "channel_folder"},
+    });
+    settings_components.set_group_setting_widget_value(pill_widget, value);
+    if (on_change !== undefined) {
+        pill_widget.onPillCreate(on_change);
+        pill_widget.onPillRemove(on_change);
+    }
+    return pill_widget;
+}
 
 export function add_channel_folder(on_create?: (folder_id: number) => void): void {
     const modal_content_html = render_create_channel_folder_modal({
@@ -43,14 +69,23 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
         max_channel_folder_description_length: realm.max_channel_folder_description_length,
     });
 
+    const everyone_group_id = user_groups.get_user_group_from_name("role:everyone")!.id;
+    let can_access_group_widget: GroupSettingPillContainer | undefined;
+
     function create_channel_folder(): void {
         const close_on_success = true;
-        const data = {
+        assert(can_access_group_widget !== undefined);
+        const can_access_group =
+            settings_components.get_group_setting_widget_value(can_access_group_widget);
+        const data: Record<string, string> = {
             name: $<HTMLInputElement>("input#new_channel_folder_name").val()!.trim(),
             description: $<HTMLTextAreaElement>("textarea#new_channel_folder_description")
                 .val()!
                 .trim(),
         };
+        if (!_.isEqual(can_access_group, everyone_group_id)) {
+            data["can_access_group"] = JSON.stringify(can_access_group);
+        }
         dialog_widget.submit_api_request(
             channel.post,
             "/json/channel_folders/create",
@@ -67,8 +102,8 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
                     // the client receives channel_folder/add event.
                     const channel_folder = {
                         id,
-                        name: data.name,
-                        description: data.description,
+                        name: data["name"]!,
+                        description: data["description"]!,
                         is_archived: false,
                         rendered_description: "",
                         date_created: 0,
@@ -78,7 +113,7 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
                             direct_members: [people.my_current_user_id()],
                             direct_subgroups: [],
                         },
-                        can_access_group: user_groups.get_user_group_from_name("role:everyone")!.id,
+                        can_access_group,
                     };
                     channel_folders.add(channel_folder);
                     on_create?.(id);
@@ -96,6 +131,13 @@ export function add_channel_folder(on_create?: (folder_id: number) => void): voi
         on_click: create_channel_folder,
         loading_spinner: true,
         on_shown: () => $("#new_channel_folder_name").trigger("focus"),
+        post_render() {
+            can_access_group_widget = create_group_setting_widget(
+                $("#id_new_channel_folder_can_access_group"),
+                "can_access_group",
+                everyone_group_id,
+            );
+        },
     });
 }
 
@@ -421,27 +463,22 @@ export function update_channel_folder_channels_list(
     }
 }
 
-function render_can_administer_group_widget(folder: channel_folders.ChannelFolder): void {
-    const $pill_container = $("#id_channel_folder_can_administer_group");
-    const pill_widget = group_setting_pill.create_pills(
-        $pill_container,
-        "can_administer_group",
-        "channel_folder",
-    );
-    group_setting_pill.set_up_pill_typeahead({
-        pill_widget,
-        $pill_container,
-        opts: {setting_name: "can_administer_group", setting_type: "channel_folder"},
-    });
-    settings_components.set_group_setting_widget_value(pill_widget, folder.can_administer_group);
-
+function render_group_setting_widgets(folder: channel_folders.ChannelFolder): void {
     // The dialog only notices changes to its form fields.
     const enable_submit_button = (): void => {
         $("#edit_channel_folder .dialog_submit_button").prop("disabled", false);
     };
-    pill_widget.onPillCreate(enable_submit_button);
-    pill_widget.onPillRemove(enable_submit_button);
-    can_administer_group_widget = pill_widget;
+    for (const setting_name of ["can_access_group", "can_administer_group"] as const) {
+        group_setting_widgets.set(
+            setting_name,
+            create_group_setting_widget(
+                $(`#id_channel_folder_${setting_name}`),
+                setting_name,
+                folder[setting_name],
+                enable_submit_button,
+            ),
+        );
+    }
 }
 
 function update_channel_folder(folder_id: number): void {
@@ -454,17 +491,13 @@ function update_channel_folder(folder_id: number): void {
         name: new_name,
         description: new_description,
     };
-    assert(can_administer_group_widget !== undefined);
-    const old_can_administer_group =
-        channel_folders.get_channel_folder_by_id(folder_id).can_administer_group;
-    const new_can_administer_group = settings_components.get_group_setting_widget_value(
-        can_administer_group_widget,
-    );
-    if (!_.isEqual(new_can_administer_group, old_can_administer_group)) {
-        data["can_administer_group"] = JSON.stringify({
-            new: new_can_administer_group,
-            old: old_can_administer_group,
-        });
+    const folder = channel_folders.get_channel_folder_by_id(folder_id);
+    for (const [setting_name, pill_widget] of group_setting_widgets) {
+        const old_value = folder[setting_name];
+        const new_value = settings_components.get_group_setting_widget_value(pill_widget);
+        if (!_.isEqual(new_value, old_value)) {
+            data[setting_name] = JSON.stringify({new: new_value, old: old_value});
+        }
     }
     const opts = {
         success_continuation() {
@@ -522,7 +555,7 @@ export function handle_editing_channel_folder(folder_id: number): void {
         on_hidden() {
             stream_list_widget_stream_ids = undefined;
             add_channel_folder_widget = undefined;
-            can_administer_group_widget = undefined;
+            group_setting_widgets = new Map();
         },
         hide_footer: !can_manage_folder,
         update_submit_disabled_state_on_change: can_manage_folder,
@@ -530,7 +563,7 @@ export function handle_editing_channel_folder(folder_id: number): void {
             render_channel_list(subs, folder_id);
             if (can_manage_folder) {
                 render_add_channel_folder_widget();
-                render_can_administer_group_widget(folder);
+                render_group_setting_widgets(folder);
             }
         },
     });

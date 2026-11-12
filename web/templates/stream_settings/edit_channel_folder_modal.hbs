@@ -13,6 +13,11 @@
 </div>
 {{#if can_manage_folder}}
 {{> ../settings/group_setting_value_pill_input
+  setting_name="can_access_group"
+  label=(t "Who can see this folder")
+  help_link="/help/manage-channel-folders#make-a-channel-folder-private"
+  prefix="id_channel_folder_"}}
+{{> ../settings/group_setting_value_pill_input
   setting_name="can_administer_group"
   label=(t "Who can administer this folder")
   prefix="id_channel_folder_"}}
