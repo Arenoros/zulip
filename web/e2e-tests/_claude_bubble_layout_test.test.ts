@@ -1,6 +1,6 @@
 import {execSync} from "node:child_process";
 
-import type {Page} from "puppeteer";
+import type {HTTPRequest, Page} from "puppeteer";
 
 import * as common from "./lib/common.ts";
 
@@ -564,6 +564,169 @@ async function visual_test(page: Page): Promise<void> {
     await shot_row(page, image_message_id, "image");
     await shot_row(page, seeded.ids[11]!, "me-message");
     await shot_row(page, seeded.ids[12]!, "mention");
+
+    // Message states.
+    const row_selector = (id: number): string =>
+        `.focused-message-list .message_row[data-message-id="${id}"]`;
+
+    // Selection with the keyboard: a ring around the bubble, time shown.
+    await page.click(`${row_selector(seeded.ids[1]!)} .message_content`);
+    await page.mouse.move(1, 1);
+    const selection = await page.$eval(row_selector(seeded.ids[1]!), (row) => ({
+        selected: row.classList.contains("selected_message"),
+        row_outline: getComputedStyle(row.querySelector(".messagebox-content")!).outlineStyle,
+        bubble_outline: getComputedStyle(row.querySelector(".message_content")!).outlineWidth,
+        time: getComputedStyle(row.querySelector(".message-time")!).visibility,
+    }));
+    check(
+        "the selected message has a ring around its bubble",
+        selection.selected &&
+            selection.row_outline === "none" &&
+            selection.bubble_outline === "2px" &&
+            selection.time === "visible",
+        JSON.stringify(selection),
+    );
+    await shot_row(page, seeded.ids[1]!, "selected");
+
+    // The hover controls float over the top edge of the bubble.
+    for (const id of [seeded.ids[1]!, seeded.ids[3]!]) {
+        await page.hover(`${row_selector(id)} .message_content`);
+        const panel = await page.$eval(row_selector(id), (row) => {
+            const controls = row.querySelector(".message_controls")!;
+            const bubble = row.querySelector(".message_content")!.getBoundingClientRect();
+            const rect = controls.getBoundingClientRect();
+            return {
+                position: getComputedStyle(controls).position,
+                buttons: [...controls.querySelectorAll(".message_control_button")].filter(
+                    (button) => button.getBoundingClientRect().width > 0,
+                ).length,
+                above_top: rect.top < bubble.top && rect.bottom > bubble.top,
+                beside:
+                    Math.abs(rect.left - bubble.right) < 30 ||
+                    Math.abs(rect.right - bubble.left) < 30,
+            };
+        });
+        check(
+            `the hover controls float at the top edge of message ${id}`,
+            panel.position === "absolute" && panel.buttons >= 3 && panel.above_top && panel.beside,
+            JSON.stringify(panel),
+        );
+        await shot_row(page, id, `hover-controls-${id === seeded.ids[1] ? "other" : "own"}`);
+    }
+    await page.mouse.move(1, 1);
+
+    // Editing in place uses 85% of the feed.
+    await page.evaluate(() => {
+        zulip_test.cancel_compose();
+    });
+    await page.hover(`${row_selector(sent_id)} .message_content`);
+    await page.click(`${row_selector(sent_id)} .edit_content_button`);
+    await page.waitForSelector(`${row_selector(sent_id)} .message_edit`, {visible: true});
+    const editor = await page.$eval(row_selector(sent_id), (row) => {
+        const content = row.querySelector(".messagebox-content")!;
+        const padding = Number.parseFloat(getComputedStyle(content).paddingLeft);
+        const width = content.getBoundingClientRect().width - padding;
+        return row.querySelector(".message_edit")!.getBoundingClientRect().width / width;
+    });
+    check("the editor takes 85% of the feed", Math.abs(editor - 0.85) < 0.02, String(editor));
+    await shot_row(page, sent_id, "editing");
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(`${row_selector(sent_id)} .message_edit`, {hidden: true});
+
+    // A message being sent, then failing to send.
+    await page.setRequestInterception(true);
+    let held: HTTPRequest | undefined;
+    const hold_sends = (request: HTTPRequest): void => {
+        if (request.method() === "POST" && request.url().endsWith("/json/messages")) {
+            held = request;
+            return;
+        }
+        void request.continue();
+    };
+    page.on("request", hold_sends);
+    await page.click("#left_bar_compose_reply_button_big");
+    await page.waitForSelector("#compose-textarea", {visible: true});
+    await page.type("#compose-textarea", "A message that will not go through");
+    await page.click("#compose-send-button");
+    await page.waitForSelector(".focused-message-list .message_row.locally-echoed");
+    await page.evaluate(() => {
+        zulip_test.cancel_compose();
+    });
+    await page.mouse.move(1, 1);
+    const echo = await page.$eval(".focused-message-list .message_row.locally-echoed", (row) => ({
+        notice: getComputedStyle(row.querySelector(".message-sending-notice")!).display,
+        text: row.querySelector(".message-sending-notice")!.textContent?.trim(),
+        opacity: getComputedStyle(row.querySelector(".message_content")!).opacity,
+        time: getComputedStyle(row.querySelector(".message-time")!).display,
+    }));
+    check(
+        "a message being sent is faded and says Sending",
+        echo.notice !== "none" && echo.text === "Sending…" && echo.opacity === "0.6" && echo.time === "none",
+        JSON.stringify(echo),
+    );
+    const echo_id = await page.$eval(".focused-message-list .message_row.locally-echoed", (row) =>
+        Number.parseFloat(row.getAttribute("data-message-id")!),
+    );
+    await shot_row(page, echo_id, "sending");
+
+    await held!.abort("failed");
+    await page.waitForSelector(".focused-message-list .message_row .failed_message_action");
+    const failure = await page.$eval(".focused-message-list .message_row.locally-echoed", (row) => ({
+        notice: row.querySelector(".failed-message-notice")!.textContent?.trim(),
+        notice_shown: getComputedStyle(row.querySelector(".failed-message-notice")!).display,
+        labels: [...row.querySelectorAll(".failed-message-action-label")].map(
+            (label) => getComputedStyle(label).display !== "none" && label.textContent?.trim(),
+        ),
+        border: getComputedStyle(row.querySelector(".message_content")!).borderTopColor,
+        sending_shown: getComputedStyle(row.querySelector(".message-sending-notice")!).display,
+    }));
+    check(
+        "a failed message says Not sent, with Retry and Delete",
+        failure.notice === "Not sent." &&
+            failure.notice_shown !== "none" &&
+            JSON.stringify(failure.labels) === JSON.stringify(["Retry", "Delete"]) &&
+            failure.sending_shown === "none",
+        JSON.stringify(failure),
+    );
+    await shot_row(page, echo_id, "failed");
+
+    page.off("request", hold_sends);
+    await page.setRequestInterception(false);
+    await page.click(".focused-message-list .message_row .refresh-failed-message");
+    await page.waitForFunction(
+        () => document.querySelectorAll(".focused-message-list .message_row.locally-echoed").length === 0,
+    );
+    check("retrying sends the message", true);
+
+    // A reminder under a message.
+    const reminder_status = await api(
+        page,
+        "POST",
+        "/json/reminders",
+        `message_id=${seeded.ids[1]}&scheduled_delivery_timestamp=${Math.floor(Date.now() / 1000) + 3600}&note=Check the logs`,
+    );
+    check("a reminder can be set", reminder_status === 200, String(reminder_status));
+    await page.waitForSelector(`${row_selector(seeded.ids[1]!)} .message-reminders`);
+    await shot_row(page, seeded.ids[1]!, "reminder");
+
+    // A muted sender keeps the layout.
+    await api(page, "POST", `/json/users/me/muted_users/${seeded.iago}`);
+    await page.waitForSelector(`${row_selector(seeded.ids[1]!)}.muted-message-sender`);
+    const muted_overflow = await page.evaluate(
+        () =>
+            [...document.querySelectorAll(".focused-message-list .messagebox-content")].filter(
+                (content) => content.scrollWidth > content.clientWidth + 1,
+            ).length,
+    );
+    check("muted messages do not overflow", muted_overflow === 0, String(muted_overflow));
+    await shot_row(page, seeded.ids[1]!, "muted");
+    await api(page, "DELETE", `/json/users/me/muted_users/${seeded.iago}`);
+    await page.waitForFunction(
+        (selector: string) => !document.querySelector(selector)!.classList.contains("muted-message-sender"),
+        {},
+        row_selector(seeded.ids[1]!),
+    );
+    await shot_list(page, "states-light");
 
     await set_setting(page, "color_scheme=2&twenty_four_hour_time=false&web_font_size_px=17&web_line_height_percent=150");
     await page.reload();
