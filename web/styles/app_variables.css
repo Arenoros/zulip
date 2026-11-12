@@ -906,6 +906,14 @@
         hsl(41deg 100% 34.5%),
         hsl(44deg 99% 48.2%)
     );
+    --color-background-code-block-in-bubble: light-dark(
+        hsl(210deg 28.6% 97.3%),
+        hsl(0deg 0% 8.6%)
+    );
+    --color-background-quote-in-bubble: light-dark(
+        hsl(0deg 0% 0% / 4%),
+        hsl(0deg 0% 0% / 20%)
+    );
     --color-selected-message-outline: light-dark(
         hsl(217deg 64% 59% / 60%),
         hsl(217deg 64% 59% / 70%)

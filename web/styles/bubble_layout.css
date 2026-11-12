@@ -125,7 +125,13 @@
         /* For the floating message controls. */
         position: relative;
 
-        &.content_edit_mode {
+        /* The editor, and bubbles with code blocks, tables, spoilers
+           or widgets, take the whole column. */
+        &.content_edit_mode,
+        &:has(
+                > .message_content:not(.collapsed)
+                    :is(.codehilite, table, .spoiler-block, .widget-content)
+            ) {
             grid-template-columns:
                 var(--bubble-avatar-column-width)
                 minmax(
@@ -136,6 +142,10 @@
                     )
                 )
                 max-content max-content max-content minmax(0, 1fr);
+
+            .message_content:not(.collapsed) {
+                justify-self: stretch;
+            }
         }
 
         .message-avatar .inline_profile_picture {
@@ -435,6 +445,63 @@
         }
     }
 
+    /* Wide and special content */
+
+    .messagebox-content:not(.is-me-message) .message_content:not(.collapsed) {
+        .codehilite pre {
+            /* 13px at 15px/1em */
+            font-size: 0.8667em;
+            /* 8px 12px at 13px/1em */
+            padding: 0.6154em 0.9231em;
+            border-radius: 6px;
+            background-color: var(--color-background-code-block-in-bubble);
+        }
+
+        & table {
+            margin: 0 0 var(--markdown-interelement-space-px);
+            padding: 0;
+            border: 1px solid var(--color-border-rendered-markdown-table);
+            border-radius: 6px;
+            /* 14px at 15px/1em */
+            font-size: 0.9333em;
+        }
+
+        & tr th,
+        & tr td {
+            border-width: 0 0 1px;
+            /* 6px 12px at 14px/1em */
+            padding: 0.4286em 0.8571em;
+        }
+
+        & tbody tr:last-child td {
+            border-bottom-width: 0;
+        }
+
+        .spoiler-block {
+            border-color: var(--color-border-rendered-markdown-table);
+            border-radius: 6px;
+
+            .spoiler-content.spoiler-content-open {
+                border-top-color: var(--color-border-rendered-markdown-table);
+            }
+        }
+
+        .message-media-preview-image,
+        .message-media-gallery-image {
+            border-radius: 4px;
+        }
+
+        & blockquote {
+            /* 6px 10px at 15px/1em */
+            padding: 0.4em 0.6667em;
+            margin-inline-start: 0;
+            border-inline-start-width: 3px;
+            border-radius: 4px;
+            background-color: var(--color-background-quote-in-bubble);
+        }
+
+    }
+
     .own-message {
         .messagebox-content:not(.is-me-message) {
             grid-template-areas:
@@ -448,7 +515,11 @@
                 minmax(0, 1fr) max-content max-content max-content
                 fit-content(calc(100% - var(--bubble-free-edge)));
 
-            &.content_edit_mode {
+            &.content_edit_mode,
+            &:has(
+                    > .message_content:not(.collapsed)
+                        :is(.codehilite, table, .spoiler-block, .widget-content)
+                ) {
                 grid-template-columns:
                     minmax(0, 1fr) max-content max-content max-content
                     minmax(0, calc(100% - var(--bubble-free-edge)));
