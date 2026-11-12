@@ -1473,12 +1473,16 @@ export const realm_plan_types = {
 export const no_folder_selected = -1;
 
 export const default_avatar_source_values: Record<
-    "jdenticon" | "gravatar",
+    "jdenticon" | "initials" | "gravatar",
     SettingDescription<string>
 > = {
     jdenticon: {
         code: "J",
         description: $t({defaultMessage: "Default"}),
+    },
+    initials: {
+        code: "I",
+        description: $t({defaultMessage: "Initials"}),
     },
     gravatar: {
         code: "G",
