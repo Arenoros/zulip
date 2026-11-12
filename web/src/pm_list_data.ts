@@ -1,12 +1,16 @@
 import * as blueslip from "./blueslip.ts";
 import * as buddy_data from "./buddy_data.ts";
 import * as hash_util from "./hash_util.ts";
+import * as muted_users from "./muted_users.ts";
 import * as narrow_state from "./narrow_state.ts";
 import * as people from "./people.ts";
+import type {User} from "./people.ts";
+import * as personal_sections from "./personal_sections.ts";
 import * as pm_conversations from "./pm_conversations.ts";
 import * as unread from "./unread.ts";
 import * as user_status from "./user_status.ts";
 import type {UserStatusEmojiInfo} from "./user_status.ts";
+import * as util from "./util.ts";
 
 // Maximum number of conversation threads to show in default view.
 const max_conversations_to_show = 8;
@@ -141,6 +145,76 @@ export function get_conversations(search_string = ""): DisplayObject[] {
     }
 
     return display_objects;
+}
+
+export type SectionDisplayObject = {
+    name: string;
+    unread: number;
+    conversations: DisplayObject[];
+};
+
+// The user's personal sections with the conversations to show in
+// them, for the Chats tab of the left sidebar.
+export function get_sections(search_string = ""): SectionDisplayObject[] {
+    const active_user_ids_string = get_active_user_ids_string();
+    const sections: SectionDisplayObject[] = [];
+
+    for (const section of personal_sections.get_conversation_sections()) {
+        // Searching for a section finds all of its conversations.
+        const section_matches_search = util.prefix_match({
+            value: section.name,
+            search_term: search_string,
+        });
+        const conversations: DisplayObject[] = [];
+
+        for (const user_ids_string of section.user_ids_strings) {
+            const user_ids = people.user_ids_string_to_ids_array(user_ids_string);
+            const users: User[] = [];
+            for (const user_id of user_ids) {
+                const user = people.maybe_get_user_by_id(user_id, true);
+                if (user !== undefined) {
+                    users.push(user);
+                }
+            }
+            if (
+                // The conversation stays in its section while one of
+                // its users is not accessible.
+                users.length !== user_ids.length ||
+                // Mirrors how pm_conversations.ts hides conversations
+                // with muted users.
+                user_ids.every((user_id) => muted_users.is_user_muted(user_id)) ||
+                (!section_matches_search && !people.dm_matches_search_string(users, search_string))
+            ) {
+                continue;
+            }
+
+            conversations.push(get_display_object(user_ids_string, active_user_ids_string));
+        }
+
+        if (search_string !== "" && conversations.length === 0) {
+            continue;
+        }
+
+        sections.push({
+            name: section.name,
+            unread: conversations.reduce((sum, conversation) => sum + conversation.unread, 0),
+            conversations,
+        });
+    }
+
+    return sections;
+}
+
+// The conversations that are not in any of the user's personal sections.
+export function get_unsectioned_conversations(search_string = ""): DisplayObject[] {
+    const sectioned_user_ids_strings = new Set(
+        personal_sections
+            .get_conversation_sections()
+            .flatMap((section) => section.user_ids_strings),
+    );
+    return get_conversations(search_string).filter(
+        (conversation) => !sectioned_user_ids_strings.has(conversation.user_ids_string),
+    );
 }
 
 // Designed to closely match topic_list_data.get_list_info().

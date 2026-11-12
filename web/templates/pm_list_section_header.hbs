@@ -1,0 +1,16 @@
+<li class="dm-list-section-header {{#if is_personal_section}}dm-list-personal-section-header bottom_left_row{{/if}}" {{#if is_personal_section}}data-section-name="{{name}}" tabindex="0" role="button" aria-expanded="{{#if is_collapsed}}false{{else}}true{{/if}}"{{/if}}>
+    {{#if is_personal_section}}
+    <i class="dm-list-section-toggle sidebar-heading-icon zulip-icon zulip-icon-heading-triangle-right {{#if is_collapsed}}rotate-icon-right{{else}}rotate-icon-down{{/if}}" aria-hidden="true"></i>
+    {{/if}}
+    <span class="left-sidebar-title dm-list-section-name">{{name}}</span>
+    {{#if is_personal_section}}
+    <div class="dm-markers-and-unreads">
+        <span class="unread_count {{#unless show_unread}}zero_count{{/unless}}">
+            {{unread}}
+        </span>
+    </div>
+    <span class="sidebar-menu-icon dm-section-sidebar-menu-icon" tabindex="0" role="button" aria-haspopup="true" aria-label="{{t 'Section actions' }}">
+        <i class="zulip-icon zulip-icon-more-vertical" aria-hidden="true"></i>
+    </span>
+    {{/if}}
+</li>

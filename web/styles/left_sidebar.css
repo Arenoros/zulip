@@ -1270,6 +1270,104 @@ li.active-sub-filter {
     }
 }
 
+.dm-list-section-header {
+    display: grid;
+    align-items: center;
+    grid-template:
+        "starting-offset starting-anchor-element icon-content-gap row-content markers-and-unreads ending-anchor-element"
+        var(--line-height-sidebar-row-prominent)
+        / var(--left-sidebar-toggle-width-offset) var(
+            --left-sidebar-icon-column-width
+        )
+        var(--left-sidebar-icon-content-gap) minmax(0, 1fr) minmax(
+            0,
+            max-content
+        )
+        var(--left-sidebar-vdots-width);
+
+    &.dm-list-personal-section-header {
+        cursor: pointer;
+    }
+
+    &:focus {
+        outline: 0;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-outline-focus);
+        outline-offset: -2px;
+    }
+
+    &:hover {
+        .dm-list-section-name,
+        .dm-list-section-toggle {
+            opacity: var(--opacity-sidebar-heading-hover);
+        }
+    }
+
+    .dm-list-section-toggle {
+        grid-area: starting-anchor-element;
+        justify-self: center;
+        color: var(--color-text-sidebar-heading);
+        opacity: var(--opacity-sidebar-heading-icon);
+    }
+
+    .dm-list-section-name {
+        grid-area: row-content;
+    }
+
+    .dm-markers-and-unreads {
+        align-self: center;
+    }
+}
+
+#left-sidebar-tabs {
+    /* Matches the padding of #left-sidebar-search. */
+    padding: 0 var(--left-sidebar-right-margin)
+        var(--sidebar-filter-bottom-spacing) 5px;
+
+    .tab-switcher {
+        display: flex;
+        margin: 0;
+    }
+
+    .ind-tab {
+        flex: 1 1 0;
+        width: auto;
+
+        .unread_count {
+            float: none;
+            display: inline-block;
+            margin-left: 0.4em;
+            vertical-align: text-bottom;
+
+            &.hide {
+                display: none;
+            }
+        }
+    }
+}
+
+#left-sidebar.showing-chats {
+    #left-sidebar-topic-search-hint,
+    #left-sidebar-navigation-area,
+    #direct-messages-section-header,
+    .direct-message-section-bottom-divider-container,
+    #streams_list,
+    #add_streams_button,
+    .channel-folders-sidebar-menu-icon {
+        display: none;
+    }
+
+    #left-sidebar-search {
+        grid-template-columns: minmax(0, 1fr) 0 0;
+    }
+}
+
+#left-sidebar:not(.showing-chats) .dm-sidebar-menu-icon {
+    display: none;
+}
+
 .top_left_mentions,
 #direct-messages-section-header,
 #direct-messages-modal-section-header,

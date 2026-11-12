@@ -545,6 +545,8 @@ function get_header_rows_selectors(): string {
         "#left-sidebar-navigation-area:not(.hidden-by-filters) #views-label-container, " +
         // DM Headers
         "#left-sidebar:not(.direct-messages-hidden-by-filters) #direct-messages-section-header, " +
+        // Headers of personal sections of direct messages.
+        ".dm-list .dm-list-personal-section-header, " +
         // All channel headers.
         ".stream-list-section-container:not(.no-display) .stream-list-subsection-header"
     );
@@ -586,12 +588,19 @@ function all_rows(): JQuery {
         "#left-sidebar-topic-search-hint.hidden .left-sidebar-topic-search-hint-link",
     );
 
-    const $filtered_rows = $all_rows
+    let $filtered_rows = $all_rows
         .not($inactive_or_muted_rows)
         .not($collapsed_views)
         .not($collapsed_channels)
         .not($toggle_inactive_or_muted_channels_row)
         .not($hidden_topic_search_hint_row);
+
+    // The Chats tab shows only the list of direct messages.
+    if (pm_list.is_chats_shown()) {
+        $filtered_rows = $filtered_rows.filter(
+            (_index, row) => $(row).closest("#direct-messages-list").length > 0,
+        );
+    }
 
     // With a "topic:" prefix search, keyboard navigation only lands on
     // topic rows, not channel header rows.
@@ -894,6 +903,7 @@ export function set_event_handlers(): void {
         if (
             $row.hasClass("stream-list-toggle-inactive-or-muted-channels") ||
             $row[0]!.id === "direct-messages-section-header" ||
+            $row.hasClass("dm-list-personal-section-header") ||
             $row.hasClass("stream-list-subsection-header")
         ) {
             $row.trigger("click");

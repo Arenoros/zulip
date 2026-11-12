@@ -98,6 +98,8 @@ import * as overlays from "./overlays.ts";
 import {page_params} from "./page_params.ts";
 import * as people from "./people.ts";
 import * as personal_menu_popover from "./personal_menu_popover.ts";
+import * as personal_sections from "./personal_sections.ts";
+import * as personal_sections_ui from "./personal_sections_ui.ts";
 import * as playground_links_popover from "./playground_links_popover.ts";
 import * as pm_conversations from "./pm_conversations.ts";
 import * as pm_conversations_util from "./pm_conversations_util.ts";
@@ -594,6 +596,7 @@ export async function initialize_everything(state_data) {
     });
     alert_words.initialize(state_data.alert_words);
     saved_snippets.initialize(state_data.saved_snippets);
+    personal_sections.initialize(state_data.personal_sections);
     emojisets.initialize(user_settings.emojiset);
     scroll_bar.initialize();
     message_viewport.initialize();
@@ -785,6 +788,7 @@ export async function initialize_everything(state_data) {
     playground_links_popover.initialize();
     personal_menu_popover.initialize();
     pm_list.initialize();
+    personal_sections_ui.initialize();
     topic_list.initialize({
         on_topic_click(stream_id, topic) {
             const sub = sub_store.get(stream_id);

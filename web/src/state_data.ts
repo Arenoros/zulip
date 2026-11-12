@@ -674,6 +674,18 @@ export const split_state_data_schema = z.object({
         server_timestamp: z.number(),
         presence_last_update_id: z.optional(z.number()),
     }),
+    personal_sections: z.object({
+        personal_sections: z.object({
+            conversation_sections: z.array(
+                z.object({
+                    name: z.string(),
+                    // Each conversation is the IDs of its participants
+                    // other than the current user, in ascending order.
+                    conversations: z.array(z.array(z.number())),
+                }),
+            ),
+        }),
+    }),
     saved_snippets: z.object({saved_snippets: z.array(saved_snippet_schema)}),
     starred_messages: z.object({starred_messages: z.array(z.number())}),
     stream_data: z.object({

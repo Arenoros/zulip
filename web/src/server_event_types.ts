@@ -21,6 +21,7 @@ export const FETCH_EVENT_TYPES: string[] = [
     "muted_users",
     "navigation_views",
     "onboarding_steps",
+    "personal_sections",
     "presence",
     "realm",
     "realm_billing",

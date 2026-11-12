@@ -46,6 +46,7 @@ import * as onboarding_steps from "./onboarding_steps.ts";
 import * as overlays from "./overlays.ts";
 import * as peer_data from "./peer_data.ts";
 import * as people from "./people.ts";
+import * as personal_sections from "./personal_sections.ts";
 import * as pm_conversations from "./pm_conversations.ts";
 import * as pm_list from "./pm_list.ts";
 import * as reactions from "./reactions.ts";
@@ -697,6 +698,13 @@ export function dispatch_normal_event(event) {
                     blueslip.error("Unexpected event type realm_user/" + event.op);
                     break;
             }
+            break;
+
+        case "personal_sections":
+            personal_sections.set_personal_sections({
+                conversation_sections: event.conversation_sections,
+            });
+            pm_list.update_private_messages();
             break;
 
         case "saved_snippets":

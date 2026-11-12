@@ -360,6 +360,12 @@ exports.fixtures = {
         ],
     },
 
+    personal_sections__update: {
+        type: "personal_sections",
+        op: "update",
+        conversation_sections: [{name: "Project", conversations: [[5], [5, 7]]}],
+    },
+
     presence: {
         type: "presence",
         presences: {

@@ -1,0 +1,32 @@
+<div class="popover-menu" data-simplebar data-simplebar-tab-index="-1">
+    <ul role="menu" class="popover-menu-list">
+        {{#if has_sections}}
+        <li role="none" class="text-item popover-menu-list-item">
+            <span class="popover-menu-label">{{t "Move to section" }}</span>
+        </li>
+        {{#each sections}}
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitemradio" aria-checked="{{#if is_current}}true{{else}}false{{/if}}" class="dm-popover-move-to-section popover-menu-link" data-section-name="{{name}}" tabindex="0">
+                <i class="popover-menu-icon zulip-icon {{#if is_current}}zulip-icon-check{{else}}zulip-icon-folder{{/if}}" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{name}}</span>
+            </a>
+        </li>
+        {{/each}}
+        <li role="separator" class="popover-menu-separator"></li>
+        {{/if}}
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="dm-popover-new-section popover-menu-link" tabindex="0">
+                <i class="popover-menu-icon zulip-icon zulip-icon-square-plus" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "New section" }}</span>
+            </a>
+        </li>
+        {{#if is_in_section}}
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="dm-popover-remove-from-section popover-menu-link" tabindex="0">
+                <i class="popover-menu-icon zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Remove from section" }}</span>
+            </a>
+        </li>
+        {{/if}}
+    </ul>
+</div>

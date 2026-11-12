@@ -59,6 +59,7 @@ const user_topics_ui = mock_esm("../src/user_topics_ui");
 const muted_users_ui = mock_esm("../src/muted_users_ui");
 const narrow_title = mock_esm("../src/narrow_title");
 const navbar_alerts = mock_esm("../src/navbar_alerts");
+const personal_sections = mock_esm("../src/personal_sections");
 const pm_list = mock_esm("../src/pm_list");
 const reactions = mock_esm("../src/reactions", {
     generate_clean_reactions() {},
@@ -259,6 +260,18 @@ run_test("navigation_views", ({override}) => {
         assert.equal(stub.num_calls, 1);
         assert_same(stub.get_args("event").event, remove_event.fragment);
     }
+});
+
+run_test("personal_sections", ({override}) => {
+    const event = event_fixtures.personal_sections__update;
+    const stub = make_stub();
+    override(personal_sections, "set_personal_sections", stub.f);
+    override(pm_list, "update_private_messages", noop);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert_same(stub.get_args("personal_sections").personal_sections, {
+        conversation_sections: event.conversation_sections,
+    });
 });
 
 run_test("saved_snippets", ({override}) => {

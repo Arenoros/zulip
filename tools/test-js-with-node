@@ -195,6 +195,7 @@ EXEMPT_FILES = make_set(
         "web/src/padded_widget.ts",
         "web/src/page_params.ts",
         "web/src/personal_menu_popover.ts",
+        "web/src/personal_sections_ui.ts",
         "web/src/playground_links_popover.ts",
         "web/src/pm_list.ts",
         "web/src/pm_list_dom.ts",

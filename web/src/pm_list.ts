@@ -3,6 +3,7 @@ import _ from "lodash";
 import * as z from "zod/mini";
 
 import * as blueslip from "./blueslip.ts";
+import * as components from "./components.ts";
 import type {Filter} from "./filter.ts";
 import {$t} from "./i18n.ts";
 import * as keydown_util from "./keydown_util.ts";
@@ -10,12 +11,13 @@ import {ListCursor} from "./list_cursor.ts";
 import {localstorage} from "./localstorage.ts";
 import * as mouse_drag from "./mouse_drag.ts";
 import * as pm_list_data from "./pm_list_data.ts";
-import type {DisplayObject} from "./pm_list_data.ts";
+import type {DisplayObject, SectionDisplayObject} from "./pm_list_data.ts";
 import * as pm_list_dom from "./pm_list_dom.ts";
 import type {PMNode} from "./pm_list_dom.ts";
 import * as resize from "./resize.ts";
 import * as scroll_util from "./scroll_util.ts";
 import * as ui_util from "./ui_util.ts";
+import * as unread from "./unread.ts";
 import type {FullUnreadCountsData} from "./unread.ts";
 import * as util from "./util.ts";
 import * as vdom from "./vdom.ts";
@@ -31,6 +33,18 @@ const ls_key = "left_sidebar_direct_messages_collapsed_state";
 const ls_schema = z._default(z.boolean(), false);
 const ls = localstorage();
 let private_messages_collapsed = false;
+
+const collapsed_sections_ls_key = "left_sidebar_direct_messages_collapsed_sections";
+const collapsed_sections_ls_schema = z._default(z.array(z.string()), []);
+// The names of the user's personal sections that are collapsed.
+let collapsed_sections = new Set<string>();
+
+// The Chats tab of the left sidebar shows all the conversations,
+// sorted into the user's personal sections, in place of the rest of
+// the left sidebar.
+const chats_shown_ls_key = "left_sidebar_chats_shown";
+const chats_shown_ls_schema = z._default(z.boolean(), false);
+let chats_shown = false;
 let temporarily_collapsed = false;
 let last_direct_message_count: number | undefined;
 
@@ -78,14 +92,14 @@ function initialize_dm_list_cursor(): void {
                 return $items.first();
             },
             prev_key($key) {
-                const $prev = $key.prev("li.dm-list-item");
+                const $prev = $key.prevAll("li.dm-list-item").first();
                 if ($prev.length === 0) {
                     return $key;
                 }
                 return $prev;
             },
             next_key($key) {
-                const $next = $key.next("li.dm-list-item");
+                const $next = $key.nextAll("li.dm-list-item").first();
                 if ($next.length === 0) {
                     return $key;
                 }
@@ -123,10 +137,42 @@ export function _build_direct_messages_list(opts: {
     all_conversations_shown: boolean;
     conversations_to_be_shown: DisplayObject[];
     search_term: string;
+    sections?: SectionDisplayObject[];
 }): vdom.Tag<PMNode> {
-    const pm_list_nodes = opts.conversations_to_be_shown.map((conversation) =>
-        pm_list_dom.keyed_pm_li(conversation),
-    );
+    const sections = opts.sections ?? [];
+    const pm_list_nodes: vdom.Node<PMNode>[] = [];
+    for (const section of sections) {
+        // A search shows the conversations it found in collapsed sections too.
+        const is_collapsed = opts.search_term === "" && collapsed_sections.has(section.name);
+        pm_list_nodes.push(
+            pm_list_dom.section_header_li({
+                name: section.name,
+                is_personal_section: true,
+                is_collapsed,
+                unread: section.unread,
+            }),
+        );
+        for (const conversation of section.conversations) {
+            // Like the collapsed direct messages section, a collapsed
+            // section still shows the current conversation.
+            if (!is_collapsed || conversation.is_active) {
+                pm_list_nodes.push(pm_list_dom.keyed_pm_li(conversation));
+            }
+        }
+    }
+    if (sections.length > 0 && opts.conversations_to_be_shown.length > 0) {
+        pm_list_nodes.push(
+            pm_list_dom.section_header_li({
+                name: $t({defaultMessage: "Other"}),
+                is_personal_section: false,
+                is_collapsed: false,
+                unread: 0,
+            }),
+        );
+    }
+    for (const conversation of opts.conversations_to_be_shown) {
+        pm_list_nodes.push(pm_list_dom.keyed_pm_li(conversation));
+    }
     const pm_list_info = pm_list_data.get_list_info(zoomed, opts.search_term);
     const more_conversations_unread_count = pm_list_info.more_conversations_unread_count;
 
@@ -172,7 +218,8 @@ export function update_private_messages(): void {
     }
 
     const is_left_sidebar_search_active = ui_util.get_left_sidebar_search_term() !== "";
-    const is_dm_section_expanded = is_left_sidebar_search_active || !private_messages_collapsed;
+    const is_dm_section_expanded =
+        chats_shown || is_left_sidebar_search_active || !private_messages_collapsed;
     if (!temporarily_collapsed) {
         $("#toggle-direct-messages-section-icon").toggleClass(
             "rotate-icon-down",
@@ -196,9 +243,20 @@ export function update_private_messages(): void {
         }
     }
 
-    const conversations = pm_list_data.get_conversations(search_term);
-    const pm_list_info = pm_list_data.get_list_info(zoomed, search_term);
-    const conversations_to_be_shown = pm_list_info.conversations_to_be_shown;
+    let conversations;
+    let conversations_to_be_shown;
+    let sections: SectionDisplayObject[] = [];
+    if (chats_shown) {
+        conversations = pm_list_data.get_unsectioned_conversations(search_term);
+        conversations_to_be_shown = conversations;
+        sections = pm_list_data.get_sections(search_term);
+    } else {
+        conversations = pm_list_data.get_conversations(search_term);
+        conversations_to_be_shown = pm_list_data.get_list_info(
+            zoomed,
+            search_term,
+        ).conversations_to_be_shown;
+    }
 
     const all_conversations_shown = conversations_to_be_shown.length === conversations.length;
     const is_header_visible =
@@ -206,6 +264,7 @@ export function update_private_messages(): void {
         zoomed ||
         // Show header if there are conversations to be shown.
         conversations_to_be_shown.length > 0 ||
+        sections.length > 0 ||
         // Show header if there are hidden conversations somehow.
         !all_conversations_shown ||
         // If there is no search term, always show the header.
@@ -235,6 +294,7 @@ export function update_private_messages(): void {
             all_conversations_shown,
             conversations_to_be_shown,
             search_term,
+            sections,
         });
         set_dom_to(new_dom, zoomed);
     }
@@ -264,6 +324,7 @@ export function update_dom_with_unread_counts(
     // This is just the global unread count.
     const new_direct_message_count = counts.direct_message_count;
     set_count(new_direct_message_count);
+    update_tab_unread_counts(counts);
 
     if (last_direct_message_count === undefined) {
         // We don't want to animate the DM header
@@ -302,6 +363,8 @@ export function update_dom_with_unread_counts(
         // typical active DMing, unreads will be cleared immediately,
         // so that should be a fairly rare edge case.
         if (
+            // The list starts with a personal section.
+            $top_dm_item.length === 0 ||
             dms_scrolled_up ||
             (is_private_messages_collapsed() && !top_item_active) ||
             top_item_no_unreads
@@ -396,6 +459,45 @@ export function toggle_private_messages_section(): void {
     }
 }
 
+function toggle_section(section_name: string): void {
+    if (collapsed_sections.has(section_name)) {
+        collapsed_sections.delete(section_name);
+    } else {
+        collapsed_sections.add(section_name);
+    }
+    ls.set(collapsed_sections_ls_key, [...collapsed_sections]);
+    update_private_messages();
+}
+
+function update_tab_unread_counts(counts: FullUnreadCountsData): void {
+    ui_util.update_unread_count_in_dom(
+        $('#left-sidebar-tabs .ind-tab[data-tab-key="channels"]'),
+        counts.stream_unread_messages,
+    );
+    ui_util.update_unread_count_in_dom(
+        $('#left-sidebar-tabs .ind-tab[data-tab-key="chats"]'),
+        counts.direct_message_count,
+    );
+}
+
+function tab_label_html(label: string): string {
+    return `${_.escape(label)}<span class="unread_count hide"></span>`;
+}
+
+export function is_chats_shown(): boolean {
+    return chats_shown;
+}
+
+function show_chats(value: boolean): void {
+    if (value && zoomed) {
+        zoom_out();
+    }
+    chats_shown = value;
+    ls.set(chats_shown_ls_key, chats_shown);
+    $("#left-sidebar").toggleClass("showing-chats", chats_shown);
+    update_private_messages();
+}
+
 function zoom_in(): void {
     zoomed = true;
     previous_search_term = "";
@@ -433,7 +535,30 @@ export function clear_search(): void {
 
 export function initialize(): void {
     // Restore collapsed status.
+    collapsed_sections = new Set(
+        collapsed_sections_ls_schema.parse(ls.get(collapsed_sections_ls_key)),
+    );
     private_messages_collapsed = ls_schema.parse(ls.get(ls_key));
+    chats_shown = chats_shown_ls_schema.parse(ls.get(chats_shown_ls_key));
+    $("#left-sidebar").toggleClass("showing-chats", chats_shown);
+    const tabs = components.toggle({
+        child_wants_focus: true,
+        values: [
+            {
+                label_html: tab_label_html($t({defaultMessage: "Channels"})),
+                key: "channels",
+            },
+            {label_html: tab_label_html($t({defaultMessage: "Chats"})), key: "chats"},
+        ],
+        selected: chats_shown ? 1 : 0,
+        callback(_label, key) {
+            if ((key === "chats") !== chats_shown) {
+                show_chats(key === "chats");
+            }
+        },
+    });
+    tabs.get().appendTo($("#left-sidebar-tabs"));
+    update_tab_unread_counts(unread.get_counts());
     if (private_messages_collapsed) {
         close();
     } else {
@@ -491,6 +616,36 @@ export function initialize(): void {
             e.preventDefault();
         }
     });
+
+    $("body").on(
+        "click",
+        ".dm-list .dm-list-personal-section-header",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle_section($(this).attr("data-section-name")!);
+        },
+    );
+
+    $("body").on(
+        "keydown",
+        ".dm-list .dm-list-personal-section-header",
+        function (this: HTMLElement, e) {
+            if (!keydown_util.is_enter_event(e) || e.target !== this) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            const section_name = $(this).attr("data-section-name")!;
+            toggle_section(section_name);
+            // Rendering the list replaced the header that had the focus.
+            for (const header of $(".dm-list .dm-list-personal-section-header")) {
+                if ($(header).attr("data-section-name") === section_name) {
+                    header.focus();
+                }
+            }
+        },
+    );
 
     $("body").on("click", ".zoom-in-conversations .left-sidebar-modal-close-area", (e) => {
         e.stopPropagation();

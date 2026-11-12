@@ -27,8 +27,10 @@ mock_esm("../src/user_status", {
     }),
 });
 
+const muted_users = zrequire("muted_users");
 const narrow_state = zrequire("narrow_state");
 const people = zrequire("people");
+const personal_sections = zrequire("personal_sections");
 const pm_conversations = zrequire("pm_conversations");
 const pm_list_data = zrequire("pm_list_data");
 const message_lists = zrequire("message_lists");
@@ -88,6 +90,7 @@ function test(label, f) {
     run_test(label, (helpers) => {
         message_lists.set_current(undefined);
         pm_conversations.clear_for_testing();
+        personal_sections.set_personal_sections({conversation_sections: [], contact_sections: []});
         f(helpers);
     });
 }
@@ -515,4 +518,93 @@ test("get_list_info_deactivated_users", ({override}) => {
 
     // Reactivate Bob to not affect other tests.
     people.add_active_user(bob);
+});
+
+test("get_sections", ({override}) => {
+    override(unread, "num_unread_for_user_ids_string", (user_ids_string) =>
+        user_ids_string === "101" ? 2 : 0,
+    );
+
+    pm_conversations.recent.insert([alice.user_id], 1);
+    pm_conversations.recent.insert([bob.user_id], 2);
+
+    function check_sections(sections, expected_sections) {
+        assert.deepEqual(
+            sections.map((section) => ({
+                name: section.name,
+                unread: section.unread,
+                recipients: section.conversations.map((conversation) => conversation.recipients),
+            })),
+            expected_sections,
+        );
+    }
+
+    assert.deepEqual(pm_list_data.get_sections(), []);
+
+    const unknown_user_id = 999;
+    personal_sections.set_personal_sections({
+        conversation_sections: [
+            {
+                name: "Project",
+                conversations: [
+                    [alice.user_id],
+                    // Conversations in sections are shown even when
+                    // they are not among the recent conversations.
+                    [alice.user_id, zoe.user_id],
+                    [unknown_user_id],
+                    [],
+                ],
+            },
+            {name: "Later", conversations: [[cardelio.user_id]]},
+            {name: "Empty", conversations: []},
+        ],
+    });
+
+    check_sections(pm_list_data.get_sections(), [
+        {name: "Project", unread: 2, recipients: ["Alice", "Alice, Zoe", "Me Myself"]},
+        {name: "Later", unread: 0, recipients: ["Cardelio"]},
+        {name: "Empty", unread: 0, recipients: []},
+    ]);
+
+    // The rest of the conversations leaves out those in sections.
+    assert.deepEqual(
+        pm_list_data.get_unsectioned_conversations().map((conversation) => conversation.recipients),
+        ["Bob"],
+    );
+
+    // A search shows the sections with matching conversations.
+    check_sections(pm_list_data.get_sections("zo"), [
+        {name: "Project", unread: 0, recipients: ["Alice, Zoe"]},
+    ]);
+    // Searching for a section shows all its conversations.
+    check_sections(pm_list_data.get_sections("lat"), [
+        {name: "Later", unread: 0, recipients: ["Cardelio"]},
+    ]);
+    check_sections(pm_list_data.get_sections("emp"), []);
+
+    // Conversations where everyone is muted are hidden.
+    muted_users.add_muted_user(cardelio.user_id);
+    check_sections(pm_list_data.get_sections(), [
+        {name: "Project", unread: 2, recipients: ["Alice", "Alice, Zoe", "Me Myself"]},
+        {name: "Later", unread: 0, recipients: []},
+        {name: "Empty", unread: 0, recipients: []},
+    ]);
+    muted_users.remove_muted_user(cardelio.user_id);
+
+    // Like all conversations, conversations with deactivated users
+    // are shown.
+    people.deactivate(people.get_by_user_id(zoe.user_id));
+    people.deactivate(people.get_by_user_id(cardelio.user_id));
+    check_sections(pm_list_data.get_sections(), [
+        {name: "Project", unread: 2, recipients: ["Alice", "Alice, Zoe", "Me Myself"]},
+        {name: "Later", unread: 0, recipients: ["Cardelio"]},
+        {name: "Empty", unread: 0, recipients: []},
+    ]);
+    set_pm_with_filter([cardelio.user_id]);
+    const sections = pm_list_data.get_sections();
+    assert.equal(sections[1].conversations[0].is_active, true);
+
+    // Reactivate the users to not affect other tests.
+    people.add_active_user(zoe);
+    people.add_active_user(cardelio);
 });
