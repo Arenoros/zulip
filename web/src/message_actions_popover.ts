@@ -25,7 +25,7 @@ import * as rows from "./rows.ts";
 import * as stream_popover from "./stream_popover.ts";
 import {parse_html} from "./ui_util.ts";
 import * as unread_ops from "./unread_ops.ts";
-import {the} from "./util.ts";
+import {is_mobile, the} from "./util.ts";
 
 let message_actions_popover_keyboard_toggle = false;
 
@@ -40,6 +40,23 @@ const quote_menu_selection_by_instance = new WeakMap<
     tippy.Instance,
     compose_reply.QuoteMenuSelection
 >();
+
+// Where a right-click asked for the menu, so that it opens at the cursor
+// rather than at the message's ⋮ button.
+let context_menu_position: {x: number; y: number} | undefined;
+
+function wants_browser_context_menu($target: JQuery<Element>, row: HTMLElement): boolean {
+    // Links, media, and text fields have browser menus that people rely on.
+    if ($target.closest("a").length > 0) {
+        return true;
+    }
+    if ($target.is("textarea, input, video, .media-image-element, .media-audio-element")) {
+        return true;
+    }
+    // The browser menu is the way to copy selected message text.
+    const selection = document.getSelection();
+    return selection?.type === "Range" && selection.containsNode(row, true);
+}
 
 function get_action_menu_menu_items(): JQuery {
     return $("[data-tippy-root] #message-actions-menu-dropdown li:not(.divider) a");
@@ -153,6 +170,34 @@ export function initialize({
         },
     );
 
+    $("#main_div").on("contextmenu", ".messagebox", function (this: HTMLElement, e) {
+        if (is_mobile()) {
+            // A long press fires this event on touch devices.
+            return;
+        }
+        assert(e.target instanceof Element);
+        const $row = $(this).closest(".message_row");
+        if (wants_browser_context_menu($(e.target), the($row))) {
+            return;
+        }
+        assert(message_lists.current !== undefined);
+        const message_id = rows.id($row);
+        const message = message_lists.current.get(message_id);
+        if (
+            message === undefined ||
+            message.locally_echoed ||
+            message_edit.currently_editing_messages.has(message_id)
+        ) {
+            return;
+        }
+        e.preventDefault();
+        popovers.hide_all();
+        message_lists.current.select_id(message_id);
+        context_menu_position = {x: e.clientX, y: e.clientY};
+        quote_menu_selection_at_button_mousedown = undefined;
+        $row.find(".actions_hover .message-actions-menu-button").trigger("click");
+    });
+
     popover_menus.register_popover_menu(".actions_hover .message-actions-menu-button", {
         theme: "popover-menu",
         placement: "bottom",
@@ -170,6 +215,29 @@ export function initialize({
         },
         onShow(instance) {
             popover_menus.on_show_prep(instance);
+            const position = context_menu_position;
+            context_menu_position = undefined;
+            if (position !== undefined) {
+                instance.setProps({
+                    placement: "bottom-start",
+                    // Start just past the cursor, so that it never rests on a menu item.
+                    getReferenceClientRect: () => new DOMRect(position.x + 2, position.y, 0, 0),
+                    popperOptions: {
+                        ...instance.props.popperOptions,
+                        modifiers: [
+                            // Without the button's fallback placements, the menu
+                            // flips to the opposite side of the cursor and keeps
+                            // its edge there instead of centering on it.
+                            ...(instance.props.popperOptions.modifiers ?? []).filter(
+                                (modifier) => modifier.name !== "flip",
+                            ),
+                            // When the menu fits on neither side of the cursor,
+                            // slide it along the cursor to stay in the window.
+                            {name: "preventOverflow", options: {altAxis: true, tether: false}},
+                        ],
+                    },
+                });
+            }
             const $row = $(instance.reference).closest(".message_row");
             const message_id = rows.id($row);
             // Mouse opens rely on what we read on mousedown; keyboard opens
