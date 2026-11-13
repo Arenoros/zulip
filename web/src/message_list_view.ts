@@ -177,7 +177,7 @@ function same_year(earlier_msg: Message | undefined, later_msg: Message | undefi
     );
 }
 
-// In the bubble layout, a pause longer than this between two messages
+// In the chat layout, a pause longer than this between two messages
 // from the same sender starts a new message series.
 const MESSAGE_SERIES_MAX_PAUSE_SECONDS = 5 * 60;
 
@@ -298,7 +298,7 @@ function get_date_divider_data(opts: {
     };
 }
 
-// In the bubble layout, the recipient bar is hidden, so a date
+// In the chat layout, the recipient bar is hidden, so a date
 // divider shows the date of the first message of each group.
 function get_group_start_date_divider_data(
     message: Message,
@@ -663,6 +663,10 @@ export class MessageListView {
 
     is_bubble_layout(): boolean {
         return bubble_layout.is_bubble_layout(this.list.data.filter);
+    }
+
+    is_chat_layout(): boolean {
+        return bubble_layout.is_chat_layout(this.list.data.filter);
     }
 
     get_calculated_message_container_variables(
@@ -1042,16 +1046,14 @@ export class MessageListView {
         let current_group_message_containers: MessageContainer[] = [];
 
         let prev_message_container: MessageContainer | undefined;
-        const bubble_layout = this.is_bubble_layout();
+        const chat_layout = this.is_chat_layout();
         // A topic card shows the sender of every message, and dates
         // next to the time rather than as dividers.
         const topic_cards_layout = this.list.is_conversations_view;
-        // The bubble layout marks where unread messages start, but not
+        // The chat layout marks where unread messages start, but not
         // for messages that arrive while the conversation is open.
         const new_messages_divider_id =
-            bubble_layout && !messages_are_new
-                ? this.list.data.first_unread_message_id()
-                : undefined;
+            chat_layout && !messages_are_new ? this.list.data.first_unread_message_id() : undefined;
 
         const add_message_container_to_group = (message_container: MessageContainer): void => {
             current_group_message_containers.push(message_container);
@@ -1109,7 +1111,7 @@ export class MessageListView {
             } else {
                 finish_group();
                 start_group(prev_message_container?.msg, message);
-                if (bubble_layout) {
+                if (chat_layout) {
                     ({want_date_divider, date_divider_html} = get_group_start_date_divider_data(
                         message,
                         year_changed,
@@ -1137,7 +1139,7 @@ export class MessageListView {
                 same_day(prev_message_container.msg, message) &&
                 prev_message_container.msg.historical === message.historical &&
                 prev_message_container.msg.sender_id === message.sender_id &&
-                (!bubble_layout ||
+                (!chat_layout ||
                     within_message_series_pause(prev_message_container.msg, message)) &&
                 !want_new_messages_divider
             ) {
@@ -1199,7 +1201,7 @@ export class MessageListView {
                 same_day(last_msg_container?.msg, first_msg_container.msg) &&
                 same_sender(last_msg_container, first_msg_container) &&
                 first_msg_container.msg.historical === last_msg_container?.msg.historical &&
-                (!this.is_bubble_layout() ||
+                (!this.is_chat_layout() ||
                     within_message_series_pause(last_msg_container.msg, first_msg_container.msg)) &&
                 !first_msg_container.want_new_messages_divider
             ) {
@@ -1261,7 +1263,7 @@ export class MessageListView {
             });
         } else {
             clear_message_divider(curr_msg_container);
-            if (this.is_bubble_layout()) {
+            if (this.is_chat_layout()) {
                 Object.assign(
                     curr_msg_container,
                     get_group_start_date_divider_data(
@@ -2425,6 +2427,7 @@ export class MessageListView {
         // jQuery data.  This does mean, however, that we need to be
         // mindful of memory leaks.
         this.$list.children().detach();
+        this.$list.toggleClass("chat-layout", this.is_chat_layout());
         this.$list.toggleClass("bubble-layout", this.is_bubble_layout());
         this.$list.toggleClass("conversations-view", this.list.is_conversations_view);
         this._rows.clear();

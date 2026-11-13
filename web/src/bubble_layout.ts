@@ -11,3 +11,10 @@ export function is_bubble_layout(filter: Filter): boolean {
         user_settings.web_direct_message_bubbles
     );
 }
+
+// The chat layout shows a single conversation as a chat: messages in
+// series broken by pauses, a date divider at the start of each day,
+// and a divider where unread messages start, without recipient bars.
+export function is_chat_layout(filter: Filter): boolean {
+    return is_bubble_layout(filter);
+}
