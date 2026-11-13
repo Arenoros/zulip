@@ -200,9 +200,9 @@ async function compose_row_test(page: Page): Promise<void> {
     // State 1: one empty row.
     let facts = await row_facts(page);
     check(
-        "the row has Formatting, Add emoji and Upload files, then the send controls",
+        "the row has Formatting, Add emoji, Upload files and More, then the send controls",
         JSON.stringify(facts.row_labels) ===
-            JSON.stringify(["Formatting", "Add emoji", "Upload files"]) &&
+            JSON.stringify(["Formatting", "Add emoji", "Upload files", "More"]) &&
             facts.row_buttons.every((button) => near(button.width, 32) && near(button.height, 32)) &&
             near(facts.send.width, 32) &&
             near(facts.send_options.width, 20),

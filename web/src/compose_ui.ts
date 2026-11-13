@@ -125,7 +125,9 @@ export function set_formatting_mode(on: boolean): void {
     }
     formatting_mode = on;
     $("#compose").toggleClass("formatting-mode", on);
-    $("#compose .compose-formatting-mode-button").attr("aria-pressed", String(on));
+    $("#compose .compose-formatting-mode-button")
+        .attr("aria-pressed", String(on))
+        .toggleClass("compose-row-button-active", on);
 }
 
 export function is_formatting_mode(): boolean {

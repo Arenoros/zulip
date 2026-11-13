@@ -1,0 +1,47 @@
+<div class="popover-menu compose-plus-menu" id="compose-plus-menu-popover" data-simplebar data-simplebar-tab-index="-1">
+    <ul role="menu" class="popover-menu-list">
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="compose-plus-menu-poll popover-menu-link{{#if has_content}} compose-plus-menu-item-disabled{{/if}}" tabindex="0"{{#if has_content}} aria-disabled="true"{{/if}}>
+                <i class="popover-menu-icon zulip-icon zulip-icon-poll" aria-hidden="true"></i>
+                <span class="popover-menu-label">
+                    {{t "Poll" }}
+                    {{#if has_content}}
+                    <span class="compose-plus-menu-note">{{t "A poll must be an entire message." }}</span>
+                    {{/if}}
+                </span>
+            </a>
+        </li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="compose-plus-menu-todo-list popover-menu-link{{#if has_content}} compose-plus-menu-item-disabled{{/if}}" tabindex="0"{{#if has_content}} aria-disabled="true"{{/if}}>
+                <i class="popover-menu-icon zulip-icon zulip-icon-todo-list" aria-hidden="true"></i>
+                <span class="popover-menu-label">
+                    {{t "To-do list" }}
+                    {{#if has_content}}
+                    <span class="compose-plus-menu-note">{{t "A to-do list must be an entire message." }}</span>
+                    {{/if}}
+                </span>
+            </a>
+        </li>
+        <li role="separator" class="popover-menu-separator"></li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="compose-plus-menu-global-time popover-menu-link" tabindex="0">
+                <i class="popover-menu-icon zulip-icon zulip-icon-time" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Global time" }}</span>
+            </a>
+        </li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="compose-plus-menu-saved-snippets popover-menu-link" tabindex="0">
+                <i class="popover-menu-icon zulip-icon zulip-icon-message-square-text" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Saved snippets" }}</span>
+            </a>
+        </li>
+        {{#if gif_enabled}}
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" class="compose-plus-menu-gif popover-menu-link" tabindex="0">
+                <i class="popover-menu-icon zulip-icon zulip-icon-gif" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "GIF" }}</span>
+            </a>
+        </li>
+        {{/if}}
+    </ul>
+</div>

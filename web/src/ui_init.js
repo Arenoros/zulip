@@ -30,6 +30,7 @@ import * as compose from "./compose.ts";
 import * as compose_closed_ui from "./compose_closed_ui.ts";
 import * as compose_notifications from "./compose_notifications.ts";
 import * as compose_paste from "./compose_paste.ts";
+import * as compose_plus_menu_popover from "./compose_plus_menu_popover.ts";
 import * as compose_pm_pill from "./compose_pm_pill.ts";
 import * as compose_recipient from "./compose_recipient.ts";
 import * as compose_reply from "./compose_reply.ts";
@@ -514,6 +515,7 @@ export async function initialize_everything(state_data) {
     };
     message_actions_popover.initialize({message_reminder_click_handler});
     compose_send_menu_popover.initialize();
+    compose_plus_menu_popover.initialize();
 
     realm_user_settings_defaults.initialize(state_data.realm_settings_defaults);
 
