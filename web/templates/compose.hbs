@@ -103,7 +103,7 @@
                     </div>
                     <div class="messagebox">
                         <div id="message-content-container" class="surround-formatting-buttons-row">
-                            <textarea class="new_message_textarea message-textarea" name="content" id='compose-textarea' placeholder="{{t 'Compose your message here' }}" tabindex="0" aria-label="{{t 'Compose your message here…' }}"></textarea>
+                            <textarea class="new_message_textarea message-textarea" name="content" id='compose-textarea' rows="1" placeholder="{{t 'Compose your message here' }}" tabindex="0" aria-label="{{t 'Compose your message here…' }}"></textarea>
                             <div id="preview-message-area-container">
                                 <div class="scrolling_list preview_message_area" data-simplebar data-simplebar-tab-index="-1" id="preview_message_area" style="display:none;">
                                     <div class="markdown_preview_spinner"></div>
@@ -116,6 +116,28 @@
                                 <button type="button" class="collapse-composebox-button zulip-icon zulip-icon-collapse-diagonal" aria-label="{{t 'Collapse compose box' }}" data-tippy-content="{{t 'Collapse compose box' }}"></button>
                             </div>
                             <div class="drag"></div>
+                        </div>
+
+                        {{!-- In a view of a single conversation, the compose box
+                        is one row: the message, these buttons, and the send
+                        controls. --}}
+                        <div id="compose-row-buttons">
+                            <button type="button" class="compose-row-button compose-formatting-mode-button tippy-zulip-delayed-tooltip" aria-pressed="false" aria-label="{{t 'Formatting' }}" data-tippy-content="{{t 'Formatting' }}">
+                                <i class="zulip-icon zulip-icon-type-big" aria-hidden="true"></i>
+                            </button>
+                            {{!-- A wrapper span, since the emoji picker cannot
+                            attach to a button that already has a tooltip. --}}
+                            <span class="compose-row-button-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Add emoji' }}">
+                                <button type="button" class="compose-row-button emoji_map" aria-label="{{t 'Add emoji' }}">
+                                    <i class="zulip-icon zulip-icon-smile-bigger" aria-hidden="true"></i>
+                                </button>
+                            </span>
+                            {{#if file_upload_enabled }}
+                            <button type="button" class="compose-row-button compose_upload_file tippy-zulip-delayed-tooltip" aria-label="{{t 'Upload files' }}" data-tippy-content="{{t 'Upload files' }}">
+                                <i class="zulip-icon zulip-icon-attachment" aria-hidden="true"></i>
+                            </button>
+                            {{/if}}
+                            <span class="compose-row-divider" aria-hidden="true"></span>
                         </div>
 
                         <div id="message-send-controls-container">
@@ -144,6 +166,19 @@
                             <button type="button" class="formatting-control-scroller-button formatting-scroller-backward" aria-label="{{t 'Scroll backward' }}">
                                 <i class="scroller-backward-icon zulip-icon zulip-icon-compose-scroll-left"></i>
                             </button>
+                            {{!-- At the end of the formatting toolbar of the compose
+                            box of a single conversation. --}}
+                            <div class="compose-toolbar-end">
+                                <button type="button" class="compose-row-button maximize-composebox-button" aria-label="{{t 'Maximize compose box' }}" data-tippy-content="{{t 'Maximize compose box' }}">
+                                    <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="compose-row-button collapse-composebox-button" aria-label="{{t 'Collapse compose box' }}" data-tippy-content="{{t 'Collapse compose box' }}">
+                                    <i class="zulip-icon zulip-icon-collapse-diagonal" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="compose-row-button compose-delete-draft-button tippy-zulip-delayed-tooltip" aria-label="{{t 'Delete draft' }}" data-tippy-content="{{t 'Delete draft' }}">
+                                    <i class="zulip-icon zulip-icon-trash" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -29,6 +29,7 @@ const compose_ui = mock_esm("../src/compose_ui", {
     cursor_inside_code_block: () => false,
     set_code_formatting_button_triggered: noop,
     maybe_set_compose_textarea_typeahead: noop,
+    is_formatting_mode: () => false,
 });
 const compose_validate = mock_esm("../src/compose_validate", {
     validate_message_length: () => true,
@@ -2474,6 +2475,30 @@ test("get_person_suggestion_for_topic_typeahead: diacritic query prioritizes exa
         results.map((result) => result.user.user_id),
         [gael.user_id, gael_ascii.user_id],
     );
+});
+
+test("should_enter_send in formatting mode", ({override}) => {
+    const $textarea = $.create("<formatting-mode-textarea>");
+    $textarea.attr("id", "compose-textarea");
+    const enter = (modifiers = {}) => ({
+        key: "Enter",
+        target: "<formatting-mode-textarea>",
+        ...modifiers,
+    });
+    override(user_settings, "enter_sends", true);
+    assert.ok(ct.should_enter_send(enter()));
+
+    // Formatting mode is for longer messages: Enter starts a new line,
+    // whatever the setting, and Ctrl+Enter sends.
+    override(compose_ui, "is_formatting_mode", () => true);
+    assert.ok(!ct.should_enter_send(enter()));
+    assert.ok(!ct.should_enter_send(enter({shiftKey: true})));
+    assert.ok(ct.should_enter_send(enter({ctrlKey: true})));
+    assert.ok(ct.should_enter_send(enter({metaKey: true})));
+
+    // The message edit form keeps the setting.
+    $textarea.attr("id", "edit-textarea");
+    assert.ok(ct.should_enter_send(enter()));
 });
 
 test("begins_typeahead", ({override, override_rewire}) => {

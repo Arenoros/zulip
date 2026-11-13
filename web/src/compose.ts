@@ -109,6 +109,7 @@ export function clear_compose_box(): void {
         compose_ui.make_compose_box_original_size();
     }
     clear_preview_area();
+    compose_ui.set_formatting_mode(false);
     $("textarea#compose-textarea").val("").trigger("focus");
     compose_ui.compose_textarea_typeahead?.hide();
     compose_validate.check_overflow_text($("#send_message_form"));
@@ -326,10 +327,8 @@ export function rewire_send_message(value: typeof send_message): void {
 }
 
 export function handle_enter_key_with_preview_open(cmd_or_ctrl_pressed = false): void {
-    if (
-        (user_settings.enter_sends && !cmd_or_ctrl_pressed) ||
-        (!user_settings.enter_sends && cmd_or_ctrl_pressed)
-    ) {
+    const enter_sends = user_settings.enter_sends && !compose_ui.is_formatting_mode();
+    if ((enter_sends && !cmd_or_ctrl_pressed) || (!enter_sends && cmd_or_ctrl_pressed)) {
         // If this enter should send, we attempt to send the message.
         finish();
     } else {

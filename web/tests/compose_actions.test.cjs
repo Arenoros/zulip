@@ -68,6 +68,7 @@ const compose_ui = mock_esm("../src/compose_ui", {
     is_expanded: () => false,
     set_focus: noop,
     compute_placeholder_text: noop,
+    set_formatting_mode: noop,
 });
 const narrow_state = mock_esm("../src/narrow_state", {
     set_compose_defaults: noop,

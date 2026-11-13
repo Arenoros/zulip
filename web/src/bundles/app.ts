@@ -47,6 +47,7 @@ import "../../styles/input_pill.css";
 import "../../styles/informational_overlays.css";
 import "../../styles/compose.css";
 import "../../styles/new_conversation_form.css";
+import "../../styles/compose_for_view.css";
 import "../../styles/message_edit_history.css";
 import "../../styles/reactions.css";
 import "../../styles/search.css";

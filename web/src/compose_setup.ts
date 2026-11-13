@@ -57,6 +57,9 @@ function setup_compose_actions_hooks(): void {
     compose_actions.register_compose_box_clear_hook(compose.clear_invites);
     compose_actions.register_compose_box_clear_hook(compose.clear_private_stream_alert);
     compose_actions.register_compose_box_clear_hook(compose.clear_preview_area);
+    compose_actions.register_compose_box_clear_hook(() => {
+        compose_ui.set_formatting_mode(false);
+    });
 
     compose_actions.register_compose_cancel_hook(abort_xhr);
     compose_actions.register_compose_cancel_hook(() => {
@@ -649,6 +652,31 @@ export function initialize(): void {
         e.stopPropagation();
 
         compose_ui.make_compose_box_original_size();
+    });
+
+    $("#compose").on("click", ".compose-formatting-mode-button", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const formatting_mode = !compose_ui.is_formatting_mode();
+        if (!formatting_mode && $("#compose").hasClass("preview_mode")) {
+            // The toolbar with the button to leave the preview is
+            // about to be hidden.
+            compose.clear_preview_area();
+        }
+        compose_ui.set_formatting_mode(formatting_mode);
+        resize.reset_compose_message_max_height();
+        $("textarea#compose-textarea").trigger("focus");
+    });
+
+    $("#compose").on("click", ".compose-delete-draft-button", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Saving the emptied compose box deletes its draft.
+        compose_state.message_content("");
+        drafts.update_draft();
+        compose.clear_compose_box();
     });
 
     $("textarea#compose-textarea").on("focus", () => {

@@ -114,6 +114,24 @@ export function is_full_size(): boolean {
     return full_size_status;
 }
 
+// In formatting mode, the compose box of a single conversation shows
+// the formatting toolbar above a taller message field, where Enter
+// starts a new line.
+let formatting_mode = false;
+
+export function set_formatting_mode(on: boolean): void {
+    if (!on && is_expanded()) {
+        make_compose_box_original_size();
+    }
+    formatting_mode = on;
+    $("#compose").toggleClass("formatting-mode", on);
+    $("#compose .compose-formatting-mode-button").attr("aria-pressed", String(on));
+}
+
+export function is_formatting_mode(): boolean {
+    return formatting_mode;
+}
+
 export let autosize_textarea = ($textarea: JQuery<HTMLTextAreaElement>): void => {
     // Since this supports both compose and file upload, one must pass
     // in the text area to autosize.

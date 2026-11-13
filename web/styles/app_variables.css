@@ -861,6 +861,47 @@
         hsl(0deg 0% 98%),
         hsl(0deg 0% 12.9%)
     );
+    /* The compose box of a view of a single conversation. */
+    --color-background-compose-field: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 14.9%)
+    );
+    --color-border-compose-field: light-dark(
+        hsl(0deg 0% 82%),
+        hsl(0deg 0% 22.7%)
+    );
+    --color-border-compose-field-focus: light-dark(
+        hsl(237.8deg 49.1% 56.9%),
+        hsl(236.9deg 85.5% 72.9%)
+    );
+    --color-compose-field-button: light-dark(
+        hsl(0deg 0% 36.1%),
+        hsl(0deg 0% 71%)
+    );
+    --color-compose-field-button-hover: light-dark(
+        hsl(0deg 0% 14.1%),
+        hsl(0deg 0% 91%)
+    );
+    --color-background-compose-field-button-hover: light-dark(
+        hsl(0deg 0% 92.2%),
+        hsl(0deg 0% 20%)
+    );
+    --color-compose-field-button-pressed: light-dark(
+        hsl(237.3deg 43.8% 30%),
+        hsl(232.5deg 100% 93.7%)
+    );
+    --color-background-compose-field-button-pressed: light-dark(
+        hsl(230deg 64.3% 94.5%),
+        hsl(237deg 27.8% 28.2%)
+    );
+    --color-compose-field-send: light-dark(
+        hsl(238.2deg 39.1% 50.4%),
+        hsl(237.3deg 100% 78%)
+    );
+    --color-compose-field-send-disabled: light-dark(
+        hsl(0deg 0% 65.9%),
+        hsl(0deg 0% 43.5%)
+    );
     /* Bubble layout of direct message conversations. */
     --color-background-message-bubble: light-dark(
         hsl(0deg 0% 100%),

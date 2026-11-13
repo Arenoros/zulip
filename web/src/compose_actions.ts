@@ -118,8 +118,9 @@ function show_compose_box(opts: ComposeActionsOpts): void {
         };
     }
     compose_recipient.update_compose_for_message_type(opts_by_message_type);
-    // When changing this, edit the 42px in _maybe_autoscroll
-    $(".new_message_textarea").css("min-height", "3em");
+    // When changing this, edit the 42px in _maybe_autoscroll. The
+    // compose box of a single conversation starts as one line.
+    $(".new_message_textarea").css("min-height", compose_state.is_for_view() ? "" : "3em");
     // Under certain circumstances, such as focusing in the
     // automatically-opened compose box in DMs, we want to
     // defer running the focus logic.
@@ -241,6 +242,13 @@ function get_view_compose_opts(): ComposeActionsStartOpts | undefined {
 function set_compose_for_view(for_view: boolean): void {
     compose_state.set_for_view(for_view);
     $("#compose").toggleClass("compose-for-view", for_view);
+    // The send options open from a chevron next to the send button.
+    $("#send_later i")
+        .toggleClass("zulip-icon-more-vertical", !for_view)
+        .toggleClass("zulip-icon-chevron-down", for_view);
+    if (!for_view) {
+        compose_ui.set_formatting_mode(false);
+    }
 }
 
 // In the conversations view of a channel, starting a new topic in it
@@ -781,7 +789,6 @@ export function on_narrow(opts: NarrowActivateOpts): void {
     // The compose box follows a view of a single conversation, saving
     // what was typed for another conversation as a draft. Elsewhere,
     // it shows its recipient row.
-    set_compose_for_view(false);
     const view_opts = get_view_compose_opts();
     if (view_opts !== undefined) {
         // Narrowing to what one is composing to, or to where one just
@@ -792,6 +799,7 @@ export function on_narrow(opts: NarrowActivateOpts): void {
         );
         return;
     }
+    set_compose_for_view(false);
 
     // We use force_close when jumping between direct message narrows with
     // the "p" key, so that we don't have an open compose box that makes

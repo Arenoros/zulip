@@ -271,7 +271,11 @@ export function should_enter_send(e: JQuery.KeyDownEvent): boolean {
     const has_non_shift_modifier_key = e.ctrlKey || e.metaKey || e.altKey;
     const has_modifier_key = e.shiftKey || has_non_shift_modifier_key;
     let this_enter_sends;
-    if (user_settings.enter_sends) {
+    if (compose_ui.is_formatting_mode() && $(e.target).attr("id") === "compose-textarea") {
+        // Formatting mode is for writing longer messages, where Enter
+        // starts a new line, whatever the setting.
+        this_enter_sends = has_non_shift_modifier_key;
+    } else if (user_settings.enter_sends) {
         // With the enter_sends setting, we should send
         // the message unless the user was holding a
         // modifier key.

@@ -837,6 +837,7 @@
   "For more examples, see the <z-link>help center documentation</z-link> on adding linkifiers.": "Дополнительные примеры см. в <z-link>справочной документации</z-link> по добавлению шаблонов ссылок.",
   "Forgot it?": "Забыли?",
   "Forked from upstream at {zulip_merge_base}": "Форк апстрима с {zulip_merge_base}",
+  "Formatting": "Форматирование",
   "Forward message": "Переслать сообщение",
   "Forward message or selection": "",
   "Forward selected messages": "",
