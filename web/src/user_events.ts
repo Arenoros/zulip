@@ -210,6 +210,7 @@ export const update_person = function update(event: UserUpdate): void {
         message_live_update.update_avatar(user.user_id, event.avatar_url);
         buddy_list.insert_or_move([event.user_id], activity_ui.get_filter_text());
         user_profile.update_profile_modal_ui(user, event);
+        message_view_header.maybe_update_conversation_header(event.user_id);
     }
 
     if (
@@ -294,6 +295,7 @@ export const update_person = function update(event: UserUpdate): void {
         // Update UI elements to reflect the user's deactivated/reactivated status
         pm_list.update_private_messages();
         compose_pm_pill.update_user_pill_active_status(user, event.is_active);
+        message_view_header.maybe_update_conversation_header(event.user_id);
         settings_account.maybe_update_deactivate_account_button();
         if (is_bot_user) {
             settings_bots.update_bot_data(event.user_id);

@@ -134,6 +134,90 @@
             animation: contract-extended-description 100ms ease-in both !important;
         }
     }
+
+    /* The header of a direct message conversation in the bubble
+       layout: avatars, then the name over a line with the status. */
+    .conversation-header {
+        align-self: stretch;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .conversation-header-avatars {
+        /* 32px at 15px/1em, as in the message feed, but leaving room
+           in a short header. */
+        --conversation-header-avatar-size: min(
+            2.1333em,
+            calc(var(--header-height) - 4px)
+        );
+        position: relative;
+        display: flex;
+        flex: none;
+    }
+
+    .conversation-header-avatar {
+        width: var(--conversation-header-avatar-size);
+        height: var(--conversation-header-avatar-size);
+        border-radius: var(--border-radius-user-avatar);
+        object-fit: cover;
+    }
+
+    .conversation-header-avatars-group {
+        /* 28px at 15px/1em */
+        --conversation-header-avatar-size: min(
+            1.8667em,
+            calc(var(--header-height) - 4px)
+        );
+
+        .conversation-header-avatar + .conversation-header-avatar {
+            margin-left: calc(var(--conversation-header-avatar-size) * -0.5);
+            box-shadow: 0 0 0 2px var(--color-background-navbar);
+        }
+    }
+
+    .conversation-header-presence {
+        position: absolute;
+        /* 12px at 15px/1em */
+        font-size: 0.8em;
+        line-height: 1;
+        /* Center the dot on the edge of the round avatar, which is
+           (1 - cos 45deg) / 2 = 0.146 of the avatar's width away from
+           the corner of its box; 2px is the dot's border. */
+        right: calc(
+            var(--conversation-header-avatar-size) * 0.146 - 0.5em - 2px
+        );
+        bottom: calc(
+            var(--conversation-header-avatar-size) * 0.146 - 0.5em - 2px
+        );
+        background-color: var(--color-background-navbar);
+        border: solid 2px var(--color-background-navbar);
+        border-radius: 50%;
+    }
+
+    .conversation-header-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        line-height: 1.2;
+
+        .message-header-navbar-title {
+            /* 16px at 15px/1em */
+            font-size: 1.0667em;
+        }
+    }
+
+    .conversation-header-subtitle {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /* 13px at 15px/1em */
+        font-size: 0.8667em;
+        color: var(--color-text-message-bubble-caption);
+
+        /* A short header has room for one line only. */
+        @media (height < $short_navbar_cutoff_height) {
+            display: none;
+        }
+    }
 }
 
 /* Media Queries */

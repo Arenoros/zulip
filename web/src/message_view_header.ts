@@ -1,21 +1,36 @@
 import {$} from "jquery";
 import assert from "minimalistic-assert";
 
+import render_conversation_header from "../templates/conversation_header.hbs";
 import render_message_view_header from "../templates/message_view_header.hbs";
 
+import * as bubble_layout from "./bubble_layout.ts";
+import * as buddy_data from "./buddy_data.ts";
 import type {Filter} from "./filter.ts";
 import * as hash_util from "./hash_util.ts";
 import {$t} from "./i18n.ts";
 import * as inbox_util from "./inbox_util.ts";
+import * as muted_users from "./muted_users.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
 import * as peer_data from "./peer_data.ts";
+import * as people from "./people.ts";
+import type {User} from "./people.ts";
 import * as recent_view_util from "./recent_view_util.ts";
 import * as rendered_markdown from "./rendered_markdown.ts";
 import * as search from "./search.ts";
-import {current_user} from "./state_data.ts";
+import {current_user, realm} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import type {StreamSubscription} from "./sub_store.ts";
+import * as util from "./util.ts";
+
+type ConversationHeaderContext = {
+    title: string;
+    avatar_urls: string[];
+    is_group: boolean;
+    user_circle_class: string | undefined;
+    subtitle: string;
+};
 
 type MessageViewHeaderContext = {
     title?: string | undefined;
@@ -29,6 +44,7 @@ type MessageViewHeaderContext = {
     is_admin?: boolean;
     stream?: StreamSubscription;
     stream_settings_link?: string;
+    conversation_header?: ConversationHeaderContext;
 } & (
     | {
           zulip_icon: string;
@@ -37,6 +53,79 @@ type MessageViewHeaderContext = {
           icon: string | undefined;
       }
 );
+
+// In the bubble layout, the header of a direct message conversation
+// shows who it is with, as avatars, and their status.
+function get_conversation_header_context(filter: Filter): ConversationHeaderContext | undefined {
+    if (!bubble_layout.is_bubble_layout(filter)) {
+        return undefined;
+    }
+    const user_ids = filter.terms_with_operator("dm")[0]!.operand;
+    const users: User[] = [];
+    for (const user_id of user_ids) {
+        const user = people.maybe_get_user_by_id(user_id, true);
+        // Unknown and muted users keep the classic header, which shows
+        // nothing about them beyond a placeholder name.
+        if (user === undefined || user.is_inaccessible_user || muted_users.is_user_muted(user_id)) {
+            return undefined;
+        }
+        users.push(user);
+    }
+    const title = filter.get_title();
+    assert(title !== undefined);
+    const direct_messages = $t({defaultMessage: "Direct messages"});
+
+    if (users.length > 1) {
+        const strcmp = util.make_strcmp();
+        users.sort((a, b) => strcmp(a.full_name, b.full_name));
+        const participants = $t(
+            {defaultMessage: "{N, plural, one {# participant} other {# participants}}"},
+            {N: users.length + 1},
+        );
+        return {
+            title,
+            avatar_urls: users.slice(0, 2).map((user) => people.small_avatar_url_for_person(user)),
+            is_group: true,
+            user_circle_class: undefined,
+            subtitle: `${$t({defaultMessage: "Group chat"})} · ${participants}`,
+        };
+    }
+
+    const user = util.the(users);
+    const context = {
+        title,
+        avatar_urls: [people.small_avatar_url_for_person(user)],
+        is_group: false,
+    };
+    if (people.is_my_user_id(user.user_id)) {
+        return {...context, user_circle_class: undefined, subtitle: direct_messages};
+    }
+    if (!people.is_person_active(user.user_id)) {
+        const deactivated = user.is_bot
+            ? $t({defaultMessage: "This bot has been deactivated."})
+            : $t({defaultMessage: "This user has been deactivated."});
+        return {
+            ...context,
+            user_circle_class: buddy_data.get_user_circle_class(user.user_id, true),
+            subtitle: `${direct_messages} · ${deactivated}`,
+        };
+    }
+    if (user.is_bot) {
+        return {
+            ...context,
+            user_circle_class: undefined,
+            subtitle: `${direct_messages} · ${$t({defaultMessage: "Bot"})}`,
+        };
+    }
+    if (realm.realm_presence_disabled) {
+        return {...context, user_circle_class: undefined, subtitle: direct_messages};
+    }
+    return {
+        ...context,
+        user_circle_class: buddy_data.get_user_circle_class(user.user_id),
+        subtitle: `${direct_messages} · ${buddy_data.user_last_seen_time_status(user.user_id)}`,
+    };
+}
 
 function get_message_view_header_context(filter: Filter | undefined): MessageViewHeaderContext {
     if (recent_view_util.is_visible()) {
@@ -99,6 +188,11 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
         link,
         is_spectator: page_params.is_spectator,
     });
+
+    const conversation_header = get_conversation_header_context(filter);
+    if (conversation_header) {
+        return {...context, conversation_header};
+    }
 
     if (filter.has_operator("channel")) {
         const current_stream = stream_data.get_sub_by_id_string(
@@ -261,5 +355,25 @@ export function maybe_update_navbar_title_for_user(modified_user_id: number): vo
         const title = filter.get_title();
         assert(title !== undefined);
         $("#message_view_header .message-header-navbar-title").text(title);
+    }
+}
+
+// Updates the conversation header for a change to the presence, avatar
+// or account of one of its participants, or of everyone's presence if
+// no user is given. Only the conversation header is replaced, because
+// rebuilding the whole header would close a search the user has open
+// to refine the narrow.
+export function maybe_update_conversation_header(user_id?: number): void {
+    const $conversation_header = $("#message_view_header .conversation-header");
+    const filter = narrow_state.filter();
+    if ($conversation_header.length === 0 || filter === undefined) {
+        return;
+    }
+    if (user_id !== undefined && !narrow_state.pm_ids_set(filter).has(user_id)) {
+        return;
+    }
+    const context = get_conversation_header_context(filter);
+    if (context !== undefined) {
+        $conversation_header.replaceWith($(render_conversation_header(context)));
     }
 }

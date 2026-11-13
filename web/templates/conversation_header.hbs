@@ -1,0 +1,14 @@
+<span class="navbar_title conversation-header">
+    <span class="conversation-header-avatars{{#if is_group}} conversation-header-avatars-group{{/if}}" aria-hidden="true">
+        {{#each avatar_urls}}
+            <img class="conversation-header-avatar" src="{{this}}" alt="" />
+        {{/each}}
+        {{#if user_circle_class}}
+            <span class="conversation-header-presence user-circle zulip-icon zulip-icon-{{user_circle_class}} {{user_circle_class}}"></span>
+        {{/if}}
+    </span>
+    <span class="conversation-header-text">
+        <span class="message-header-navbar-title">{{title}}</span>
+        <span class="conversation-header-subtitle">{{subtitle}}</span>
+    </span>
+</span>

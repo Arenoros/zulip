@@ -55,6 +55,7 @@ const message_events = mock_esm("../src/message_events", {
     update_current_view_for_topic_visibility: noop,
 });
 const message_lists = mock_esm("../src/message_lists");
+const message_view_header = mock_esm("../src/message_view_header");
 const user_topics_ui = mock_esm("../src/user_topics_ui");
 const muted_users_ui = mock_esm("../src/muted_users_ui");
 const narrow_title = mock_esm("../src/narrow_title");
@@ -1345,10 +1346,15 @@ run_test("user_settings", ({override}) => {
     override(user_settings, "web_direct_message_bubbles", true);
     called = false;
     called_for_cached_msg_list = false;
+    let rendered_title_area = false;
+    override(message_view_header, "render_title_area", () => {
+        rendered_title_area = true;
+    });
     dispatch(event);
     assert_same(user_settings.web_direct_message_bubbles, false);
     assert_same(called, true);
     assert_same(called_for_cached_msg_list, true);
+    assert_same(rendered_title_area, true);
 
     event = event_fixtures.user_settings__web_font_size_px;
     override(user_settings, "web_font_size_px", 14);

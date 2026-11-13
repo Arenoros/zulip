@@ -10,6 +10,7 @@ import * as buddy_list_presence from "./buddy_list_presence.ts";
 import * as keydown_util from "./keydown_util.ts";
 import {ListCursor} from "./list_cursor.ts";
 import * as loading from "./loading.ts";
+import * as message_view_header from "./message_view_header.ts";
 import * as narrow_state from "./narrow_state.ts";
 import * as peer_data from "./peer_data.ts";
 import * as people from "./people.ts";
@@ -242,6 +243,7 @@ export function update_presence_info(info: PresenceInfoFromEvent): void {
     presence.update_info_from_event(user_id, presence_info);
     redraw_user(user_id);
     pm_list.update_private_messages();
+    message_view_header.maybe_update_conversation_header(user_id);
 }
 
 export function redraw(): void {
@@ -250,6 +252,7 @@ export function redraw(): void {
     user_cursor.redraw();
     pm_list.update_private_messages();
     buddy_list_presence.update_indicators();
+    message_view_header.maybe_update_conversation_header();
 }
 
 export function reset_users(): void {
