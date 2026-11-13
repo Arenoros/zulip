@@ -2,8 +2,9 @@
    in a view of a single conversation uses: one row with the message, a
    few buttons, and the send controls. In formatting mode, the
    formatting toolbar shows above a taller message field, and the
-   buttons move below it. Sizes are in em at the 15px font size of the
-   design. */
+   buttons move below it. The form for a new conversation always shows
+   the formatting toolbar. Sizes are in em at the 15px font size of
+   the design. */
 #compose-row-buttons,
 .compose-toolbar-end {
     display: none;
@@ -77,7 +78,7 @@
     /* Six lines at most, before the message scrolls. This
        overrides the maximum set to keep the last message in view,
        which formatting mode keeps. */
-    &:not(.formatting-mode) #compose-textarea {
+    &:not(.formatting-mode, .new-conversation-form) #compose-textarea {
         max-height: calc(
             6em * var(--base-line-height-unitless) + 1.3333em
         ) !important;
@@ -212,7 +213,8 @@
         display: none;
     }
 
-    &.formatting-mode {
+    &.formatting-mode,
+    &.new-conversation-form {
         #send_message_form .messagebox {
             grid-template:
                 "message-formatting-controls-container message-formatting-controls-container message-formatting-controls-container"

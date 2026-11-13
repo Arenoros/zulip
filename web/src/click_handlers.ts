@@ -964,7 +964,7 @@ export function initialize(): void {
 
     $("body").on(
         "click",
-        "#compose_close, #new-conversation-cancel, .compose-reply-line-close",
+        "#compose_close, .new-conversation-form-close, .compose-reply-line-close",
         () => {
             compose_actions.cancel();
         },

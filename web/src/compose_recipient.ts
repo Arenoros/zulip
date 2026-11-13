@@ -521,7 +521,7 @@ export function update_topic_displayed_text(topic_name = "", has_topic_focus = f
     $("#compose-channel-recipient").removeClass("disabled");
 
     if (compose_state.is_new_conversation_form()) {
-        $input.attr("placeholder", $t({defaultMessage: "What is the conversation about"}));
+        $input.attr("placeholder", $t({defaultMessage: "Conversation topic (required)"}));
         return;
     }
 
@@ -577,7 +577,7 @@ export let update_compose_area_placeholder_text = (): void => {
 
     let placeholder = compose_ui.DEFAULT_COMPOSE_PLACEHOLDER;
     if (compose_state.is_new_conversation_form()) {
-        placeholder = $t({defaultMessage: "First message of the conversation"});
+        placeholder = $t({defaultMessage: "Message"});
     } else if (message_type === "stream") {
         const stream_id = compose_state.stream_id();
         placeholder = compose_ui.compute_placeholder_text({

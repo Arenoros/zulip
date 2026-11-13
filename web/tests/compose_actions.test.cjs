@@ -1349,10 +1349,22 @@ test("reply in the conversations view", ({override, override_rewire, mock_templa
     assert.ok(!compose_state.is_reply_in_conversations_view());
     assert.ok(!$("#compose").hasClass("compose-row-layout"));
 
-    // A new conversation is not a reply.
+    // A new conversation is not a reply. Its form has the buttons of
+    // the row, and keeps the ⋮ of the send options.
     start({message_type: "stream", stream_id: kitchen.stream_id, trigger: "compose_hotkey"});
     assert.ok(!compose_state.is_reply_in_conversations_view());
+    assert.ok(compose_state.is_new_conversation_form());
+    assert.ok($("#compose").hasClass("compose-row-layout"));
+    assert.ok($("#send_later i").hasClass("zulip-icon-more-vertical"));
+    assert.equal($("input#stream_message_recipient_topic").attr("aria-required"), "true");
+    assert.equal($("#compose-send-button").attr("aria-label"), "translated: Publish");
+    assert.equal(
+        $("#new-conversation-form-title").text(),
+        "translated: new conversation in #kitchen",
+    );
     cancel();
+    assert.ok(!$("#compose").hasClass("compose-row-layout"));
+    assert.equal($("#compose-send-button").attr("aria-label"), "translated: Send");
 
     // Elsewhere, replies keep the classic compose box.
     override(message_lists.current, "is_conversations_view", false);

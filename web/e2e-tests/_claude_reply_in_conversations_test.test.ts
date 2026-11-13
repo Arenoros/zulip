@@ -247,7 +247,7 @@ async function reply_in_conversations_test(page: Page): Promise<void> {
     await page.waitForSelector("#compose.new-conversation-form", {visible: true});
     facts = await reply_facts(page);
     check("c opens the new conversation form, not a reply", !facts.reply, JSON.stringify(facts));
-    await page.click("#new-conversation-cancel");
+    await page.click(".new-conversation-form-close");
     await wait_for_compose_closed(page);
 
     // A long topic is cut off in the line.

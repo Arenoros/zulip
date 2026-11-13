@@ -27,12 +27,14 @@ import type {ShowMessageViewOpts} from "./message_view.ts";
 import * as message_viewport from "./message_viewport.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
+import * as people from "./people.ts";
 import * as popovers from "./popovers.ts";
 import * as reload from "./reload.ts";
 import * as reload_state from "./reload_state.ts";
 import * as resize from "./resize.ts";
 import * as saved_snippets_ui from "./saved_snippets_ui.ts";
 import * as spectators from "./spectators.ts";
+import {current_user} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import * as util from "./util.ts";
 
@@ -265,17 +267,24 @@ function set_reply_in_conversations_view(reply: boolean, topic = ""): void {
 }
 
 function is_row_layout(): boolean {
-    return compose_state.is_for_view() || compose_state.is_reply_in_conversations_view();
+    return (
+        compose_state.is_for_view() ||
+        compose_state.is_reply_in_conversations_view() ||
+        compose_state.is_new_conversation_form()
+    );
 }
 
 // The compose box of a single conversation is a row, with a chevron
-// for the send options next to the send button.
+// for the send options next to the send button. The form for a new
+// conversation has the same buttons, under the formatting toolbar,
+// and a ⋮ for the send options next to Publish.
 function update_row_layout(): void {
+    const is_form = compose_state.is_new_conversation_form();
     const row_layout = is_row_layout();
     $("#compose").toggleClass("compose-row-layout", row_layout);
     $("#send_later i")
-        .toggleClass("zulip-icon-more-vertical", !row_layout)
-        .toggleClass("zulip-icon-chevron-down", row_layout);
+        .toggleClass("zulip-icon-more-vertical", !row_layout || is_form)
+        .toggleClass("zulip-icon-chevron-down", row_layout && !is_form);
 }
 
 // In the conversations view of a channel, starting a new topic in it
@@ -293,14 +302,25 @@ function update_new_conversation_form(opts: ComposeActionsOpts): void {
 function set_new_conversation_form(is_form: boolean, stream_id?: number): void {
     compose_state.set_new_conversation_form(is_form);
     $("#compose").toggleClass("new-conversation-form", is_form);
+    $("input#stream_message_recipient_topic").attr("aria-required", is_form ? "true" : null);
+    $("#compose-send-button").attr(
+        "aria-label",
+        is_form ? $t({defaultMessage: "Publish"}) : $t({defaultMessage: "Send"}),
+    );
     if (is_form && stream_id !== undefined) {
+        $(".new-conversation-form-avatar").attr(
+            "src",
+            people.small_avatar_url_for_person(current_user),
+        );
+        $(".new-conversation-form-author").text(current_user.full_name);
         $("#new-conversation-form-title").text(
             $t(
-                {defaultMessage: "New conversation in #{channel}"},
+                {defaultMessage: "new conversation in #{channel}"},
                 {channel: stream_data.get_sub_by_id(stream_id)?.name ?? ""},
             ),
         );
     }
+    update_row_layout();
 }
 
 // The form only shows in the conversations view of its channel; the

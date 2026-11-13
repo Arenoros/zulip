@@ -902,6 +902,28 @@
         hsl(0deg 0% 65.9%),
         hsl(0deg 0% 43.5%)
     );
+    /* The form for a new conversation in the conversations view. */
+    --color-background-new-conversation-form: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 16.1%)
+    );
+    --color-border-new-conversation-form: light-dark(
+        hsl(0deg 0% 87.8%),
+        hsl(0deg 0% 22.7%)
+    );
+    --color-background-new-conversation-publish: hsl(237.8deg 49.1% 56.9%);
+    --color-background-new-conversation-publish-hover: hsl(
+        238.2deg 39.1% 50.4%
+    );
+    --color-text-new-conversation-publish: hsl(0deg 0% 100%);
+    --color-background-new-conversation-publish-disabled: light-dark(
+        hsl(240deg 29.6% 89.4%),
+        hsl(237.8deg 18.9% 28%)
+    );
+    --color-text-new-conversation-publish-disabled: light-dark(
+        hsl(236.8deg 17.9% 40.6%),
+        hsl(236.2deg 22.9% 72.5%)
+    );
     /* Bubble layout of direct message conversations. */
     --color-background-message-bubble: light-dark(
         hsl(0deg 0% 100%),
