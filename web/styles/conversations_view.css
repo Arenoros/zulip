@@ -6,18 +6,18 @@
     --topic-card-padding: 0.8em;
     /* 24px at 15px/1em */
     --topic-card-reply-avatar-width: 1.6em;
+    /* How far a card's panel of topic actions reaches above the card,
+       clear of the first message's time below it. */
+    --topic-card-panel-overhang: 1.2em;
 
-    /* Each card names its topic in its title. */
-    .message_header {
-        display: none;
-    }
+    /* Room for the first card's panel below the navbar. */
+    padding-top: var(--topic-card-panel-overhang);
 
     .recipient_row {
         margin: 0 0 var(--topic-card-padding);
         border: 1px solid var(--color-border-topic-card);
         border-radius: 8px;
         background-color: var(--color-background-topic-card-replies);
-        overflow: hidden;
 
         .message_row {
             border-left: 0;
@@ -28,6 +28,9 @@
 
     /* The topic's first message, on the card's background. */
     .message_row:has(.topic-card-title) {
+        /* The card does not clip its contents, so that its panel of
+           topic actions can stick out over its top edge. */
+        border-radius: 8px 8px 0 0;
         padding-bottom: 0.4em;
         border-bottom: 1px solid var(--color-border-topic-card);
         background-color: var(--color-background-topic-card);
@@ -112,6 +115,75 @@
         }
     }
 
+    /* The recipient bar becomes a panel of topic actions, shown
+       over the card's top edge while the card is hovered or the
+       panel has focus. Each card names its topic in its title.
+       The bar takes no space, and sticks below the navbar like
+       recipient bars do, so that the panel of a card scrolled up
+       under the navbar stays in view. The panel is transparent
+       rather than hidden while not shown, so that its buttons stay
+       in the tab order. */
+    .message_header {
+        position: sticky;
+        top: calc(
+            var(--navbar-fixed-height) + var(--header-padding-bottom) +
+                var(--topic-card-panel-overhang)
+        );
+        z-index: 2;
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+        height: 0;
+        overflow: visible;
+        opacity: 0;
+        pointer-events: none;
+        background-color: transparent;
+        box-shadow: none;
+
+        .message-header-contents {
+            position: relative;
+            top: calc(-1 * var(--topic-card-panel-overhang));
+            display: flex;
+            height: auto;
+            margin: 0;
+            margin-inline-end: var(--topic-card-padding);
+            padding: 0;
+            border: 0;
+        }
+
+        /* The panel shows and hides as a whole. */
+        .recipient_bar_controls {
+            opacity: 1;
+            padding: 0 0.2em;
+            border: 1px solid var(--color-border-topic-card);
+            border-radius: 6px;
+            background-color: var(--color-background-topic-card);
+            box-shadow: 0 2px 6px hsl(0deg 0% 0% / 15%);
+        }
+
+        .stream_label,
+        .stream_topic_separator,
+        .copy-paste-text,
+        .stream_topic,
+        .on_hover_topic_edit,
+        .recipient_row_date {
+            display: none;
+        }
+    }
+
+    .recipient_row:hover .message_header,
+    .message_header:focus-within {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    @media (hover: none) {
+        .recipient_row:has(.selected_message) .message_header {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    }
+
     /* A card with unread messages, counted in its title, gets a bar
        along its left edge, drawn above the messages' backgrounds. */
     .recipient_row.topic-card-unread {
@@ -123,6 +195,7 @@
             inset: 0 auto 0 0;
             z-index: 1;
             width: 3px;
+            border-radius: 8px 0 0 8px;
             background-color: var(--color-message-bubble-unread);
         }
     }

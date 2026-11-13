@@ -1,6 +1,7 @@
 import {$} from "jquery";
 
 import * as compose_actions from "./compose_actions.ts";
+import * as emoji_picker from "./emoji_picker.ts";
 import * as message_fetch from "./message_fetch.ts";
 import type {MessageList} from "./message_list.ts";
 import * as message_lists from "./message_lists.ts";
@@ -94,6 +95,16 @@ export function initialize(): void {
     on_click_or_enter(".topic-card-hidden-replies-label", open_hidden_replies);
     on_click_or_enter(".topic-card-collapse", collapse_replies);
     on_click_or_enter(".topic-card-reply-button", reply_in_topic);
+
+    // A reaction from the card's panel goes on the topic's first message.
+    $("#message_feed_container").on("click", ".topic-card-react", function (this: HTMLElement, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = get_card(this);
+        if (card !== undefined) {
+            emoji_picker.start_picker_for_message_reaction(this, card.first_message.id);
+        }
+    });
 
     $("#message_feed_container").on("click", ".topic-cards-unread-above-button", (e) => {
         e.preventDefault();

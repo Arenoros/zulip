@@ -38,6 +38,13 @@
             </a>
         </span>
         <span class="recipient_bar_controls no-select">
+            {{#if is_topic_card}}
+            {{!-- A wrapper span, since the emoji picker cannot attach to
+            the icon button, which already has a tooltip. --}}
+            <span class="topic-card-react recipient-bar-control hidden-for-spectators">
+                {{> components/icon_button icon="smile" intent="neutral" custom_classes="recipient-bar-control-icon" data-tippy-content=(t "Add emoji reaction") aria-label=(t "Add emoji reaction") }}
+            </span>
+            {{/if}}
             <span class="topic_edit hidden-for-spectators"></span>
 
             {{! exterior links (e.g. to a trac ticket) }}
@@ -64,7 +71,9 @@
                 {{/if}}
             {{/if}}
 
-            {{> components/icon_button icon="link-alt" intent="neutral" custom_classes="recipient-bar-control recipient-bar-control-icon recipient-bar-copy-link-to-topic" data-tippy-content=(t "Copy link to topic") aria-label=(t "Copy link to topic") }}
+            {{#unless is_topic_card}}
+                {{> components/icon_button icon="link-alt" intent="neutral" custom_classes="recipient-bar-control recipient-bar-control-icon recipient-bar-copy-link-to-topic" data-tippy-content=(t "Copy link to topic") aria-label=(t "Copy link to topic") }}
+            {{/unless}}
 
             {{! visibility policy menu }}
             {{#if (and is_subscribed (not is_archived))}}
@@ -82,6 +91,10 @@
                     {{> components/icon_button icon="inherit" intent="neutral" custom_classes="recipient-bar-control-icon" data-tippy-content=(t "Notifications are based on your configuration for this channel.") aria-label=(t "Notifications are based on your configuration for this channel.") }}
                 {{/if}}
             </span>
+            {{/if}}
+
+            {{#if is_topic_card}}
+                {{> components/icon_button icon="link-alt" intent="neutral" custom_classes="recipient-bar-control recipient-bar-control-icon recipient-bar-copy-link-to-topic" data-tippy-content=(t "Copy link to topic") aria-label=(t "Copy link to topic") }}
             {{/if}}
 
             {{! Topic menu }}

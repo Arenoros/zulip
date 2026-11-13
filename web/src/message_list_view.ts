@@ -1688,6 +1688,9 @@ export class MessageListView {
             const card = cards[index]!;
             assert(group.is_stream);
             group.is_topic_card = true;
+            // The bar becomes the card's panel of topic actions, which
+            // has the card's colors rather than the channel's.
+            group.recipient_bar_color = "transparent";
             const [first_container, first_reply_container] = group.message_containers;
             assert(first_container !== undefined);
             // A resolved topic is marked with a label instead of
@@ -2570,6 +2573,11 @@ export class MessageListView {
           like date being always displayed.
         * Set date on message header corresponding to the message next to the header. */
     update_sticky_recipient_headers(): void {
+        if (this.list.is_conversations_view) {
+            // Topic cards show their topic in their title, and their
+            // recipient bars only as a panel of topic actions.
+            return;
+        }
         const rows_length = this._rows.size;
         if (!rows_length) {
             /* No headers are present */
