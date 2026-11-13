@@ -57,3 +57,21 @@ A message sent by the user who is viewing it.
 **Initials avatar**
 
 A default profile picture showing two letters of the user's name on a colored circle.
+
+**Conversations view**
+
+A presentation of a channel as a list of topic cards, ordered by the latest activity in each topic.
+
+_Avoid_: Conversation (alone, it also means a direct message conversation), channel feed
+
+**Topic card**
+
+The entry for one topic in the conversations view, holding its first message and its latest replies.
+
+**Open conversation**
+
+A single topic shown in full from the conversations view, with its first message set apart from the replies.
+
+**Reply**
+
+Any message in a topic after its first message.
