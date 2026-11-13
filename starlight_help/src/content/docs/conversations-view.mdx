@@ -1,0 +1,127 @@
+---
+title: Conversations view
+---
+
+import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
+
+import KeyboardTip from "../../components/KeyboardTip.astro";
+import ConfigureChannelLinks from "../include/_ConfigureChannelLinks.mdx";
+
+The **conversations view** shows a channel as a list of cards, one for each
+[topic](/help/introduction-to-topics). A card shows the topic's first message
+and its latest replies, and the most recently active conversation is at the
+bottom, right above the button for starting a new one. It's a great way to
+follow a channel where several conversations happen at once.
+
+Clicking on a channel in the [left sidebar](/help/left-sidebar) takes you to
+its conversations view, unless you have
+[configured](#configure-where-channel-links-in-the-left-sidebar-go) channel
+links to go elsewhere. Channels where messages can only be sent to the
+[general chat](/help/general-chat-topic) topic open in the [channel
+feed](/help/channel-feed) instead.
+
+## Read conversations
+
+Messages in cards work like everywhere else in Zulip: you can
+[react](/help/emoji-reactions) to them, [edit](/help/edit-a-message) and
+[star](/help/star-a-message) them, and they are [marked as
+read](/help/marking-messages-as-read) when you see them. A card with unread
+messages shows how many there are next to its title.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <Steps>
+      1. Click on a channel in the left sidebar.
+      1. Scroll up to see conversations that were active earlier.
+      1. To see a conversation's earlier replies, click the line above its
+         latest replies that says how many there are. Click **Collapse
+         replies** to hide them again.
+    </Steps>
+
+    <KeyboardTip>
+      Use <kbd>Up</kbd> and <kbd>Down</kbd> to move between messages, from one
+      card to the next.
+    </KeyboardTip>
+  </TabItem>
+</Tabs>
+
+If there are cards with unread messages above the ones you are looking at, a
+button at the top of the view takes you to them.
+
+## Open a conversation
+
+Opening a conversation shows the whole topic: its first message, how many
+replies it has, and every reply. The buttons at the top let you
+[resolve](/help/resolve-a-topic) or [rename](/help/rename-a-topic) the topic,
+configure [notifications](/help/follow-a-topic) for it, copy a link to it, and
+use the topic's menu.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <Steps>
+      1. Click on the title of a card.
+      1. Click the **back** (<kbd>←</kbd>) button in the top left to return to
+         the conversation's card.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+## Reply to a conversation
+
+Your reply moves the conversation's card to the bottom of the view, and you stay
+in the conversations view.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <Steps>
+      1. Click **Reply in topic** at the bottom of a card.
+      1. Write your reply, and press <kbd>Enter</kbd> or click the **Send**
+         button.
+    </Steps>
+
+    <KeyboardTip>
+      Use <kbd>R</kbd> to reply to the conversation of the selected message.
+    </KeyboardTip>
+  </TabItem>
+</Tabs>
+
+## Start a new conversation
+
+A new conversation always needs a topic.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <Steps>
+      1. Click **New conversation** at the bottom of the view.
+      1. Enter a topic and your message.
+      1. Click **Publish**. The new conversation's card appears at the bottom of
+         the view.
+    </Steps>
+
+    <KeyboardTip>
+      Use <kbd>C</kbd> to start a new conversation.
+    </KeyboardTip>
+  </TabItem>
+</Tabs>
+
+Click **Cancel** to close the form; what you wrote is saved as a
+[draft](/help/view-and-edit-your-message-drafts).
+
+## Topic actions on a card
+
+Hover over a card to see buttons for adding an [emoji
+reaction](/help/emoji-reactions) to the topic's first message, [resolving the
+topic](/help/resolve-a-topic), configuring [notifications](/help/follow-a-topic)
+for it, copying a link to it, and opening the topic's menu.
+
+## Configure where channel links in the left sidebar go
+
+<ConfigureChannelLinks />
+
+## Related articles
+
+* [Channel feed](/help/channel-feed)
+* [List of topics in a channel](/help/list-of-topics)
+* [Introduction to topics](/help/introduction-to-topics)
+* [Reading conversations](/help/reading-conversations)
+* [Left sidebar](/help/left-sidebar)

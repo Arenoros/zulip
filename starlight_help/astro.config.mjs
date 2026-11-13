@@ -381,6 +381,7 @@ export default defineConfig({
                         "inbox",
                         "recent-conversations",
                         "combined-feed",
+                        "conversations-view",
                         "channel-feed",
                         "list-of-topics",
                         "left-sidebar",
