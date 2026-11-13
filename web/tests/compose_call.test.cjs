@@ -6,7 +6,7 @@ const events = require("./lib/events.cjs");
 const {make_realm} = require("./lib/example_realm.cjs");
 const {make_stream} = require("./lib/example_stream.cjs");
 const {make_user} = require("./lib/example_user.cjs");
-const {mock_esm, set_global, with_overrides, zrequire} = require("./lib/namespace.cjs");
+const {mock_esm, zrequire} = require("./lib/namespace.cjs");
 const {run_test} = require("./lib/test.cjs");
 const {$} = require("./lib/zjquery.cjs");
 const {page_params} = require("./lib/zpage_params.cjs");
@@ -15,25 +15,10 @@ const channel = mock_esm("../src/channel");
 const compose_state = mock_esm("../src/compose_state");
 const compose_ui = mock_esm("../src/compose_ui");
 const message_store = mock_esm("../src/message_store");
-mock_esm("../src/resize", {
-    watch_manual_resize() {},
-});
-set_global("document", {
-    hasFocus: () => true,
-    querySelector() {},
-});
-set_global("navigator", {});
-set_global(
-    "ResizeObserver",
-    class ResizeObserver {
-        observe() {}
-    },
-);
 
 const server_events_dispatch = zrequire("server_events_dispatch");
-const call_ringing = zrequire("call_ringing");
+const compose_call = zrequire("compose_call");
 const compose_call_ui = zrequire("compose_call_ui");
-const compose_setup = zrequire("compose_setup");
 const people = zrequire("people");
 const stream_data = zrequire("stream_data");
 const {set_current_user, set_realm} = zrequire("state_data");
@@ -106,30 +91,7 @@ function test(label, f) {
     });
 }
 
-test("videos", ({override, override_rewire, disallow_rewire}) => {
-    override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.disabled.id);
-    override(window, "to_$", () => $("window-stub"));
-
-    compose_setup.initialize();
-
-    (function test_no_provider_video_link_compose_clicked() {
-        const $textarea = $.create("target-stub");
-        $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
-
-        const handler = $("body").get_on_handler("click", ".video_link");
-        $("textarea#compose-textarea").val("");
-
-        with_overrides(({disallow}) => {
-            disallow(compose_ui, "insert_syntax_and_focus");
-            handler(ev);
-        });
-    })();
-
+test("videos", ({override, override_rewire}) => {
     (function test_jitsi_video_link_compose_clicked() {
         let syntax_to_insert;
         let called = false;
@@ -137,17 +99,11 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         const $textarea = $.create("jitsi-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
 
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
-
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
             called = true;
         });
 
-        const handler = $("body").get_on_handler("click", ".video_link");
         $("textarea#compose-textarea").val("");
 
         override(
@@ -157,13 +113,8 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         );
 
         override(realm, "realm_jitsi_server_url", null);
-        override(realm, "server_jitsi_server_url", null);
-        handler(ev);
-        assert.ok(!called);
-
-        override(realm, "realm_jitsi_server_url", null);
         override(realm, "server_jitsi_server_url", "https://server.example.com");
-        handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         // video link ids consist of 15 random digits
         let video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/server.example.com\/\d{15}#config.startWithVideoMuted=false\)/;
@@ -172,7 +123,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         override(realm, "realm_jitsi_server_url", "https://realm.example.com");
         override(realm, "server_jitsi_server_url", null);
-        handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/realm.example.com\/\d{15}#config.startWithVideoMuted=false\)/;
         assert.ok(called);
@@ -180,7 +131,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         override(realm, "realm_jitsi_server_url", "https://realm.example.com");
         override(realm, "server_jitsi_server_url", "https://server.example.com");
-        handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/realm.example.com\/\d{15}#config.startWithVideoMuted=false\)/;
         assert.ok(called);
@@ -188,7 +139,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         // Scenario where the URL has a path segment (like an auth token)
         override(realm, "realm_jitsi_server_url", "https://jitsi.example.com/custom-token");
-        handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
 
         video_link_regex =
             /\[translated: Join video call\.\]\(https:\/\/jitsi\.example\.com\/custom-token\/\d{15}#config\.startWithVideoMuted=false\)/;
@@ -202,11 +153,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("zoom-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -243,16 +189,14 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         }
 
         $("textarea#compose-textarea").val("");
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex = /\[translated: Join video call\.]\(example\.zoom\.com\)/;
         assert.ok(called);
         assert.match(syntax_to_insert, video_link_regex);
 
         $("textarea#compose-textarea").val("");
-        const audio_handler = $("body").get_on_handler("click", ".audio_link");
-        audio_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, true);
         call_success_callback();
         const audio_link_regex = /\[translated: Join voice call\.]\(example\.zoom\.com\)/;
         assert.ok(called);
@@ -265,11 +209,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("webex-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -306,8 +245,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         }
 
         $("textarea#compose-textarea").val("");
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex = /\[translated: Join video call\.]\(example\.webex\.com\)/;
         assert.ok(called);
@@ -320,11 +258,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("google-meet-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -365,8 +298,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         }
 
         $("textarea#compose-textarea").val("");
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/meet\.google\.com\/abc-mnop-xyz\)/;
@@ -380,11 +312,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("bbb-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -430,16 +357,14 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         $("textarea#compose-textarea").val("");
 
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex =
             /\[translated: Join video call\.]\(\/calls\/bigbluebutton\/join\?meeting_id=%22zulip-1%22&moderator=%22AAAAAAAAAA%22&lock_settings_disable_cam=false&checksum=%2232702220bff2a22a44aee72e96cfdb4c4091752e%22\)/;
         assert.ok(called);
         assert.match(syntax_to_insert, video_link_regex);
 
-        const audio_handler = $("body").get_on_handler("click", ".audio_link");
-        audio_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, true);
         call_success_callback();
         const audio_link_regex =
             /\[translated: Join voice call\.]\(\/calls\/bigbluebutton\/join\?meeting_id=%22zulip-1%22&moderator=%22AAAAAAAAAA%22&lock_settings_disable_cam=true&checksum=%2232702220bff2a22a44aee72e96cfdb4c4091752e%22\)/;
@@ -461,9 +386,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         };
 
         $("textarea#compose-textarea").val("");
-        $("body")
-            .get_on_handler("click", ".video_link")
-            .call($textarea, {preventDefault() {}, stopPropagation() {}});
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         assert.ok(checked);
     })();
 
@@ -473,11 +396,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("constructor-groups-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -508,8 +426,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         };
 
         $("textarea#compose-textarea").val("");
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/example\.constructor\.app\/groups\/room\/room-123\)/;
@@ -523,11 +440,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         const $textarea = $.create("nextcloud-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
-
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
 
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
@@ -566,8 +478,7 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
 
         $("textarea#compose-textarea").val("");
 
-        const video_handler = $("body").get_on_handler("click", ".video_link");
-        video_handler.call($textarea, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         call_success_callback();
         const video_link_regex =
             /\[translated: Join video call\.]\(https:\/\/nextcloud\.example\.com\/index\.php\/call\/abc123token\)/;
@@ -589,45 +500,30 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         };
 
         $("textarea#compose-textarea").val("");
-        $("body")
-            .get_on_handler("click", ".video_link")
-            .call($textarea, {preventDefault() {}, stopPropagation() {}});
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
         assert.ok(checked);
     })();
 
-    (function test_livekit_calls_compose_clicked() {
+    (function test_livekit_links_compose_clicked() {
+        let syntax_to_insert;
+
         const $textarea = $.create("livekit-target-stub");
         $textarea.set_parents_result(".message_edit_form", []);
 
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
-
+        override(compose_ui, "insert_syntax_and_focus", (syntax) => {
+            syntax_to_insert = syntax;
+        });
         override(
             realm,
             "realm_video_chat_provider",
             realm_available_video_chat_providers.livekit.id,
         );
-        const started_calls = [];
-        override_rewire(call_ringing, "start_call_from_compose", (call_id, voice_only) => {
-            started_calls.push({call_id, voice_only});
-        });
 
         $("textarea#compose-textarea").val("");
-        with_overrides(({disallow}) => {
-            disallow(compose_ui, "insert_syntax_and_focus");
-            $("body").get_on_handler("click", ".video_link").call($textarea, ev);
-            $("body").get_on_handler("click", ".audio_link").call($textarea, ev);
-        });
-        // Call IDs consist of 15 random digits.
-        assert.equal(started_calls.length, 2);
-        for (const {call_id} of started_calls) {
-            assert.match(String(call_id), /^\d{15}$/);
-        }
-        assert.deepEqual(
-            started_calls.map(({voice_only}) => voice_only),
-            [false, true],
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($textarea, false);
+        assert.match(
+            syntax_to_insert,
+            /^\[translated: Join video call\.]\(\/calls\/livekit\/join\?call_id=\d{15}\)$/,
         );
     })();
 
@@ -641,11 +537,6 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
         $button.set_parents_result(".message_edit_form", $.create("livekit-edit-form-stub"));
         $button.set_parents_result(".message_row", $row);
 
-        const ev = {
-            preventDefault() {},
-            stopPropagation() {},
-        };
-
         override(compose_ui, "insert_syntax_and_focus", (syntax) => {
             syntax_to_insert = syntax;
         });
@@ -654,15 +545,13 @@ test("videos", ({override, override_rewire, disallow_rewire}) => {
             "realm_video_chat_provider",
             realm_available_video_chat_providers.livekit.id,
         );
-        disallow_rewire(call_ringing, "start_call_from_compose");
-
-        $("body").get_on_handler("click", ".video_link").call($button, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($button, false);
         assert.match(
             syntax_to_insert,
             /^\[translated: Join video call\.]\(\/calls\/livekit\/join\?call_id=\d{15}\)$/,
         );
 
-        $("body").get_on_handler("click", ".audio_link").call($button, ev);
+        compose_call_ui.generate_and_insert_audio_or_video_call_link($button, true);
         assert.match(
             syntax_to_insert,
             /^\[translated: Join voice call\.]\(\/calls\/livekit\/join\?call_id=\d{15}&voice_only=true\)$/,
@@ -740,51 +629,49 @@ run_test("get_recipient_label_for_call", ({override}) => {
     assert.equal(compose_call_ui.get_recipient_label_for_call("999"), undefined);
 });
 
-test("test_video_chat_button_toggle disabled", ({override}) => {
+test("compute_show_video_chat_button disabled", ({override}) => {
     override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.disabled.id);
-    override(window, "to_$", () => $("window-stub"));
-    compose_setup.initialize();
-    assert.equal($(".compose-control-buttons-container .video_link").visible(), false);
+    assert.equal(compose_call.compute_show_video_chat_button(), false);
+    assert.equal(compose_call.compute_show_audio_chat_button(), false);
 });
 
-test("test_video_chat_button_toggle no url", ({override}) => {
+test("compute_show_video_chat_button no url", ({override}) => {
     override(
         realm,
         "realm_video_chat_provider",
         realm_available_video_chat_providers.jitsi_meet.id,
     );
-    override(window, "to_$", () => $("window-stub"));
     page_params.jitsi_server_url = null;
-    compose_setup.initialize();
-    assert.equal($(".compose-control-buttons-container .video_link").visible(), false);
+    assert.equal(compose_call.compute_show_video_chat_button(), false);
 });
 
-test("test_video_chat_button_toggle enabled", ({override}) => {
+test("compute_show_video_chat_button enabled", ({override}) => {
     override(
         realm,
         "realm_video_chat_provider",
         realm_available_video_chat_providers.jitsi_meet.id,
     );
     override(realm, "realm_jitsi_server_url", "https://meet.jit.si");
-    override(window, "to_$", () => $("window-stub"));
-    compose_setup.initialize();
-    assert.equal($(".compose-control-buttons-container .video_link").visible(), true);
+    assert.equal(compose_call.compute_show_video_chat_button(), true);
 });
 
-test("test_livekit_audio_chat_button_toggle enabled", ({override}) => {
+test("compute_show_audio_chat_button livekit", ({override}) => {
     override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.livekit.id);
-    override(window, "to_$", () => $("window-stub"));
-    compose_setup.initialize();
-    assert.equal($(".compose-control-buttons-container .audio_link").visible(), true);
+    assert.equal(compose_call.compute_show_audio_chat_button(), true);
 });
 
-test("test_constructor_groups_video_chat_button_toggle enabled", ({override}) => {
+test("compute_show_video_chat_button constructor groups", ({override}) => {
     override(
         realm,
         "realm_video_chat_provider",
         realm_available_video_chat_providers.constructor_groups.id,
     );
-    override(window, "to_$", () => $("window-stub"));
-    compose_setup.initialize();
-    assert.equal($(".compose-control-buttons-container .video_link").visible(), true);
+    assert.equal(compose_call.compute_show_video_chat_button(), true);
+});
+
+test("is_livekit_call_provider", ({override}) => {
+    override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.livekit.id);
+    assert.equal(compose_call.is_livekit_call_provider(), true);
+    override(realm, "realm_video_chat_provider", realm_available_video_chat_providers.zoom.id);
+    assert.equal(compose_call.is_livekit_call_provider(), false);
 });

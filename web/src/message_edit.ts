@@ -24,7 +24,6 @@ import * as buttons from "./buttons.ts";
 import * as channel from "./channel.ts";
 import * as compose_actions from "./compose_actions.ts";
 import * as compose_banner from "./compose_banner.ts";
-import * as compose_call from "./compose_call.ts";
 import {compose_call_session_manager} from "./compose_call_session.ts";
 import * as compose_tooltips from "./compose_tooltips.ts";
 import * as compose_ui from "./compose_ui.ts";
@@ -664,13 +663,6 @@ function edit_message($row: JQuery, raw_content: string): void {
     $form.on("input", () => {
         compose_validate.check_overflow_text($row);
     });
-
-    $form
-        .find(".message-edit-feature-group .video_link")
-        .toggle(compose_call.compute_show_video_chat_button());
-    $form
-        .find(".message-edit-feature-group .audio_link")
-        .toggle(compose_call.compute_show_audio_chat_button());
 
     $button_bar.on(
         "scroll",

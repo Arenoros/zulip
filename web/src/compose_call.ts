@@ -31,6 +31,14 @@ export function get_jitsi_server_url(video_call_id?: string): URL | null {
     return url;
 }
 
+// LiveKit calls start right away from the header of a direct message
+// conversation; other providers only put a call link in a message.
+export function is_livekit_call_provider(): boolean {
+    return (
+        realm.realm_video_chat_provider === realm.realm_available_video_chat_providers.livekit?.id
+    );
+}
+
 export function compute_show_video_chat_button(): boolean {
     const available_providers = realm.realm_available_video_chat_providers;
     if (realm.realm_video_chat_provider === available_providers.disabled.id) {

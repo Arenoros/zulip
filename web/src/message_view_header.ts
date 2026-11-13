@@ -3,9 +3,12 @@ import assert from "minimalistic-assert";
 
 import render_conversation_header from "../templates/conversation_header.hbs";
 import render_message_view_header from "../templates/message_view_header.hbs";
+import render_message_view_header_call_buttons from "../templates/message_view_header_call_buttons.hbs";
 
 import * as bubble_layout from "./bubble_layout.ts";
 import * as buddy_data from "./buddy_data.ts";
+import * as call_ringing from "./call_ringing.ts";
+import * as compose_call from "./compose_call.ts";
 import type {Filter} from "./filter.ts";
 import * as hash_util from "./hash_util.ts";
 import {$t} from "./i18n.ts";
@@ -75,6 +78,7 @@ type MessageViewHeaderContext = {
     stream_settings_link?: string;
     conversation_header?: ConversationHeaderContext;
     open_conversation_header?: OpenConversationHeaderContext;
+    can_start_call?: boolean;
 } & (
     | {
           zulip_icon: string;
@@ -155,6 +159,31 @@ function get_conversation_header_context(filter: Filter): ConversationHeaderCont
         user_circle_class: buddy_data.get_user_circle_class(user.user_id),
         subtitle: `${direct_messages} · ${buddy_data.user_last_seen_time_status(user.user_id)}`,
     };
+}
+
+// Calls start from the header of a direct message conversation, with
+// everyone in it, so they need someone else who can answer: not only
+// bots, and no one deactivated.
+function can_start_call(filter: Filter): boolean {
+    if (!filter.is_conversation_view() || !compose_call.is_livekit_call_provider()) {
+        return false;
+    }
+    const user_ids = narrow_state.pm_ids(filter);
+    if (user_ids === undefined) {
+        return false;
+    }
+    const users: User[] = [];
+    for (const user_id of user_ids) {
+        if (people.is_my_user_id(user_id)) {
+            continue;
+        }
+        const user = people.maybe_get_user_by_id(user_id, true);
+        if (user === undefined || user.is_inaccessible_user || !people.is_person_active(user_id)) {
+            return false;
+        }
+        users.push(user);
+    }
+    return users.some((user) => !user.is_bot);
 }
 
 // The header of an open conversation names the topic, under the
@@ -245,12 +274,15 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
     const description = filter.get_description()?.description;
     const link = filter.get_description()?.link;
     assert(title !== undefined);
-    const context = filter.add_icon_data({
-        title,
-        description,
-        link,
-        is_spectator: page_params.is_spectator,
-    });
+    const context = {
+        ...filter.add_icon_data({
+            title,
+            description,
+            link,
+            is_spectator: page_params.is_spectator,
+        }),
+        can_start_call: can_start_call(filter),
+    };
 
     const conversation_header = get_conversation_header_context(filter);
     if (conversation_header) {
@@ -349,6 +381,23 @@ function build_message_view_header(filter: Filter | undefined): void {
 
 export function initialize(): void {
     render_title_area();
+
+    $("#message_view_header").on(
+        "click",
+        ".message-view-header-video-call, .message-view-header-voice-call",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const user_ids = narrow_state.pm_ids();
+            assert(user_ids !== undefined);
+            // Call IDs consist of 15 random digits.
+            call_ringing.start_direct_message_call(
+                util.random_int(100000000000000, 999999999999999),
+                user_ids,
+                this.classList.contains("message-view-header-voice-call"),
+            );
+        },
+    );
 
     const hide_stream_settings_button_width_threshold = 620;
     $("body").on("mouseenter mouseleave", ".narrow_description", function (event) {
@@ -461,20 +510,29 @@ export function maybe_update_navbar_title_for_user(modified_user_id: number): vo
 
 // Updates the conversation header for a change to the presence, avatar
 // or account of one of its participants, or of everyone's presence if
-// no user is given. Only the conversation header is replaced, because
-// rebuilding the whole header would close a search the user has open
-// to refine the narrow.
+// no user is given. Only the conversation header and the call buttons
+// are replaced, because rebuilding the whole header would close a
+// search the user has open to refine the narrow.
 export function maybe_update_conversation_header(user_id?: number): void {
-    const $conversation_header = $("#message_view_header .conversation-header");
     const filter = narrow_state.filter();
-    if ($conversation_header.length === 0 || filter === undefined) {
+    if (filter === undefined) {
         return;
     }
     if (user_id !== undefined && !narrow_state.pm_ids_set(filter).has(user_id)) {
         return;
     }
-    const context = get_conversation_header_context(filter);
-    if (context !== undefined) {
-        $conversation_header.replaceWith($(render_conversation_header(context)));
+    const $conversation_header = $("#message_view_header .conversation-header");
+    if ($conversation_header.length > 0) {
+        const context = get_conversation_header_context(filter);
+        if (context !== undefined) {
+            $conversation_header.replaceWith($(render_conversation_header(context)));
+        }
+    }
+    // Presence does not change who can be called.
+    if (user_id !== undefined && filter.is_common_narrow()) {
+        $("#message_view_header .message-view-header-call-buttons").remove();
+        if (can_start_call(filter)) {
+            $("#message_view_header").append($(render_message_view_header_call_buttons()));
+        }
     }
 }

@@ -84,24 +84,6 @@ async function livekit_call_test(page: Page): Promise<void> {
     );
     await page.waitForFunction(() => zulip_test.realm.realm_video_chat_provider === 10);
 
-    await page.keyboard.press("KeyC");
-    await page.waitForSelector("#compose-textarea", {visible: true});
-    check(
-        "audio call button is shown",
-        await page.$eval(
-            ".compose-control-buttons-container .audio_link",
-            (element) => (element as HTMLElement).offsetParent !== null,
-        ),
-    );
-    await page.click(".compose-control-buttons-container .video_link");
-    await page.waitForFunction(() =>
-        document
-            .querySelector<HTMLTextAreaElement>("#compose-textarea")
-            ?.value.includes("/calls/livekit/join?call_id="),
-    );
-    check("video call button inserts a LiveKit link", true);
-    await common.screenshot(page, "livekit-0-compose");
-
     const cordelia_password = process.env["CORDELIA_PASSWORD"];
     if (cordelia_password === undefined) {
         throw new Error("CORDELIA_PASSWORD is not set");

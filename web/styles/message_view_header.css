@@ -308,6 +308,16 @@
         margin-left: auto;
     }
 
+    /* Call buttons at the end of the header of a direct message
+       conversation. */
+    .message-view-header-call-buttons {
+        display: flex;
+        flex: none;
+        align-self: center;
+        align-items: center;
+        margin-left: auto;
+    }
+
     .conversation-header-subtitle {
         overflow: hidden;
         text-overflow: ellipsis;

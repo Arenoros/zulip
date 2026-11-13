@@ -9,9 +9,7 @@ import render_add_todo_list_modal from "../templates/add_todo_list_modal.hbs";
 import * as compose from "./compose.ts";
 import * as compose_actions from "./compose_actions.ts";
 import * as compose_banner from "./compose_banner.ts";
-import * as compose_call from "./compose_call.ts";
 import {compose_call_session_manager} from "./compose_call_session.ts";
-import * as compose_call_ui from "./compose_call_ui.ts";
 import * as compose_fade from "./compose_fade.ts";
 import * as compose_notifications from "./compose_notifications.ts";
 import * as compose_recipient from "./compose_recipient.ts";
@@ -104,13 +102,6 @@ export function finish(scheduling_message = false): boolean | undefined {
 export function initialize(): void {
     // Register hooks for compose_actions.
     setup_compose_actions_hooks();
-
-    $(".compose-control-buttons-container .video_link").toggle(
-        compose_call.compute_show_video_chat_button(),
-    );
-    $(".compose-control-buttons-container .audio_link").toggle(
-        compose_call.compute_show_audio_chat_button(),
-    );
 
     $("textarea#compose-textarea").on("keydown", (event) => {
         compose_ui.handle_keydown(
@@ -471,32 +462,6 @@ export function initialize(): void {
         e.stopPropagation();
 
         $("#compose .file_input").trigger("click");
-    });
-
-    $("body").on("click", ".video_link", function (this: HTMLElement, e): void {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const show_video_chat_button = compose_call.compute_show_video_chat_button();
-
-        if (!show_video_chat_button) {
-            return;
-        }
-
-        compose_call_ui.generate_and_insert_audio_or_video_call_link($(this), false);
-    });
-
-    $("body").on("click", ".audio_link", function (this: HTMLElement, e): void {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const show_audio_chat_button = compose_call.compute_show_audio_chat_button();
-
-        if (!show_audio_chat_button) {
-            return;
-        }
-
-        compose_call_ui.generate_and_insert_audio_or_video_call_link($(this), true);
     });
 
     $("body").on("click", ".time_pick", function (this: HTMLElement, e) {

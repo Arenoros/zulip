@@ -13,7 +13,6 @@ import * as call_ringing from "./call_ringing.ts";
 import * as channel_folders from "./channel_folders.ts";
 import * as compose from "./compose.ts";
 import {compose_call_session_manager} from "./compose_call_session.ts";
-import * as compose_call_ui from "./compose_call_ui.ts";
 import * as compose_closed_ui from "./compose_closed_ui.ts";
 import * as compose_pm_pill from "./compose_pm_pill.ts";
 import * as compose_recipient from "./compose_recipient.ts";
@@ -403,8 +402,8 @@ export function dispatch_normal_event(event) {
                 signup_announcements_stream_id: noop,
                 zulip_update_announcements_stream_id: noop,
                 emails_restricted_to_domains: noop,
-                video_chat_provider: compose_call_ui.update_audio_and_video_chat_button_display,
-                jitsi_server_url: compose_call_ui.update_audio_and_video_chat_button_display,
+                video_chat_provider: message_view_header.render_title_area,
+                jitsi_server_url: noop,
                 gif_rating_policy: gif_state.update_gif_icon_visibility,
                 waiting_period_threshold: noop,
                 want_advertise_in_communities_directory: noop,
