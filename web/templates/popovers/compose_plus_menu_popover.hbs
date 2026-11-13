@@ -1,5 +1,6 @@
 <div class="popover-menu compose-plus-menu" id="compose-plus-menu-popover" data-simplebar data-simplebar-tab-index="-1">
     <ul role="menu" class="popover-menu-list">
+        {{#unless editing}}
         <li role="none" class="link-item popover-menu-list-item">
             <a role="menuitem" class="compose-plus-menu-poll popover-menu-link{{#if has_content}} compose-plus-menu-item-disabled{{/if}}" tabindex="0"{{#if has_content}} aria-disabled="true"{{/if}}>
                 <i class="popover-menu-icon zulip-icon zulip-icon-poll" aria-hidden="true"></i>
@@ -23,6 +24,7 @@
             </a>
         </li>
         <li role="separator" class="popover-menu-separator"></li>
+        {{/unless}}
         <li role="none" class="link-item popover-menu-list-item">
             <a role="menuitem" class="compose-plus-menu-global-time popover-menu-link" tabindex="0">
                 <i class="popover-menu-icon zulip-icon zulip-icon-time" aria-hidden="true"></i>

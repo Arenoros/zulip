@@ -233,11 +233,6 @@
         }
     }
 
-    .messagebox-content:not(.is-me-message) .message_edit .edit-content-container {
-        border: 2px solid var(--color-message-bubble-focus);
-        border-radius: 8px;
-    }
-
     .selected_message .messagebox-content:not(.is-me-message) {
         outline: 0;
 

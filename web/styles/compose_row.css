@@ -3,14 +3,15 @@
    few buttons, and the send controls. In formatting mode, the
    formatting toolbar shows above a taller message field, and the
    buttons move below it. The form for a new conversation always shows
-   the formatting toolbar. Sizes are in em at the 15px font size of
-   the design. */
+   the formatting toolbar. The edit form of a message has the same
+   buttons and formatting toolbar; see message_row.css. Sizes are in em
+   at the 15px font size of the design. */
 #compose-row-buttons,
 .compose-toolbar-end {
     display: none;
 }
 
-#compose.compose-row-layout {
+:is(#compose.compose-row-layout, .message_edit_form) {
     #compose-content {
         padding: 0 0 0.5333em;
         border-color: transparent;

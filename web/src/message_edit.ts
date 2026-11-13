@@ -1871,3 +1871,23 @@ export function clear_preview_area($element: JQuery): void {
     const $row = rows.get_closest_row($element);
     compose_ui.exit_preview_mode($row);
 }
+
+// The edit form of a message has its own formatting mode, apart from
+// the compose box's.
+export function toggle_formatting_mode($button: JQuery): void {
+    const $row = rows.get_closest_row($button);
+    const $form = $row.find(".message_edit_form");
+    const formatting_mode = !$form.hasClass("formatting-mode");
+    if (!formatting_mode && $row.hasClass("preview_mode")) {
+        // The toolbar with the button to leave the preview is
+        // about to be hidden.
+        clear_preview_area($row);
+    }
+    $form.toggleClass("formatting-mode", formatting_mode);
+    $button
+        .attr("aria-pressed", String(formatting_mode))
+        .toggleClass("compose-row-button-active", formatting_mode);
+    const $textarea = $row.find<HTMLTextAreaElement>("textarea.message_edit_content");
+    autosize.update($textarea);
+    $textarea.trigger("focus");
+}

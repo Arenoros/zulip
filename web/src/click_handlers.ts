@@ -403,6 +403,16 @@ export function initialize(): void {
         },
     );
 
+    $("body").on(
+        "click",
+        ".message_edit_form .compose-formatting-mode-button",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            message_edit.toggle_formatting_mode($(this));
+        },
+    );
+
     $("body").on("click", ".message_edit_form .markdown_preview", function (this: HTMLElement, e) {
         e.preventDefault();
         message_edit.show_preview_area($(this));

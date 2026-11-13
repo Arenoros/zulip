@@ -261,8 +261,10 @@ export function open_saved_snippets_dropdown_via_hotkey(): void {
     });
 }
 
-export function open_saved_snippets_dropdown_from_compose_plus_menu(): void {
-    saved_snippets_widget?.open({reference: get_compose_saved_snippets_reference()});
+// The snippet goes into the compose box or the edit form that the
+// reference, the anchor of its "+" button, is in.
+export function open_saved_snippets_dropdown_from(reference: HTMLElement): void {
+    saved_snippets_widget?.open({reference});
 }
 
 export function setup_saved_snippets_dropdown_widget_if_needed(): void {

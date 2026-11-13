@@ -2498,7 +2498,14 @@ test("should_enter_send in formatting mode", ({override}) => {
 
     // The message edit form keeps the setting.
     $textarea.attr("id", "edit-textarea");
+    const $edit_form = $.create("<message-edit-form>");
+    $textarea.set_closest_results(".message_edit_form", $edit_form);
     assert.ok(ct.should_enter_send(enter()));
+
+    // It has its own formatting mode.
+    $edit_form.addClass("formatting-mode");
+    assert.ok(!ct.should_enter_send(enter()));
+    assert.ok(ct.should_enter_send(enter({ctrlKey: true})));
 });
 
 test("begins_typeahead", ({override, override_rewire}) => {

@@ -271,7 +271,14 @@ export function should_enter_send(e: JQuery.KeyDownEvent): boolean {
     const has_non_shift_modifier_key = e.ctrlKey || e.metaKey || e.altKey;
     const has_modifier_key = e.shiftKey || has_non_shift_modifier_key;
     let this_enter_sends;
-    if (compose_ui.is_formatting_mode() && $(e.target).attr("id") === "compose-textarea") {
+    // The compose box and the edit form of a message each have their
+    // own formatting mode.
+    const $target = $(e.target);
+    const formatting_mode =
+        $target.attr("id") === "compose-textarea"
+            ? compose_ui.is_formatting_mode()
+            : $target.closest(".message_edit_form").hasClass("formatting-mode");
+    if (formatting_mode) {
         // Formatting mode is for writing longer messages, where Enter
         // starts a new line, whatever the setting.
         this_enter_sends = has_non_shift_modifier_key;

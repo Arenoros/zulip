@@ -1,4 +1,5 @@
-{{! The buttons of the compose box in the row layout. }}
+{{! The buttons of the compose box in the row layout, and of the edit form
+    of a message. }}
 <button type="button" class="compose-row-button compose-formatting-mode-button tippy-zulip-delayed-tooltip" aria-pressed="false" aria-label="{{t 'Formatting' }}" data-tippy-content="{{t 'Formatting' }}">
     <i class="zulip-icon zulip-icon-type-big" aria-hidden="true"></i>
 </button>
@@ -21,7 +22,11 @@ attach to a button that already has a tooltip. --}}
     {{!-- Where the saved snippets, the GIF picker and the
     time picker open from the menu, apart from the button,
     which has the menu's popover. --}}
-    <span class="saved-snippets-composebox-widget compose-plus-menu-anchor" aria-hidden="true"></span>
+    {{#unless (eq message_id undefined)}}
+    <span class="saved-snippets-message-edit-widget compose-plus-menu-anchor compose-plus-menu-snippets-anchor" data-message-id="{{message_id}}" aria-hidden="true"></span>
+    {{else}}
+    <span class="saved-snippets-composebox-widget compose-plus-menu-anchor compose-plus-menu-snippets-anchor" aria-hidden="true"></span>
+    {{/unless}}
     <span class="compose-plus-menu-anchor compose-plus-menu-picker-anchor" aria-hidden="true"></span>
 </span>
 <span class="compose-row-divider" aria-hidden="true"></span>
