@@ -22,47 +22,33 @@ from zerver.lib.test_classes import MigrationsTestCase
 #   "zerver_subscription" because it has pending trigger events
 
 
-class FixDeletedUserEmail(MigrationsTestCase):
-    migrate_from = "0804_backfill_user_created_audit_logs"
-    migrate_to = "0805_fix_deleteduser_email"
+class ConversationsWebChannelDefaultView(MigrationsTestCase):
+    migrate_from = "0831_usersetting_web_direct_message_bubbles"
+    migrate_to = "0832_conversations_web_channel_default_view"
 
     @override
     def setUpBeforeMigration(self, apps: StateApps) -> None:
-        Realm = apps.get_model("zerver", "Realm")
         UserProfile = apps.get_model("zerver", "UserProfile")
-        realm = Realm.objects.get(string_id="zulip")
+        RealmUserDefault = apps.get_model("zerver", "RealmUserDefault")
 
-        # Simulate a user deleted before the fix in 208c0c303405,
-        # after 0439_fix_deleteduser_email repaired delivery_email.
-        deleted_user = UserProfile.objects.get(realm=realm, delivery_email="hamlet@zulip.com")
-        UserProfile.objects.filter(id=deleted_user.id).update(
-            is_active=False,
-            email=f"deleteduser{deleted_user.id}@https://zulip.testserver",
-            delivery_email=f"deleteduser{deleted_user.id}@zulip.testserver",
+        # A user who had chosen the channel feed, and one with the
+        # previous default.
+        UserProfile.objects.filter(delivery_email="hamlet@zulip.com").update(
+            web_channel_default_view=2
         )
-        self.deleted_user_id = deleted_user.id
+        UserProfile.objects.filter(delivery_email="cordelia@zulip.com").update(
+            web_channel_default_view=1
+        )
+        RealmUserDefault.objects.update(web_channel_default_view=3)
 
-        # A normal active user, as a control.
-        control_user = UserProfile.objects.get(realm=realm, delivery_email="cordelia@zulip.com")
-        self.control_user_id = control_user.id
-        self.control_user_email = control_user.email
-
-        # A deactivated user with a valid email, as a control for the
-        # is_active=False part of the migration's filter.
-        deactivated_user = UserProfile.objects.get(realm=realm, delivery_email="othello@zulip.com")
-        UserProfile.objects.filter(id=deactivated_user.id).update(is_active=False)
-        self.deactivated_user_id = deactivated_user.id
-        self.deactivated_user_email = deactivated_user.email
-
-    def test_deleted_user_email_fixed(self) -> None:
+    def test_conversations_become_the_default_view(self) -> None:
         UserProfile = self.apps.get_model("zerver", "UserProfile")
+        RealmUserDefault = self.apps.get_model("zerver", "RealmUserDefault")
 
-        deleted_user = UserProfile.objects.get(id=self.deleted_user_id)
-        self.assertEqual(deleted_user.email, f"deleteduser{deleted_user.id}@zulip.testserver")
-        self.assertEqual(deleted_user.email, deleted_user.delivery_email)
-
-        control_user = UserProfile.objects.get(id=self.control_user_id)
-        self.assertEqual(control_user.email, self.control_user_email)
-
-        deactivated_user = UserProfile.objects.get(id=self.deactivated_user_id)
-        self.assertEqual(deactivated_user.email, self.deactivated_user_email)
+        self.assertEqual(
+            set(UserProfile.objects.values_list("web_channel_default_view", flat=True)), {5}
+        )
+        self.assertEqual(
+            set(RealmUserDefault.objects.values_list("web_channel_default_view", flat=True)),
+            {5},
+        )

@@ -16246,7 +16246,8 @@ paths:
                     - 5 - Conversations
 
                     **Changes**: The "Conversations" option is new in Zulip 13.0
-                    (feature level ZF-f7b407).
+                    (feature level ZF-f7b407), and is the default. Previously,
+                    the default was "Top topic in the channel".
 
                     The "Top unread topic in channel" is new in Zulip 11.0
                     (feature level 401).
@@ -20466,7 +20467,8 @@ paths:
                               - 5 - Conversations
 
                               **Changes**: The "Conversations" option is new in Zulip 13.0
-                              (feature level ZF-f7b407).
+                              (feature level ZF-f7b407), and is the default. Previously,
+                              the default was "Top topic in the channel".
 
                               The "Top unread topic in channel" is new in Zulip 11.0
                               (feature level 401).
@@ -22930,7 +22932,8 @@ paths:
                               - 5 - Conversations
 
                               **Changes**: The "Conversations" option is new in Zulip 13.0
-                              (feature level ZF-f7b407).
+                              (feature level ZF-f7b407), and is the default. Previously,
+                              the default was "Top topic in the channel".
 
                               The "Top unread topic in channel" is new in Zulip 11.0
                               (feature level 401).
@@ -24239,7 +24242,8 @@ paths:
                     - 5 - Conversations
 
                     **Changes**: The "Conversations" option is new in Zulip 13.0
-                    (feature level ZF-f7b407).
+                    (feature level ZF-f7b407), and is the default. Previously,
+                    the default was "Top topic in the channel".
 
                     The "Top unread topic in channel" is new in Zulip 11.0
                     (feature level 401).

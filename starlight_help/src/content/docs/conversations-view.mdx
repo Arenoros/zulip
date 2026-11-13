@@ -5,6 +5,7 @@ title: Conversations view
 import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
 
 import KeyboardTip from "../../components/KeyboardTip.astro";
+import ZulipNote from "../../components/ZulipNote.astro";
 import ConfigureChannelLinks from "../include/_ConfigureChannelLinks.mdx";
 
 The **conversations view** shows a channel as a list of cards, one for each
@@ -117,6 +118,11 @@ for it, copying a link to it, and opening the topic's menu.
 ## Configure where channel links in the left sidebar go
 
 <ConfigureChannelLinks />
+
+<ZulipNote>
+  When the conversations view became the default, it replaced the option
+  previously chosen by every user. You can choose another option at any time.
+</ZulipNote>
 
 ## Related articles
 

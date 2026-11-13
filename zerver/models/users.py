@@ -133,8 +133,8 @@ class UserBaseSettings(models.Model):
     web_mark_read_on_scroll_policy = models.SmallIntegerField(default=MARK_READ_ON_SCROLL_ALWAYS)
 
     # UI setting controlling if clicking on a channel link should open
-    # the channel feed (interleaved view) or narrow to the first topic
-    # in the channel.
+    # the channel's conversations, the channel feed (interleaved view),
+    # its list of topics, or narrow to a topic in the channel.
 
     WEB_CHANNEL_DEFAULT_VIEW_FIRST_TOPIC = 1
     WEB_CHANNEL_DEFAULT_VIEW_CHANNEL_FEED = 2
@@ -151,8 +151,8 @@ class UserBaseSettings(models.Model):
     ]
 
     web_channel_default_view = models.SmallIntegerField(
-        default=WEB_CHANNEL_DEFAULT_VIEW_FIRST_TOPIC,
-        db_default=WEB_CHANNEL_DEFAULT_VIEW_FIRST_TOPIC,
+        default=WEB_CHANNEL_DEFAULT_VIEW_CONVERSATIONS,
+        db_default=WEB_CHANNEL_DEFAULT_VIEW_CONVERSATIONS,
     )
 
     # Emoji sets
