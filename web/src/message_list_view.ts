@@ -14,6 +14,7 @@ import render_single_message from "../templates/single_message.hbs";
 
 import * as activity from "./activity.ts";
 import * as blueslip from "./blueslip.ts";
+import * as bubble_layout from "./bubble_layout.ts";
 import * as compose_fade from "./compose_fade.ts";
 import * as condense from "./condense.ts";
 import * as hash_util from "./hash_util.ts";
@@ -48,7 +49,6 @@ import type {TopicLink} from "./types.ts";
 import * as typing_data from "./typing_data.ts";
 import * as typing_events from "./typing_events.ts";
 import * as ui_util from "./ui_util.ts";
-import {user_settings} from "./user_settings.ts";
 import * as user_topics from "./user_topics.ts";
 import type {AllVisibilityPolicies} from "./user_topics.ts";
 import * as util from "./util.ts";
@@ -612,13 +612,7 @@ export class MessageListView {
     }
 
     is_bubble_layout(): boolean {
-        // Views that mix conversations keep the classic layout.
-        const filter = this.list.data.filter;
-        return (
-            filter.is_conversation_view() &&
-            filter.has_operator("dm") &&
-            user_settings.web_direct_message_bubbles
-        );
+        return bubble_layout.is_bubble_layout(this.list.data.filter);
     }
 
     get_calculated_message_container_variables(
