@@ -611,7 +611,12 @@ export function get_frontfill_anchor(msg_list: MessageList): number | string {
     return "oldest";
 }
 
-export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void}): void {
+export function load_topic_cards(opts: {
+    msg_list: MessageList;
+    // Looking for a topic's card takes pages of the most cards.
+    searching_for_topic?: boolean;
+    cont?: () => void;
+}): void {
     const msg_list = opts.msg_list;
     const stream_id = narrow_state.stream_id(msg_list.data.filter);
     const fetch_status = msg_list.data.fetch_status;
@@ -625,7 +630,9 @@ export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void
     void channel.get({
         url: `/json/streams/${stream_id}/topic_cards`,
         data: {
-            num_topics: topic_cards.NUM_TOPIC_CARDS_PER_FETCH,
+            num_topics: opts.searching_for_topic
+                ? topic_cards.MAX_TOPIC_CARDS_PER_FETCH
+                : topic_cards.NUM_TOPIC_CARDS_PER_FETCH,
             num_replies: topic_cards.NUM_TOPIC_CARD_REPLIES,
             allow_empty_topic_name: true,
             ...(anchor !== undefined && {anchor}),
@@ -651,10 +658,10 @@ export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void
             // Each page of cards is complete in itself, though not
             // contiguous with the messages already in the list.
             const is_contiguous_history = true;
-            if (msg_list.data.empty()) {
-                // The caller renders the first page, scrolled to the most
-                // recently active topic. Rendering it here first would
-                // show the oldest cards for a moment, and read them.
+            if (msg_list.selected_id() === -1) {
+                // The caller renders the cards once loaded, scrolled to
+                // the topic the view opens at. Rendering them here first
+                // would show the oldest cards for a moment, and read them.
                 msg_list.data.add_messages(messages, is_contiguous_history);
             } else {
                 msg_list.add_messages(messages, {}, is_contiguous_history);

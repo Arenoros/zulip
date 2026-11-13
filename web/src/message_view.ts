@@ -7,6 +7,7 @@ import * as z from "zod/mini";
 import * as activity_ui from "./activity_ui.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
+import * as bubble_layout from "./bubble_layout.ts";
 import * as channel from "./channel.ts";
 import * as compose_actions from "./compose_actions.ts";
 import type {NarrowActivateOpts} from "./compose_actions.ts";
@@ -517,6 +518,18 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
     const filter = new Filter(raw_terms);
     filter.try_adjusting_for_moved_with_target();
 
+    // Going from an open conversation to its channel's conversations
+    // view, such as with the open conversation's back button, shows
+    // the topic's card.
+    const previous_filter = narrow_state.filter();
+    const conversations_view_focus_topic =
+        show_opts.conversations_view &&
+        previous_filter !== undefined &&
+        bubble_layout.is_open_conversation(previous_filter) &&
+        narrow_state.stream_id(previous_filter) === narrow_state.stream_id(filter)
+            ? narrow_state.topic(previous_filter)
+            : undefined;
+
     if (embedded_call_chat.is_active() && !embedded_call_chat.is_call_chat(filter)) {
         return;
     }
@@ -833,22 +846,49 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
 
             if (opts.conversations_view) {
                 // Topic cards open at the most recently active topic,
-                // which holds the newest message.
-                id_info.final_select_id ??= LARGER_THAN_MAX_MESSAGE_ID;
-                message_fetch.load_topic_cards({
-                    msg_list,
-                    cont() {
-                        if (message_lists.current !== msg_list) {
-                            return;
-                        }
-                        render_message_list_with_selected_message({
-                            id_info,
-                            select_offset: then_select_offset,
-                            msg_list,
-                            select_opts,
-                        });
-                    },
-                });
+                // which holds the newest message, or at the card of
+                // the topic to show, loading older cards until it.
+                const load_topic_cards = (): void => {
+                    message_fetch.load_topic_cards({
+                        msg_list,
+                        searching_for_topic: conversations_view_focus_topic !== undefined,
+                        cont() {
+                            if (message_lists.current !== msg_list) {
+                                return;
+                            }
+                            const focus_message =
+                                conversations_view_focus_topic === undefined
+                                    ? undefined
+                                    : msg_list
+                                          .all_messages()
+                                          .find(
+                                              (message) =>
+                                                  message.type === "stream" &&
+                                                  util.lower_same(
+                                                      message.topic,
+                                                      conversations_view_focus_topic,
+                                                  ),
+                                          );
+                            if (
+                                conversations_view_focus_topic !== undefined &&
+                                focus_message === undefined &&
+                                msg_list.data.fetch_status.can_load_older_messages()
+                            ) {
+                                load_topic_cards();
+                                return;
+                            }
+                            id_info.final_select_id ??=
+                                focus_message?.id ?? LARGER_THAN_MAX_MESSAGE_ID;
+                            render_message_list_with_selected_message({
+                                id_info,
+                                select_offset: then_select_offset,
+                                msg_list,
+                                select_opts,
+                            });
+                        },
+                    });
+                };
+                load_topic_cards();
             } else {
                 let anchor;
                 let anchor_date;

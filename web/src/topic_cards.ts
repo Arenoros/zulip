@@ -12,6 +12,8 @@ import * as people from "./people.ts";
 
 export const NUM_TOPIC_CARD_REPLIES = 3;
 export const NUM_TOPIC_CARDS_PER_FETCH = 20;
+// The most cards the server returns at a time.
+export const MAX_TOPIC_CARDS_PER_FETCH = 100;
 
 const topic_card_schema = z.object({
     topic_name: z.string(),
