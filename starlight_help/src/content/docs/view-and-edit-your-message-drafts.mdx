@@ -9,6 +9,7 @@ import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
 import ComposeBoxMenu from "../include/_ComposeBoxMenu.mdx";
 import GoToDraftMessages from "../include/_GoToDraftMessages.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import CloseIcon from "~icons/zulip-icon/close";
@@ -129,6 +130,16 @@ counter next to the **Drafts** button in the compose box shows how many there ar
       You can also use <kbd>D</kbd> to bring up your list of saved drafts, and
       <kbd>Backspace</kbd> within the drafts view to delete the selected draft.
     </KeyboardTip>
+  </TabItem>
+
+  <TabItem label="In a conversation">
+    <FlattenedSteps>
+      <ShowFormattingButtons />
+
+      1. Click the **delete draft** (<TrashIcon />) icon at the end of the
+         formatting buttons. This empties the compose box and deletes its
+         draft.
+    </FlattenedSteps>
   </TabItem>
 </Tabs>
 

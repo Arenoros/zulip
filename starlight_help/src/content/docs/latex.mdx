@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import LatexExamples from "../include/_LatexExamples.mdx";
 import LatexIntro from "../include/_LatexIntro.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import MathIcon from "~icons/zulip-icon/math";
@@ -30,9 +31,11 @@ which inserts contextually appropriate LaTeX formatting:
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. *(optional)* Select the text you want to format.
-      1. Click the **math (LaTeX)** (<MathIcon />) icon at the bottom of
-         the compose box to insert LaTeX formatting.
+      1. Click the **math (LaTeX)** (<MathIcon />) icon in the
+         compose box to insert LaTeX formatting.
     </FlattenedSteps>
 
     <ZulipTip>

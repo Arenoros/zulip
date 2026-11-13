@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import NumberedListsExamples from "../include/_NumberedListsExamples.mdx";
 import NumberedListsIntro from "../include/_NumberedListsIntro.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import OrderedListIcon from "~icons/zulip-icon/ordered-list";
@@ -21,9 +22,11 @@ import OrderedListIcon from "~icons/zulip-icon/ordered-list";
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. *(optional)* Select the text you want to format.
-      1. Click the **numbered list** (<OrderedListIcon />) icon at the
-         bottom of the compose box to insert list formatting.
+      1. Click the **numbered list** (<OrderedListIcon />) icon in the
+         compose box to insert list formatting.
       1. Press <kbd>Enter</kbd> to automatically add a new number to the list.
       1. When your list is done, press <kbd>Enter</kbd> a second time to remove the
          number.

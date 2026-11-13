@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import KeyboardTip from "../../components/KeyboardTip.astro";
 import LinksExamples from "../include/_LinksExamples.mdx";
 import LinksIntro from "../include/_LinksIntro.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import LinkIcon from "~icons/zulip-icon/link";
@@ -35,9 +36,11 @@ import LinkIcon from "~icons/zulip-icon/link";
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. Select the text you want to linkify.
-      1. Click the **link** (<LinkIcon />) icon at the
-         bottom of the compose box.
+      1. Click the **link** (<LinkIcon />) icon in the
+         compose box.
       1. Replace `url` with a valid URL.
     </FlattenedSteps>
 
