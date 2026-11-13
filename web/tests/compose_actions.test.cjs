@@ -1302,3 +1302,63 @@ test("compose box for the conversation of the view", ({
 
     stream_data.clear_subscriptions();
 });
+
+test("reply in the conversations view", ({override, override_rewire, mock_template}) => {
+    mock_banners();
+    override_private_message_recipient_ids({override});
+    override_rewire(compose_actions, "autosize_message_content", noop);
+    override_rewire(compose_actions, "expand_compose_box", noop);
+    override_rewire(compose_actions, "complete_starting_tasks", noop);
+    override_rewire(compose_actions, "clear_textarea", noop);
+    override_rewire(compose_actions, "blur_compose_inputs", noop);
+    override_rewire(compose_recipient, "on_compose_select_recipient_update", noop);
+    override_rewire(compose_recipient, "update_recipient_row_attention_level", noop);
+    override_rewire(stream_data, "can_post_messages_in_stream", () => true);
+    mock_template("decorated_channel_name.hbs", false, () => "");
+    const $textarea = $("textarea#compose-textarea");
+    stub_message_row($textarea);
+    $("#send_message_form").set_find_results(".message-textarea", $textarea);
+    $("#send_message_form").set_find_results(
+        ".message-limit-indicator",
+        $("#compose-limit-indicator"),
+    );
+    compose_pm_pill.clear = noop;
+
+    const kitchen = make_stream({name: "kitchen", stream_id: 7});
+    stream_data.add_sub_for_tests(kitchen);
+    override(narrow_state, "filter", () => ({is_conversation_view: () => false}));
+    override(narrow_state, "set_compose_defaults", () => ({stream_id: kitchen.stream_id}));
+    override(narrow_state, "stream_id", () => kitchen.stream_id);
+    override(message_lists.current, "is_conversations_view", true);
+
+    // A reply to a topic card is a row under a line naming the topic.
+    start({message_type: "stream", stream_id: kitchen.stream_id, topic: "coffee"});
+    assert.ok(compose_state.is_reply_in_conversations_view());
+    assert.ok(!compose_state.is_for_view());
+    assert.ok($("#compose").hasClass("compose-reply-in-conversations"));
+    assert.ok($("#compose").hasClass("compose-row-layout"));
+    assert.equal($("#compose-reply-line-text").text(), "translated: Reply in “coffee”");
+
+    // A reply to another card names that topic.
+    start({message_type: "stream", stream_id: kitchen.stream_id, topic: "fridge"});
+    assert.equal($("#compose-reply-line-text").text(), "translated: Reply in “fridge”");
+
+    // Closing it ends the reply.
+    cancel();
+    assert.ok(!compose_state.composing());
+    assert.ok(!compose_state.is_reply_in_conversations_view());
+    assert.ok(!$("#compose").hasClass("compose-row-layout"));
+
+    // A new conversation is not a reply.
+    start({message_type: "stream", stream_id: kitchen.stream_id, trigger: "compose_hotkey"});
+    assert.ok(!compose_state.is_reply_in_conversations_view());
+    cancel();
+
+    // Elsewhere, replies keep the classic compose box.
+    override(message_lists.current, "is_conversations_view", false);
+    start({message_type: "stream", stream_id: kitchen.stream_id, topic: "coffee"});
+    assert.ok(!compose_state.is_reply_in_conversations_view());
+    cancel();
+
+    stream_data.clear_subscriptions();
+});

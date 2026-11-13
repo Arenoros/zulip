@@ -464,3 +464,35 @@
         display: block;
     }
 }
+
+#compose-reply-line {
+    display: none;
+}
+
+/* A reply to a topic card in the conversations view names its topic
+   above the row, in place of the recipient row. */
+#compose.compose-reply-in-conversations {
+    #compose_top,
+    #compose_close {
+        display: none;
+    }
+
+    #compose-reply-line {
+        display: flex;
+        align-items: center;
+        gap: 0.25em;
+        /* 0 0 4px 4px at 13px/1em */
+        padding: 0 0 0.3077em 0.3077em;
+        /* 13px at 15px/1em */
+        font-size: 0.8667em;
+        color: var(--color-text-message-bubble-caption);
+    }
+
+    #compose-reply-line-text {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}

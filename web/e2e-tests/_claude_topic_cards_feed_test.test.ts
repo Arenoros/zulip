@@ -95,8 +95,8 @@ async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -150,8 +150,9 @@ function row(id: number): string {
 async function selected_id(page: Page): Promise<number> {
     return await page.evaluate(() =>
         Number(
-            document.querySelector<HTMLElement>(".focused-message-list .selected_message")
-                ?.dataset["messageId"],
+            document.querySelector<HTMLElement>(".focused-message-list .selected_message")?.dataset[
+                "messageId"
+            ],
         ),
     );
 }
@@ -205,7 +206,8 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     );
     const unread_card = await page.evaluate(() => {
         const card = [...document.querySelectorAll(".focused-message-list .recipient_row")].find(
-            (card) => card.querySelector(".topic-card-title-text")?.textContent.trim() === "unread news",
+            (card) =>
+                card.querySelector(".topic-card-title-text")?.textContent.trim() === "unread news",
         )!;
         return {
             marked: card.classList.contains("topic-card-unread"),
@@ -230,7 +232,8 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const after_reading = await page.evaluate(() => {
         const card = [...document.querySelectorAll(".focused-message-list .recipient_row")].find(
-            (card) => card.querySelector(".topic-card-title-text")?.textContent.trim() === "unread news",
+            (card) =>
+                card.querySelector(".topic-card-title-text")?.textContent.trim() === "unread news",
         )!;
         return card.querySelector(".topic-card-unread-count")?.textContent.trim();
     });
@@ -257,11 +260,7 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     await page.keyboard.press("KeyJ");
     await page.keyboard.press("KeyJ");
     selected = await selected_id(page);
-    check(
-        "j goes down through a card's messages",
-        selected === talk[1],
-        `${selected} ${talk[1]}`,
-    );
+    check("j goes down through a card's messages", selected === talk[1], `${selected} ${talk[1]}`);
 
     // Full message actions inside a card.
     await page.keyboard.type("+");
@@ -321,7 +320,8 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     // card moves to the bottom.
     const filler_card = await page.evaluate(() => {
         const card = [...document.querySelectorAll(".focused-message-list .recipient_row")].find(
-            (card) => card.querySelector(".topic-card-title-text")?.textContent.trim() === "filler 05",
+            (card) =>
+                card.querySelector(".topic-card-title-text")?.textContent.trim() === "filler 05",
         )!;
         card.scrollIntoView({block: "center"});
         return true;
@@ -329,7 +329,8 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     assert_ok(filler_card);
     await page.evaluate(() => {
         const card = [...document.querySelectorAll(".focused-message-list .recipient_row")].find(
-            (card) => card.querySelector(".topic-card-title-text")?.textContent.trim() === "filler 05",
+            (card) =>
+                card.querySelector(".topic-card-title-text")?.textContent.trim() === "filler 05",
         )!;
         card.querySelector<HTMLElement>(".topic-card-reply-button")!.click();
     });
@@ -350,7 +351,9 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     await page.waitForFunction(() => {
         const cards = [...document.querySelectorAll(".focused-message-list .recipient_row")];
         const last_card = cards.at(-1);
-        const last_row = [...(last_card?.querySelectorAll<HTMLElement>(".message_row") ?? [])].at(-1);
+        const last_row = [...(last_card?.querySelectorAll<HTMLElement>(".message_row") ?? [])].at(
+            -1,
+        );
         return (
             last_card?.querySelector(".topic-card-title-text")?.textContent.trim() ===
                 "filler 05" &&
@@ -360,22 +363,19 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
     });
     await wait_for_scroll_to_settle(page);
     const own_reply_id = (await card_rows(page, "filler 05")).at(-1)!;
-    const after_reply = await page.evaluate(
-        (selector: string) => {
-            const rect = document.querySelector(selector)!.getBoundingClientRect();
-            return {
-                hash: window.location.hash,
-                visible: rect.top >= 0 && rect.bottom <= window.innerHeight,
-            };
-        },
-        row(own_reply_id),
-    );
+    const after_reply = await page.evaluate((selector: string) => {
+        const rect = document.querySelector(selector)!.getBoundingClientRect();
+        return {
+            hash: window.location.hash,
+            visible: rect.top >= 0 && rect.bottom <= window.innerHeight,
+        };
+    }, row(own_reply_id));
     check(
         "a reply moves its card to the bottom and the view follows it",
         after_reply.hash.startsWith("#conversations/") && after_reply.visible,
         JSON.stringify(after_reply),
     );
-    await page.keyboard.press("Escape");
+    // Sending a reply closes the compose box.
     await page.waitForSelector("#compose-textarea", {hidden: true});
     await wait_for_scroll_to_settle(page);
 

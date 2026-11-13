@@ -2543,17 +2543,16 @@ export class MessageListView {
             }
             this.rerender_topic_cards_keeping_visible_cards(messages);
             if (sent_by_me) {
-                // Sending a message also resizes the compose box, which
-                // can scroll the feed with an animation, so we go to the
-                // reply once that is done.
+                // Sending a message also resizes or closes the compose
+                // box, which can scroll the feed with an animation, so we
+                // go to the reply once that is done. Its card is now the
+                // last one.
                 const message_id = messages.at(-1)!.id;
                 setTimeout(() => {
                     message_viewport.after_animated_scroll(() => {
                         if (this.list === message_lists.current) {
-                            this.list.select_id(message_id, {
-                                then_scroll: true,
-                                use_closest: true,
-                            });
+                            this.list.select_id(message_id, {use_closest: true});
+                            message_viewport.scrollTop(this.$list.outerHeight(true) ?? 0);
                         }
                     });
                 }, 0);

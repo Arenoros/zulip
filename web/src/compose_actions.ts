@@ -118,9 +118,9 @@ function show_compose_box(opts: ComposeActionsOpts): void {
         };
     }
     compose_recipient.update_compose_for_message_type(opts_by_message_type);
-    // When changing this, edit the 42px in _maybe_autoscroll. The
-    // compose box of a single conversation starts as one line.
-    $(".new_message_textarea").css("min-height", compose_state.is_for_view() ? "" : "3em");
+    // When changing this, edit the 42px in _maybe_autoscroll. A row
+    // starts as one line.
+    $(".new_message_textarea").css("min-height", is_row_layout() ? "" : "3em");
     // Under certain circumstances, such as focusing in the
     // automatically-opened compose box in DMs, we want to
     // defer running the focus logic.
@@ -242,15 +242,36 @@ function get_view_compose_opts(): ComposeActionsStartOpts | undefined {
 function set_compose_for_view(for_view: boolean): void {
     compose_state.set_for_view(for_view);
     $("#compose").toggleClass("compose-for-view", for_view);
-    set_row_layout(for_view);
+    update_row_layout();
     if (!for_view) {
         compose_ui.set_formatting_mode(false);
     }
 }
 
+// In the conversations view of a channel, a reply to a topic card is
+// a row too, under a line naming the topic, until it is sent or closed.
+function set_reply_in_conversations_view(reply: boolean, topic = ""): void {
+    compose_state.set_reply_in_conversations_view(reply);
+    $("#compose").toggleClass("compose-reply-in-conversations", reply);
+    if (reply) {
+        $("#compose-reply-line-text").text(
+            $t(
+                {defaultMessage: "Reply in “{topic_name}”"},
+                {topic_name: util.get_final_topic_display_name(topic)},
+            ),
+        );
+    }
+    update_row_layout();
+}
+
+function is_row_layout(): boolean {
+    return compose_state.is_for_view() || compose_state.is_reply_in_conversations_view();
+}
+
 // The compose box of a single conversation is a row, with a chevron
 // for the send options next to the send button.
-function set_row_layout(row_layout: boolean): void {
+function update_row_layout(): void {
+    const row_layout = is_row_layout();
     $("#compose").toggleClass("compose-row-layout", row_layout);
     $("#send_later i")
         .toggleClass("zulip-icon-more-vertical", !row_layout)
@@ -581,6 +602,15 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
             !is_new_message &&
             same_recipient_as_before(fill_in_opts_from_current_narrowed_view(view_opts)),
     );
+    set_reply_in_conversations_view(
+        !compose_state.is_for_view() &&
+            !is_new_message &&
+            !compose_state.is_new_conversation_form() &&
+            opts.message_type === "stream" &&
+            message_lists.current?.is_conversations_view === true &&
+            opts.stream_id === narrow_state.stream_id(),
+        opts.topic,
+    );
 
     // Show either stream/topic fields or "You and" field.
     show_compose_box(opts);
@@ -664,6 +694,7 @@ export let cancel = (): void => {
     compose_tooltips.dismiss_intro_go_to_conversation_tooltip();
     call_hooks(compose_cancel_hooks);
     set_new_conversation_form(false);
+    set_reply_in_conversations_view(false);
     compose_state.set_message_type(undefined);
     compose_pm_pill.clear();
     message_viewport.bottom_of_feed.reset();
@@ -685,6 +716,7 @@ export function on_show_navigation_view(): void {
     /* This function dictates the behavior of the compose box
      * when navigating to a view, as opposed to a narrow. */
     set_compose_for_view(false);
+    set_reply_in_conversations_view(false);
 
     // Leave the compose box closed if it was already closed.
     if (!compose_state.composing()) {
@@ -806,6 +838,7 @@ export function on_narrow(opts: NarrowActivateOpts): void {
         return;
     }
     set_compose_for_view(false);
+    set_reply_in_conversations_view(false);
 
     // We use force_close when jumping between direct message narrows with
     // the "p" key, so that we don't have an open compose box that makes

@@ -94,9 +94,12 @@ const throttled_update_draft = _.throttle(
 // Sends the message in the compose box. The form for a new
 // conversation closes once the conversation is published.
 export function finish(scheduling_message = false): boolean | undefined {
-    const is_new_conversation_form = compose_state.is_new_conversation_form();
+    // A new conversation, or a reply to a topic card, in the
+    // conversations view closes once sent.
+    const closes_once_sent =
+        compose_state.is_new_conversation_form() || compose_state.is_reply_in_conversations_view();
     const sent = compose.finish(scheduling_message);
-    if (sent && is_new_conversation_form) {
+    if (sent && closes_once_sent) {
         compose_actions.cancel();
     }
     return sent;

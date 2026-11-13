@@ -15,6 +15,9 @@ let new_conversation_form = false;
 // Whether the compose box is the one always open for the conversation
 // that a view of a single conversation shows, without a recipient row.
 let for_view = false;
+// Whether the compose box is a reply to a topic card in the
+// conversations view of a channel, which closes once sent.
+let reply_in_conversations_view = false;
 
 // We use this variable to keep track of whether user has viewed the topic resolved
 // banner for the current compose session, for a narrow. This prevents the banner
@@ -64,6 +67,14 @@ export function set_for_view(flag: boolean): void {
 
 export function is_for_view(): boolean {
     return for_view;
+}
+
+export function set_reply_in_conversations_view(flag: boolean): void {
+    reply_in_conversations_view = flag;
+}
+
+export function is_reply_in_conversations_view(): boolean {
+    return reply_in_conversations_view;
 }
 
 export function set_message_type(msg_type: "stream" | "private" | undefined): void {

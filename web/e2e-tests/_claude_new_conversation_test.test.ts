@@ -36,8 +36,8 @@ async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -254,12 +254,15 @@ async function new_conversation_test(page: Page): Promise<void> {
             "coffee",
     );
     form = await form_state(page);
-    check(
-        "Reply in topic opens the regular compose box from the form",
-        form.open && !form.form && form.picker_shown,
-        JSON.stringify(form),
+    const reply_row = await page.$eval("#compose", (compose) =>
+        compose.classList.contains("compose-reply-in-conversations"),
     );
-    await page.click("#compose_close");
+    check(
+        "Reply in topic opens the reply to that topic from the form",
+        form.open && !form.form && reply_row && form.topic === "coffee",
+        JSON.stringify({...form, reply_row}),
+    );
+    await page.click(".compose-reply-line-close");
     await wait_for_compose_closed(page);
 
     await page.click("#legacy-closed-compose-box .topic-cards-new-conversation-button");
@@ -299,7 +302,9 @@ async function new_conversation_test(page: Page): Promise<void> {
         "#legacy-closed-compose-box .topic-cards-new-conversation-button",
         (button) => {
             const rect = button.getBoundingClientRect();
-            const box = document.querySelector("#legacy-closed-compose-box")!.getBoundingClientRect();
+            const box = document
+                .querySelector("#legacy-closed-compose-box")!
+                .getBoundingClientRect();
             return {
                 height: Math.round(rect.height),
                 full_width: Math.abs(rect.width - box.width) < 2,

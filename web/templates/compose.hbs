@@ -101,6 +101,12 @@
                         </div>
                         <label class="new-conversation-form-label new-conversation-form-only" for="compose-textarea">{{t "Message" }}</label>
                     </div>
+                    {{!-- In the conversations view of a channel, the topic a
+                    reply goes to. --}}
+                    <div id="compose-reply-line">
+                        <span id="compose-reply-line-text"></span>
+                        {{> components/icon_button icon="close" intent="neutral" custom_classes="compose-reply-line-close tippy-zulip-delayed-tooltip" data-tippy-content=(t "Close") aria-label=(t "Close") }}
+                    </div>
                     <div class="messagebox">
                         <div id="message-content-container" class="surround-formatting-buttons-row">
                             <textarea class="new_message_textarea message-textarea" name="content" id='compose-textarea' rows="1" placeholder="{{t 'Compose your message here' }}" tabindex="0" aria-label="{{t 'Compose your message here…' }}"></textarea>

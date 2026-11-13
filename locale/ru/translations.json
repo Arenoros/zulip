@@ -1496,6 +1496,7 @@
   "Reply @-mentioning sender": "Ответить, @-упомянув отправителя",
   "Reply directly to sender": "Ответить непосредственно отправителю",
   "Reply in topic": "Ответить в теме",
+  "Reply in “{topic_name}”": "Ответ в «{topic_name}»",
   "Reply mentioning bot": "Ответ с упоминанием бота",
   "Reply mentioning user": "Ответить, упомянув пользователя",
   "Reply not allowed": "Ответ не разрешен",
