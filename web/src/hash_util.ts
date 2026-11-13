@@ -133,6 +133,13 @@ export function channel_url_by_user_setting(channel_id: number): string {
     ) {
         return by_channel_topic_list_url(channel_id);
     }
+    if (
+        user_settings.web_channel_default_view ===
+            web_channel_default_view_values.conversations.code &&
+        !stream_data.is_empty_topic_only_channel(channel_id)
+    ) {
+        return by_channel_conversations_url(channel_id);
+    }
     return by_stream_url(channel_id);
 }
 

@@ -1474,6 +1474,14 @@ export function on_sidebar_channel_click(
         return;
     }
 
+    if (
+        user_settings.web_channel_default_view ===
+        web_channel_default_view_values.conversations.code
+    ) {
+        browser_history.go_to_location(hash_util.by_channel_conversations_url(stream_id));
+        return;
+    }
+
     if (current_narrow_stream_id === stream_id && current_topic !== undefined) {
         const channel_feed_url = hash_util.channel_url_by_user_setting(stream_id);
         browser_history.go_to_location(channel_feed_url);

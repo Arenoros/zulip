@@ -73,7 +73,11 @@ export const web_mark_read_on_scroll_policy_values: Record<
 };
 
 export const web_channel_default_view_values: Record<
-    "top_topic_in_channel" | "top_unread_topic_in_channel" | "list_of_topics" | "channel_feed",
+    | "top_topic_in_channel"
+    | "top_unread_topic_in_channel"
+    | "list_of_topics"
+    | "channel_feed"
+    | "conversations",
     SettingDescription<number>
 > = {
     top_topic_in_channel: {
@@ -91,6 +95,10 @@ export const web_channel_default_view_values: Record<
     channel_feed: {
         code: 2,
         description: $t({defaultMessage: "Channel feed"}),
+    },
+    conversations: {
+        code: 5,
+        description: $t({defaultMessage: "Conversations"}),
     },
 };
 
