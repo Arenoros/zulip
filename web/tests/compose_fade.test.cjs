@@ -128,6 +128,11 @@ run_test("want_normal_display", ({override, override_rewire}) => {
     });
     assert.ok(!compose_fade_helper.want_normal_display());
 
+    // The form for a new conversation fades nothing.
+    compose_state.set_new_conversation_form(true);
+    assert.ok(compose_fade_helper.want_normal_display());
+    compose_state.set_new_conversation_form(false);
+
     // Private message with no recipient.
     compose_fade_helper.set_focused_recipient({
         type: "private",

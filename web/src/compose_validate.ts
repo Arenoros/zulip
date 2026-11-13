@@ -18,7 +18,7 @@ import * as compose_pm_pill from "./compose_pm_pill.ts";
 import * as compose_state from "./compose_state.ts";
 import * as compose_ui from "./compose_ui.ts";
 import * as hash_util from "./hash_util.ts";
-import {$t} from "./i18n.ts";
+import {$t, $t_html} from "./i18n.ts";
 import * as message_store from "./message_store.ts";
 import * as message_util from "./message_util.ts";
 import * as narrow_state from "./narrow_state.ts";
@@ -917,10 +917,27 @@ function validate_stream_message(scheduling_message: boolean, show_banner = true
         return false;
     }
 
-    if (!stream_data.can_use_empty_topic(compose_state.stream_id())) {
+    // The form for a new conversation requires a topic, even where
+    // messages without one are allowed.
+    if (
+        compose_state.is_new_conversation_form() ||
+        !stream_data.can_use_empty_topic(compose_state.stream_id())
+    ) {
         const topic = compose_state.topic();
         const missing_topic = util.is_topic_name_considered_empty(topic);
         if (missing_topic) {
+            if (compose_state.is_new_conversation_form()) {
+                // The form marks the topic as required already.
+                if (show_banner) {
+                    $("input#stream_message_recipient_topic").trigger("focus");
+                }
+                if (is_validating_compose_box) {
+                    disabled_send_tooltip_message_html = $t_html({
+                        defaultMessage: "Enter a topic for the conversation.",
+                    });
+                }
+                return false;
+            }
             if (show_banner) {
                 compose_banner.topic_missing_error(util.get_final_topic_display_name(""));
             }

@@ -520,6 +520,11 @@ export function update_topic_displayed_text(topic_name = "", has_topic_focus = f
     $topic_not_mandatory_placeholder.hide();
     $("#compose-channel-recipient").removeClass("disabled");
 
+    if (compose_state.is_new_conversation_form()) {
+        $input.attr("placeholder", $t({defaultMessage: "What is the conversation about"}));
+        return;
+    }
+
     if (!stream_data.can_use_empty_topic(compose_state.stream_id())) {
         $input.attr("placeholder", $t({defaultMessage: "Topic"}));
         // When topics are mandatory, no additional adjustments are needed.
@@ -571,7 +576,9 @@ export let update_compose_area_placeholder_text = (): void => {
     const message_type = compose_state.get_message_type();
 
     let placeholder = compose_ui.DEFAULT_COMPOSE_PLACEHOLDER;
-    if (message_type === "stream") {
+    if (compose_state.is_new_conversation_form()) {
+        placeholder = $t({defaultMessage: "First message of the conversation"});
+    } else if (message_type === "stream") {
         const stream_id = compose_state.stream_id();
         placeholder = compose_ui.compute_placeholder_text({
             message_type,

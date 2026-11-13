@@ -962,7 +962,7 @@ export function initialize(): void {
 
     $("body").on("click", "#compose-content", handle_compose_click);
 
-    $("body").on("click", "#compose_close", () => {
+    $("body").on("click", "#compose_close, #new-conversation-cancel", () => {
         compose_actions.cancel();
     });
 

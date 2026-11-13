@@ -207,6 +207,49 @@ export function rewire_expand_compose_box(value: typeof expand_compose_box): voi
     expand_compose_box = value;
 }
 
+// In the conversations view of a channel, starting a new topic in it
+// opens the compose box as the form for a new conversation.
+function update_new_conversation_form(opts: ComposeActionsOpts): void {
+    const stream_id = opts.message_type === "stream" ? opts.stream_id : undefined;
+    const is_form =
+        stream_id !== undefined &&
+        opts.topic === "" &&
+        message_lists.current?.is_conversations_view === true &&
+        narrow_state.stream_id() === stream_id;
+    set_new_conversation_form(is_form, stream_id);
+}
+
+function set_new_conversation_form(is_form: boolean, stream_id?: number): void {
+    compose_state.set_new_conversation_form(is_form);
+    $("#compose").toggleClass("new-conversation-form", is_form);
+    if (is_form && stream_id !== undefined) {
+        $("#new-conversation-form-title").text(
+            $t(
+                {defaultMessage: "New conversation in #{channel}"},
+                {channel: stream_data.get_sub_by_id(stream_id)?.name ?? ""},
+            ),
+        );
+    }
+}
+
+// The form only shows in the conversations view of its channel; the
+// compose box keeps what was typed elsewhere.
+function maybe_leave_new_conversation_form(showing_navigation_view = false): void {
+    if (
+        compose_state.is_new_conversation_form() &&
+        (showing_navigation_view ||
+            !(
+                message_lists.current?.is_conversations_view === true &&
+                narrow_state.stream_id() === compose_state.stream_id()
+            ))
+    ) {
+        set_new_conversation_form(false);
+        compose_recipient.update_topic_displayed_text(compose_state.topic());
+        compose_recipient.update_compose_area_placeholder_text();
+        compose_validate.validate_and_update_send_button_status();
+    }
+}
+
 export let complete_starting_tasks = (opts: ComposeActionsOpts): void => {
     // This is sort of a kitchen sink function, and it's called only
     // by compose.start() for now.  Having this as a separate function
@@ -433,6 +476,7 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
         compose_state.set_stream_id("");
         compose_recipient.toggle_compose_recipient_dropdown();
     }
+    update_new_conversation_form(opts);
     compose_recipient.update_topic_displayed_text(opts.topic);
 
     compose_state.set_private_message_recipient_ids(opts.private_message_recipient_ids);
@@ -546,6 +590,7 @@ export let cancel = (): void => {
     compose_banner.clear_interleaved_view_messages_fading_banner();
     compose_tooltips.dismiss_intro_go_to_conversation_tooltip();
     call_hooks(compose_cancel_hooks);
+    set_new_conversation_form(false);
     compose_state.set_message_type(undefined);
     compose_pm_pill.clear();
     message_viewport.bottom_of_feed.reset();
@@ -567,6 +612,7 @@ export function on_show_navigation_view(): void {
 
     // Leave the compose box open if there is content or if the recipient was edited.
     if (compose_state.has_novel_message_content() || compose_state.is_recipient_edited_manually()) {
+        maybe_leave_new_conversation_form(true);
         return;
     }
 
@@ -659,6 +705,7 @@ function show_call_chat_compose(): void {
 }
 
 export function on_narrow(opts: NarrowActivateOpts): void {
+    maybe_leave_new_conversation_form();
     if (embedded_call_chat.is_active()) {
         show_call_chat_compose();
         return;

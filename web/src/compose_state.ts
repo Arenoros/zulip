@@ -9,6 +9,9 @@ let recipient_edited_manually = false;
 let is_content_unedited_restored_draft = false;
 let last_focused_compose_type_input: HTMLTextAreaElement | undefined;
 let is_processing_forward_message = false;
+// Whether the compose box is the form for starting a conversation in
+// the conversations view of a channel, where a topic is required.
+let new_conversation_form = false;
 
 // We use this variable to keep track of whether user has viewed the topic resolved
 // banner for the current compose session, for a narrow. This prevents the banner
@@ -42,6 +45,14 @@ export function set_last_focused_compose_type_input(element: HTMLTextAreaElement
 
 export function get_last_focused_compose_type_input(): HTMLTextAreaElement | undefined {
     return last_focused_compose_type_input;
+}
+
+export function set_new_conversation_form(flag: boolean): void {
+    new_conversation_form = flag;
+}
+
+export function is_new_conversation_form(): boolean {
+    return new_conversation_form;
 }
 
 export function set_message_type(msg_type: "stream" | "private" | undefined): void {

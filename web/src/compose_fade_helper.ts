@@ -1,5 +1,6 @@
 import {$} from "jquery";
 
+import * as compose_state from "./compose_state.ts";
 import type {Message} from "./message_store.ts";
 import * as stream_data from "./stream_data.ts";
 import * as sub_store from "./sub_store.ts";
@@ -23,6 +24,12 @@ export function set_focused_recipient(recipient?: Recipient): void {
 export function want_normal_display(): boolean {
     // If we're not composing show a normal display.
     if (focused_recipient === undefined) {
+        return true;
+    }
+
+    // The form for a new conversation writes to a topic that no card
+    // in the conversations view shows yet.
+    if (compose_state.is_new_conversation_form()) {
         return true;
     }
 

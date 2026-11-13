@@ -51,6 +51,8 @@
                 </button>
             </span>
             {{/unless}}
+            {{!-- The conversations view offers only this button. --}}
+            {{> components/action_button label=(t "New conversation") icon="pencil" variant="solid" intent="brand" custom_classes="compose_new_conversation_button topic-cards-new-conversation-button" data-tooltip-template-id="new_stream_message_button_tooltip_template" }}
         </div>
     </div>
     <div class="message_comp">
@@ -59,6 +61,10 @@
             <form id="send_message_form" action="/json/messages" method="post">
                 <div class="compose_table">
                     <div id="compose_top">
+                        <div id="new-conversation-form-title" class="new-conversation-form-only"></div>
+                        <label class="new-conversation-form-label new-conversation-form-only" for="stream_message_recipient_topic">
+                            {{t "Topic" }} <span class="new-conversation-form-required" aria-hidden="true">*</span>
+                        </label>
                         {{!-- We start with the low-attention-recipient-row class
                         on the template to avoid showing the transition
                         when the compose box first opens. Note that this
@@ -90,6 +96,10 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="new-conversation-form-hint new-conversation-form-only">
+                            {{t "Required. A message posted here starts a new conversation; to reply to an existing one, use Reply in topic on its card." }}
+                        </div>
+                        <label class="new-conversation-form-label new-conversation-form-only" for="compose-textarea">{{t "Message" }}</label>
                     </div>
                     <div class="messagebox">
                         <div id="message-content-container" class="surround-formatting-buttons-row">
@@ -113,10 +123,12 @@
                                 <span class="compose-drafts-text">{{t 'Drafts' }}</span><span class="compose-drafts-count-container">(<span class="compose-drafts-count"></span>)</span>
                             </a>
                             <span id="compose-limit-indicator" class="message-limit-indicator"></span>
+                            {{> components/action_button id="new-conversation-cancel" label=(t "Cancel") variant="subtle" intent="neutral" custom_classes="new-conversation-form-only" }}
                             <div class="message-send-controls">
                                 <button type="submit" id="compose-send-button" class="send_message compose-submit-button compose-send-or-save-button" aria-label="{{t 'Send' }}">
                                     <img class="loader" alt="" src="" />
                                     <i class="zulip-icon zulip-icon-send"></i>
+                                    <span class="new-conversation-publish-label new-conversation-form-only">{{t "Publish" }}</span>
                                 </button>
                                 <button class="send-control-button send-related-action-button" id="send_later" tabindex=0 type="button" data-tippy-content="{{t 'Send options' }}" aria-label="{{t 'Send options' }}">
                                     <i class="zulip-icon zulip-icon-more-vertical"></i>

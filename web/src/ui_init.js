@@ -723,7 +723,7 @@ export async function initialize_everything(state_data) {
     compose_setup.initialize();
     // Typeahead must be initialized after compose_setup.initialize()
     composebox_typeahead.initialize({
-        on_enter_send: compose.finish,
+        on_enter_send: compose_setup.finish,
     });
     compose_validate.initialize();
     compose_textarea.initialize();

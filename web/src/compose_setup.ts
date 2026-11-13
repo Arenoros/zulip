@@ -90,6 +90,17 @@ const throttled_update_draft = _.throttle(
     {leading: false, trailing: true},
 );
 
+// Sends the message in the compose box. The form for a new
+// conversation closes once the conversation is published.
+export function finish(scheduling_message = false): boolean | undefined {
+    const is_new_conversation_form = compose_state.is_new_conversation_form();
+    const sent = compose.finish(scheduling_message);
+    if (sent && is_new_conversation_form) {
+        compose_actions.cancel();
+    }
+    return sent;
+}
+
 export function initialize(): void {
     // Register hooks for compose_actions.
     setup_compose_actions_hooks();
@@ -160,7 +171,7 @@ export function initialize(): void {
 
     $("#compose form").on("submit", (e) => {
         e.preventDefault();
-        compose.finish();
+        finish();
     });
 
     resize.watch_manual_resize("#compose-textarea");
@@ -211,7 +222,7 @@ export function initialize(): void {
                 // would again show the wildcard warning banner when we actually send the message from 'send-later' modal.
                 compose_validate.set_user_acknowledged_stream_wildcard_flag(true);
             } else {
-                compose.finish();
+                finish();
             }
         },
     );
