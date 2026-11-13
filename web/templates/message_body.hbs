@@ -46,6 +46,7 @@
         {{#if topic_card_title_is_resolved}}
             <span class="topic-card-resolved-label">{{t "Resolved" }}</span>
         {{/if}}
+        <span class="topic-card-unread-count{{#unless topic_card_has_unread}} hide{{/unless}}">{{topic_card_unread_count}}</span>
     </div>
 {{/if}}
 

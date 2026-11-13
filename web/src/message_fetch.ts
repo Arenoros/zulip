@@ -674,6 +674,46 @@ export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void
     });
 }
 
+// Replies to load each time a card's hidden replies are opened.
+const NUM_TOPIC_CARD_REPLIES_PER_FETCH = 100;
+
+export function load_topic_card_replies(opts: {
+    msg_list: MessageList;
+    stream_id: number;
+    topic: string;
+    // The oldest reply the card shows; older ones are loaded.
+    anchor: number;
+}): void {
+    void channel.get({
+        url: "/json/messages",
+        data: {
+            anchor: opts.anchor,
+            num_before: NUM_TOPIC_CARD_REPLIES_PER_FETCH,
+            num_after: 0,
+            include_anchor: false,
+            narrow: JSON.stringify([
+                {operator: "channel", operand: opts.stream_id},
+                {operator: "topic", operand: opts.topic},
+            ]),
+            client_gravatar: true,
+            allow_empty_topic_name: true,
+        },
+        success(raw_data) {
+            const data = message_fetch_response_schema.parse(raw_data);
+            const messages = data.messages.map((raw_message) =>
+                message_helper.process_new_server_message(raw_message),
+            );
+            do_unread_count_updates(messages, true);
+            topic_cards.set_expanded(opts.msg_list, opts.topic, true);
+            const is_contiguous_history = true;
+            opts.msg_list.add_messages(messages, {}, is_contiguous_history);
+            // Opening the card changes what it shows even when no
+            // message was new to the list.
+            opts.msg_list.view.rerender_preserving_scrolltop(true);
+        },
+    });
+}
+
 export function maybe_load_older_messages(opts: {
     recent_view?: boolean;
     first_unread_message_id?: number;

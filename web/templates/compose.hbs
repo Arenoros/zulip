@@ -12,6 +12,14 @@
             {{> components/action_button id="scroll-to-bottom-button" icon="chevron-down" variant="subtle" intent="brand" }}
         </div>
     </div>
+    {{!-- Shown in a channel's conversations view when a topic the
+    user is not looking at gets a new reply. --}}
+    <div id="topic-cards-new-replies">
+        <button type="button" class="topic-cards-new-replies-button">
+            {{t "New replies" }}
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+    </div>
     <div id="closed-compose-controls">
         <div id="legacy-closed-compose-box">
             <div class="reply_button_container">

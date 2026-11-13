@@ -182,6 +182,11 @@ export function should_jump_to_sent_message_conversation(message: Message): bool
         // not have a mix, so we are happy.
         return false;
     }
+    if (message_lists.current.is_conversations_view && $row.length > 0) {
+        // The conversations view shows the message in its topic's
+        // card, which moves to the bottom of the view.
+        return false;
+    }
 
     return true;
 }

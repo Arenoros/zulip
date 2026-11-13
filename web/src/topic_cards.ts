@@ -60,8 +60,25 @@ export function add_topic_card_info(msg_list: MessageList, cards: TopicCardInfo[
     }
 }
 
+// Topics whose cards show every loaded reply, by message list ID.
+const expanded_topics = new Map<number, Set<string>>();
+
+export function set_expanded(msg_list: MessageList, topic: string, expanded: boolean): void {
+    let topics = expanded_topics.get(msg_list.id);
+    if (topics === undefined) {
+        topics = new Set();
+        expanded_topics.set(msg_list.id, topics);
+    }
+    if (expanded) {
+        topics.add(topic_key(topic));
+    } else {
+        topics.delete(topic_key(topic));
+    }
+}
+
 export function forget_message_list(msg_list_id: number): void {
     topic_card_info.delete(msg_list_id);
+    expanded_topics.delete(msg_list_id);
 }
 
 export type HiddenReplies = {
@@ -74,6 +91,9 @@ export type TopicCard = {
     first_message: Message;
     replies: Message[];
     hidden_replies: HiddenReplies | undefined;
+    // Whether the card shows every loaded reply rather than the
+    // latest ones.
+    expanded: boolean;
 };
 
 // Names of the authors of hidden replies, as in "From Alice, Bob, and
@@ -134,6 +154,7 @@ export function get_topic_cards(msg_list: MessageList, messages: Message[]): Top
         messages_by_topic.set(key, topic_messages);
     }
 
+    const expanded = expanded_topics.get(msg_list.id) ?? new Set<string>();
     const cards: TopicCard[] = [];
     for (const [key, topic_messages] of messages_by_topic) {
         const card_info = info.get(key);
@@ -143,11 +164,14 @@ export function get_topic_cards(msg_list: MessageList, messages: Message[]): Top
             topic_messages.find((message) => message.id === card_info?.first_message_id) ??
             topic_messages[0]!;
         const loaded_replies = topic_messages.filter((message) => message.id > first_message.id);
-        const replies = loaded_replies.slice(-NUM_TOPIC_CARD_REPLIES);
+        const replies = expanded.has(key)
+            ? loaded_replies
+            : loaded_replies.slice(-NUM_TOPIC_CARD_REPLIES);
         cards.push({
             first_message,
             replies,
             hidden_replies: get_hidden_replies(card_info, loaded_replies, replies),
+            expanded: expanded.has(key),
         });
     }
     const last_id = (card: TopicCard): number => (card.replies.at(-1) ?? card.first_message).id;

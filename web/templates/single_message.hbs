@@ -33,9 +33,14 @@
         <span class="new-messages-divider-label">{{t "New messages" }}</span>
     </div>
     {{/if}}
-    {{#if topic_card_hidden_replies}}
+    {{#if (or topic_card_hidden_replies topic_card_can_collapse)}}
     <div class="topic-card-hidden-replies no-select">
-        <span class="topic-card-hidden-replies-label">{{topic_card_hidden_replies}}</span>
+        {{#if topic_card_hidden_replies}}
+            <span class="topic-card-hidden-replies-label" role="button" tabindex="0">{{topic_card_hidden_replies}}</span>
+        {{/if}}
+        {{#if topic_card_can_collapse}}
+            <span class="topic-card-collapse" role="button" tabindex="0">{{t "Collapse replies" }}</span>
+        {{/if}}
     </div>
     {{/if}}
     <div class="unread_marker message_unread_marker"><div class="unread-marker-fill"></div></div>

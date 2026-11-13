@@ -117,3 +117,30 @@ run_test("cards with what the server told us", () => {
     topic_cards.forget_message_list(msg_list.id);
     assert.equal(topic_cards.get_anchor(msg_list), undefined);
 });
+
+run_test("expanded cards", () => {
+    const msg_list = make_list();
+    const messages = [
+        message(1, "lunch", alice),
+        message(2, "lunch", bob),
+        message(3, "lunch", carol),
+        message(4, "lunch", dave),
+        message(5, "lunch", alice),
+    ];
+    // An expanded card shows every loaded reply.
+    topic_cards.set_expanded(msg_list, "Lunch", true);
+    let [card] = topic_cards.get_topic_cards(msg_list, messages);
+    assert.deepEqual(card_ids(card), [1, 2, 3, 4, 5]);
+    assert.ok(card.expanded);
+    assert.equal(card.hidden_replies, undefined);
+
+    topic_cards.set_expanded(msg_list, "lunch", false);
+    [card] = topic_cards.get_topic_cards(msg_list, messages);
+    assert.deepEqual(card_ids(card), [1, 3, 4, 5]);
+    assert.ok(!card.expanded);
+
+    topic_cards.set_expanded(msg_list, "lunch", true);
+    topic_cards.forget_message_list(msg_list.id);
+    [card] = topic_cards.get_topic_cards(msg_list, messages);
+    assert.ok(!card.expanded);
+});

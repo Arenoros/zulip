@@ -164,6 +164,7 @@ import * as theme from "./theme.ts";
 import * as thumbnail from "./thumbnail.ts";
 import * as timerender from "./timerender.ts";
 import * as tippyjs from "./tippyjs.ts";
+import * as topic_cards_ui from "./topic_cards_ui.ts";
 import * as topic_list from "./topic_list.ts";
 import * as topic_popover from "./topic_popover.ts";
 import * as transmit from "./transmit.ts";
@@ -655,6 +656,7 @@ export async function initialize_everything(state_data) {
         update_inbox_channel_view: inbox_ui.update_channel_view,
     });
     condense.initialize();
+    topic_cards_ui.initialize();
     spoilers.initialize();
     lightbox.initialize();
     sidebar_ui.initialize();

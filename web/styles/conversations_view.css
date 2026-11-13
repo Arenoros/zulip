@@ -87,9 +87,85 @@
 
     .topic-card-hidden-replies {
         grid-area: message_feed_divider_content;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4em 1.2em;
         padding: var(--topic-card-padding) var(--topic-card-padding) 0;
         font-weight: 600;
+    }
+
+    .topic-card-hidden-replies-label {
         color: var(--color-link-message-bubble);
+        cursor: pointer;
+    }
+
+    .topic-card-collapse {
+        color: var(--color-text-message-bubble-caption);
+        cursor: pointer;
+    }
+
+    .topic-card-hidden-replies-label,
+    .topic-card-collapse {
+        &:hover,
+        &:focus-visible {
+            text-decoration: underline;
+        }
+    }
+
+    /* A card with unread messages, counted in its title, gets a bar
+       along its left edge, drawn above the messages' backgrounds. */
+    .recipient_row.topic-card-unread {
+        position: relative;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto 0 0;
+            z-index: 1;
+            width: 3px;
+            background-color: var(--color-message-bubble-unread);
+        }
+    }
+
+    .topic-card-unread-count {
+        align-self: center;
+        /* 12px at 18px/1em */
+        font-size: 0.6667em;
+        line-height: 1.6;
+        min-width: 1.6em;
+        padding: 0 0.45em;
+        border-radius: 0.8em;
+        text-align: center;
+        background-color: var(--color-message-bubble-unread);
+        color: hsl(0deg 0% 100%);
+    }
+
+    /* Above the cards, but taking no space: it floats under the
+       navbar while there are cards with unread messages above. */
+    .topic-cards-unread-above {
+        position: sticky;
+        top: calc(var(--navbar-fixed-height) + 0.5em);
+        z-index: 5;
+        display: flex;
+        justify-content: center;
+        height: 0;
+
+        &:not(.show) {
+            visibility: hidden;
+        }
+    }
+
+    .topic-cards-unread-above-button {
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+        height: fit-content;
+        padding: 0.3em 0.9em;
+        border: 0;
+        border-radius: 1em;
+        background-color: var(--color-message-bubble-unread);
+        color: hsl(0deg 0% 100%);
+        font-weight: 600;
         cursor: pointer;
     }
 
@@ -104,6 +180,31 @@
         border-radius: 6px;
         background-color: var(--color-background-topic-card);
         color: var(--color-text-message-bubble-caption);
+        cursor: pointer;
+    }
+}
+
+#topic-cards-new-replies {
+    position: absolute;
+    bottom: 3.2em;
+    left: 50%;
+    transform: translateX(-50%);
+    visibility: hidden;
+
+    body:has(.focused-message-list.conversations-view) &.show {
+        visibility: visible;
+    }
+
+    .topic-cards-new-replies-button {
+        display: flex;
+        align-items: center;
+        gap: 0.3em;
+        padding: 0.3em 0.9em;
+        border: 0;
+        border-radius: 1em;
+        background-color: var(--color-message-bubble-unread);
+        color: hsl(0deg 0% 100%);
+        font-weight: 600;
         cursor: pointer;
     }
 }

@@ -11,6 +11,7 @@ import render_message_list from "../templates/message_list.hbs";
 import render_recipient_row from "../templates/recipient_row.hbs";
 import render_revealed_message_hide_button from "../templates/revealed_message_hide_button.hbs";
 import render_single_message from "../templates/single_message.hbs";
+import render_topic_cards_unread_above from "../templates/topic_cards_unread_above.hbs";
 
 import * as activity from "./activity.ts";
 import * as blueslip from "./blueslip.ts";
@@ -50,6 +51,7 @@ import type {TopicLink} from "./types.ts";
 import * as typing_data from "./typing_data.ts";
 import * as typing_events from "./typing_events.ts";
 import * as ui_util from "./ui_util.ts";
+import * as unread from "./unread.ts";
 import * as user_topics from "./user_topics.ts";
 import type {AllVisibilityPolicies} from "./user_topics.ts";
 import * as util from "./util.ts";
@@ -92,6 +94,9 @@ export type MessageContainer = {
     topic_card_title_is_empty_topic?: boolean;
     topic_card_title_is_resolved?: boolean;
     topic_card_hidden_replies?: string;
+    topic_card_can_collapse?: boolean;
+    topic_card_unread_count?: number;
+    topic_card_has_unread?: boolean;
 };
 
 export type MessageGroup = {
@@ -524,8 +529,20 @@ function get_topic_card_timestr(message: Message): string {
     return $t({defaultMessage: "{date} at {time}"}, {date, time: get_timestr(message)});
 }
 
-function get_hidden_replies_label(hidden_replies: topic_cards.HiddenReplies): string {
+function get_hidden_replies_label(
+    hidden_replies: topic_cards.HiddenReplies,
+    expanded: boolean,
+): string {
     const {count, sender_names, other_sender_count} = hidden_replies;
+    if (expanded) {
+        return $t(
+            {
+                defaultMessage:
+                    "{count, plural, one {Open # more reply} other {Open # more replies}}",
+            },
+            {count},
+        );
+    }
     if (other_sender_count > 0) {
         return $t(
             {
@@ -1680,11 +1697,20 @@ export class MessageListView {
             )[1];
             first_container.topic_card_title_is_empty_topic = group.is_empty_string_topic;
             first_container.topic_card_title_is_resolved = group.topic_is_resolved;
-            if (card.hidden_replies !== undefined && first_reply_container !== undefined) {
-                first_reply_container.topic_card_hidden_replies = get_hidden_replies_label(
-                    card.hidden_replies,
-                );
+            if (first_reply_container !== undefined) {
+                if (card.hidden_replies !== undefined) {
+                    first_reply_container.topic_card_hidden_replies = get_hidden_replies_label(
+                        card.hidden_replies,
+                        card.expanded,
+                    );
+                }
+                first_reply_container.topic_card_can_collapse = card.expanded;
             }
+            first_container.topic_card_unread_count = unread.num_unread_for_topic(
+                group.stream_id,
+                card.first_message.type === "stream" ? card.first_message.topic : "",
+            );
+            first_container.topic_card_has_unread = first_container.topic_card_unread_count > 0;
             for (const message_container of group.message_containers) {
                 message_container.timestr = get_topic_card_timestr(message_container.msg);
                 this.set_edited_notice_locations(message_container);
@@ -1701,10 +1727,103 @@ export class MessageListView {
         const $rendered_groups = this._render_group({message_groups, use_match_properties: false});
         const $dom_messages = $rendered_groups.find(".message_row");
         this._post_process($dom_messages);
-        this.$list.append($rendered_groups);
+        this.$list.append($(render_topic_cards_unread_above()), $rendered_groups);
         condense.condense_and_collapse($dom_messages);
         autosize.update(this.$list.find(".message_edit_content"));
         maybe_restore_focus_to_message_edit_form();
+        this.update_topic_cards_unread();
+        // Callers usually scroll right after rendering; the buttons
+        // depend on the final scroll position.
+        setTimeout(() => {
+            this.update_topic_cards_navigation();
+        }, 0);
+    }
+
+    rerender_topic_cards_keeping_visible_cards(new_messages: Message[]): void {
+        // Keep the first visible message of a card that does not move
+        // at the same place on screen.
+        const moved_message_ids = new Set(new_messages.map((message) => message.id));
+        const moved_topics = new Set<string>();
+        for (const message of new_messages) {
+            if (message.type === "stream") {
+                moved_topics.add(message.topic.toLowerCase());
+            }
+        }
+        const visible_top = message_viewport.message_viewport_info().visible_top;
+        const anchor_row = this.$list
+            .find(".message_row")
+            .get()
+            .find((row) => {
+                const message = this.list.get(rows.id($(row)));
+                return (
+                    row.getBoundingClientRect().bottom > visible_top &&
+                    message?.type === "stream" &&
+                    !moved_message_ids.has(message.id) &&
+                    !moved_topics.has(message.topic.toLowerCase())
+                );
+            });
+        const anchor_id = anchor_row === undefined ? undefined : rows.id($(anchor_row));
+        const anchor_top = anchor_row?.getBoundingClientRect().top;
+
+        this.clear_rendering_state(true);
+        this.render_topic_cards();
+        this.list.reselect_selected_id();
+
+        if (anchor_id !== undefined && anchor_top !== undefined) {
+            const $anchor = this.get_row(anchor_id);
+            if ($anchor.length > 0) {
+                message_viewport.scrollTop(
+                    message_viewport.scrollTop() +
+                        util.the($anchor).getBoundingClientRect().top -
+                        anchor_top,
+                );
+            }
+        }
+    }
+
+    update_topic_cards_unread(): void {
+        // The cards' unread counts cover their topic's hidden replies
+        // too, so they change whenever messages are read anywhere.
+        for (const card of this.$list.find(".recipient_row")) {
+            const $card = $(card);
+            const message = this.list.get(rows.id($card.find(".message_row").first()));
+            if (message?.type !== "stream") {
+                continue;
+            }
+            const count = unread.num_unread_for_topic(message.stream_id, message.topic);
+            $card.toggleClass("topic-card-unread", count > 0);
+            $card
+                .find(".topic-card-unread-count")
+                .text(count)
+                .toggleClass("hide", count === 0);
+        }
+        this.update_topic_cards_navigation();
+    }
+
+    update_topic_cards_navigation(): void {
+        if (!this.list.is_conversations_view || this.list !== message_lists.current) {
+            return;
+        }
+        // Cards with unread messages that are entirely above the
+        // visible part of the feed.
+        const visible_top = message_viewport.message_viewport_info().visible_top;
+        const unread_above = this.$list
+            .find(".recipient_row.topic-card-unread")
+            .filter((_index, card) => card.getBoundingClientRect().bottom < visible_top).length;
+        const $button = this.$list.find(".topic-cards-unread-above");
+        $button.toggleClass("show", unread_above > 0);
+        $button.find(".topic-cards-unread-above-label").text(
+            $t(
+                {
+                    defaultMessage:
+                        "{count, plural, one {# conversation with unread messages} other {# conversations with unread messages}}",
+                },
+                {count: unread_above},
+            ),
+        );
+        if (!message_viewport.is_scrolled_up()) {
+            $("#topic-cards-new-replies").removeClass("show");
+        }
     }
 
     _new_messages_height(rendered_elems: JQuery[]): number {
@@ -1939,6 +2058,12 @@ export class MessageListView {
     }
 
     rerender_preserving_scrolltop(discard_rendering_state = false): void {
+        if (this.list.is_conversations_view) {
+            // The selected message may be in a card that moves, so we
+            // keep the cards the user is looking at in place instead.
+            this.rerender_topic_cards_keeping_visible_cards([]);
+            return;
+        }
         // old_offset is the number of pixels between the top of the
         // viewable window and the selected message
         let old_offset;
@@ -2116,6 +2241,12 @@ export class MessageListView {
     }
 
     rerender_messages(messages: Message[], message_content_edited = false): void {
+        if (this.list.is_conversations_view) {
+            // An edit can change a topic card's title or which topic a
+            // message belongs to, so we render the cards again.
+            this.rerender_preserving_scrolltop(true);
+            return;
+        }
         // this.render is never called in this code path, we use
         // `_rerender_message` instead which is optimized for this use
         // case.
@@ -2194,7 +2325,37 @@ export class MessageListView {
         messages_are_new: boolean,
     ): {need_user_to_scroll: boolean} | undefined {
         if (this.list.is_conversations_view) {
-            this.rerender_preserving_scrolltop(true);
+            if (!messages_are_new || this.list !== message_lists.current) {
+                this.rerender_topic_cards_keeping_visible_cards(messages);
+                return undefined;
+            }
+            // A topic with a new reply moves to the bottom. We follow
+            // it if the user was reading the bottom or wrote it, and
+            // otherwise keep what the user is reading in place and
+            // offer to go there.
+            const started_scrolled_up = message_viewport.is_scrolled_up();
+            const sent_by_me = messages.some((message) => message.sent_by_me);
+            this.rerender_topic_cards_keeping_visible_cards(messages);
+            if (sent_by_me) {
+                // Sending a message also resizes the compose box, which
+                // can scroll the feed with an animation, so we go to the
+                // reply once that is done.
+                const message_id = messages.at(-1)!.id;
+                setTimeout(() => {
+                    message_viewport.after_animated_scroll(() => {
+                        if (this.list === message_lists.current) {
+                            this.list.select_id(message_id, {
+                                then_scroll: true,
+                                use_closest: true,
+                            });
+                        }
+                    });
+                }, 0);
+            } else if (!started_scrolled_up) {
+                message_viewport.scrollTop(this.$list.outerHeight(true) ?? 0);
+            } else {
+                $("#topic-cards-new-replies").addClass("show");
+            }
             return undefined;
         }
         const cur_window_size = this._render_win_end - this._render_win_start;
@@ -2222,7 +2383,7 @@ export class MessageListView {
 
     prepend(messages: Message[]): void {
         if (this.list.is_conversations_view) {
-            this.rerender_preserving_scrolltop(true);
+            this.rerender_topic_cards_keeping_visible_cards(messages);
             return;
         }
         if (this._render_win_end === this._render_win_start) {
@@ -2618,6 +2779,9 @@ export class MessageListView {
             $row.find(".unread_marker").addClass("slow_fade");
         }
         $row.removeClass("unread");
+        if (this.list.is_conversations_view) {
+            this.update_topic_cards_unread();
+        }
     }
 
     show_messages_as_unread(message_ids: number[]): void {
@@ -2626,5 +2790,8 @@ export class MessageListView {
             return message_ids.includes(message_id);
         });
         $rows_to_show_as_unread.addClass("unread");
+        if (this.list.is_conversations_view) {
+            this.update_topic_cards_unread();
+        }
     }
 }

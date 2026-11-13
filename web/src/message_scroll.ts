@@ -24,6 +24,7 @@ export function scroll_finished(): void {
     // It's possible that we are in transit and message_lists.current is not defined.
     // We still want the rest of the code to run but it's fine to skip this.
     message_lists.current.view.update_sticky_recipient_headers();
+    message_lists.current.view.update_topic_cards_navigation();
 
     if (compose_banner.scroll_to_message_banner_message_id !== null) {
         const $message_row = message_lists.current.get_row(
