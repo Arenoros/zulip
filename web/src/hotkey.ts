@@ -465,6 +465,12 @@ function process_escape_key(e: JQuery.KeyDownEvent): boolean {
         return true;
     }
 
+    // Micromodal closes a dialog that is still opening by itself; the
+    // same Esc should not also leave the view behind the dialog.
+    if (modals.any_active_or_animating()) {
+        return true;
+    }
+
     if (overlays.any_active()) {
         overlays.close_active();
         return true;
