@@ -242,13 +242,19 @@ function get_view_compose_opts(): ComposeActionsStartOpts | undefined {
 function set_compose_for_view(for_view: boolean): void {
     compose_state.set_for_view(for_view);
     $("#compose").toggleClass("compose-for-view", for_view);
-    // The send options open from a chevron next to the send button.
-    $("#send_later i")
-        .toggleClass("zulip-icon-more-vertical", !for_view)
-        .toggleClass("zulip-icon-chevron-down", for_view);
+    set_row_layout(for_view);
     if (!for_view) {
         compose_ui.set_formatting_mode(false);
     }
+}
+
+// The compose box of a single conversation is a row, with a chevron
+// for the send options next to the send button.
+function set_row_layout(row_layout: boolean): void {
+    $("#compose").toggleClass("compose-row-layout", row_layout);
+    $("#send_later i")
+        .toggleClass("zulip-icon-more-vertical", !row_layout)
+        .toggleClass("zulip-icon-chevron-down", row_layout);
 }
 
 // In the conversations view of a channel, starting a new topic in it

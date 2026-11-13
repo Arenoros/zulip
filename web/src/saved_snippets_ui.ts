@@ -248,7 +248,7 @@ export function setup_saved_snippets_dropdown_widget(widget_selector: string): v
 // compose boxes have a button for them.
 function get_compose_saved_snippets_reference(): HTMLElement | undefined {
     const $compose = $("#compose");
-    if ($compose.hasClass("compose-for-view")) {
+    if ($compose.hasClass("compose-row-layout")) {
         return $compose.find(".saved-snippets-composebox-widget.compose-plus-menu-anchor").get(0);
     }
     return $compose.find(".compose_control_button.saved-snippets-composebox-widget").get(0);

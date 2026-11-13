@@ -1,14 +1,15 @@
-/* The compose box always open in a view of a single conversation: one
-   row with the message, a few buttons, and the send controls. In
-   formatting mode, the formatting toolbar shows above a taller
-   message field, and the buttons move below it. Sizes are in em
-   at the 15px font size of the design. */
+/* The row layout of the compose box, which the compose box always open
+   in a view of a single conversation uses: one row with the message, a
+   few buttons, and the send controls. In formatting mode, the
+   formatting toolbar shows above a taller message field, and the
+   buttons move below it. Sizes are in em at the 15px font size of the
+   design. */
 #compose-row-buttons,
 .compose-toolbar-end {
     display: none;
 }
 
-#compose.compose-for-view {
+#compose.compose-row-layout {
     #compose-content {
         padding: 0 0 0.5333em;
         border-color: transparent;
@@ -414,11 +415,10 @@
     }
 }
 
-/* The menus of the "+" and send options buttons of the compose box of
-   a conversation, appended to the body. Like other popover menus, they
-   use a 16px em. */
+/* The menus of the "+" and send options buttons of the row layout,
+   appended to the body. Like other popover menus, they use a 16px em. */
 .popover-menu.compose-plus-menu,
-.popover-menu.compose-for-view-send-menu {
+.popover-menu.compose-row-send-menu {
     .link-item .popover-menu-link {
         /* 40px */
         min-height: 2.5em;
@@ -455,7 +455,7 @@
     }
 }
 
-.compose-for-view-send-menu {
+.compose-row-send-menu {
     /* 280px */
     width: 17.5em;
 

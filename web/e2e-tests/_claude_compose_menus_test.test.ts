@@ -289,7 +289,7 @@ async function compose_menus_test(page: Page): Promise<void> {
         const drafts = popover.querySelector<HTMLElement>(".view_contextual_drafts");
         return {
             drafts_shown: drafts !== null && drafts.offsetParent !== null,
-            for_view: popover.classList.contains("compose-for-view-send-menu"),
+            for_view: popover.classList.contains("compose-row-send-menu"),
             width: popover.getBoundingClientRect().width,
             items: [...popover.querySelectorAll(".popover-menu-label, .enter_sends_major")].map(
                 (label) => label.textContent?.replaceAll(/\s+/g, " ").trim(),
@@ -331,7 +331,7 @@ async function compose_menus_test(page: Page): Promise<void> {
     await page.click("#send_later i");
     await page.waitForSelector("#send_later_popover", {visible: true});
     const classic_for_view = await page.$eval("#send_later_popover", (popover) =>
-        popover.classList.contains("compose-for-view-send-menu"),
+        popover.classList.contains("compose-row-send-menu"),
     );
     check("the classic compose box keeps its send options menu", !classic_for_view);
     await close_popovers(page);
