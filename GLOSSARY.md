@@ -75,3 +75,19 @@ A single topic shown in full from the conversations view, with its first message
 **Reply**
 
 Any message in a topic after its first message.
+
+**Compose box**
+
+The field at the bottom of a view where the user writes a message to the conversation that the view shows.
+
+**Formatting mode**
+
+The state of the compose box in which the formatting toolbar is shown and the field is taller.
+
+_Avoid_: Expanded compose box (Zulip's name for a taller compose box without the toolbar)
+
+**Recipient row**
+
+The row above the compose box where the user picks the channel and topic or the direct message recipients.
+
+_Avoid_: To field
