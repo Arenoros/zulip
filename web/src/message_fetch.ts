@@ -298,6 +298,10 @@ function get_messages_success(data: MessageFetchResponse, opts: MessageFetchOpti
 
     process_result(data, opts);
 
+    if (current_fetch_found_oldest && opts.msg_list?.view.is_open_conversation()) {
+        opts.msg_list.view.show_open_conversation_card();
+    }
+
     if (current_fetch_found_newest && opts.msg_list === message_lists.current) {
         // Now that we've confirmed we have the newest messages in
         // this view, re-check whether the visible messages should

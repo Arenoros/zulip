@@ -16,6 +16,7 @@ import render_topic_cards_unread_above from "../templates/topic_cards_unread_abo
 import * as activity from "./activity.ts";
 import * as blueslip from "./blueslip.ts";
 import * as bubble_layout from "./bubble_layout.ts";
+import * as channel from "./channel.ts";
 import * as compose_fade from "./compose_fade.ts";
 import * as condense from "./condense.ts";
 import * as hash_util from "./hash_util.ts";
@@ -97,6 +98,10 @@ export type MessageContainer = {
     topic_card_can_collapse?: boolean;
     topic_card_unread_count?: number;
     topic_card_has_unread?: boolean;
+    // In an open conversation, the topic's first message is a card,
+    // followed by the number of replies.
+    open_conversation_first_message?: boolean;
+    open_conversation_replies_label?: string;
 };
 
 export type MessageGroup = {
@@ -529,6 +534,16 @@ function get_topic_card_timestr(message: Message): string {
     return $t({defaultMessage: "{date} at {time}"}, {date, time: get_timestr(message)});
 }
 
+function get_open_conversation_replies_label(reply_count: number | undefined): string {
+    if (reply_count === undefined) {
+        return $t({defaultMessage: "Replies"});
+    }
+    return $t(
+        {defaultMessage: "{count, plural, one {# reply} other {# replies}}"},
+        {count: reply_count},
+    );
+}
+
 function get_hidden_replies_label(
     hidden_replies: topic_cards.HiddenReplies,
     expanded: boolean,
@@ -598,6 +613,11 @@ export class MessageListView {
     // ID of message under the sticky recipient bar if there is one.
     sticky_recipient_message_id: number | undefined;
 
+    // In an open conversation, how many replies the topic has, once
+    // the server has told us.
+    open_conversation_reply_count: number | undefined;
+    open_conversation_reply_count_requested: boolean;
+
     // Number of messages to render at a time
     _RENDER_WINDOW_SIZE = 250;
     // Number of messages away from edge of render window at which we
@@ -619,6 +639,8 @@ export class MessageListView {
         this._render_win_start = 0;
         this._render_win_end = 0;
         this.sticky_recipient_message_id = undefined;
+        this.open_conversation_reply_count = undefined;
+        this.open_conversation_reply_count_requested = false;
     }
 
     _add_message_list_to_DOM(): void {
@@ -667,6 +689,121 @@ export class MessageListView {
 
     is_chat_layout(): boolean {
         return bubble_layout.is_chat_layout(this.list.data.filter);
+    }
+
+    is_open_conversation(): boolean {
+        return bubble_layout.is_open_conversation(this.list.data.filter);
+    }
+
+    // The topic's first message, once loaded, which an open
+    // conversation shows as a card.
+    open_conversation_first_message_id(): number | undefined {
+        if (!this.is_open_conversation() || !this.list.data.fetch_status.has_found_oldest()) {
+            return undefined;
+        }
+        return this.list.data.first()?.id;
+    }
+
+    get_open_conversation_card_variables(message: Message): Partial<MessageContainer> {
+        // The card shows its date next to its time.
+        return {
+            want_date_divider: false,
+            date_divider_html: undefined,
+            timestr: get_topic_card_timestr(message),
+            open_conversation_first_message: true,
+            open_conversation_replies_label: get_open_conversation_replies_label(
+                this.open_conversation_reply_count,
+            ),
+        };
+    }
+
+    // Once the server confirms that the topic's first message is
+    // shown, it becomes a card, and the message after it starts a
+    // series. Rerendering just these keeps the rest of the feed,
+    // including the divider where unread messages started.
+    show_open_conversation_card(): void {
+        const first_message_id = this.open_conversation_first_message_id();
+        if (first_message_id === undefined) {
+            return;
+        }
+        const containers = this._message_groups.flatMap((group) => group.message_containers);
+        const index = containers.findIndex((container) => container.msg.id === first_message_id);
+        const card_container = containers[index];
+        if (card_container === undefined || card_container.open_conversation_first_message) {
+            return;
+        }
+        Object.assign(
+            card_container,
+            this.get_open_conversation_card_variables(card_container.msg),
+        );
+        const changed_containers = [card_container];
+        const next_container = containers[index + 1];
+        if (next_container !== undefined && !next_container.include_sender) {
+            next_container.include_sender = true;
+            changed_containers.push(next_container);
+        }
+        for (const container of changed_containers) {
+            // Messages outside the render window get rendered from
+            // their containers later.
+            if (this.get_row(container.msg.id).length > 0) {
+                this._rerender_message(container, {
+                    message_content_edited: false,
+                    is_revealed: false,
+                });
+            }
+        }
+    }
+
+    // Only the server knows how many replies a topic has until the
+    // whole topic is loaded.
+    request_open_conversation_reply_count(): void {
+        const stream_id = narrow_state.stream_id(this.list.data.filter);
+        const topic = narrow_state.topic(this.list.data.filter);
+        assert(stream_id !== undefined && topic !== undefined);
+        this.open_conversation_reply_count_requested = true;
+        void channel.get({
+            url: `/json/streams/${stream_id}/topic_cards`,
+            data: {
+                topic_name: topic,
+                num_replies: 0,
+                allow_empty_topic_name: true,
+            },
+            success: (raw_data) => {
+                const data = topic_cards.topic_cards_response_schema.parse(raw_data);
+                this.open_conversation_reply_count = data.topic_cards[0]?.reply_count ?? 0;
+                this.update_open_conversation_replies();
+            },
+        });
+    }
+
+    // Counts new replies: one's own as soon as it is sent, and those
+    // from the server by asking it again.
+    maybe_update_open_conversation_reply_count(
+        messages: Message[],
+        messages_are_new: boolean,
+    ): void {
+        if (!this.is_open_conversation()) {
+            return;
+        }
+        if (!this.open_conversation_reply_count_requested) {
+            this.request_open_conversation_reply_count();
+        } else if (messages_are_new) {
+            if (
+                this.open_conversation_reply_count !== undefined &&
+                messages.every((message) => message.locally_echoed)
+            ) {
+                this.open_conversation_reply_count += messages.length;
+                this.update_open_conversation_replies();
+            } else {
+                this.request_open_conversation_reply_count();
+            }
+        }
+    }
+
+    update_open_conversation_replies(): void {
+        this.$list
+            .find(".open-conversation-replies-label")
+            .text(get_open_conversation_replies_label(this.open_conversation_reply_count));
     }
 
     get_calculated_message_container_variables(
@@ -1054,6 +1191,7 @@ export class MessageListView {
         // for messages that arrive while the conversation is open.
         const new_messages_divider_id =
             chat_layout && !messages_are_new ? this.list.data.first_unread_message_id() : undefined;
+        const open_conversation_first_message_id = this.open_conversation_first_message_id();
 
         const add_message_container_to_group = (message_container: MessageContainer): void => {
             current_group_message_containers.push(message_container);
@@ -1136,6 +1274,7 @@ export class MessageListView {
                 !include_recipient &&
                 prev_message_container &&
                 !prev_message_container.status_message &&
+                !prev_message_container.open_conversation_first_message &&
                 same_day(prev_message_container.msg, message) &&
                 prev_message_container.msg.historical === message.historical &&
                 prev_message_container.msg.sender_id === message.sender_id &&
@@ -1168,6 +1307,12 @@ export class MessageListView {
                     Boolean(calculated_variables.status_message),
                 ),
             };
+            if (message.id === open_conversation_first_message_id) {
+                Object.assign(
+                    message_container,
+                    this.get_open_conversation_card_variables(message),
+                );
+            }
             add_message_container_to_group(message_container);
 
             prev_message_container = message_container;
@@ -1197,6 +1342,7 @@ export class MessageListView {
         if (this.collapse_messages && same_recipient(last_msg_container, first_msg_container)) {
             if (
                 !last_msg_container!.status_message &&
+                !last_msg_container!.open_conversation_first_message &&
                 !first_msg_container.msg.is_me_message &&
                 same_day(last_msg_container?.msg, first_msg_container.msg) &&
                 same_sender(last_msg_container, first_msg_container) &&
@@ -1263,7 +1409,7 @@ export class MessageListView {
             });
         } else {
             clear_message_divider(curr_msg_container);
-            if (this.is_chat_layout()) {
+            if (this.is_chat_layout() && !curr_msg_container.open_conversation_first_message) {
                 Object.assign(
                     curr_msg_container,
                     get_group_start_date_divider_data(
@@ -1478,6 +1624,8 @@ export class MessageListView {
     ): {need_user_to_scroll: boolean} | undefined {
         // This function processes messages into chunks with separators between them,
         // and templates them to be inserted as table rows into the DOM.
+
+        this.maybe_update_open_conversation_reply_count(messages, messages_are_new);
 
         if (this.list.is_conversations_view) {
             // Topic cards are ordered by each topic's latest message
@@ -2180,6 +2328,13 @@ export class MessageListView {
             ),
         );
 
+        if (message_container.open_conversation_first_message) {
+            Object.assign(
+                message_container,
+                this.get_open_conversation_card_variables(message_container.msg),
+            );
+        }
+
         this.set_edited_notice_locations(message_container);
 
         const $rendered_msg = $(this._get_message_template(message_container));
@@ -2429,6 +2584,10 @@ export class MessageListView {
         this.$list.children().detach();
         this.$list.toggleClass("chat-layout", this.is_chat_layout());
         this.$list.toggleClass("bubble-layout", this.is_bubble_layout());
+        this.$list.toggleClass("open-conversation", this.is_open_conversation());
+        // Rerendering follows changes such as deleted or moved
+        // messages, which change the number of replies.
+        this.open_conversation_reply_count_requested = false;
         this.$list.toggleClass("conversations-view", this.list.is_conversations_view);
         this._rows.clear();
         this._message_groups = [];

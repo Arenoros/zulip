@@ -1,0 +1,77 @@
+/* The open conversation of a topic: the topic's first message as a
+   card, the number of replies, and then the replies as rows on the
+   left, each series starting with the sender's avatar, name and
+   time. */
+.message-list.open-conversation {
+    /* Mentions keep the color of their row. */
+    .message_row:not(.direct_mention, .group_mention) {
+        background-color: transparent;
+    }
+
+    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+        .message-sender-and-time {
+            grid-area: sender;
+            display: flex;
+            align-items: baseline;
+            /* 8px at 15px/1em */
+            gap: 0.5333em;
+            min-width: 0;
+        }
+
+        .message-time {
+            padding-right: 0;
+        }
+    }
+
+    .open-conversation-first-message {
+        grid-template:
+            "message_divider_unread_marker message_feed_divider_content" auto
+            ".                             new_messages_divider" auto
+            "message_unread_marker         messagebox" auto
+            ".                             open_conversation_replies" auto / 2px minmax(
+                0,
+                1fr
+            );
+
+        .messagebox {
+            /* 4px 12px at 15px/1em */
+            margin: 0.2667em 0.8em 0;
+            border: 1px solid var(--color-border-topic-card);
+            border-radius: 8px;
+            background-color: var(--color-background-topic-card);
+        }
+
+        .messagebox-content:not(.is-me-message) {
+            /* 12px at 15px/1em */
+            padding-bottom: 0.8em;
+            grid-template-areas:
+                "avatar  sender    controls . time"
+                "message message   message  . .   "
+                "more    more      more     . .   "
+                "reactions reactions reactions . . "
+                "reminders reminders reminders . . ";
+        }
+    }
+
+    .open-conversation-replies {
+        grid-area: open_conversation_replies;
+        display: grid;
+        grid-template-columns: auto minmax(20px, 1fr);
+        align-items: center;
+        /* 12px at 15px/1em */
+        gap: 0.8em;
+        /* 16px 12px 4px at 15px/1em */
+        padding: 1.0667em 0.8em 0.2667em;
+        /* 13px at 15px/1em */
+        font-size: 0.8667em;
+        font-weight: 600;
+        color: var(--color-text-message-bubble-caption);
+
+        &::after {
+            content: " ";
+            height: 0;
+            border-bottom: 1px solid
+                var(--color-border-message-group-spacer-line);
+        }
+    }
+}

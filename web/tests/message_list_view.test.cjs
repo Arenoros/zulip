@@ -4,6 +4,9 @@ const assert = require("node:assert/strict");
 
 const _ = require("lodash");
 
+const {make_user_group} = require("./lib/example_group.cjs");
+const {make_realm} = require("./lib/example_realm.cjs");
+const {make_stream} = require("./lib/example_stream.cjs");
 const {mock_esm, set_global, zrequire} = require("./lib/namespace.cjs");
 const {run_test, noop} = require("./lib/test.cjs");
 const {$} = require("./lib/zjquery.cjs");
@@ -17,6 +20,9 @@ mock_esm("../src/timerender", {
     },
     stringify_time(time) {
         return time.toString("h:mm TT");
+    },
+    render_now(time) {
+        return {time_str: `date ${time.getTime()}`};
     },
 });
 
@@ -41,9 +47,18 @@ const {MessageListView} = zrequire("../src/message_list_view");
 const message_list = zrequire("message_list");
 const {MessageListData} = zrequire("message_list_data");
 const muted_users = zrequire("muted_users");
+const settings_config = zrequire("settings_config");
+const {set_current_user, set_realm} = zrequire("state_data");
+const stream_data = zrequire("stream_data");
+const user_groups = zrequire("user_groups");
 const {initialize_user_settings} = zrequire("user_settings");
 
-const user_settings = {web_direct_message_bubbles: false};
+set_realm(make_realm());
+set_current_user({user_id: 1, is_guest: false});
+// Nobody may resolve, rename or move topics in the channels here.
+user_groups.initialize({realm_user_groups: [make_user_group({id: 0, name: "role:nobody"})]});
+
+const user_settings = {web_direct_message_bubbles: false, web_channel_default_view: 1};
 initialize_user_settings({user_settings});
 
 let next_timestamp = 1500000000;
@@ -1450,6 +1465,117 @@ test("new messages divider in the bubble layout", ({override}) => {
     view = make_bubble_test_view();
     view._message_groups = view.build_message_groups(messages);
     assert.ok(rendered_containers(view).every((container) => !container.want_new_messages_divider));
+});
+
+test("open conversation", ({override}) => {
+    // Where channels open as their conversations view, a topic opens
+    // as an open conversation: the chat layout without bubbles, with
+    // the topic's first message as a card once it is loaded.
+    stream_data.add_sub_for_tests(
+        make_stream({
+            stream_id: 101,
+            name: "Launch",
+            can_administer_channel_group: 0,
+            can_move_messages_within_channel_group: 0,
+            can_resolve_topics_group: 0,
+        }),
+    );
+    const ten_am = new Date(2026, 10, 9, 10, 0).getTime() / 1000;
+    function topic_message_at(minutes) {
+        return {
+            id: Number(_.uniqueId()),
+            type: "stream",
+            is_stream: true,
+            stream_id: 101,
+            display_recipient: "Launch",
+            topic: "venue",
+            sender_id: 5,
+            timestamp: ten_am + minutes * 60,
+            historical: false,
+            clean_reactions: new Map(),
+            submessages: [],
+        };
+    }
+    function make_open_conversation(messages, found_oldest) {
+        const list = new message_list.MessageList({
+            data: new MessageListData({
+                excludes_muted_topics: false,
+                filter: new Filter([
+                    {operator: "channel", operand: "101"},
+                    {operator: "topic", operand: "venue"},
+                ]),
+            }),
+            is_node_test: true,
+        });
+        list.data.fetch_status.finish_older_batch({
+            found_oldest,
+            history_limited: false,
+            update_loading_indicator: false,
+        });
+        list.data.add_messages(messages, true);
+        list.view._message_groups = list.view.build_message_groups(messages);
+        return list.view;
+    }
+    const messages = [
+        topic_message_at(0),
+        topic_message_at(1),
+        topic_message_at(2),
+        topic_message_at(10),
+    ];
+
+    override(
+        user_settings,
+        "web_channel_default_view",
+        settings_config.web_channel_default_view_values.conversations.code,
+    );
+    let view = make_open_conversation(messages, true);
+    assert.ok(view.is_open_conversation());
+    assert.ok(view.is_chat_layout());
+    assert.ok(!view.is_bubble_layout());
+    let result = rendered_containers(view);
+    assert.deepEqual(
+        result.map((container) => container.open_conversation_first_message ?? false),
+        [true, false, false, false],
+    );
+    // The card shows its date next to its time instead of a divider,
+    // and the first reply starts a series.
+    assert.equal(result[0].want_date_divider, false);
+    const ten_am_time = new Date(ten_am * 1000);
+    assert.equal(
+        result[0].timestr,
+        `translated: date ${ten_am * 1000} at ${ten_am_time.toString("h:mm TT")}`,
+    );
+    assert.equal(result[0].open_conversation_replies_label, "translated: Replies");
+    assert.deepEqual(
+        result.map((container) => container.include_sender),
+        [true, true, false, true],
+    );
+
+    // A reply that arrives when the topic has no other replies starts
+    // a series too.
+    view = make_open_conversation(messages.slice(0, 1), true);
+    view.merge_message_groups(view.build_message_groups([messages[1]]), "bottom");
+    assert.deepEqual(
+        rendered_containers(view).map((container) => container.include_sender),
+        [true, true],
+    );
+
+    // Until the topic's first message is loaded, there is no card.
+    view = make_open_conversation(messages.slice(1), false);
+    result = rendered_containers(view);
+    assert.ok(result.every((container) => !container.open_conversation_first_message));
+    assert.deepEqual(
+        result.map((container) => container.include_sender),
+        [true, false, true],
+    );
+
+    // With another default view for channels, topics keep the classic
+    // layout.
+    override(user_settings, "web_channel_default_view", 1);
+    view = make_open_conversation(messages, true);
+    assert.ok(!view.is_open_conversation());
+    assert.ok(!view.is_chat_layout());
+    assert.ok(rendered_containers(view).every((c) => !c.open_conversation_first_message));
 });
 
 test("render_windows", ({mock_template}) => {

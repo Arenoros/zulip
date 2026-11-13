@@ -1,5 +1,5 @@
 <div id="message-row-{{message_list_id}}-{{msg/id}}" data-message-id="{{msg/id}}"
-  class="message_row{{#unless msg/is_stream}} private-message{{/unless}}{{#if msg/sent_by_me}} own-message{{/if}}{{#if include_sender}} messagebox-includes-sender{{/if}}{{#if mention_classname}} {{mention_classname}}{{/if}}{{#if msg.unread}} unread{{/if}} {{#if msg.locally_echoed}}locally-echoed{{/if}} selectable_row {{#if is_hidden}}muted-message-sender{{/if}}"
+  class="message_row{{#unless msg/is_stream}} private-message{{/unless}}{{#if msg/sent_by_me}} own-message{{/if}}{{#if include_sender}} messagebox-includes-sender{{/if}}{{#if mention_classname}} {{mention_classname}}{{/if}}{{#if msg.unread}} unread{{/if}} {{#if msg.locally_echoed}}locally-echoed{{/if}} selectable_row {{#if is_hidden}}muted-message-sender{{/if}}{{#if open_conversation_first_message}} open-conversation-first-message{{/if}}"
   role="listitem">
     {{#if (or want_subscription_status_divider want_date_divider)}}
     <div class="unread_marker message_divider_unread_marker"><div class="unread-marker-fill"></div></div>
@@ -50,4 +50,9 @@
             {{!-- message_edit_form.hbs is inserted here when editing a message. --}}
         </div>
     </div>
+    {{#if open_conversation_first_message}}
+    <div class="open-conversation-replies no-select">
+        <span class="open-conversation-replies-label">{{open_conversation_replies_label}}</span>
+    </div>
+    {{/if}}
 </div>
