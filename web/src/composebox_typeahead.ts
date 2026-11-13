@@ -428,6 +428,10 @@ function handle_keydown(
                 // Enter
                 if (should_enter_send(e)) {
                     e.preventDefault();
+                    // The compose box may close once the message is
+                    // sent; this Enter must not then go on to reply
+                    // to the selected message.
+                    e.stopPropagation();
                     if (
                         compose_validate.validate_message_length($("#send_message_form")) &&
                         !$("#compose-send-button").hasClass("disabled-message-send-controls")
