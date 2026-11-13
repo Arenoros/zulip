@@ -1,0 +1,27 @@
+{{! The buttons of the compose box in the row layout. }}
+<button type="button" class="compose-row-button compose-formatting-mode-button tippy-zulip-delayed-tooltip" aria-pressed="false" aria-label="{{t 'Formatting' }}" data-tippy-content="{{t 'Formatting' }}">
+    <i class="zulip-icon zulip-icon-type-big" aria-hidden="true"></i>
+</button>
+{{!-- A wrapper span, since the emoji picker cannot
+attach to a button that already has a tooltip. --}}
+<span class="compose-row-button-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Add emoji' }}">
+    <button type="button" class="compose-row-button emoji_map" aria-label="{{t 'Add emoji' }}">
+        <i class="zulip-icon zulip-icon-smile-bigger" aria-hidden="true"></i>
+    </button>
+</span>
+{{#if file_upload_enabled }}
+<button type="button" class="compose-row-button compose_upload_file tippy-zulip-delayed-tooltip" aria-label="{{t 'Upload files' }}" data-tippy-content="{{t 'Upload files' }}">
+    <i class="zulip-icon zulip-icon-attachment" aria-hidden="true"></i>
+</button>
+{{/if}}
+<span class="compose-row-button-wrapper compose-plus-menu-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'More' }}">
+    <button type="button" class="compose-row-button compose-plus-menu-button" aria-label="{{t 'More' }}" aria-haspopup="true" aria-expanded="false">
+        <i class="zulip-icon zulip-icon-plus" aria-hidden="true"></i>
+    </button>
+    {{!-- Where the saved snippets, the GIF picker and the
+    time picker open from the menu, apart from the button,
+    which has the menu's popover. --}}
+    <span class="saved-snippets-composebox-widget compose-plus-menu-anchor" aria-hidden="true"></span>
+    <span class="compose-plus-menu-anchor compose-plus-menu-picker-anchor" aria-hidden="true"></span>
+</span>
+<span class="compose-row-divider" aria-hidden="true"></span>
