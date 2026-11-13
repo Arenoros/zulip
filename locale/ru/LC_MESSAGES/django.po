@@ -8792,3 +8792,87 @@ msgstr "Нельзя одновременно использовать mobile_fl
 #, python-brace-format
 #~ msgid "Channel {channel_name} un-archived."
 #~ msgstr "Канал {channel_name} возвращен из архива."
+
+msgid "Camera"
+msgstr "Камера"
+
+msgid "Chat"
+msgstr "Чат"
+
+msgid "Choose camera"
+msgstr "Выбрать камеру"
+
+msgid "Choose microphone and speakers"
+msgstr "Выбрать микрофон и динамики"
+
+msgid "Enable audio"
+msgstr "Включить звук"
+
+msgid "Go to the conversation"
+msgstr "Перейти к беседе"
+
+msgid "Invite someone to the call"
+msgstr "Пригласить в звонок"
+
+msgid "Invite someone…"
+msgstr "Пригласить…"
+
+msgid "Invited"
+msgstr "Приглашённые"
+
+msgid "Leave"
+msgstr "Выйти"
+
+msgid "Mic"
+msgstr "Микрофон"
+
+msgid "Participants"
+msgstr "Участники"
+
+msgid "Rejoin"
+msgstr "Вернуться"
+
+msgid "Share"
+msgstr "Экран"
+
+msgid "No access to this call"
+msgstr "Нет доступа к этому звонку"
+
+msgid "This call is only open to the people in the conversation where it started."
+msgstr "Этот звонок доступен только участникам беседы, в которой он начат."
+
+msgid "This call has ended"
+msgstr "Звонок завершён"
+
+msgid "Call"
+msgstr "Звонок"
+
+msgid "Invalid LiveKit webhook signature"
+msgstr "Неверная подпись веб-хука LiveKit"
+
+msgid "Invalid call"
+msgstr "Неверный звонок"
+
+msgid "LiveKit is not the call provider of this organization."
+msgstr "LiveKit не выбран сервисом звонков в этой организации."
+
+msgid "Only the caller can cancel a call."
+msgstr "Отменить звонок может только тот, кто звонит."
+
+msgid "You were not called."
+msgstr "Вам не звонили."
+
+msgid "Join video call."
+msgstr "Присоединиться к видеовызову."
+
+msgid "Join voice call."
+msgstr "Присоединиться к звонку."
+
+msgid "This call has already been started."
+msgstr "Этот звонок уже начат."
+
+msgid "This call has ended."
+msgstr "Звонок завершён."
+
+msgid "{full_name} cannot access this channel."
+msgstr "{full_name}: нет доступа к этому каналу."
