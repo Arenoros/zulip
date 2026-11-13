@@ -26115,6 +26115,17 @@ paths:
             type: integer
             default: 3
           example: 3
+        - name: topic_name
+          in: query
+          description: |
+            A topic name. If specified, only the card of this topic is
+            returned, or none if the topic has no messages the user has
+            access to. Compared case-insensitively.
+
+            Clients can use this to show how many replies a topic has.
+          schema:
+            type: string
+          example: new coffee machine
         - name: allow_empty_topic_name
           in: query
           description: |

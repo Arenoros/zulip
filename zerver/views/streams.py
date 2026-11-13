@@ -1386,6 +1386,7 @@ def get_topic_cards_backend(
     num_replies: Json[NonNegativeInt] = 3,
     num_topics: Json[PositiveInt] = 20,
     stream_id: PathOnly[NonNegativeInt],
+    topic_name: str | None = None,
 ) -> HttpResponse:
     if num_topics > MAX_TOPIC_CARDS_PER_FETCH:
         raise JsonableError(
@@ -1414,6 +1415,8 @@ def get_topic_cards_backend(
         realm = user_profile.realm
         (stream, _sub) = access_stream_by_id(user_profile, stream_id, require_active_channel=False)
     public_history = user_profile is None or stream.is_history_public_to_subscribers()
+    if topic_name is not None:
+        topic_name = maybe_rename_general_chat_to_empty_topic(topic_name)
 
     with transaction.atomic(durable=True):
         # As in GET /messages, read the cards and their messages from
@@ -1433,6 +1436,7 @@ def get_topic_cards_backend(
             num_topics=num_topics,
             num_replies=num_replies,
             allow_empty_topic_name=allow_empty_topic_name,
+            topic_name=topic_name,
         )
 
         user_message_flags: dict[int, list[str]]

@@ -357,6 +357,7 @@ def get_topic_cards(
     num_topics: int,
     num_replies: int,
     allow_empty_topic_name: bool,
+    topic_name: str | None,
 ) -> tuple[list[dict[str, Any]], list[int], bool]:
     """Returns the topic cards for a page of a channel's topics, the
     topic with the most recent message first; the IDs of the messages
@@ -366,7 +367,8 @@ def get_topic_cards(
     Only messages the user can access count, so in a channel with
     protected history, a topic's first message is the earliest one
     the user received. Topic names are compared case-insensitively,
-    and a card uses the most recent spelling.
+    and a card uses the most recent spelling. With a topic_name, only
+    that topic's card is returned.
     """
     if public_history:
         message_source: Composable = SQL("zerver_message AS m")
@@ -381,12 +383,16 @@ def get_topic_cards(
             """
         )
     anchor_condition = SQL("HAVING max(m.id) < %(anchor)s") if anchor is not None else SQL("")
+    topic_condition = (
+        SQL("AND upper(m.subject) = upper(%(topic_name)s)") if topic_name is not None else SQL("")
+    )
     params = dict(
         realm_id=realm_id,
         recipient_id=recipient_id,
         user_profile_id=None if user_profile is None else user_profile.id,
         first_visible_message_id=first_visible_message_id,
         anchor=anchor,
+        topic_name=topic_name,
         # One extra topic tells us whether older topics exist.
         limit=num_topics + 1,
         num_replies=num_replies,
@@ -405,6 +411,7 @@ def get_topic_cards(
                 AND m.recipient_id = %(recipient_id)s
                 AND m.is_channel_message
                 AND m.id >= %(first_visible_message_id)s
+                {topic_condition}
             GROUP BY upper(m.subject)
             {anchor_condition}
             ORDER BY max_id DESC
@@ -413,7 +420,11 @@ def get_topic_cards(
         JOIN zerver_message AS latest ON latest.id = latest_message_per_topic.max_id
         ORDER BY latest.id DESC
         """
-    ).format(message_source=message_source, anchor_condition=anchor_condition)
+    ).format(
+        message_source=message_source,
+        anchor_condition=anchor_condition,
+        topic_condition=topic_condition,
+    )
 
     # For the chosen topics, returns the messages a card shows, with
     # the topic's first message and size, and then each author of the
@@ -455,11 +466,11 @@ def get_topic_cards(
             return [], [], found_oldest
 
         cards: dict[str, dict[str, Any]] = {}
-        for topic_key, topic_name, max_id in topic_rows:
-            if topic_name == "" and not allow_empty_topic_name:
-                topic_name = Message.EMPTY_TOPIC_FALLBACK_NAME
+        for topic_key, latest_topic_name, max_id in topic_rows:
+            if latest_topic_name == "" and not allow_empty_topic_name:
+                latest_topic_name = Message.EMPTY_TOPIC_FALLBACK_NAME
             cards[topic_key] = dict(
-                topic_name=topic_name,
+                topic_name=latest_topic_name,
                 max_id=max_id,
                 hidden_reply_sender_ids=[],
                 hidden_reply_sender_count=0,

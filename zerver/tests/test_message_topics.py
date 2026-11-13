@@ -318,6 +318,57 @@ class TopicCardsTest(ZulipTestCase):
             self.get_topic_cards(stream.id, num_topics=3)
         self.assert_length(three_topic_queries, len(one_topic_queries))
 
+    def test_topic_card_for_one_topic(self) -> None:
+        hamlet = self.example_user("hamlet")
+        iago = self.example_user("iago")
+        stream = self.make_stream("hiring")
+        for user in [hamlet, iago]:
+            self.subscribe(user, stream.name)
+        first = self.send_stream_message(hamlet, stream.name, topic_name="Interviews")
+        self.send_stream_message(hamlet, stream.name, topic_name="offers")
+        latest = self.send_stream_message(iago, stream.name, topic_name="interviews")
+        self.send_stream_message(hamlet, stream.name, topic_name="offers")
+
+        self.login_user(hamlet)
+
+        def get_topic_card(topic_name: str, **params: object) -> dict[str, Any]:
+            result = self.client_get(
+                f"/json/streams/{stream.id}/topic_cards",
+                {
+                    "topic_name": topic_name,
+                    **{key: orjson.dumps(value).decode() for key, value in params.items()},
+                },
+            )
+            return self.assert_json_success(result)
+
+        # Topic names are compared case-insensitively.
+        data = get_topic_card("INTERVIEWS", num_replies=0)
+        self.assertEqual(
+            data["topic_cards"],
+            [
+                {
+                    "topic_name": "interviews",
+                    "max_id": latest,
+                    "first_message_id": first,
+                    "reply_count": 1,
+                    "hidden_reply_sender_ids": [iago.id],
+                    "hidden_reply_sender_count": 1,
+                }
+            ],
+        )
+        self.assertEqual([message["id"] for message in data["messages"]], [first])
+        self.assertTrue(data["found_oldest"])
+
+        data = get_topic_card("budget")
+        self.assertEqual(data["topic_cards"], [])
+        self.assertEqual(data["messages"], [])
+
+        # Clients that do not support the empty topic name refer to it
+        # by its display name.
+        empty_topic = self.send_stream_message(hamlet, stream.name, topic_name="")
+        data = get_topic_card(Message.EMPTY_TOPIC_FALLBACK_NAME)
+        self.assertEqual([card["first_message_id"] for card in data["topic_cards"]], [empty_topic])
+
     def test_topic_cards_limits(self) -> None:
         stream = get_stream("Verona", get_realm("zulip"))
         self.login("iago")
