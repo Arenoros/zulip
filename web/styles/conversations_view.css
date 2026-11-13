@@ -184,6 +184,12 @@
         }
     }
 
+    /* The card of a conversation the user just started; see
+       NEW_TOPIC_CARD_HIGHLIGHT_MS. */
+    .recipient_row.topic-card-new {
+        animation: topic-card-new 2s ease-out;
+    }
+
     /* A card with unread messages, counted in its title, gets a bar
        along its left edge, drawn above the messages' backgrounds. */
     .recipient_row.topic-card-unread {
@@ -279,5 +285,15 @@
         color: hsl(0deg 0% 100%);
         font-weight: 600;
         cursor: pointer;
+    }
+}
+
+@keyframes topic-card-new {
+    from {
+        box-shadow: 0 0 0 3px var(--color-outline-focus);
+    }
+
+    to {
+        box-shadow: 0 0 0 3px transparent;
     }
 }

@@ -534,6 +534,10 @@ function get_topic_card_timestr(message: Message): string {
     return $t({defaultMessage: "{date} at {time}"}, {date, time: get_timestr(message)});
 }
 
+// How long the card of a conversation the user just started stays
+// highlighted; see the topic-card-new animation.
+const NEW_TOPIC_CARD_HIGHLIGHT_MS = 2000;
+
 function get_open_conversation_replies_label(reply_count: number | undefined): string {
     if (reply_count === undefined) {
         return $t({defaultMessage: "Replies"});
@@ -618,6 +622,10 @@ export class MessageListView {
     open_conversation_reply_count: number | undefined;
     open_conversation_reply_count_requested: boolean;
 
+    // In the conversations view, the first message of a conversation
+    // the user just started, whose card is highlighted for a moment.
+    new_topic_card_highlight: {message: Message; started: number} | undefined;
+
     // Number of messages to render at a time
     _RENDER_WINDOW_SIZE = 250;
     // Number of messages away from edge of render window at which we
@@ -641,6 +649,7 @@ export class MessageListView {
         this.sticky_recipient_message_id = undefined;
         this.open_conversation_reply_count = undefined;
         this.open_conversation_reply_count_requested = false;
+        this.new_topic_card_highlight = undefined;
     }
 
     _add_message_list_to_DOM(): void {
@@ -1885,11 +1894,30 @@ export class MessageListView {
         autosize.update(this.$list.find(".message_edit_content"));
         maybe_restore_focus_to_message_edit_form();
         this.update_topic_cards_unread();
+        this.update_new_topic_card_highlight();
         // Callers usually scroll right after rendering; the buttons
         // depend on the final scroll position.
         setTimeout(() => {
             this.update_topic_cards_navigation();
         }, 0);
+    }
+
+    // The card of a conversation the user just started is highlighted
+    // for a moment; renders during the highlight continue it.
+    update_new_topic_card_highlight(): void {
+        const highlight = this.new_topic_card_highlight;
+        if (highlight === undefined) {
+            return;
+        }
+        const elapsed = Date.now() - highlight.started;
+        if (elapsed >= NEW_TOPIC_CARD_HIGHLIGHT_MS) {
+            this.new_topic_card_highlight = undefined;
+            return;
+        }
+        this.get_row(highlight.message.id)
+            .closest(".recipient_row")
+            .addClass("topic-card-new")
+            .css("animation-delay", `-${elapsed}ms`);
     }
 
     rerender_topic_cards_keeping_visible_cards(new_messages: Message[]): void {
@@ -2495,6 +2523,24 @@ export class MessageListView {
             // offer to go there.
             const started_scrolled_up = message_viewport.is_scrolled_up();
             const sent_by_me = messages.some((message) => message.sent_by_me);
+            // A message the user sent that is the first of its topic
+            // started a conversation.
+            const new_topic_message = messages.find(
+                (message) =>
+                    message.sent_by_me &&
+                    message.type === "stream" &&
+                    this.list
+                        .all_messages()
+                        .every(
+                            (other) =>
+                                other.id >= message.id ||
+                                other.type !== "stream" ||
+                                !util.lower_same(other.topic, message.topic),
+                        ),
+            );
+            if (new_topic_message !== undefined) {
+                this.new_topic_card_highlight = {message: new_topic_message, started: Date.now()};
+            }
             this.rerender_topic_cards_keeping_visible_cards(messages);
             if (sent_by_me) {
                 // Sending a message also resizes the compose box, which
