@@ -9,39 +9,28 @@ import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import GoToRecentConversations from "../include/_GoToRecentConversations.mdx";
-import StartComposing from "../include/_StartComposing.mdx";
 
 import VideoCallIcon from "~icons/zulip-icon/video-call";
 import VoiceCallIcon from "~icons/zulip-icon/voice-call";
 
-Zulip makes it convenient to add a video or voice call link to any message,
-using the call provider (Jitsi, Zoom, etc.)
-[configured](/help/configure-call-provider) by your organization's
-administrators. With LiveKit, you can also
-[call people directly](#calls-with-livekit).
+When your organization uses LiveKit as its
+[call provider](/help/configure-call-provider), you can call the people in a
+[direct message](/help/direct-messages) conversation right from Zulip.
 
-## Start a video call
-
-<ZulipNote>
-  When you join a call, you may need to log in to a separate account for the
-  call provider (Jitsi, Zoom, etc.).
-</ZulipNote>
+## Start a call
 
 <Tabs>
   <TabItem label="Desktop/Web">
-    <FlattenedSteps>
-      <StartComposing />
-
-      1. Click the **add video call** (<VideoCallIcon />) icon at the bottom of
-         the compose box. This will insert a **Join video call.** link into your
-         message.
-      1. Send the message.
-      1. Click on the link in the message to start or join the call.
-    </FlattenedSteps>
+    <Steps>
+      1. Go to the direct message conversation with the people you want to
+         call.
+      1. Click the **video call** (<VideoCallIcon />) or **voice call**
+         (<VoiceCallIcon />) icon in the top right, next to the search bar.
+    </Steps>
 
     <ZulipTip>
-      You can replace the "Join video call." label for the link with any text you
-      like.
+      The call icons aren't shown in a conversation with yourself, with only
+      bots, or with a deactivated user.
     </ZulipTip>
   </TabItem>
 
@@ -56,46 +45,15 @@ administrators. With LiveKit, you can also
   </TabItem>
 </Tabs>
 
-## Start a voice call
+The call opens, and a message with a link to the call is sent to the
+conversation. Everyone else in the conversation gets an incoming call, which
+rings for 45 seconds. People who have [muted](/help/mute-a-user) you aren't
+called.
 
-<Tabs>
-  <TabItem label="Desktop/Web">
-    <FlattenedSteps>
-      <StartComposing />
+Only the people in the conversation can join the call, even if the link to
+the call is shared elsewhere.
 
-      1. Click the **add voice call** (<VoiceCallIcon />) icon at the bottom of
-         the compose box. This will insert a **Join voice call.** link into your
-         message.
-      1. Send the message.
-      1. Click on the link in the message to start or join the call.
-    </FlattenedSteps>
-
-    <ZulipTip>
-      You can replace the "Join voice call." label for the link with any text you
-      like.
-    </ZulipTip>
-  </TabItem>
-</Tabs>
-
-## Calls with LiveKit
-
-When your organization uses LiveKit for calls, the **add video call**
-(<VideoCallIcon />) and **add voice call** (<VoiceCallIcon />) icons start
-the call right away, instead of inserting a link into your message. The call
-opens, and a message with a link to the call is sent to the conversation.
-
-In a direct message conversation, everyone else in the conversation gets an
-incoming call, which rings for 45 seconds. People who have
-[muted](/help/mute-a-user) you aren't called. A call in a channel doesn't
-ring anyone; people who [can access](/help/channel-permissions) the channel
-can join it with the link in the message.
-
-Only the people in the conversation can join a call started this way, even
-if the link to the call is shared elsewhere. A call link inserted while
-[editing a message](/help/edit-a-message) can be joined by anyone in your
-organization.
-
-### Answer a call
+## Answer a call
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -111,7 +69,7 @@ organization.
   </TabItem>
 </Tabs>
 
-### Find calls you missed
+## Find calls you missed
 
 A call is missed if you didn't answer it before it stopped ringing. In
 [recent conversations](/help/recent-conversations), conversations with
@@ -132,7 +90,7 @@ conversation.
   </TabItem>
 </Tabs>
 
-### Chat during a call
+## Chat during a call
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -152,7 +110,7 @@ is invited to a call from a direct message conversation, the chat moves to
 the group direct message with everyone in the call and everyone invited to
 it. Links to other conversations in the chat open in a new tab.
 
-### Invite someone to a call
+## Invite someone to a call
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -176,7 +134,7 @@ the link to the call is sent to a group direct message with everyone in the
 call and everyone invited to it. To a call in a channel, you can only invite
 people who [can access](/help/channel-permissions) the channel.
 
-### Choose your microphone, speakers, and camera
+## Choose your microphone, speakers, and camera
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -194,7 +152,7 @@ people who [can access](/help/channel-permissions) the channel.
   </TabItem>
 </Tabs>
 
-### Share your screen
+## Share your screen
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -212,7 +170,7 @@ people who [can access](/help/channel-permissions) the channel.
   </TabItem>
 </Tabs>
 
-### Leave a call
+## Leave a call
 
 The buttons at the top of the call window turn your microphone and camera on
 and off, share your screen, and show who is in the call.
