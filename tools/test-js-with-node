@@ -190,6 +190,7 @@ EXEMPT_FILES = make_set(
         "web/src/navbar_menus.ts",
         "web/src/navigate.ts",
         "web/src/onboarding_steps.ts",
+        "web/src/open_conversation_ui.ts",
         "web/src/overlay_util.ts",
         "web/src/overlays.ts",
         "web/src/padded_widget.ts",

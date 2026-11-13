@@ -1193,7 +1193,10 @@ export function dispatch_normal_event(event) {
                     inbox_ui.complete_rerender();
                     // Recent View
                     recent_view_ui.complete_rerender();
-                    // Message feed
+                    // Message feed, where topics open as open
+                    // conversations with the conversations view, which
+                    // have their own header.
+                    message_view_header.render_title_area();
                     for (const msg_list of message_lists.all_rendered_message_lists()) {
                         msg_list.rerender();
                     }

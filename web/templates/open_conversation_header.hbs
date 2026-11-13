@@ -1,0 +1,50 @@
+<span class="navbar_title open-conversation-header">
+    <a class="open-conversation-back icon-button icon-button-neutral tippy-zulip-delayed-tooltip" href="{{back_url}}" data-tippy-content="{{t 'Back to conversations' }}" aria-label="{{t 'Back to conversations' }}">
+        <i class="zulip-icon zulip-icon-chevron-left" aria-hidden="true"></i>
+    </a>
+    <span class="open-conversation-header-text">
+        <span class="open-conversation-header-channel">
+            <span class="open-conversation-header-channel-dot" style="background-color: {{channel_color}}"></span>
+            <span class="open-conversation-header-channel-name">{{channel_name}}</span>
+        </span>
+        <span class="open-conversation-header-topic">
+            <span class="message-header-navbar-title{{#if is_empty_string_topic}} empty-topic-display{{/if}}">{{topic_display_name}}</span>
+            {{#if topic_is_resolved}}
+                <span class="topic-card-resolved-label">{{t "Resolved" }}</span>
+            {{/if}}
+        </span>
+    </span>
+    <span class="open-conversation-header-actions hidden-for-spectators" data-stream-id="{{stream_id}}" data-topic-name="{{topic_name}}" data-topic-url="{{topic_url}}">
+        {{#if can_resolve_topic}}
+            {{#if topic_is_resolved}}
+                {{> components/icon_button icon="check-x" intent="neutral" custom_classes="open-conversation-resolve tippy-zulip-delayed-tooltip" data-tippy-content=(t "Mark as unresolved") aria-label=(t "Mark as unresolved") }}
+            {{else}}
+                {{> components/icon_button icon="check" intent="neutral" custom_classes="open-conversation-resolve tippy-zulip-delayed-tooltip" data-tippy-content=(t "Mark as resolved") aria-label=(t "Mark as resolved") }}
+            {{/if}}
+        {{/if}}
+        {{#if can_rename_topic}}
+            {{> components/icon_button icon="pencil" intent="neutral" custom_classes="open-conversation-rename tippy-zulip-delayed-tooltip" data-tippy-content=(t "Rename topic") aria-label=(t "Rename topic") }}
+        {{/if}}
+        {{#if is_subscribed}}
+        {{!-- A wrapper span, since the visibility policy popover
+        cannot attach to the icon button, which already has a tooltip. --}}
+        <span class="change_visibility_policy" data-stream-id="{{stream_id}}" data-topic-name="{{topic_name}}" aria-haspopup="true">
+            {{#if (eq visibility_policy all_visibility_policies.FOLLOWED)}}
+                {{> components/icon_button icon="follow" intent="neutral" custom_classes="tippy-zulip-delayed-tooltip" data-tippy-content=(t "You follow this topic.") aria-label=(t "You follow this topic.") }}
+            {{else if (eq visibility_policy all_visibility_policies.UNMUTED)}}
+                {{> components/icon_button icon="unmute" intent="neutral" custom_classes="tippy-zulip-delayed-tooltip" data-tippy-content=(t "You have unmuted this topic.") aria-label=(t "You have unmuted this topic.") }}
+            {{else if (eq visibility_policy all_visibility_policies.MUTED)}}
+                {{> components/icon_button icon="mute" intent="neutral" custom_classes="tippy-zulip-delayed-tooltip" data-tippy-content=(t "You have muted this topic.") aria-label=(t "You have muted this topic.") }}
+            {{else}}
+                {{> components/icon_button icon="inherit" intent="neutral" custom_classes="tippy-zulip-delayed-tooltip" data-tippy-content=(t "Notifications are based on your configuration for this channel.") aria-label=(t "Notifications are based on your configuration for this channel.") }}
+            {{/if}}
+        </span>
+        {{/if}}
+        {{> components/icon_button icon="link-alt" intent="neutral" custom_classes="open-conversation-copy-link tippy-zulip-delayed-tooltip" data-tippy-content=(t "Copy link to topic") aria-label=(t "Copy link to topic") }}
+        {{!-- A wrapper span, since the topic menu cannot attach to the
+        icon button, which already has a tooltip. --}}
+        <span class="open-conversation-topic-menu" data-stream-id="{{stream_id}}" data-topic-name="{{topic_name}}" data-topic-url="{{topic_url}}" aria-haspopup="true">
+            {{> components/icon_button icon="more-vertical" intent="neutral" custom_classes="tippy-zulip-delayed-tooltip" data-tippy-content=(t "Topic actions") aria-label=(t "Topic actions") }}
+        </span>
+    </span>
+</span>

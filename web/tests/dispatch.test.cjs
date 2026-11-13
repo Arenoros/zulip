@@ -1337,10 +1337,17 @@ run_test("user_settings", ({override}) => {
     override(stream_list, "update_streams_sidebar", () => {
         called_update_streams_sidebar = true;
     });
+    // Topics open as open conversations, with their own header, only
+    // with some values of the setting.
+    let rendered_title_area_for_default_view = false;
+    override(message_view_header, "render_title_area", () => {
+        rendered_title_area_for_default_view = true;
+    });
     dispatch(event);
     assert_same(user_settings.web_channel_default_view, 1);
     assert.equal(called_create_initial_sidebar_rows, true);
     assert.equal(called_update_streams_sidebar, true);
+    assert.equal(rendered_title_area_for_default_view, true);
 
     event = event_fixtures.user_settings__web_direct_message_bubbles;
     override(user_settings, "web_direct_message_bubbles", true);

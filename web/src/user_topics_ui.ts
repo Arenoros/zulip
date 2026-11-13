@@ -5,6 +5,7 @@ import * as inbox_util from "./inbox_util.ts";
 import type {MessageList} from "./message_list.ts";
 import * as message_lists from "./message_lists.ts";
 import type {Message} from "./message_store.ts";
+import * as message_view_header from "./message_view_header.ts";
 import * as narrow_state from "./narrow_state.ts";
 import * as overlays from "./overlays.ts";
 import * as popover_menus from "./popover_menus.ts";
@@ -47,6 +48,10 @@ export function handle_topic_updates(
     );
     // Update the UI after changes in topic visibility policies.
     user_topics.set_user_topic(user_topic_event);
+    message_view_header.maybe_rerender_title_area_for_topic(
+        user_topic_event.stream_id,
+        user_topic_event.topic_name,
+    );
 
     const update_delay_ms = should_add_topic_update_delay(user_topic_event.visibility_policy)
         ? MUTED_TOPIC_UPDATE_DELAY_MS

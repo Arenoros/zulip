@@ -223,6 +223,91 @@
         }
     }
 
+    /* The header of an open conversation: a button back to the
+       conversations view, the channel over the topic, and the
+       topic's actions at the end of the header. */
+    .open-conversation-header {
+        flex: 1 1 0;
+        align-self: stretch;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+        padding-left: 2px;
+    }
+
+    .open-conversation-back {
+        flex: none;
+        text-decoration: none;
+    }
+
+    .open-conversation-header-text {
+        display: flex;
+        flex-direction: column;
+        flex: 0 1 auto;
+        min-width: 0;
+        line-height: 1.2;
+    }
+
+    .open-conversation-header-channel {
+        display: flex;
+        align-items: center;
+        gap: 0.4em;
+        min-width: 0;
+        /* 13px at 15px/1em */
+        font-size: 0.8667em;
+        color: var(--color-text-message-bubble-caption);
+
+        /* A short header has room for the topic only. */
+        @media (height < $short_navbar_cutoff_height) {
+            display: none;
+        }
+    }
+
+    .open-conversation-header-channel-dot {
+        flex: none;
+        /* 8px at 13px/1em */
+        width: 0.6154em;
+        height: 0.6154em;
+        border-radius: 2px;
+    }
+
+    .open-conversation-header-channel-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .open-conversation-header-topic {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5em;
+        min-width: 0;
+
+        .message-header-navbar-title {
+            /* 16px at 15px/1em */
+            font-size: 1.0667em;
+            font-weight: 700;
+        }
+
+        .topic-card-resolved-label {
+            flex: none;
+            /* 12px at 15px/1em */
+            font-size: 0.8em;
+            font-weight: 600;
+            line-height: 1.4;
+            padding: 0 0.5em;
+            border: 1px solid var(--color-border-topic-card);
+            border-radius: 4px;
+            color: var(--color-text-message-bubble-caption);
+        }
+    }
+
+    .open-conversation-header-actions {
+        display: flex;
+        flex: none;
+        align-items: center;
+        margin-left: auto;
+    }
+
     .conversation-header-subtitle {
         overflow: hidden;
         text-overflow: ellipsis;

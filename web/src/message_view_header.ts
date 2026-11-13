@@ -19,10 +19,14 @@ import * as people from "./people.ts";
 import type {User} from "./people.ts";
 import * as recent_view_util from "./recent_view_util.ts";
 import * as rendered_markdown from "./rendered_markdown.ts";
+import * as resolved_topic from "./resolved_topic.ts";
 import * as search from "./search.ts";
 import {current_user, realm} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
+import * as stream_topic_history from "./stream_topic_history.ts";
 import type {StreamSubscription} from "./sub_store.ts";
+import * as user_topics from "./user_topics.ts";
+import type {AllVisibilityPolicies} from "./user_topics.ts";
 import * as util from "./util.ts";
 
 type ConversationHeaderContext = {
@@ -40,6 +44,23 @@ type ConversationHeaderContext = {
     channel_color?: string;
 };
 
+type OpenConversationHeaderContext = {
+    back_url: string;
+    channel_name: string;
+    channel_color: string;
+    stream_id: number;
+    topic_name: string;
+    topic_display_name: string;
+    is_empty_string_topic: boolean;
+    topic_is_resolved: boolean;
+    topic_url: string;
+    can_resolve_topic: boolean;
+    can_rename_topic: boolean;
+    is_subscribed: boolean;
+    visibility_policy: number | false;
+    all_visibility_policies: AllVisibilityPolicies;
+};
+
 type MessageViewHeaderContext = {
     title?: string | undefined;
     title_html?: string | undefined;
@@ -53,6 +74,7 @@ type MessageViewHeaderContext = {
     stream?: StreamSubscription;
     stream_settings_link?: string;
     conversation_header?: ConversationHeaderContext;
+    open_conversation_header?: OpenConversationHeaderContext;
 } & (
     | {
           zulip_icon: string;
@@ -135,6 +157,39 @@ function get_conversation_header_context(filter: Filter): ConversationHeaderCont
     };
 }
 
+// The header of an open conversation names the topic, under the
+// channel it is in, leads back to the channel's conversations view,
+// and offers the topic's actions.
+function get_open_conversation_header_context(
+    filter: Filter,
+): OpenConversationHeaderContext | undefined {
+    if (!bubble_layout.is_open_conversation(filter)) {
+        return undefined;
+    }
+    const sub = narrow_state.stream_sub(filter);
+    const topic_name = narrow_state.topic(filter);
+    assert(sub !== undefined && topic_name !== undefined);
+    const topic_is_resolved = resolved_topic.is_resolved(topic_name);
+    return {
+        back_url: hash_util.by_channel_conversations_url(sub.stream_id),
+        channel_name: sub.name,
+        channel_color: sub.color,
+        stream_id: sub.stream_id,
+        topic_name,
+        topic_display_name: resolved_topic.display_parts(
+            util.get_final_topic_display_name(topic_name),
+        )[1],
+        is_empty_string_topic: topic_name === "",
+        topic_is_resolved,
+        topic_url: stream_topic_history.channel_topic_permalink_hash(sub.stream_id, topic_name),
+        can_resolve_topic: stream_data.can_resolve_topics(sub) && topic_name !== "",
+        can_rename_topic: stream_data.user_can_move_messages_within_channel(sub),
+        is_subscribed: sub.subscribed && !sub.is_archived,
+        visibility_policy: user_topics.get_topic_visibility_policy(sub.stream_id, topic_name),
+        all_visibility_policies: user_topics.all_visibility_policies,
+    };
+}
+
 function get_message_view_header_context(filter: Filter | undefined): MessageViewHeaderContext {
     if (recent_view_util.is_visible()) {
         return {
@@ -200,6 +255,11 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
     const conversation_header = get_conversation_header_context(filter);
     if (conversation_header) {
         return {...context, conversation_header};
+    }
+
+    const open_conversation_header = get_open_conversation_header_context(filter);
+    if (open_conversation_header) {
+        return {...context, open_conversation_header};
     }
 
     if (filter.has_operator("channel")) {
@@ -348,6 +408,20 @@ export function render_title_area(): void {
 // This function checks if "modified_sub" which is the stream whose values
 // have been updated is the same as the stream which is currently
 // narrowed and rerenders if necessary
+// The header of an open conversation shows the topic's visibility
+// policy.
+export function maybe_rerender_title_area_for_topic(stream_id: number, topic_name: string): void {
+    const filter = narrow_state.filter();
+    if (
+        filter !== undefined &&
+        bubble_layout.is_open_conversation(filter) &&
+        narrow_state.stream_id(filter) === stream_id &&
+        util.lower_same(narrow_state.topic(filter), topic_name)
+    ) {
+        render_title_area();
+    }
+}
+
 export function maybe_rerender_title_area_for_stream(modified_stream_id: number): void {
     const current_stream_id = narrow_state.stream_id();
 

@@ -281,6 +281,7 @@
   "BROWSE 1 MORE CHANNEL": "ЕЩЕ 1 КАНАЛ",
   "BROWSE {can_subscribe_stream_count} MORE CHANNELS": "ПРОСМОТР ЕЩЁ {can_subscribe_stream_count} КАНАЛОВ",
   "Back": "",
+  "Back to conversations": "Назад к беседам",
   "Back to settings": "Назад к настройкам",
   "Bankruptcy": "Банкротство",
   "Because the original owner of this bot <z-bot-owner></z-bot-owner> is deactivated, you will become the owner for this bot.": "Исходный владелец этого бота <z-bot-owner></z-bot-owner> отключен, поэтому вы станете его новым владельцем.",

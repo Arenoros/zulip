@@ -94,6 +94,7 @@ import * as navbar_help_menu from "./navbar_help_menu.ts";
 import * as navigate from "./navigate.ts";
 import * as navigation_views from "./navigation_views.ts";
 import * as onboarding_steps from "./onboarding_steps.ts";
+import * as open_conversation_ui from "./open_conversation_ui.ts";
 import * as overlays from "./overlays.ts";
 import {page_params} from "./page_params.ts";
 import * as people from "./people.ts";
@@ -657,6 +658,7 @@ export async function initialize_everything(state_data) {
     });
     condense.initialize();
     topic_cards_ui.initialize();
+    open_conversation_ui.initialize();
     spoilers.initialize();
     lightbox.initialize();
     sidebar_ui.initialize();

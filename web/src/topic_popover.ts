@@ -177,6 +177,7 @@ export function initialize(): void {
         ".recipient-row-topic-menu, .recent_view_focusable .visibility-status-icon",
         "bottom",
     );
+    register_popover_menu(".open-conversation-topic-menu", "bottom");
 }
 
 function register_popover_menu(target: string, placement: tippy.Placement): void {
