@@ -40,6 +40,15 @@
     </a>
 </span>
 
+{{#if topic_card_title}}
+    <div class="topic-card-title">
+        <span class="topic-card-title-text{{#if topic_card_title_is_empty_topic}} empty-topic-display{{/if}}">{{topic_card_title}}</span>
+        {{#if topic_card_title_is_resolved}}
+            <span class="topic-card-resolved-label">{{t "Resolved" }}</span>
+        {{/if}}
+    </div>
+{{/if}}
+
 {{#if (and (not msg/failed_request) msg/locally_echoed)}}
     <span data-tooltip-template-id="slow-send-spinner-tooltip-template" class="fa fa-circle-o-notch slow-send-spinner{{#unless msg/show_slow_send_spinner }} hidden{{/unless}}"></span>
 {{/if}}

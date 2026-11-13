@@ -745,6 +745,18 @@ run_test("show_empty_narrow_message", ({mock_template, override, override_rewire
             'translated: Why not <a href="#" class="empty_feed_compose_stream">start the conversation</a>?',
         ),
     );
+    // The channel's conversations view has no topics.
+    message_lists.current.is_conversations_view = true;
+    narrow_banner.show_empty_narrow_message(current_filter);
+    assert.equal(
+        $(".empty_feed_notice_main").html(),
+        empty_narrow_html(
+            "translated: There are no conversations in this channel yet.",
+            undefined,
+            'translated: Why not <a href="#" class="empty_feed_compose_stream">start the conversation</a>?',
+        ),
+    );
+    message_lists.current.is_conversations_view = false;
     // The channel does not exist.
     current_filter = set_filter([["stream", ""]]);
     narrow_banner.show_empty_narrow_message(current_filter);

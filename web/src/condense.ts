@@ -213,6 +213,10 @@ export function condense_and_collapse(elems: JQuery | HTMLElement[]): void {
         35 * user_settings.web_font_size_px,
         0.65 * message_viewport.height(),
     );
+    // A topic card shows the start of its topic's first message, so
+    // that a long one does not hide the replies below it. 168px at
+    // 15px/1em, matching the condensed height of these messages.
+    const height_cutoff_topic_card = 11.2 * user_settings.web_font_size_px;
 
     const rows_to_resize = [];
     for (const elem of elems) {
@@ -255,9 +259,12 @@ export function condense_and_collapse(elems: JQuery | HTMLElement[]): void {
         if (message.unread) {
             state.has_unread_cutoff_by_message_id.add(message.id);
         }
-        const height_cutoff = state.has_unread_cutoff_by_message_id.has(message.id)
+        let height_cutoff = state.has_unread_cutoff_by_message_id.has(message.id)
             ? height_cutoff_unread
             : height_cutoff_read;
+        if ($(elem).find(".topic-card-title").length > 0) {
+            height_cutoff = height_cutoff_topic_card;
+        }
         const long_message = message_height > height_cutoff;
         if (long_message) {
             // All long messages are flagged as such.

@@ -193,7 +193,14 @@ function create_and_update_message_list(
     let msg_list;
     let restore_rendered_list = false;
     const is_combined_feed_global_view = filter.is_in_home();
-    if (!opts.force_rerender) {
+    if (opts.conversations_view) {
+        // Topic cards come from their own server request, so
+        // messages already in the client cannot fill this view.
+        msg_list = new message_list.MessageList({
+            data: new MessageListData({filter, excludes_muted_topics, excludes_muted_users}),
+            is_conversations_view: true,
+        });
+    } else if (!opts.force_rerender) {
         for (const list of message_lists.all_rendered_message_lists()) {
             if (is_combined_feed_global_view && list.data.filter.is_in_home()) {
                 if (opts.then_select_id > 0 && !list.msg_id_in_fetched_range(opts.then_select_id)) {
@@ -209,7 +216,7 @@ function create_and_update_message_list(
         }
     }
 
-    if (!restore_rendered_list) {
+    if (!restore_rendered_list && msg_list === undefined) {
         // If we don't have a cached message list for the narrow, we
         // need to construct one from scratch.
         let msg_data = new MessageListData({
@@ -283,7 +290,16 @@ function create_and_update_message_list(
     if (opts.change_hash) {
         const remove_current_hash_from_history = opts.remove_current_hash_from_history ?? false;
         const trigger = opts.trigger ?? "unknown";
-        update_hash_to_match_filter(filter, trigger, remove_current_hash_from_history);
+        const stream_id = narrow_state.stream_id(filter);
+        if (opts.conversations_view && stream_id !== undefined) {
+            changehash(
+                hash_util.by_channel_conversations_url(stream_id),
+                trigger,
+                remove_current_hash_from_history,
+            );
+        } else {
+            update_hash_to_match_filter(filter, trigger, remove_current_hash_from_history);
+        }
         opts.show_more_topics = browser_history.get_current_state_show_more_topics() ?? false;
     }
 
@@ -379,6 +395,9 @@ export function try_rendering_locally_for_same_narrow(
     if (!current_filter) {
         return false;
     }
+    if ((opts.conversations_view ?? false) !== message_lists.current?.is_conversations_view) {
+        return false;
+    }
 
     const near_message_id = filter.message_id_operand("near");
     let target_id;
@@ -445,6 +464,8 @@ export type ShowMessageViewOpts = {
     then_select_offset?: number | undefined;
     show_more_topics?: boolean;
     remove_current_hash_from_history?: boolean;
+    // Show the channel as topic cards rather than as its feed.
+    conversations_view?: boolean;
 };
 
 export function get_id_info(): TargetMessageIdInfo {
@@ -809,7 +830,25 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
                 then_select_offset = opts.then_select_offset;
             }
 
-            {
+            if (opts.conversations_view) {
+                // Topic cards open at the most recently active topic,
+                // which holds the newest message.
+                id_info.final_select_id ??= LARGER_THAN_MAX_MESSAGE_ID;
+                message_fetch.load_topic_cards({
+                    msg_list,
+                    cont() {
+                        if (message_lists.current !== msg_list) {
+                            return;
+                        }
+                        render_message_list_with_selected_message({
+                            id_info,
+                            select_offset: then_select_offset,
+                            msg_list,
+                            select_opts,
+                        });
+                    },
+                });
+            } else {
                 let anchor;
                 let anchor_date;
 

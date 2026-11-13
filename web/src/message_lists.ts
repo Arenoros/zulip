@@ -4,6 +4,7 @@ import * as inbox_util from "./inbox_util.ts";
 import type {MessageList} from "./message_list.ts";
 import type {MessageListData} from "./message_list_data.ts";
 import * as message_list_data_cache from "./message_list_data_cache.ts";
+import * as topic_cards from "./topic_cards.ts";
 import * as ui_util from "./ui_util.ts";
 
 export let current: MessageList | undefined;
@@ -18,6 +19,7 @@ export function set_current(msg_list: MessageList | undefined): void {
 export function delete_message_list(message_list: MessageList): void {
     message_list.view.$list.remove();
     rendered_message_lists.delete(message_list.id);
+    topic_cards.forget_message_list(message_list.id);
     message_list.data.set_rendered_message_list_id(undefined);
 }
 

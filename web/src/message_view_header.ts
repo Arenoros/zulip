@@ -10,6 +10,7 @@ import type {Filter} from "./filter.ts";
 import * as hash_util from "./hash_util.ts";
 import {$t} from "./i18n.ts";
 import * as inbox_util from "./inbox_util.ts";
+import * as message_lists from "./message_lists.ts";
 import * as muted_users from "./muted_users.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
@@ -30,6 +31,13 @@ type ConversationHeaderContext = {
     is_group: boolean;
     user_circle_class: string | undefined;
     subtitle: string;
+    // For a channel, the icon of who can access it, and a link to
+    // its settings.
+    channel_icon?: string;
+    stream_settings_link?: string;
+    // In the conversations view of a channel, a square of the
+    // channel's color takes the place of avatars.
+    channel_color?: string;
 };
 
 type MessageViewHeaderContext = {
@@ -206,6 +214,25 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
                 rendered_narrow_description: $t({
                     defaultMessage: "This channel does not exist or is private.",
                 }),
+            };
+        }
+
+        if (message_lists.current?.is_conversations_view && filter.is_channel_view()) {
+            return {
+                ...context,
+                conversation_header: {
+                    title: current_stream.name,
+                    avatar_urls: [],
+                    is_group: false,
+                    user_circle_class: undefined,
+                    subtitle: current_stream.description,
+                    channel_icon: "zulip_icon" in context ? context.zulip_icon : "hashtag",
+                    stream_settings_link: hash_util.channels_settings_edit_url(
+                        current_stream,
+                        "general",
+                    ),
+                    channel_color: current_stream.color,
+                },
             };
         }
 

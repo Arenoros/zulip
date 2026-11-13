@@ -848,6 +848,19 @@
         hsl(0deg 0% 100%),
         hsl(0deg 0% 13.5%)
     );
+    /* Topic cards of the conversations view of a channel. */
+    --color-background-topic-card: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 14.9%)
+    );
+    --color-border-topic-card: light-dark(
+        hsl(0deg 0% 87.8%),
+        hsl(0deg 0% 20.8%)
+    );
+    --color-background-topic-card-replies: light-dark(
+        hsl(0deg 0% 98%),
+        hsl(0deg 0% 12.9%)
+    );
     /* Bubble layout of direct message conversations. */
     --color-background-message-bubble: light-dark(
         hsl(0deg 0% 100%),

@@ -203,6 +203,7 @@ function do_hashchange_normal(from_reload: boolean, restore_selected_id: boolean
 
     switch (hash[0]) {
         case "#topics":
+        case "#conversations":
         case "#narrow": {
             let terms;
             try {
@@ -230,6 +231,17 @@ function do_hashchange_normal(from_reload: boolean, restore_selected_id: boolean
                     return false;
                 }
                 inbox_ui.show(filter);
+                return true;
+            }
+
+            if (hash[0] === "#conversations") {
+                const filter = new Filter(terms);
+                if (!filter.is_channel_view()) {
+                    show_invalid_url_error();
+                    show_home_view();
+                    return false;
+                }
+                message_view.show(terms, {...narrow_opts, conversations_view: true});
                 return true;
             }
 

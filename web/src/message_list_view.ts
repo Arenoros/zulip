@@ -45,6 +45,7 @@ import * as stream_data from "./stream_data.ts";
 import * as sub_store from "./sub_store.ts";
 import * as submessage from "./submessage.ts";
 import * as timerender from "./timerender.ts";
+import * as topic_cards from "./topic_cards.ts";
 import type {TopicLink} from "./types.ts";
 import * as typing_data from "./typing_data.ts";
 import * as typing_events from "./typing_events.ts";
@@ -84,12 +85,20 @@ export type MessageContainer = {
     want_date_divider: boolean;
     want_new_messages_divider: boolean;
     want_subscription_status_divider: boolean;
+    // In the conversations view, the topic's first message carries
+    // the topic card's title, and its first shown reply the summary
+    // of the replies before it that the card leaves out.
+    topic_card_title?: string;
+    topic_card_title_is_empty_topic?: boolean;
+    topic_card_title_is_resolved?: boolean;
+    topic_card_hidden_replies?: string;
 };
 
 export type MessageGroup = {
     bookend_top?: boolean;
     date_html: string;
     date_unchanged: boolean;
+    is_topic_card?: boolean;
     message_containers: MessageContainer[];
     message_group_id: string;
 } & (
@@ -508,6 +517,30 @@ export function populate_group_from_message(
 //
 // Logic to compute context, render templates, insert them into
 // the DOM, and generally
+function get_topic_card_timestr(message: Message): string {
+    // Topic cards span days without date dividers, so every message
+    // shows its date next to its time.
+    const date = timerender.render_now(new Date(message.timestamp * 1000)).time_str;
+    return $t({defaultMessage: "{date} at {time}"}, {date, time: get_timestr(message)});
+}
+
+function get_hidden_replies_label(hidden_replies: topic_cards.HiddenReplies): string {
+    const {count, sender_names, other_sender_count} = hidden_replies;
+    if (other_sender_count > 0) {
+        return $t(
+            {
+                defaultMessage:
+                    "{count, plural, one {Open # reply} other {Open # replies}} from {names}, and {other_count, plural, one {# other} other {# others}}",
+            },
+            {count, names: sender_names.join(", "), other_count: other_sender_count},
+        );
+    }
+    return $t(
+        {defaultMessage: "{count, plural, one {Open # reply} other {Open # replies}} from {names}"},
+        {count, names: util.format_array_as_list(sender_names, "long", "conjunction")},
+    );
+}
+
 export class MessageListView {
     // The MessageList that this MessageListView is responsible for rendering.
     list: MessageList;
@@ -993,6 +1026,9 @@ export class MessageListView {
 
         let prev_message_container: MessageContainer | undefined;
         const bubble_layout = this.is_bubble_layout();
+        // A topic card shows the sender of every message, and dates
+        // next to the time rather than as dividers.
+        const topic_cards_layout = this.list.is_conversations_view;
         // The bubble layout marks where unread messages start, but not
         // for messages that arrive while the conversation is open.
         const new_messages_divider_id =
@@ -1051,7 +1087,7 @@ export class MessageListView {
                     curr_message: message,
                     display_year: year_changed,
                 });
-                want_date_divider = divider_data.want_date_divider;
+                want_date_divider = divider_data.want_date_divider && !topic_cards_layout;
                 date_divider_html = divider_data.date_divider_html;
             } else {
                 finish_group();
@@ -1077,6 +1113,7 @@ export class MessageListView {
 
             include_sender = true;
             if (
+                !topic_cards_layout &&
                 !include_recipient &&
                 prev_message_container &&
                 !prev_message_container.status_message &&
@@ -1423,6 +1460,14 @@ export class MessageListView {
         // This function processes messages into chunks with separators between them,
         // and templates them to be inserted as table rows into the DOM.
 
+        if (this.list.is_conversations_view) {
+            // Topic cards are ordered by each topic's latest message
+            // rather than by message ID, so any change can move cards
+            // around; we render them all again.
+            this.render_topic_cards();
+            return undefined;
+        }
+
         if (messages.length === 0) {
             return undefined;
         }
@@ -1612,6 +1657,56 @@ export class MessageListView {
         return undefined;
     }
 
+    render_topic_cards(): void {
+        capture_user_message_editing_state();
+        this.clear_table();
+        const cards = topic_cards.get_topic_cards(this.list, this.list.all_messages());
+        const messages = cards.flatMap((card) => [card.first_message, ...card.replies]);
+        for (const message of messages) {
+            message.url = hash_util.by_conversation_and_time_url(message);
+        }
+
+        const message_groups = this.build_message_groups(messages);
+        for (const [index, group] of message_groups.entries()) {
+            const card = cards[index]!;
+            assert(group.is_stream);
+            group.is_topic_card = true;
+            const [first_container, first_reply_container] = group.message_containers;
+            assert(first_container !== undefined);
+            // A resolved topic is marked with a label instead of
+            // the check mark in its name.
+            first_container.topic_card_title = resolved_topic.display_parts(
+                group.topic_display_name,
+            )[1];
+            first_container.topic_card_title_is_empty_topic = group.is_empty_string_topic;
+            first_container.topic_card_title_is_resolved = group.topic_is_resolved;
+            if (card.hidden_replies !== undefined && first_reply_container !== undefined) {
+                first_reply_container.topic_card_hidden_replies = get_hidden_replies_label(
+                    card.hidden_replies,
+                );
+            }
+            for (const message_container of group.message_containers) {
+                message_container.timestr = get_topic_card_timestr(message_container.msg);
+                this.set_edited_notice_locations(message_container);
+                this.message_containers.set(message_container.msg.id, message_container);
+            }
+        }
+        this._message_groups = message_groups;
+        this._render_win_start = 0;
+        this._render_win_end = this.list.num_items();
+        if (message_groups.length === 0) {
+            return;
+        }
+
+        const $rendered_groups = this._render_group({message_groups, use_match_properties: false});
+        const $dom_messages = $rendered_groups.find(".message_row");
+        this._post_process($dom_messages);
+        this.$list.append($rendered_groups);
+        condense.condense_and_collapse($dom_messages);
+        autosize.update(this.$list.find(".message_edit_content"));
+        maybe_restore_focus_to_message_edit_form();
+    }
+
     _new_messages_height(rendered_elems: JQuery[]): number {
         let new_messages_height = 0;
 
@@ -1756,6 +1851,14 @@ export class MessageListView {
     }
 
     update_render_window(selected_idx: number, check_for_changed: boolean): boolean {
+        if (this.list.is_conversations_view) {
+            // Topic cards hold only a few messages per topic, so the
+            // conversations view renders all of them.
+            const changed = this._render_win_end !== this.list.num_items();
+            this._render_win_start = 0;
+            this._render_win_end = this.list.num_items();
+            return changed || !check_for_changed;
+        }
         const new_start = Math.max(selected_idx - Math.floor(this._RENDER_WINDOW_SIZE / 2), 0);
         if (check_for_changed && new_start === this._render_win_start) {
             return false;
@@ -1770,6 +1873,15 @@ export class MessageListView {
     }
 
     should_fetch_older_messages(): boolean {
+        if (this.list.is_conversations_view) {
+            // The oldest topic cards are at the top of the view, but
+            // they don't hold the messages with the lowest IDs, so we
+            // check the scroll position rather than the selected message.
+            return (
+                !this.list.data.fetch_status.has_found_oldest() &&
+                message_viewport.scrollTop() < message_viewport.height()
+            );
+        }
         const selected_idx = this.list.selected_idx();
         // We fetch older messages when the user is near the top of the
         // rendered message feed and there are older messages to fetch.
@@ -1782,6 +1894,10 @@ export class MessageListView {
     }
 
     should_fetch_newer_messages(): boolean {
+        if (this.list.is_conversations_view) {
+            // Topic cards always start from the newest topic.
+            return false;
+        }
         const selected_idx = this.list.selected_idx();
         // We fetch new messages when the user is near the bottom of the
         // rendered message feed and there are newer messages to fetch.
@@ -2077,6 +2193,10 @@ export class MessageListView {
         messages: Message[],
         messages_are_new: boolean,
     ): {need_user_to_scroll: boolean} | undefined {
+        if (this.list.is_conversations_view) {
+            this.rerender_preserving_scrolltop(true);
+            return undefined;
+        }
         const cur_window_size = this._render_win_end - this._render_win_start;
         let render_info;
 
@@ -2101,6 +2221,10 @@ export class MessageListView {
     }
 
     prepend(messages: Message[]): void {
+        if (this.list.is_conversations_view) {
+            this.rerender_preserving_scrolltop(true);
+            return;
+        }
         if (this._render_win_end === this._render_win_start) {
             // If the message list previously contained no visible
             // messages, appending and prepending are equivalent, but
@@ -2138,6 +2262,7 @@ export class MessageListView {
         // mindful of memory leaks.
         this.$list.children().detach();
         this.$list.toggleClass("bubble-layout", this.is_bubble_layout());
+        this.$list.toggleClass("conversations-view", this.list.is_conversations_view);
         this._rows.clear();
         this._message_groups = [];
         this.message_containers.clear();

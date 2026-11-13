@@ -10,5 +10,10 @@
         {{#each message_containers}}
             {{> single_message . use_match_properties=../../use_match_properties message_list_id=../../message_list_id is_archived=../is_archived invite_only=../invite_only is_web_public=../is_web_public}}
         {{/each}}
+        {{#if is_topic_card}}
+        <div class="topic-card-reply no-select">
+            <span class="topic-card-reply-button" role="button" tabindex="0">{{t "Reply in topic" }}</span>
+        </div>
+        {{/if}}
     </div>
 {{/each}}

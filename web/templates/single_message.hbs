@@ -33,6 +33,11 @@
         <span class="new-messages-divider-label">{{t "New messages" }}</span>
     </div>
     {{/if}}
+    {{#if topic_card_hidden_replies}}
+    <div class="topic-card-hidden-replies no-select">
+        <span class="topic-card-hidden-replies-label">{{topic_card_hidden_replies}}</span>
+    </div>
+    {{/if}}
     <div class="unread_marker message_unread_marker"><div class="unread-marker-fill"></div></div>
     <div class="messagebox">
         <div class="messagebox-content {{#if status_message}}is-me-message{{/if}}">

@@ -162,6 +162,17 @@
         object-fit: cover;
     }
 
+    .conversation-header-channel-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--conversation-header-avatar-size);
+        height: var(--conversation-header-avatar-size);
+        border-radius: 6px;
+        font-weight: 700;
+        color: hsl(0deg 0% 100%);
+    }
+
     .conversation-header-avatars-group {
         /* 28px at 15px/1em */
         --conversation-header-avatar-size: min(
@@ -203,6 +214,12 @@
         .message-header-navbar-title {
             /* 16px at 15px/1em */
             font-size: 1.0667em;
+        }
+
+        /* A channel's name links to its settings. */
+        .message-header-stream-settings-button {
+            display: block;
+            padding: 0;
         }
     }
 

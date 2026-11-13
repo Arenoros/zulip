@@ -53,7 +53,12 @@ export function scroll_finished(): void {
         message_scroll_state.set_update_selection_on_next_scroll(true);
     }
 
-    if (message_lists.current.view.should_fetch_older_messages()) {
+    if (
+        message_lists.current.is_conversations_view &&
+        message_lists.current.view.should_fetch_older_messages()
+    ) {
+        message_fetch.load_topic_cards({msg_list: message_lists.current});
+    } else if (message_lists.current.view.should_fetch_older_messages()) {
         // Subtle note: While we've only checked that we're at the
         // very top of the render window (i.e. there may be some more
         // cached messages to render), it's a good idea to fetch

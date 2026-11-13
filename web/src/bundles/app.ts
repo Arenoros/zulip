@@ -34,6 +34,7 @@ import "../../styles/message_view_header.css";
 import "../../styles/message_header.css";
 import "../../styles/message_row.css";
 import "../../styles/bubble_layout.css";
+import "../../styles/conversations_view.css";
 import "../../styles/modal.css";
 import "../../styles/settings.css";
 import "../../styles/image_upload_widget.css";

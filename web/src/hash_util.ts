@@ -120,6 +120,11 @@ export function by_stream_url(stream_id: number): string {
     return internal_url.by_stream_url(stream_id, sub_store.maybe_get_stream_name);
 }
 
+export function by_channel_conversations_url(channel_id: number): string {
+    // Wrapper for web use of internal_url.by_channel_conversations_url
+    return internal_url.by_channel_conversations_url(channel_id, sub_store.maybe_get_stream_name);
+}
+
 export function channel_url_by_user_setting(channel_id: number): string {
     if (
         user_settings.web_channel_default_view ===

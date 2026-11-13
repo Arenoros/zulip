@@ -52,6 +52,12 @@ run_test("test by_channel_topic_list_url", () => {
     assert.equal(result, "#topics/channel/123-a-test-stream");
 });
 
+run_test("test by_channel_conversations_url", () => {
+    const maybe_get_stream_name = () => "a test stream";
+    const result = internal_url.by_channel_conversations_url(123, maybe_get_stream_name);
+    assert.equal(result, "#conversations/channel/123-a-test-stream");
+});
+
 run_test("test by_stream_topic_url", () => {
     const maybe_get_stream_name = () => "a test stream";
     // Test stream_topic_url is a traditional topic link when the

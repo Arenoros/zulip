@@ -20,6 +20,7 @@ import type {Message} from "./message_store.ts";
 import {raw_message_schema} from "./message_store.ts";
 import * as message_viewport from "./message_viewport.ts";
 import * as narrow_banner from "./narrow_banner.ts";
+import * as narrow_state from "./narrow_state.ts";
 import * as navbar_alerts from "./navbar_alerts.ts";
 import {page_params} from "./page_params.ts";
 import * as popup_banners from "./popup_banners.ts";
@@ -32,6 +33,7 @@ import {narrow_operator_schema} from "./state_data.ts";
 import type {NarrowTerm} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import * as stream_list from "./stream_list.ts";
+import * as topic_cards from "./topic_cards.ts";
 import * as unread from "./unread.ts";
 import * as unread_ops from "./unread_ops.ts";
 import * as unread_ui from "./unread_ui.ts";
@@ -605,6 +607,66 @@ export function get_frontfill_anchor(msg_list: MessageList): number | string {
     return "oldest";
 }
 
+export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void}): void {
+    const msg_list = opts.msg_list;
+    const stream_id = narrow_state.stream_id(msg_list.data.filter);
+    const fetch_status = msg_list.data.fetch_status;
+    if (stream_id === undefined || !fetch_status.can_load_older_messages()) {
+        return;
+    }
+    const anchor = topic_cards.get_anchor(msg_list);
+    const update_loading_indicator = msg_list === message_lists.current;
+
+    fetch_status.start_older_batch({update_loading_indicator});
+    void channel.get({
+        url: `/json/streams/${stream_id}/topic_cards`,
+        data: {
+            num_topics: topic_cards.NUM_TOPIC_CARDS_PER_FETCH,
+            num_replies: topic_cards.NUM_TOPIC_CARD_REPLIES,
+            allow_empty_topic_name: true,
+            ...(anchor !== undefined && {anchor}),
+        },
+        success(raw_data) {
+            const data = topic_cards.topic_cards_response_schema.parse(raw_data);
+            topic_cards.add_topic_card_info(msg_list, data.topic_cards);
+            const messages = data.messages.map((raw_message) =>
+                message_helper.process_new_server_message(raw_message),
+            );
+            do_unread_count_updates(messages, true);
+            fetch_status.finish_older_batch({
+                found_oldest: data.found_oldest,
+                history_limited: false,
+                update_loading_indicator,
+            });
+            // The cards always start from the most recently active
+            // topic, so new messages in the channel belong in this view.
+            fetch_status.finish_newer_batch([], {
+                found_newest: true,
+                update_loading_indicator: false,
+            });
+            // Each page of cards is complete in itself, though not
+            // contiguous with the messages already in the list.
+            const is_contiguous_history = true;
+            msg_list.add_messages(messages, {}, is_contiguous_history);
+            if (
+                msg_list === message_lists.current &&
+                msg_list.visibly_empty() &&
+                data.found_oldest
+            ) {
+                narrow_banner.show_empty_narrow_message(msg_list.data.filter);
+            }
+            opts.cont?.();
+        },
+        error() {
+            fetch_status.finish_older_batch({
+                found_oldest: false,
+                history_limited: false,
+                update_loading_indicator,
+            });
+        },
+    });
+}
+
 export function maybe_load_older_messages(opts: {
     recent_view?: boolean;
     first_unread_message_id?: number;
@@ -616,6 +678,10 @@ export function maybe_load_older_messages(opts: {
     // of your window, and you want to get messages older
     // than what the browsers originally fetched.
     const msg_list_data = opts.msg_list_data;
+    if (opts.msg_list?.is_conversations_view) {
+        // See the similar check in maybe_load_newer_messages.
+        return;
+    }
     if (!msg_list_data.fetch_status.can_load_older_messages()) {
         // We may already be loading old messages or already
         // got the oldest one.
@@ -710,6 +776,12 @@ export function maybe_load_newer_messages(opts: {msg_list: MessageList}): void {
     // of your window, and you want to get messages newer
     // than what the browsers originally fetched.
     const msg_list = opts.msg_list;
+
+    if (msg_list.is_conversations_view) {
+        // Topic cards come only from load_topic_cards; a range of
+        // the channel's messages would add replies the cards leave out.
+        return;
+    }
 
     if (!msg_list.data.fetch_status.can_load_newer_messages()) {
         // We may already be loading new messages or already

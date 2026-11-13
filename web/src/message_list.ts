@@ -96,6 +96,10 @@ export class MessageList {
     view: MessageListView;
     // If this message list is for the combined feed view.
     is_combined_feed_view: boolean;
+    // If this message list shows a channel as topic cards, holding
+    // each topic's first message and latest replies rather than a
+    // contiguous range of messages.
+    is_conversations_view: boolean;
     // Keeps track of whether the user has done a UI interaction,
     // such as "Mark as unread", that should disable marking
     // messages as read until prevent_reading is called again.
@@ -123,11 +127,13 @@ export class MessageList {
         is_node_test?: boolean;
         reading_prevented?: boolean;
         near_view_reading_gate_pending?: boolean;
+        is_conversations_view?: boolean;
     }) {
         MessageList.id_counter += 1;
         this.id = MessageList.id_counter;
         this.data = opts.data;
         this.data.set_rendered_message_list_id(this.id);
+        this.is_conversations_view = opts.is_conversations_view ?? false;
 
         // TODO: This property should likely just be inlined into
         // having the MessageListView code that needs to access it

@@ -27,6 +27,35 @@ run_test("and", () => {
     assert.equal(html, "<p>empty and</p>\n<p>last and</p>\n\n");
 });
 
+run_test("conversation_header", () => {
+    const render_conversation_header = require("../templates/conversation_header.hbs");
+
+    // A channel's header shows who can access it, and links to its
+    // settings.
+    let html = render_conversation_header({
+        title: "Verona",
+        avatar_urls: [],
+        is_group: false,
+        subtitle: "For everyone",
+        channel_color: "#76ce90",
+        channel_icon: "lock",
+        stream_settings_link: "#channels/3/Verona/general",
+    });
+    assert.ok(html.includes('href="#channels/3/Verona/general"'));
+    assert.ok(html.includes("zulip-icon-lock"));
+    assert.ok(html.includes("Verona"));
+
+    // The header of a direct message conversation links nowhere.
+    html = render_conversation_header({
+        title: "Alice",
+        avatar_urls: ["/avatar/alice.png"],
+        is_group: false,
+        subtitle: "Direct messages",
+    });
+    assert.ok(!html.includes("href="));
+    assert.ok(html.includes("/avatar/alice.png"));
+});
+
 run_test("or", () => {
     const args = {
         last: true,

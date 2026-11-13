@@ -433,6 +433,14 @@ export function pick_empty_narrow_banner(
                 // messages in muted topics.
                 return MUTED_TOPICS_IN_CHANNEL_EMPTY_BANNER;
             }
+            if (message_lists.current.is_conversations_view) {
+                return {
+                    ...default_banner,
+                    title: $t({
+                        defaultMessage: "There are no conversations in this channel yet.",
+                    }),
+                };
+            }
             // else fallthrough to default case
             break;
         }
