@@ -6,7 +6,10 @@ import {Steps, TabItem, Tabs} from "@astrojs/starlight/components";
 
 import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
+import ZulipTip from "../../components/ZulipTip.astro";
 import ConfigureChannelLinks from "../include/_ConfigureChannelLinks.mdx";
+
+import CloseIcon from "~icons/zulip-icon/close";
 
 The **conversations view** shows a channel as a list of cards, one for each
 [topic](/help/introduction-to-topics). A card shows the topic's first message
@@ -70,7 +73,8 @@ use the topic's menu.
 ## Reply to a conversation
 
 Your reply moves the conversation's card to the bottom of the view, and you stay
-in the conversations view.
+in the conversations view. The compose box shows which conversation you are
+replying to, and closes once your reply is sent.
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -83,6 +87,12 @@ in the conversations view.
     <KeyboardTip>
       Use <kbd>R</kbd> to reply to the conversation of the selected message.
     </KeyboardTip>
+
+    <ZulipTip>
+      To stop replying, click the **close** (<CloseIcon />) icon next to the
+      name of the conversation, or press <kbd>Esc</kbd>. What you wrote is
+      saved as a [draft](/help/view-and-edit-your-message-drafts).
+    </ZulipTip>
   </TabItem>
 </Tabs>
 
