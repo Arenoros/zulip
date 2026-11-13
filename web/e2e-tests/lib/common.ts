@@ -456,8 +456,13 @@ export async function send_message(
     await page.evaluate(() => {
         zulip_test.cancel_compose();
     });
-    // Make sure the compose box is closed.
-    await page.waitForSelector("#compose-textarea", {hidden: true});
+    // Make sure the compose box is closed, unless it is the one always
+    // open in a view of a single conversation.
+    await page.waitForFunction(
+        () =>
+            document.querySelector("#compose.compose-for-view") !== null ||
+            document.querySelector<HTMLElement>("#compose-textarea")?.offsetParent === null,
+    );
 }
 
 export async function send_multiple_messages(page: Page, msgs: Message[]): Promise<void> {

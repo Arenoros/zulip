@@ -51,6 +51,7 @@ type ComposeActionsStartOpts = {
     is_reply?: boolean;
     keep_composebox_empty?: boolean | undefined;
     defer_focus?: boolean | undefined;
+    skip_focus?: boolean | undefined;
 };
 
 // An iteration on `ComposeActionsStartOpts` that enforces that
@@ -122,7 +123,12 @@ function show_compose_box(opts: ComposeActionsOpts): void {
     // Under certain circumstances, such as focusing in the
     // automatically-opened compose box in DMs, we want to
     // defer running the focus logic.
-    if (opts.defer_focus) {
+    if (opts.skip_focus) {
+        // The compose box always open in a view of a single
+        // conversation leaves the keyboard to the message feed, even
+        // if it had the focus in the previous view.
+        blur_compose_inputs();
+    } else if (opts.defer_focus) {
         setTimeout(() => {
             compose_ui.set_focus(opts_by_message_type);
         }, 0);
@@ -205,6 +211,36 @@ export let expand_compose_box = (): void => {
 
 export function rewire_expand_compose_box(value: typeof expand_compose_box): void {
     expand_compose_box = value;
+}
+
+// In a view of a single conversation that the user can post to, the
+// compose box is always open for that conversation.
+function get_view_compose_opts(): ComposeActionsStartOpts | undefined {
+    const filter = narrow_state.filter();
+    if (page_params.is_spectator || filter === undefined || !filter.is_conversation_view()) {
+        return undefined;
+    }
+    const {stream_id, topic, private_message_recipient_ids} = narrow_state.set_compose_defaults();
+    if (private_message_recipient_ids !== undefined) {
+        const recipient_ids_string = util.sorted_ids(private_message_recipient_ids).join(",");
+        if (!message_util.user_can_send_direct_message(recipient_ids_string)) {
+            return undefined;
+        }
+        return {message_type: "private", private_message_recipient_ids};
+    }
+    if (stream_id === undefined || topic === undefined) {
+        return undefined;
+    }
+    const stream = stream_data.get_sub_by_id(stream_id);
+    if (stream === undefined || !stream_data.can_post_messages_in_stream(stream)) {
+        return undefined;
+    }
+    return {message_type: "stream", stream_id, topic};
+}
+
+function set_compose_for_view(for_view: boolean): void {
+    compose_state.set_for_view(for_view);
+    $("#compose").toggleClass("compose-for-view", for_view);
 }
 
 // In the conversations view of a channel, starting a new topic in it
@@ -398,11 +434,11 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
     // If we are invoked by a compose hotkey (c or x) or new topic
     // button, do not assume that we know what the message's topic or
     // direct message recipient should be.
-    if (
+    const is_new_message =
         opts.trigger === "compose_hotkey" ||
         is_clear_topic_button_triggered ||
-        opts.trigger === "new direct message"
-    ) {
+        opts.trigger === "new direct message";
+    if (is_new_message) {
         opts.topic = "";
         opts.private_message_recipient_ids = [];
     }
@@ -525,6 +561,13 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
 
     compose_state.set_message_type(opts.message_type);
 
+    const view_opts = get_view_compose_opts();
+    set_compose_for_view(
+        view_opts !== undefined &&
+            !is_new_message &&
+            same_recipient_as_before(fill_in_opts_from_current_narrowed_view(view_opts)),
+    );
+
     // Show either stream/topic fields or "You and" field.
     show_compose_box(opts);
 
@@ -558,7 +601,23 @@ export function rewire_start(value: typeof start): void {
     start = value;
 }
 
+function open_compose_for_view(view_opts: ComposeActionsStartOpts, focus = false): void {
+    start({
+        ...view_opts,
+        trigger: "conversation view",
+        skip_focus: !focus,
+        skip_scrolling_selected_message: true,
+    });
+}
+
 export let cancel = (): void => {
+    if (compose_state.is_for_view()) {
+        // The compose box for the conversation of the view stays open,
+        // keeping what was typed.
+        blur_compose_inputs();
+        return;
+    }
+
     // As user closes the compose box, restore the compose box max height
     if (compose_ui.is_expanded()) {
         compose_ui.make_compose_box_original_size();
@@ -595,6 +654,13 @@ export let cancel = (): void => {
     compose_pm_pill.clear();
     message_viewport.bottom_of_feed.reset();
     reload.maybe_reset_pending_reload_timeout("compose_end");
+
+    // Closing the compose box for another conversation brings back
+    // the one for the conversation of the view.
+    const view_opts = get_view_compose_opts();
+    if (view_opts !== undefined) {
+        open_compose_for_view(view_opts);
+    }
 };
 
 export function rewire_cancel(value: typeof cancel): void {
@@ -604,6 +670,7 @@ export function rewire_cancel(value: typeof cancel): void {
 export function on_show_navigation_view(): void {
     /* This function dictates the behavior of the compose box
      * when navigating to a view, as opposed to a narrow. */
+    set_compose_for_view(false);
 
     // Leave the compose box closed if it was already closed.
     if (!compose_state.composing()) {
@@ -708,6 +775,21 @@ export function on_narrow(opts: NarrowActivateOpts): void {
     maybe_leave_new_conversation_form();
     if (embedded_call_chat.is_active()) {
         show_call_chat_compose();
+        return;
+    }
+
+    // The compose box follows a view of a single conversation, saving
+    // what was typed for another conversation as a draft. Elsewhere,
+    // it shows its recipient row.
+    set_compose_for_view(false);
+    const view_opts = get_view_compose_opts();
+    if (view_opts !== undefined) {
+        // Narrowing to what one is composing to, or to where one just
+        // sent a message, is a sign of being ready to write.
+        open_compose_for_view(
+            view_opts,
+            opts.trigger === "narrow_to_compose_target" || opts.trigger === "outside_current_view",
+        );
         return;
     }
 

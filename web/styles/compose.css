@@ -1279,6 +1279,16 @@ textarea.new_message_textarea {
     }
 }
 
+/* The compose box always open in a view of a single conversation
+   writes to that conversation, so it has no recipient row and no
+   button to close it. */
+#compose.compose-for-view {
+    #compose_top,
+    #compose_close {
+        display: none;
+    }
+}
+
 /* We want transitions to run only on user interactions with
    the mouse, once the compose box is open. Any keyboard
    interactions (e.g., Shift-Tabbing from the compose textarea

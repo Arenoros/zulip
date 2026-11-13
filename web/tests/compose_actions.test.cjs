@@ -1152,3 +1152,152 @@ test("on_narrow", ({override, override_rewire}) => {
     });
     assert.ok(cancel_called);
 });
+
+test("compose box for the conversation of the view", ({
+    override,
+    override_rewire,
+    mock_template,
+}) => {
+    mock_banners();
+    override_private_message_recipient_ids({override});
+    override_rewire(compose_actions, "autosize_message_content", noop);
+    override_rewire(compose_actions, "expand_compose_box", noop);
+    override_rewire(compose_actions, "complete_starting_tasks", noop);
+    override_rewire(compose_actions, "clear_textarea", noop);
+    override_rewire(compose_recipient, "on_compose_select_recipient_update", noop);
+    override_rewire(compose_recipient, "update_recipient_row_attention_level", noop);
+    override_rewire(stream_data, "can_create_new_topics_in_stream", () => true);
+    mock_template("decorated_channel_name.hbs", false, () => "");
+    const $textarea = $("textarea#compose-textarea");
+    stub_message_row($textarea);
+    $("#send_message_form").set_find_results(".message-textarea", $textarea);
+    $("#send_message_form").set_find_results(
+        ".message-limit-indicator",
+        $("#compose-limit-indicator"),
+    );
+    compose_pm_pill.clear = noop;
+    override(realm, "realm_direct_message_permission_group", everyone.id);
+    override(realm, "realm_direct_message_initiator_group", everyone.id);
+
+    let focused = false;
+    override(compose_ui, "set_focus", () => {
+        focused = true;
+    });
+    let blurred = false;
+    override_rewire(compose_actions, "blur_compose_inputs", () => {
+        blurred = true;
+    });
+
+    const steve = make_user({full_name: "Steve Stephenson"});
+    people.add_active_user(steve);
+    // The only member of the group allowed to send direct messages.
+    const me = make_user({user_id: 30});
+    people.add_active_user(me);
+    people.initialize_current_user(me.user_id);
+    set_current_user(me);
+
+    let is_conversation_view = true;
+    override(narrow_state, "filter", () => ({is_conversation_view: () => is_conversation_view}));
+    let compose_defaults = {private_message_recipient_ids: [steve.user_id]};
+    override(narrow_state, "set_compose_defaults", () => compose_defaults);
+
+    // Opening a direct message conversation opens the compose box for
+    // it, without its recipient row, and leaves the focus alone.
+    compose_actions.on_narrow({force_close: true});
+    assert.ok(compose_state.composing());
+    assert.ok(compose_state.is_for_view());
+    assert.ok($("#compose").hasClass("compose-for-view"));
+    assert.deepEqual(compose_state.private_message_recipient_ids(), [steve.user_id]);
+    assert.ok(!focused);
+    assert.ok(blurred);
+
+    // Escape, or a click elsewhere, only takes the focus away.
+    blurred = false;
+    cancel();
+    assert.ok(blurred);
+    assert.ok(compose_state.composing());
+    assert.ok(compose_state.is_for_view());
+
+    // A new direct message to someone else shows the recipient row,
+    // and closing it brings back the compose box for the view.
+    start({message_type: "private", trigger: "compose_hotkey"});
+    assert.ok(!compose_state.is_for_view());
+    assert.ok(!$("#compose").hasClass("compose-for-view"));
+    assert.deepEqual(compose_state.private_message_recipient_ids(), []);
+    focused = false;
+    cancel();
+    assert.ok(compose_state.is_for_view());
+    assert.deepEqual(compose_state.private_message_recipient_ids(), [steve.user_id]);
+    assert.ok(!focused);
+
+    // Narrowing to what one is composing to, or to where one just sent
+    // a message, focuses the compose box.
+    compose_actions.on_narrow({trigger: "narrow_to_compose_target"});
+    assert.ok(focused);
+    focused = false;
+    compose_actions.on_narrow({trigger: "outside_current_view"});
+    assert.ok(focused);
+
+    // A topic gets the compose box for it, unless one cannot post there.
+    const denmark = make_stream({name: "Denmark", stream_id: 1});
+    stream_data.add_sub_for_tests(denmark);
+    compose_defaults = {stream_id: denmark.stream_id, topic: "castle"};
+    let can_post = true;
+    override_rewire(stream_data, "can_post_messages_in_stream", () => can_post);
+    compose_actions.on_narrow({});
+    assert.ok(compose_state.is_for_view());
+    assert.equal(compose_state.stream_id(), denmark.stream_id);
+    assert.equal(compose_state.topic(), "castle");
+
+    // Starting a new topic from it shows the recipient row.
+    start({message_type: "stream", trigger: "clear topic button"});
+    assert.ok(!compose_state.is_for_view());
+
+    can_post = false;
+    let on_topic_narrow_called = false;
+    override_rewire(compose_actions, "on_topic_narrow", () => {
+        on_topic_narrow_called = true;
+    });
+    override(narrow_state, "narrowed_by_topic_reply", () => true);
+    compose_actions.on_narrow({});
+    assert.ok(on_topic_narrow_called);
+    assert.ok(!compose_state.is_for_view());
+    can_post = true;
+
+    // No compose box for a conversation with someone one cannot write to.
+    override(realm, "realm_direct_message_permission_group", nobody.id);
+    compose_defaults = {private_message_recipient_ids: [steve.user_id]};
+    override(narrow_state, "narrowed_by_topic_reply", () => false);
+    override(narrow_state, "narrowed_by_pm_reply", () => false);
+    compose_actions.on_narrow({});
+    assert.ok(!compose_state.is_for_view());
+    override(realm, "realm_direct_message_permission_group", everyone.id);
+
+    // Views of several conversations show the recipient row, and keep
+    // what was typed.
+    compose_actions.on_narrow({});
+    assert.ok(compose_state.is_for_view());
+    compose_state.message_content("hello");
+    is_conversation_view = false;
+    let faded = false;
+    compose_fade.update_message_list = () => {
+        faded = true;
+    };
+    compose_actions.on_narrow({});
+    assert.ok(faded);
+    assert.ok(compose_state.composing());
+    assert.ok(!compose_state.is_for_view());
+    assert.ok(!$("#compose").hasClass("compose-for-view"));
+
+    // Inbox and Recent conversations close an empty compose box.
+    is_conversation_view = true;
+    compose_state.message_content("");
+    compose_actions.on_narrow({});
+    assert.ok(compose_state.is_for_view());
+    is_conversation_view = false;
+    compose_actions.on_show_navigation_view();
+    assert.ok(!compose_state.composing());
+    assert.ok(!compose_state.is_for_view());
+
+    stream_data.clear_subscriptions();
+});

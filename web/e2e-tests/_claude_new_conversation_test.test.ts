@@ -271,14 +271,16 @@ async function new_conversation_test(page: Page): Promise<void> {
     await page.waitForSelector(".focused-message-list.open-conversation .message_row", {
         visible: true,
     });
+    await page.waitForSelector("#compose.compose-for-view");
     form = await form_state(page);
-    check(
-        "leaving the view keeps what was typed in the regular compose box",
-        form.open && !form.form && form.picker_shown && form.topic === "menu",
-        JSON.stringify(form),
+    const saved_as_draft = await page.evaluate(() =>
+        Object.values(localStorage).some((value) => value.includes("Lunch menu ideas.")),
     );
-    await page.click("#compose_close");
-    await wait_for_compose_closed(page);
+    check(
+        "leaving the view saves what was typed as a draft, and the topic gets its own compose box",
+        form.open && !form.form && form.topic === "fridge" && saved_as_draft,
+        JSON.stringify({...form, saved_as_draft}),
+    );
 
     // Dark theme, and a narrow window.
     await set_setting(page, "color_scheme=2");

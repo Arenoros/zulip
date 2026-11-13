@@ -12,6 +12,9 @@ let is_processing_forward_message = false;
 // Whether the compose box is the form for starting a conversation in
 // the conversations view of a channel, where a topic is required.
 let new_conversation_form = false;
+// Whether the compose box is the one always open for the conversation
+// that a view of a single conversation shows, without a recipient row.
+let for_view = false;
 
 // We use this variable to keep track of whether user has viewed the topic resolved
 // banner for the current compose session, for a narrow. This prevents the banner
@@ -53,6 +56,14 @@ export function set_new_conversation_form(flag: boolean): void {
 
 export function is_new_conversation_form(): boolean {
     return new_conversation_form;
+}
+
+export function set_for_view(flag: boolean): void {
+    for_view = flag;
+}
+
+export function is_for_view(): boolean {
+    return for_view;
 }
 
 export function set_message_type(msg_type: "stream" | "private" | undefined): void {

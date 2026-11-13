@@ -644,8 +644,7 @@ async function visual_test(page: Page): Promise<void> {
         void request.continue();
     };
     page.on("request", hold_sends);
-    await page.click("#left_bar_compose_reply_button_big");
-    await page.waitForSelector("#compose-textarea", {visible: true});
+    await page.click("#compose-textarea");
     await page.type("#compose-textarea", "A message that will not go through");
     await page.click("#compose-send-button");
     await page.waitForSelector(".focused-message-list .message_row.locally-echoed");

@@ -543,7 +543,9 @@ function process_escape_key(e: JQuery.KeyDownEvent): boolean {
         return true;
     }
 
-    if (compose_state.composing()) {
+    // The compose box always open in a view of a single conversation
+    // leaves Esc to the rest of the app when it is not focused.
+    if (compose_state.composing() && !compose_state.is_for_view()) {
         compose_actions.cancel();
         return true;
     }
@@ -1328,7 +1330,7 @@ function process_hotkey(e: JQuery.KeyDownEvent, hotkey: Hotkey): boolean {
             compose_reply.respond_to_message({trigger: "hotkey"});
             return true;
         case "compose": // 'c': compose
-            if (!compose_state.composing()) {
+            if (!compose_state.composing() || compose_state.is_for_view()) {
                 compose_actions.start({
                     message_type: "stream",
                     trigger: "compose_hotkey",
@@ -1337,7 +1339,7 @@ function process_hotkey(e: JQuery.KeyDownEvent, hotkey: Hotkey): boolean {
             }
             return true;
         case "compose_private_message":
-            if (!compose_state.composing()) {
+            if (!compose_state.composing() || compose_state.is_for_view()) {
                 compose_actions.start({
                     message_type: "private",
                     trigger: "compose_hotkey",
