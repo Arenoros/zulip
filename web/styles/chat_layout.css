@@ -1,0 +1,88 @@
+/* The chat layout of a single conversation, shared by the bubble
+   layout: dividers for each day and for where unread messages start,
+   instead of recipient bars. */
+.message-list.chat-layout {
+    /* 32px at 15px/1em */
+    --message-box-avatar-width: 2.1333em;
+    --message-box-avatar-height: var(--message-box-avatar-width);
+
+    /* The conversation is named in the navbar; the date of each day
+       is shown in a date divider instead. */
+    .message_header {
+        display: none;
+    }
+
+    /* The new messages divider marks unread messages instead. */
+    .unread_marker {
+        display: none;
+    }
+
+    .recipient_row .message_row {
+        border-left: 0;
+        border-right: 0;
+        border-bottom: 0;
+    }
+
+    .message_row {
+        grid-template:
+            "message_divider_unread_marker message_feed_divider_content" auto
+            ".                             new_messages_divider" auto
+            "message_unread_marker         messagebox" auto / 2px minmax(0, 1fr);
+    }
+
+    .message_feed_divider {
+        grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
+
+        &::after {
+            display: block;
+            grid-area: right_divider_content;
+            content: " ";
+            height: 0;
+            border-bottom: 1px solid
+                var(--color-border-message-group-spacer-line);
+        }
+
+        .date-divider-content {
+            grid-area: middle_divider_content;
+            text-transform: none;
+            letter-spacing: normal;
+            color: var(--color-text-message-bubble-caption);
+
+            &::before,
+            &::after {
+                display: none;
+            }
+        }
+    }
+
+    .new-messages-divider {
+        grid-area: new_messages_divider;
+        display: grid;
+        grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
+        align-items: center;
+        padding: 8px 0;
+        font-size: calc(12em / 14);
+        font-weight: 600;
+        line-height: 17px;
+        color: var(--color-message-bubble-unread);
+        transition: opacity 2s ease-out;
+
+        &::before,
+        &::after {
+            content: " ";
+            height: 0;
+            border-bottom: 1px solid currentcolor;
+        }
+
+        .new-messages-divider-label {
+            /* Same as .date_row_text */
+            padding: 0 var(--date-divider-text-padding);
+        }
+    }
+
+    /* Once read, the divider fades out but keeps its space, so that
+       the messages below don't move. */
+    .message_row:not(.unread) .new-messages-divider {
+        opacity: 0;
+    }
+}
