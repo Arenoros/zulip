@@ -102,6 +102,128 @@ export function finish(scheduling_message = false): boolean | undefined {
     return sent;
 }
 
+export function toggle_global_time_picker(trigger: HTMLElement): void {
+    let $target_textarea;
+    const $compose_click_target = $(trigger);
+    if ($compose_click_target.parents(".message_edit_form").length === 1) {
+        const edit_message_id = rows.id($compose_click_target.parents(".message_row"));
+        $target_textarea = $<HTMLTextAreaElement>(
+            `#edit_form_${edit_message_id} textarea.message_edit_content`,
+        );
+    } else {
+        $target_textarea = $compose_click_target
+            .closest("form")
+            .find<HTMLTextAreaElement>("textarea");
+    }
+
+    if (!flatpickr.is_open()) {
+        const on_timestamp_selection = (time: string): void => {
+            const timestr = `<time:${time}> `;
+            compose_ui.insert_syntax_and_focus(timestr, $target_textarea);
+        };
+
+        flatpickr.show_flatpickr(
+            util.the($compose_click_target),
+            on_timestamp_selection,
+            get_timestamp_for_flatpickr(),
+            {
+                // place the time picker wherever there is space and center it horizontally
+                position: "auto center",
+                // Since we want to handle close of flatpickr manually, we don't want
+                // flatpickr to hide automatically on clicking its trigger element.
+                ignoredFocusElements: [trigger],
+            },
+        );
+    } else {
+        flatpickr.flatpickr_instance?.close();
+    }
+}
+
+export function open_add_poll_modal(): void {
+    function validate_input(): boolean {
+        const question = $<HTMLInputElement>("#poll-question-input").val()!.trim();
+
+        if (question === "") {
+            ui_report.error(
+                $t_html({defaultMessage: "Please enter a question."}),
+                undefined,
+                $("#dialog_error"),
+            );
+            return false;
+        }
+        return true;
+    }
+
+    dialog_widget.launch({
+        modal_title_html: $t_html({defaultMessage: "Create a poll"}),
+        modal_content_html: render_add_poll_modal(),
+        modal_submit_button_text: $t({defaultMessage: "Add poll"}),
+        close_on_submit: true,
+        on_click(e) {
+            // frame a message using data input in modal, then populate the compose textarea with it
+            e.preventDefault();
+            e.stopPropagation();
+            const poll_message_content = widget_modal.frame_poll_message_content();
+            compose_ui.insert_syntax_and_focus(poll_message_content);
+        },
+        on_show() {
+            setTimeout(() => {
+                $("#poll-question-input").trigger("focus");
+            }, 0);
+        },
+        validate_input,
+        form_id: "add-poll-form",
+        id: "add-poll-modal",
+        post_render: widget_modal.poll_options_setup,
+        help_link: "https://zulip.com/help/create-a-poll",
+    });
+}
+
+export function open_add_todo_list_modal(): void {
+    function validate_input(e: JQuery.ClickEvent): boolean {
+        let is_valid = true;
+        e.preventDefault();
+        e.stopPropagation();
+        $(".option-row").each(function () {
+            const todo_name = $(this).find(".todo-input").val();
+            const todo_description = $(this).find(".todo-description-input").val();
+            if (!todo_name && todo_description) {
+                ui_report.error(
+                    $t_html({defaultMessage: "Please enter task title."}),
+                    undefined,
+                    $("#dialog_error"),
+                );
+                is_valid = false;
+            }
+        });
+        return is_valid;
+    }
+
+    dialog_widget.launch({
+        modal_title_html: $t_html({defaultMessage: "Create a collaborative to-do list"}),
+        modal_content_html: render_add_todo_list_modal(),
+        modal_submit_button_text: $t({defaultMessage: "Create to-do list"}),
+        close_on_submit: true,
+        on_click(e) {
+            // frame a message using data input in modal, then populate the compose textarea with it
+            e.preventDefault();
+            e.stopPropagation();
+            const todo_message_content = widget_modal.frame_todo_message_content();
+            compose_ui.insert_syntax_and_focus(todo_message_content);
+        },
+        on_show() {
+            setTimeout(() => {
+                $("#todo-title-input").trigger("select");
+            }, 0);
+        },
+        form_id: "add-todo-form",
+        validate_input,
+        id: "add-todo-modal",
+        post_render: widget_modal.todo_list_tasks_setup,
+        help_link: "https://zulip.com/help/collaborative-to-do-lists",
+    });
+}
+
 export function initialize(): void {
     // Register hooks for compose_actions.
     setup_compose_actions_hooks();
@@ -471,83 +593,14 @@ export function initialize(): void {
         e.preventDefault();
         e.stopPropagation();
 
-        let $target_textarea;
-        const $compose_click_target = $(this);
-        if ($compose_click_target.parents(".message_edit_form").length === 1) {
-            const edit_message_id = rows.id($compose_click_target.parents(".message_row"));
-            $target_textarea = $<HTMLTextAreaElement>(
-                `#edit_form_${edit_message_id} textarea.message_edit_content`,
-            );
-        } else {
-            $target_textarea = $compose_click_target
-                .closest("form")
-                .find<HTMLTextAreaElement>("textarea");
-        }
-
-        if (!flatpickr.is_open()) {
-            const on_timestamp_selection = (time: string): void => {
-                const timestr = `<time:${time}> `;
-                compose_ui.insert_syntax_and_focus(timestr, $target_textarea);
-            };
-
-            flatpickr.show_flatpickr(
-                util.the($compose_click_target),
-                on_timestamp_selection,
-                get_timestamp_for_flatpickr(),
-                {
-                    // place the time picker wherever there is space and center it horizontally
-                    position: "auto center",
-                    // Since we want to handle close of flatpickr manually, we don't want
-                    // flatpickr to hide automatically on clicking its trigger element.
-                    ignoredFocusElements: [this],
-                },
-            );
-        } else {
-            flatpickr.flatpickr_instance?.close();
-        }
+        toggle_global_time_picker(this);
     });
 
     $("body").on("click", ".compose_control_button_container:not(.disabled) .add-poll", (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        function validate_input(): boolean {
-            const question = $<HTMLInputElement>("#poll-question-input").val()!.trim();
-
-            if (question === "") {
-                ui_report.error(
-                    $t_html({defaultMessage: "Please enter a question."}),
-                    undefined,
-                    $("#dialog_error"),
-                );
-                return false;
-            }
-            return true;
-        }
-
-        dialog_widget.launch({
-            modal_title_html: $t_html({defaultMessage: "Create a poll"}),
-            modal_content_html: render_add_poll_modal(),
-            modal_submit_button_text: $t({defaultMessage: "Add poll"}),
-            close_on_submit: true,
-            on_click(e) {
-                // frame a message using data input in modal, then populate the compose textarea with it
-                e.preventDefault();
-                e.stopPropagation();
-                const poll_message_content = widget_modal.frame_poll_message_content();
-                compose_ui.insert_syntax_and_focus(poll_message_content);
-            },
-            on_show() {
-                setTimeout(() => {
-                    $("#poll-question-input").trigger("focus");
-                }, 0);
-            },
-            validate_input,
-            form_id: "add-poll-form",
-            id: "add-poll-modal",
-            post_render: widget_modal.poll_options_setup,
-            help_link: "https://zulip.com/help/create-a-poll",
-        });
+        open_add_poll_modal();
     });
 
     $("body").on("input", "#add-todo-modal .todo-input", (e) => {
@@ -568,48 +621,7 @@ export function initialize(): void {
             e.preventDefault();
             e.stopPropagation();
 
-            function validate_input(e: JQuery.ClickEvent): boolean {
-                let is_valid = true;
-                e.preventDefault();
-                e.stopPropagation();
-                $(".option-row").each(function () {
-                    const todo_name = $(this).find(".todo-input").val();
-                    const todo_description = $(this).find(".todo-description-input").val();
-                    if (!todo_name && todo_description) {
-                        ui_report.error(
-                            $t_html({defaultMessage: "Please enter task title."}),
-                            undefined,
-                            $("#dialog_error"),
-                        );
-                        is_valid = false;
-                    }
-                });
-                return is_valid;
-            }
-
-            dialog_widget.launch({
-                modal_title_html: $t_html({defaultMessage: "Create a collaborative to-do list"}),
-                modal_content_html: render_add_todo_list_modal(),
-                modal_submit_button_text: $t({defaultMessage: "Create to-do list"}),
-                close_on_submit: true,
-                on_click(e) {
-                    // frame a message using data input in modal, then populate the compose textarea with it
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const todo_message_content = widget_modal.frame_todo_message_content();
-                    compose_ui.insert_syntax_and_focus(todo_message_content);
-                },
-                on_show() {
-                    setTimeout(() => {
-                        $("#todo-title-input").trigger("select");
-                    }, 0);
-                },
-                form_id: "add-todo-form",
-                validate_input,
-                id: "add-todo-modal",
-                post_render: widget_modal.todo_list_tasks_setup,
-                help_link: "https://zulip.com/help/collaborative-to-do-lists",
-            });
+            open_add_todo_list_modal();
         },
     );
 
