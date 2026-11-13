@@ -4,11 +4,19 @@ from typing import Annotated, Any, Literal
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.db import transaction
+from django.db import connection, transaction
 from django.http import HttpRequest, HttpResponse
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
-from pydantic import BaseModel, Field, Json, NonNegativeInt, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    Json,
+    NonNegativeInt,
+    PositiveInt,
+    StringConstraints,
+    model_validator,
+)
 from pydantic.functional_validators import AfterValidator
 from pydantic_partials.sentinels import Missing, MissingType
 
@@ -63,7 +71,11 @@ from zerver.lib.exceptions import (
     OrganizationOwnerRequiredError,
 )
 from zerver.lib.mention import MentionBackend, silent_mention_syntax_for_user
-from zerver.lib.message import bulk_access_stream_messages_query
+from zerver.lib.message import (
+    bulk_access_stream_messages_query,
+    get_first_visible_message_id,
+    messages_for_ids,
+)
 from zerver.lib.response import json_success
 from zerver.lib.retention import STREAM_MESSAGE_BATCH_SIZE as RETENTION_STREAM_MESSAGE_BATCH_SIZE
 from zerver.lib.retention import parse_message_retention_days
@@ -98,6 +110,7 @@ from zerver.lib.streams import (
 )
 from zerver.lib.subscription_info import gather_subscriptions
 from zerver.lib.topic import (
+    get_topic_cards,
     get_topic_history_for_public_stream,
     get_topic_history_for_stream,
     maybe_rename_general_chat_to_empty_topic,
@@ -1355,6 +1368,105 @@ def get_topics_backend(
         )
 
     return json_success(request, data=dict(topics=result))
+
+
+MAX_TOPIC_CARDS_PER_FETCH = 100
+MAX_TOPIC_CARD_REPLIES = 10
+
+
+@typed_endpoint
+def get_topic_cards_backend(
+    request: HttpRequest,
+    maybe_user_profile: UserProfile | AnonymousUser,
+    *,
+    allow_empty_topic_name: Json[bool] = False,
+    anchor: Json[PositiveInt] | None = None,
+    apply_markdown: Json[bool] = True,
+    client_gravatar: Json[bool] = True,
+    num_replies: Json[NonNegativeInt] = 3,
+    num_topics: Json[PositiveInt] = 20,
+    stream_id: PathOnly[NonNegativeInt],
+) -> HttpResponse:
+    if num_topics > MAX_TOPIC_CARDS_PER_FETCH:
+        raise JsonableError(
+            _("Too many topics requested (maximum {max_topics}).").format(
+                max_topics=MAX_TOPIC_CARDS_PER_FETCH
+            )
+        )
+    if num_replies > MAX_TOPIC_CARD_REPLIES:
+        raise JsonableError(
+            _("Too many replies requested (maximum {max_replies}).").format(
+                max_replies=MAX_TOPIC_CARD_REPLIES
+            )
+        )
+
+    user_profile: UserProfile | None
+    if not maybe_user_profile.is_authenticated:
+        user_profile = None
+        realm = get_valid_realm_from_request(request)
+        stream = access_web_public_stream(stream_id, realm)
+        # As in GET /messages, spectators get avatar URLs for
+        # every sender.
+        client_gravatar = False
+    else:
+        assert isinstance(maybe_user_profile, UserProfile)
+        user_profile = maybe_user_profile
+        realm = user_profile.realm
+        (stream, _sub) = access_stream_by_id(user_profile, stream_id, require_active_channel=False)
+    public_history = user_profile is None or stream.is_history_public_to_subscribers()
+
+    with transaction.atomic(durable=True):
+        # As in GET /messages, read the cards and their messages from
+        # one snapshot of the database, so that a message sent or
+        # deleted meanwhile cannot leave a card inconsistent.
+        if not settings.TEST_SUITE:  # nocoverage
+            with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+
+        topic_cards, message_ids, found_oldest = get_topic_cards(
+            realm_id=realm.id,
+            recipient_id=assert_is_not_none(stream.recipient_id),
+            user_profile=user_profile,
+            public_history=public_history,
+            first_visible_message_id=get_first_visible_message_id(realm),
+            anchor=anchor,
+            num_topics=num_topics,
+            num_replies=num_replies,
+            allow_empty_topic_name=allow_empty_topic_name,
+        )
+
+        user_message_flags: dict[int, list[str]]
+        if user_profile is None:
+            # As in GET /messages, spectators see every message as read.
+            user_message_flags = {message_id: ["read"] for message_id in message_ids}
+        else:
+            user_message_flags = {
+                user_message.message_id: user_message.flags_list()
+                for user_message in UserMessage.objects.filter(
+                    user_profile=user_profile, message_id__in=message_ids
+                )
+            }
+            # Channels with public history include messages the user
+            # never received, which GET /messages marks the same way.
+            for message_id in message_ids:
+                user_message_flags.setdefault(message_id, ["read", "historical"])
+
+        messages = messages_for_ids(
+            message_ids=message_ids,
+            user_message_flags=user_message_flags,
+            search_fields={},
+            apply_markdown=apply_markdown,
+            client_gravatar=client_gravatar,
+            allow_empty_topic_name=allow_empty_topic_name,
+            message_edit_history_visibility_policy=realm.message_edit_history_visibility_policy,
+            user_profile=user_profile,
+            realm=realm,
+        )
+
+    return json_success(
+        request,
+        data=dict(topic_cards=topic_cards, messages=messages, found_oldest=found_oldest),
+    )
 
 
 @require_realm_admin

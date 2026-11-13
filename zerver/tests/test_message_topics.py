@@ -1,4 +1,5 @@
 import time
+from typing import Any
 from unittest import mock
 
 import orjson
@@ -9,8 +10,9 @@ from zerver.actions.streams import do_change_stream_permission, do_deactivate_st
 from zerver.actions.user_topics import do_set_user_topic_visibility_policy
 from zerver.lib.events import ClientCapabilities, do_events_register
 from zerver.lib.test_classes import ZulipTestCase
+from zerver.lib.test_helpers import queries_captured
 from zerver.lib.user_topics import set_topic_visibility_policy, topic_has_visibility_policy
-from zerver.models import Message, UserMessage, UserTopic
+from zerver.models import Message, UserMessage, UserProfile, UserTopic
 from zerver.models.clients import get_client
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
@@ -207,6 +209,245 @@ class TopicHistoryTest(ZulipTestCase):
         endpoint = f"/json/users/me/{non_existent_stream_id}/topics"
         result = self.client_get(endpoint)
         self.assert_json_error(result, "Invalid channel ID", 400)
+
+
+class TopicCardsTest(ZulipTestCase):
+    def get_topic_cards(self, stream_id: int, **params: object) -> dict[str, Any]:
+        result = self.client_get(
+            f"/json/streams/{stream_id}/topic_cards",
+            {key: orjson.dumps(value).decode() for key, value in params.items()},
+        )
+        return self.assert_json_success(result)
+
+    def test_topic_cards(self) -> None:
+        iago = self.example_user("iago")
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        stream = self.make_stream("release planning")
+        for user in [iago, hamlet, cordelia, othello]:
+            self.subscribe(user, stream.name)
+
+        def send(sender: UserProfile, topic_name: str) -> int:
+            return self.send_stream_message(sender, stream.name, topic_name=topic_name)
+
+        gamma = send(hamlet, "gamma")
+        alpha = [send(hamlet, "alpha")]
+        alpha += [send(sender, "alpha") for sender in [iago, cordelia, othello, hamlet]]
+        beta = [send(iago, "beta"), send(cordelia, "Beta")]
+        alpha.append(send(iago, "alpha"))
+
+        self.login_user(iago)
+        data = self.get_topic_cards(stream.id)
+        self.assertEqual(
+            data["topic_cards"],
+            [
+                {
+                    "topic_name": "alpha",
+                    "max_id": alpha[5],
+                    "first_message_id": alpha[0],
+                    "reply_count": 5,
+                    # The two replies before the latest three.
+                    "hidden_reply_sender_ids": [cordelia.id, iago.id],
+                    "hidden_reply_sender_count": 2,
+                },
+                {
+                    # The most recent spelling of the topic name.
+                    "topic_name": "Beta",
+                    "max_id": beta[1],
+                    "first_message_id": beta[0],
+                    "reply_count": 1,
+                    "hidden_reply_sender_ids": [],
+                    "hidden_reply_sender_count": 0,
+                },
+                {
+                    "topic_name": "gamma",
+                    "max_id": gamma,
+                    "first_message_id": gamma,
+                    "reply_count": 0,
+                    "hidden_reply_sender_ids": [],
+                    "hidden_reply_sender_count": 0,
+                },
+            ],
+        )
+        self.assertEqual(
+            [message["id"] for message in data["messages"]],
+            sorted([gamma, alpha[0], *alpha[3:], *beta]),
+        )
+        self.assertTrue(data["found_oldest"])
+        message = data["messages"][0]
+        self.assertEqual(message["subject"], "gamma")
+        self.assertEqual(message["content"], "<p>test content</p>")
+        self.assertEqual(message["flags"], [])
+
+        # Pages of topics, older ones first going back.
+        data = self.get_topic_cards(stream.id, num_topics=1)
+        self.assertEqual([card["topic_name"] for card in data["topic_cards"]], ["alpha"])
+        self.assertFalse(data["found_oldest"])
+        data = self.get_topic_cards(stream.id, num_topics=1, anchor=alpha[5])
+        self.assertEqual([card["topic_name"] for card in data["topic_cards"]], ["Beta"])
+        self.assertFalse(data["found_oldest"])
+        data = self.get_topic_cards(stream.id, num_topics=1, anchor=beta[1])
+        self.assertEqual([card["topic_name"] for card in data["topic_cards"]], ["gamma"])
+        self.assertTrue(data["found_oldest"])
+        data = self.get_topic_cards(stream.id, anchor=gamma)
+        self.assertEqual(
+            data,
+            {
+                "msg": "",
+                "result": "success",
+                "topic_cards": [],
+                "messages": [],
+                "found_oldest": True,
+            },
+        )
+
+        # With no replies requested, every reply is left out.
+        data = self.get_topic_cards(stream.id, num_topics=1, num_replies=0)
+        self.assertEqual([message["id"] for message in data["messages"]], [alpha[0]])
+        card = data["topic_cards"][0]
+        self.assertEqual(card["hidden_reply_sender_ids"], [iago.id, hamlet.id, othello.id])
+        self.assertEqual(card["hidden_reply_sender_count"], 4)
+
+        # The number of database queries does not grow with the number
+        # of topics. The first request fills the message cache.
+        self.get_topic_cards(stream.id)
+        with queries_captured() as one_topic_queries:
+            self.get_topic_cards(stream.id, num_topics=1)
+        with queries_captured() as three_topic_queries:
+            self.get_topic_cards(stream.id, num_topics=3)
+        self.assert_length(three_topic_queries, len(one_topic_queries))
+
+    def test_topic_cards_limits(self) -> None:
+        stream = get_stream("Verona", get_realm("zulip"))
+        self.login("iago")
+        result = self.client_get(f"/json/streams/{stream.id}/topic_cards", {"num_topics": "101"})
+        self.assert_json_error(result, "Too many topics requested (maximum 100).")
+        result = self.client_get(f"/json/streams/{stream.id}/topic_cards", {"num_replies": "11"})
+        self.assert_json_error(result, "Too many replies requested (maximum 10).")
+
+        data = self.get_topic_cards(stream.id, num_topics=100, num_replies=10)
+        self.assertNotEqual(data["topic_cards"], [])
+
+    def test_topic_cards_without_access(self) -> None:
+        self.login("iago")
+        result = self.client_get("/json/streams/9999999999/topic_cards")
+        self.assert_json_error(result, "Invalid channel ID")
+
+        other_realm_stream = self.make_stream("mit_stream", realm=get_realm("zephyr"))
+        result = self.client_get(f"/json/streams/{other_realm_stream.id}/topic_cards")
+        self.assert_json_error(result, "Invalid channel ID")
+
+        private_stream = self.make_stream("private_stream", invite_only=True)
+        result = self.client_get(f"/json/streams/{private_stream.id}/topic_cards")
+        self.assert_json_error(result, "Invalid channel ID")
+
+        # Guests have no access to public channels they are not
+        # subscribed to.
+        public_stream = self.make_stream("public channel without guests")
+        self.login("polonius")
+        result = self.client_get(f"/json/streams/{public_stream.id}/topic_cards")
+        self.assert_json_error(result, "Invalid channel ID")
+
+    def test_topic_cards_with_protected_history(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        stream = self.make_stream(
+            "protected", invite_only=True, history_public_to_subscribers=False
+        )
+        self.subscribe(hamlet, stream.name)
+        before_joining = [
+            self.send_stream_message(hamlet, stream.name, topic_name="plans"),
+            self.send_stream_message(hamlet, stream.name, topic_name="plans"),
+            self.send_stream_message(hamlet, stream.name, topic_name="old news"),
+        ]
+        self.subscribe(cordelia, stream.name)
+        after_joining = [
+            self.send_stream_message(hamlet, stream.name, topic_name="plans"),
+            self.send_stream_message(hamlet, stream.name, topic_name="plans"),
+        ]
+
+        self.login_user(hamlet)
+        card = self.get_topic_cards(stream.id)["topic_cards"][0]
+        self.assertEqual(card["first_message_id"], before_joining[0])
+        self.assertEqual(card["reply_count"], 3)
+
+        # Cordelia sees only the topic messages she received, so her
+        # card starts later and the older topic is missing.
+        self.login_user(cordelia)
+        data = self.get_topic_cards(stream.id)
+        self.assertEqual(
+            data["topic_cards"],
+            [
+                {
+                    "topic_name": "plans",
+                    "max_id": after_joining[1],
+                    "first_message_id": after_joining[0],
+                    "reply_count": 1,
+                    "hidden_reply_sender_ids": [],
+                    "hidden_reply_sender_count": 0,
+                }
+            ],
+        )
+
+    def test_topic_cards_with_public_history(self) -> None:
+        hamlet = self.example_user("hamlet")
+        stream = self.make_stream("public history")
+        self.subscribe(hamlet, stream.name)
+        message_ids = [
+            self.send_stream_message(hamlet, stream.name, topic_name="news"),
+            self.send_stream_message(hamlet, stream.name, topic_name="news"),
+        ]
+
+        # Iago is not subscribed, so he never received the messages.
+        self.login("iago")
+        data = self.get_topic_cards(stream.id)
+        self.assertEqual([message["id"] for message in data["messages"]], message_ids)
+        for message in data["messages"]:
+            self.assertEqual(message["flags"], ["read", "historical"])
+
+        # Messages before the organization's first visible message are
+        # left out.
+        realm = get_realm("zulip")
+        realm.first_visible_message_id = message_ids[1]
+        realm.save(update_fields=["first_visible_message_id"])
+        card = self.get_topic_cards(stream.id)["topic_cards"][0]
+        self.assertEqual(card["first_message_id"], message_ids[1])
+        self.assertEqual(card["reply_count"], 0)
+
+    def test_topic_cards_with_empty_topic_name(self) -> None:
+        hamlet = self.example_user("hamlet")
+        stream = self.make_stream("general chat channel")
+        self.subscribe(hamlet, stream.name)
+        self.send_stream_message(hamlet, stream.name, topic_name="")
+
+        self.login_user(hamlet)
+        card = self.get_topic_cards(stream.id)["topic_cards"][0]
+        self.assertEqual(card["topic_name"], Message.EMPTY_TOPIC_FALLBACK_NAME)
+        card = self.get_topic_cards(stream.id, allow_empty_topic_name=True)["topic_cards"][0]
+        self.assertEqual(card["topic_name"], "")
+
+    def test_topic_cards_for_spectators(self) -> None:
+        iago = self.example_user("iago")
+        stream = self.make_stream("web-public-stream", is_web_public=True)
+        self.subscribe(iago, stream.name)
+        message_id = self.send_stream_message(iago, stream.name, topic_name="welcome")
+
+        data = self.get_topic_cards(stream.id)
+        self.assertEqual([card["topic_name"] for card in data["topic_cards"]], ["welcome"])
+        message = data["messages"][0]
+        self.assertEqual(message["id"], message_id)
+        self.assertEqual(message["flags"], ["read"])
+        self.assertIsNotNone(message["avatar_url"])
+
+        result = self.client_get(f"/json/streams/{get_stream('Verona', iago.realm).id}/topic_cards")
+        self.assert_json_error(result, "Invalid channel ID", status_code=400)
+
+        do_set_realm_property(iago.realm, "enable_spectator_access", False, acting_user=None)
+        result = self.client_get(f"/json/streams/{stream.id}/topic_cards")
+        self.assert_json_error(
+            result, "Not logged in: API authentication or user session required", status_code=401
+        )
 
 
 class TopicDeleteTest(ZulipTestCase):

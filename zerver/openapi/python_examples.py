@@ -1841,6 +1841,22 @@ def get_stream_topics(client: Client, stream_id: int) -> None:
     validate_against_openapi_schema(result, "/users/me/{stream_id}/topics", "get", "200")
 
 
+@openapi_test_function("/streams/{stream_id}/topic_cards:get")
+def get_topic_cards(client: Client, stream_id: int) -> None:
+    # {code_example|start}
+    # Get the cards of the two most recently active topics in a channel,
+    # with up to three latest replies each.
+    request = {"num_topics": 2, "num_replies": 3}
+    result = client.call_endpoint(
+        url=f"/streams/{stream_id}/topic_cards",
+        method="GET",
+        request=request,
+    )
+    # {code_example|end}
+    assert_success_response(result)
+    validate_against_openapi_schema(result, "/streams/{stream_id}/topic_cards", "get", "200")
+
+
 @openapi_test_function("/users/me/apns_device_token:post")
 def add_apns_token(client: Client) -> None:
     # {code_example|start}
@@ -2285,6 +2301,7 @@ def test_streams(client: Client, nonadmin_client: Client) -> None:
     update_subscription_settings(client)
     update_subscription_property(client)
     get_stream_topics(client, 1)
+    get_topic_cards(client, 1)
     delete_topic(client, 1, "test")
     archive_stream(client)
     add_default_stream(client)

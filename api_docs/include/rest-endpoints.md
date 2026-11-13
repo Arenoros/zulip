@@ -71,6 +71,7 @@
 * [Archive a channel](/api/archive-stream)
 * [Get channel's email address](/api/get-stream-email-address)
 * [Get topics in a channel](/api/get-stream-topics)
+* [Get topic cards in a channel](/api/get-topic-cards)
 * [Topic muting](/api/mute-topic)
 * [Update personal preferences for a topic](/api/update-user-topic)
 * [Delete a topic](/api/delete-topic)

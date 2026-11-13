@@ -26044,6 +26044,272 @@ paths:
                   - description: |
                       An example JSON response for when the requested channel does not exist,
                       or where the user does not have permission to access the target channel:
+  /streams/{stream_id}/topic_cards:
+    get:
+      operationId: get-topic-cards
+      summary: Get topic cards in a channel
+      tags: ["channels"]
+      description: |
+        Get a page of the topics in a channel, the topic with the most
+        recent message first. For each topic, the response describes a
+        topic card: the topic's first message, its latest replies, how
+        many replies it has, and who wrote the replies left out.
+
+        A reply is any message in a topic after its first message.
+        Topic names are compared case-insensitively, and each card uses
+        the most recent spelling of its topic's name, as in
+        [`GET /users/me/{stream_id}/topics`](/api/get-stream-topics).
+
+        Only messages the user has access to are considered. In
+        [private channels with protected
+        history](/help/channel-permissions#private-channels), a topic's
+        first message is the earliest message in it that the user
+        received.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-08e5e5).
+      parameters:
+        - $ref: "#/components/parameters/ChannelIdInPath"
+        - name: anchor
+          in: query
+          description: |
+            A message ID. If specified, only topics whose most recent message
+            is older than this message are returned. To fetch the next page,
+            pass the smallest `max_id` from the previous page.
+
+            If not specified, the topics with the most recent messages in
+            the channel are returned.
+          schema:
+            type: integer
+          example: 43
+        - name: num_topics
+          in: query
+          description: |
+            The maximum number of topics to return. Must be at most 100.
+          schema:
+            type: integer
+            default: 20
+          example: 2
+        - name: num_replies
+          in: query
+          description: |
+            The maximum number of latest replies to return for each topic.
+            Must be at most 10.
+          schema:
+            type: integer
+            default: 3
+          example: 3
+        - name: allow_empty_topic_name
+          in: query
+          description: |
+            Whether the client supports processing the empty string as
+            a topic name in the returned data.
+
+            If `false`, the value of `realm_empty_topic_display_name`
+            found in the [`POST /register`](/api/register-queue) response is
+            returned replacing the empty string as the topic name.
+          schema:
+            type: boolean
+            default: false
+          example: true
+        - name: apply_markdown
+          in: query
+          description: |
+            If `true`, message content is returned in the rendered HTML
+            format. If `false`, message content is returned in the raw
+            Markdown-format text that user entered.
+
+            See [Markdown message formatting](/api/message-formatting) for details on Zulip's HTML format.
+          schema:
+            type: boolean
+            default: true
+          example: false
+        - $ref: "#/components/parameters/ClientGravatar"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      topic_cards:
+                        type: array
+                        description: |
+                          An array of objects describing topic cards, the topic
+                          with the most recent message first.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            topic_name:
+                              type: string
+                              description: |
+                                The name of the topic, in its most recent spelling.
+                            max_id:
+                              type: integer
+                              description: |
+                                The ID of the most recent message in the topic.
+                            first_message_id:
+                              type: integer
+                              description: |
+                                The ID of the first message in the topic that the
+                                user has access to.
+                            reply_count:
+                              type: integer
+                              description: |
+                                The number of replies in the topic, which is the
+                                number of messages after the first one.
+                            hidden_reply_sender_ids:
+                              type: array
+                              items:
+                                type: integer
+                              description: |
+                                The IDs of up to three users who wrote replies that
+                                are not among the returned latest replies, the user
+                                with the most recent such reply first.
+                            hidden_reply_sender_count:
+                              type: integer
+                              description: |
+                                The number of different users who wrote replies that
+                                are not among the returned latest replies.
+                      messages:
+                        type: array
+                        description: |
+                          An array of `message` objects, sorted by ID, in the same
+                          format as in [`GET /messages`](/api/get-messages): each
+                          topic's first message, followed by its latest replies.
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/MessagesBase"
+                            - additionalProperties: false
+                              properties:
+                                avatar_url:
+                                  nullable: true
+                                client: {}
+                                content: {}
+                                content_type: {}
+                                display_recipient: {}
+                                edit_history: {}
+                                id: {}
+                                is_me_message: {}
+                                last_edit_timestamp: {}
+                                last_moved_timestamp: {}
+                                reactions: {}
+                                recipient_id: {}
+                                sender_email: {}
+                                sender_full_name: {}
+                                sender_id: {}
+                                sender_realm_str: {}
+                                stream_id: {}
+                                subject: {}
+                                submessages: {}
+                                timestamp: {}
+                                topic_links: {}
+                                type: {}
+                                flags:
+                                  type: array
+                                  description: |
+                                    The user's [message flags][message-flags] for the message.
+
+                                    [message-flags]: /api/update-message-flags#available-flags
+                                  items:
+                                    type: string
+                      found_oldest:
+                        type: boolean
+                        description: |
+                          Whether the channel has no topics older than the ones
+                          returned.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "found_oldest": true,
+                        "topic_cards":
+                          [
+                            {
+                              "topic_name": "release",
+                              "max_id": 42,
+                              "first_message_id": 37,
+                              "reply_count": 1,
+                              "hidden_reply_sender_ids": [],
+                              "hidden_reply_sender_count": 0,
+                            },
+                          ],
+                        "messages":
+                          [
+                            {
+                              "subject": "release",
+                              "stream_id": 5,
+                              "sender_realm_str": "zulip",
+                              "type": "stream",
+                              "content": "<p>When do we ship the next release?</p>",
+                              "flags": ["read"],
+                              "id": 37,
+                              "display_recipient": "Verona",
+                              "content_type": "text/html",
+                              "is_me_message": false,
+                              "timestamp": 1527939746,
+                              "sender_id": 4,
+                              "sender_full_name": "King Hamlet",
+                              "recipient_id": 20,
+                              "topic_links": [],
+                              "client": "website",
+                              "avatar_url": "https://secure.gravatar.com/avatar/6d8cad0fd00256e7b40691d27ddfd466?d=identicon&version=1",
+                              "submessages": [],
+                              "sender_email": "hamlet@zulip.com",
+                              "reactions": [],
+                            },
+                            {
+                              "subject": "release",
+                              "stream_id": 5,
+                              "sender_realm_str": "zulip",
+                              "type": "stream",
+                              "content": "<p>On Friday.</p>",
+                              "flags": ["read"],
+                              "id": 42,
+                              "display_recipient": "Verona",
+                              "content_type": "text/html",
+                              "is_me_message": false,
+                              "timestamp": 1527939812,
+                              "sender_id": 11,
+                              "sender_full_name": "Iago",
+                              "recipient_id": 20,
+                              "topic_links": [],
+                              "client": "website",
+                              "avatar_url": "https://secure.gravatar.com/avatar/af4f06322c177ef4e1e9b2c424986b54?d=identicon&version=1",
+                              "submessages": [],
+                              "sender_email": "iago@zulip.com",
+                              "reactions": [],
+                            },
+                          ],
+                      }
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - allOf:
+                      - $ref: "#/components/schemas/InvalidChannelError"
+                      - description: |
+                          An example JSON response for when the channel does not
+                          exist, or is a private channel the user has no access to:
+                  - allOf:
+                      - $ref: "#/components/schemas/CodedError"
+                      - example:
+                          {
+                            "code": "BAD_REQUEST",
+                            "msg": "Too many topics requested (maximum 100).",
+                            "result": "error",
+                          }
+                        description: |
+                          An example JSON response for when more than 100 topics
+                          are requested:
   /streams/{stream_id}/delete_topic:
     post:
       operationId: delete-topic

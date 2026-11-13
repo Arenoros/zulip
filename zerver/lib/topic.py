@@ -19,6 +19,7 @@ from django.db.models import (
 from django.db.models.functions import Cast
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
+from psycopg2.sql import SQL, Composable
 
 from zerver.lib.types import EditHistoryEvent, StreamMessageEditRequest
 from zerver.lib.utils import assert_is_not_none
@@ -338,6 +339,153 @@ def get_topic_history_for_stream(
     cursor.close()
 
     return generate_topic_history_from_db_rows(rows, allow_empty_topic_name)
+
+
+# A topic card shows up to this many of the most recent authors of
+# the replies it leaves out.
+MAX_HIDDEN_REPLY_SENDERS_PER_TOPIC_CARD = 3
+
+
+def get_topic_cards(
+    *,
+    realm_id: int,
+    recipient_id: int,
+    user_profile: UserProfile | None,
+    public_history: bool,
+    first_visible_message_id: int,
+    anchor: int | None,
+    num_topics: int,
+    num_replies: int,
+    allow_empty_topic_name: bool,
+) -> tuple[list[dict[str, Any]], list[int], bool]:
+    """Returns the topic cards for a page of a channel's topics, the
+    topic with the most recent message first; the IDs of the messages
+    the cards show, which are each topic's first message and its
+    latest replies; and whether there are no older topics.
+
+    Only messages the user can access count, so in a channel with
+    protected history, a topic's first message is the earliest one
+    the user received. Topic names are compared case-insensitively,
+    and a card uses the most recent spelling.
+    """
+    if public_history:
+        message_source: Composable = SQL("zerver_message AS m")
+    else:
+        assert user_profile is not None
+        message_source = SQL(
+            """
+            zerver_message AS m
+            JOIN zerver_usermessage AS um ON (
+                um.message_id = m.id AND um.user_profile_id = %(user_profile_id)s
+            )
+            """
+        )
+    anchor_condition = SQL("HAVING max(m.id) < %(anchor)s") if anchor is not None else SQL("")
+    params = dict(
+        realm_id=realm_id,
+        recipient_id=recipient_id,
+        user_profile_id=None if user_profile is None else user_profile.id,
+        first_visible_message_id=first_visible_message_id,
+        anchor=anchor,
+        # One extra topic tells us whether older topics exist.
+        limit=num_topics + 1,
+        num_replies=num_replies,
+    )
+
+    # Finds each topic's latest message by grouping, which is much
+    # faster than sorting the channel's messages, and then reads the
+    # topic's most recent spelling from that message.
+    topics_query = SQL(
+        """
+        SELECT upper(latest.subject), latest.subject, latest.id
+        FROM (
+            SELECT max(m.id) AS max_id
+            FROM {message_source}
+            WHERE m.realm_id = %(realm_id)s
+                AND m.recipient_id = %(recipient_id)s
+                AND m.is_channel_message
+                AND m.id >= %(first_visible_message_id)s
+            GROUP BY upper(m.subject)
+            {anchor_condition}
+            ORDER BY max_id DESC
+            LIMIT %(limit)s
+        ) AS latest_message_per_topic
+        JOIN zerver_message AS latest ON latest.id = latest_message_per_topic.max_id
+        ORDER BY latest.id DESC
+        """
+    ).format(message_source=message_source, anchor_condition=anchor_condition)
+
+    # For the chosen topics, returns the messages a card shows, with
+    # the topic's first message and size, and then each author of the
+    # replies the card leaves out, with their latest such reply.
+    details_query = SQL(
+        """
+        WITH topic_messages AS (
+            SELECT
+                m.id,
+                m.sender_id,
+                upper(m.subject) AS topic_key,
+                row_number() OVER (PARTITION BY upper(m.subject) ORDER BY m.id DESC) AS recency,
+                min(m.id) OVER (PARTITION BY upper(m.subject)) AS first_id,
+                count(*) OVER (PARTITION BY upper(m.subject)) AS message_count
+            FROM {message_source}
+            WHERE m.realm_id = %(realm_id)s
+                AND m.recipient_id = %(recipient_id)s
+                AND m.is_channel_message
+                AND m.id >= %(first_visible_message_id)s
+                AND upper(m.subject) = ANY(%(topic_keys)s)
+        )
+        SELECT TRUE AS is_shown, topic_key, id, first_id, message_count, NULL AS sender_id
+        FROM topic_messages
+        WHERE recency <= %(num_replies)s OR id = first_id
+        UNION ALL
+        SELECT FALSE AS is_shown, topic_key, max(id), NULL, NULL, sender_id
+        FROM topic_messages
+        WHERE recency > %(num_replies)s AND id != first_id
+        GROUP BY topic_key, sender_id
+        """
+    ).format(message_source=message_source)
+
+    with connection.cursor() as cursor:
+        cursor.execute(topics_query, params)
+        topic_rows = cursor.fetchall()
+        found_oldest = len(topic_rows) <= num_topics
+        topic_rows = topic_rows[:num_topics]
+        if not topic_rows:
+            return [], [], found_oldest
+
+        cards: dict[str, dict[str, Any]] = {}
+        for topic_key, topic_name, max_id in topic_rows:
+            if topic_name == "" and not allow_empty_topic_name:
+                topic_name = Message.EMPTY_TOPIC_FALLBACK_NAME
+            cards[topic_key] = dict(
+                topic_name=topic_name,
+                max_id=max_id,
+                hidden_reply_sender_ids=[],
+                hidden_reply_sender_count=0,
+            )
+
+        cursor.execute(details_query, {**params, "topic_keys": list(cards)})
+        detail_rows = cursor.fetchall()
+
+    shown_message_ids: list[int] = []
+    hidden_reply_senders: dict[str, list[tuple[int, int]]] = {}
+    for is_shown, topic_key, message_id, first_id, message_count, sender_id in detail_rows:
+        if is_shown:
+            shown_message_ids.append(message_id)
+            cards[topic_key]["first_message_id"] = first_id
+            cards[topic_key]["reply_count"] = message_count - 1
+        else:
+            hidden_reply_senders.setdefault(topic_key, []).append((message_id, sender_id))
+
+    for topic_key, senders in hidden_reply_senders.items():
+        senders.sort(reverse=True)
+        cards[topic_key]["hidden_reply_sender_ids"] = [
+            sender_id for _, sender_id in senders[:MAX_HIDDEN_REPLY_SENDERS_PER_TOPIC_CARD]
+        ]
+        cards[topic_key]["hidden_reply_sender_count"] = len(senders)
+
+    return list(cards.values()), sorted(shown_message_ids), found_oldest
 
 
 def get_topic_resolution_and_bare_name(stored_name: str) -> tuple[bool, str]:
