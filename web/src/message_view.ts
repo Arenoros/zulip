@@ -54,6 +54,7 @@ import * as popup_banners from "./popup_banners.ts";
 import * as recent_view_ui from "./recent_view_ui.ts";
 import * as recent_view_util from "./recent_view_util.ts";
 import * as resize from "./resize.ts";
+import * as rows from "./rows.ts";
 import * as scheduled_messages_feed_ui from "./scheduled_messages_feed_ui.ts";
 import * as scroll_to_bottom_button from "./scroll_to_bottom_button.ts";
 import {
@@ -1130,6 +1131,17 @@ function navigate_to_anchor_message(opts: {
 export function fast_track_current_msg_list_to_anchor(anchor: string, anchor_date?: string): void {
     assert(message_lists.current !== undefined);
     if (message_lists.current.visibly_empty()) {
+        return;
+    }
+
+    if (message_lists.current.is_conversations_view) {
+        // Topic cards are all rendered, and ordered by activity
+        // rather than by message ID, so we go to the first or last
+        // message shown.
+        const $row = anchor === "newest" ? rows.last_visible() : rows.first_visible();
+        if ($row.length > 0) {
+            message_lists.current.select_id(rows.id($row), {then_scroll: true});
+        }
         return;
     }
 

@@ -647,7 +647,14 @@ export function load_topic_cards(opts: {msg_list: MessageList; cont?: () => void
             // Each page of cards is complete in itself, though not
             // contiguous with the messages already in the list.
             const is_contiguous_history = true;
-            msg_list.add_messages(messages, {}, is_contiguous_history);
+            if (msg_list.data.empty()) {
+                // The caller renders the first page, scrolled to the most
+                // recently active topic. Rendering it here first would
+                // show the oldest cards for a moment, and read them.
+                msg_list.data.add_messages(messages, is_contiguous_history);
+            } else {
+                msg_list.add_messages(messages, {}, is_contiguous_history);
+            }
             if (
                 msg_list === message_lists.current &&
                 msg_list.visibly_empty() &&

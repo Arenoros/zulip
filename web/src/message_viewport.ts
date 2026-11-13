@@ -373,6 +373,20 @@ export function visible_groups(require_fully_visible: boolean): HTMLElement[] {
     );
 }
 
+// All messages whose rows are on screen, wherever the selected
+// message is.
+export function messages_on_screen(): Message[] {
+    assert(message_lists.current !== undefined);
+    const msg_list = message_lists.current;
+    const top = top_of_feed.get();
+    const bottom = bottom_of_feed.get();
+    return msg_list.view.$list
+        .find(".message_row")
+        .get()
+        .filter((row) => in_viewport_or_tall(row.getBoundingClientRect(), top, bottom, true))
+        .flatMap((row) => msg_list.get(rows.id($(row))) ?? []);
+}
+
 export function visible_messages(require_fully_visible: boolean): Message[] {
     assert(message_lists.current !== undefined);
     const $selected_row = message_lists.current.selected_row();

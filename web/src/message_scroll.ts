@@ -115,6 +115,19 @@ export function initialize(): void {
             return;
         }
 
+        if (event.msg_list.is_conversations_view) {
+            // Topic cards are not in message ID order, so a range of
+            // IDs is not what the user moved past. Instead, we mark
+            // the messages on screen as read once the selection has
+            // scrolled into view.
+            if (event.mark_read) {
+                setTimeout(() => {
+                    unread_ops.process_visible();
+                }, 0);
+            }
+            return;
+        }
+
         if (event.mark_read && event.previously_selected_id !== -1) {
             // Mark messages between old pointer and new pointer as read
             if (event.id < event.previously_selected_id) {

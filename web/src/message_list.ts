@@ -14,6 +14,7 @@ import * as message_viewport from "./message_viewport.ts";
 import * as narrow_banner from "./narrow_banner.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
+import * as rows from "./rows.ts";
 import {web_mark_read_on_scroll_policy_values} from "./settings_config.ts";
 import * as stream_data from "./stream_data.ts";
 import * as unread from "./unread.ts";
@@ -360,14 +361,27 @@ export class MessageList {
     }
 
     prev(): number | undefined {
+        if (this.is_conversations_view) {
+            // Topic cards are ordered by activity rather than by
+            // message ID, so we move in the order shown.
+            const $prev_row = rows.prev_visible(this.selected_row());
+            return $prev_row.length > 0 ? rows.id($prev_row) : undefined;
+        }
         return this.data.prev();
     }
 
     next(): number | undefined {
+        if (this.is_conversations_view) {
+            const $next_row = rows.next_visible(this.selected_row());
+            return $next_row.length > 0 ? rows.id($next_row) : undefined;
+        }
         return this.data.next();
     }
 
     is_at_end(): boolean {
+        if (this.is_conversations_view) {
+            return this.selected_id() !== -1 && this.next() === undefined;
+        }
         return this.data.is_at_end();
     }
 

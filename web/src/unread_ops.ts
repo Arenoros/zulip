@@ -840,6 +840,18 @@ function process_scrolled_to_bottom(): void {
 // If we ever materially change the algorithm for this function, we
 // may need to update message_notifications.received_messages as well.
 export function process_visible(): void {
+    if (message_lists.current?.is_conversations_view) {
+        // Topic cards are ordered by activity, so reaching the bottom
+        // of the view does not mean having read the cards above it;
+        // we mark the messages on screen as read instead.
+        if (
+            message_viewport.viewport_is_visible_and_focused() &&
+            message_lists.current.can_mark_messages_read()
+        ) {
+            notify_server_messages_read(message_viewport.messages_on_screen());
+        }
+        return;
+    }
     if (
         message_lists.current !== undefined &&
         message_viewport.viewport_is_visible_and_focused() &&
