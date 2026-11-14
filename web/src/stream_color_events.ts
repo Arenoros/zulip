@@ -18,8 +18,12 @@ function update_table_message_recipient_stream_color(
     for (const label of $stream_labels) {
         const $label = $(label);
         if ($label.text().trim() === stream_name) {
+            // Conversation fragments show the channel's color in
+            // their channel icon rather than as their background.
             $label
-                .closest(".message_header_stream .message-header-contents")
+                .closest(
+                    ".message_header_stream:not(.conversation-fragment-header) .message-header-contents",
+                )
                 .css({background: recipient_bar_color});
         }
     }

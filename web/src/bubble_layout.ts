@@ -32,6 +32,12 @@ export function is_open_conversation(filter: Filter): boolean {
     );
 }
 
+// A view that gathers messages from more than one conversation shows
+// each conversation's consecutive messages as a conversation fragment.
+export function is_mixed_view(filter: Filter): boolean {
+    return !filter.is_conversation_view();
+}
+
 // The chat layout shows a single conversation as a chat: messages in
 // series broken by pauses, a date divider at the start of each day,
 // and a divider where unread messages start, without recipient bars.

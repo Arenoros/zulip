@@ -16,6 +16,14 @@ export function update_stream_recipient_color($stream_header: JQuery, color?: st
             return;
         }
         const stream_color = color ?? stream_data.get_color(stream_id);
+
+        // Conversation fragments show the channel's color in their
+        // channel icon rather than as their background.
+        if ($stream_header.hasClass("conversation-fragment-header")) {
+            $stream_header.find(".conversation-fragment-channel-icon").css("color", stream_color);
+            return;
+        }
+
         const recipient_bar_color = get_recipient_bar_color(stream_color);
 
         const $stream_privacy_icon = $stream_header.find(".stream-privacy");

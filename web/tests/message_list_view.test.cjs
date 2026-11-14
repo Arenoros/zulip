@@ -1393,6 +1393,74 @@ test("date dividers in the bubble layout", ({override}) => {
     );
 });
 
+test("conversation fragments in mixed views", () => {
+    // In a view of more than one conversation, each group is a
+    // conversation fragment, with a date divider above it where its
+    // first message is from another day than the message before it.
+    const day = 24 * 60;
+    function dm_to(user_id, minutes) {
+        return {
+            ...bubble_test_dm_at(minutes),
+            to_user_ids: String(user_id),
+            display_recipient: [{id: user_id, email: "user@example.com", full_name: "User"}],
+        };
+    }
+    function make_view(terms) {
+        const list = new message_list.MessageList({
+            data: new MessageListData({excludes_muted_topics: false, filter: new Filter(terms)}),
+            is_node_test: true,
+        });
+        return list.view;
+    }
+    function dividers(view) {
+        return view._message_groups.map((group) => group.fragment_date_divider_html);
+    }
+    function date_html(minutes) {
+        return String((bubble_test_ten_am + minutes * 60) * 1000);
+    }
+    const dm_feed = [{operator: "is", operand: "dm"}];
+
+    let view = make_view(dm_feed);
+    assert.ok(view.is_mixed_view());
+    view._message_groups = view.build_message_groups([dm_to(5, 0), dm_to(6, 1), dm_to(5, day)]);
+    assert.ok(view._message_groups.every((group) => group.is_conversation_fragment));
+    assert.deepEqual(dividers(view), [date_html(0), undefined, date_html(day)]);
+
+    // Appended fragments compare with the last message shown.
+    view.merge_message_groups(view.build_message_groups([dm_to(6, day + 1)]), "bottom");
+    view.merge_message_groups(view.build_message_groups([dm_to(5, 2 * day)]), "bottom");
+    assert.deepEqual(dividers(view), [
+        date_html(0),
+        undefined,
+        date_html(day),
+        undefined,
+        date_html(2 * day),
+    ]);
+
+    // The old first fragment loses its divider when older messages
+    // from the same day are shown above it, and is rerendered.
+    view = make_view(dm_feed);
+    view._message_groups = view.build_message_groups([dm_to(5, day)]);
+    const old_first_group = view._message_groups[0];
+    let result = view.merge_message_groups(view.build_message_groups([dm_to(6, day - 1)]), "top");
+    assert.deepEqual(dividers(view), [date_html(day - 1), undefined]);
+    assert.deepEqual(result.rerender_groups, [old_first_group]);
+    result = view.merge_message_groups(view.build_message_groups([dm_to(5, 0)]), "top");
+    assert.deepEqual(dividers(view), [date_html(0), date_html(day - 1), undefined]);
+    assert.equal(result.rerender_groups.length, 1);
+
+    // A single conversation and the conversations view are not
+    // mixed views.
+    view = make_view([{operator: "dm", operand: [5]}]);
+    assert.ok(!view.is_mixed_view());
+    view._message_groups = view.build_message_groups([dm_to(5, 0)]);
+    assert.equal(view._message_groups[0].is_conversation_fragment, undefined);
+    view = make_view([{operator: "channel", operand: "101"}]);
+    assert.ok(view.is_mixed_view());
+    view.list.is_conversations_view = true;
+    assert.ok(!view.is_mixed_view());
+});
+
 test("edited notices in the bubble layout", ({override}) => {
     // Bubbles have the edited notice next to them, also at the start
     // of a series; /me messages keep theirs.

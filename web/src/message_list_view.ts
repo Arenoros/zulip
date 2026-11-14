@@ -109,6 +109,10 @@ export type MessageGroup = {
     date_html: string;
     date_unchanged: boolean;
     is_topic_card?: boolean;
+    // In a mixed view, each group is a conversation fragment, with
+    // the date in a divider above it rather than in its header.
+    is_conversation_fragment?: boolean;
+    fragment_date_divider_html?: string | undefined;
     message_containers: MessageContainer[];
     message_group_id: string;
 } & (
@@ -126,6 +130,7 @@ export type MessageGroup = {
           stream_id: number;
           stream_name?: string;
           stream_privacy_icon_color: string;
+          channel_color: string;
           stream_url: string;
           is_archived: boolean;
           subscribed?: boolean;
@@ -148,6 +153,7 @@ export type MessageGroup = {
           recipient_users: RecipientRowUser[];
           always_display_date: boolean;
           is_dm_with_self: boolean;
+          is_group_direct_message: boolean;
       }
 );
 
@@ -219,6 +225,18 @@ function update_group_date(group: MessageGroup, message: Message, prev: Message 
 
 function clear_group_date(group: MessageGroup): void {
     group.date_unchanged = false;
+}
+
+// A conversation fragment has a date divider above it if its first
+// message is from a different day than the message before it.
+function update_fragment_date_divider(
+    group: MessageGroup,
+    first_message: Message,
+    prev_message: Message | undefined,
+): void {
+    group.fragment_date_divider_html = same_day(prev_message, first_message)
+        ? undefined
+        : get_group_display_date(first_message, !same_year(prev_message, first_message));
 }
 
 function clear_message_divider(message_container: MessageContainer): void {
@@ -479,6 +497,7 @@ export function populate_group_from_message(
             is_empty_string_topic: topic === "",
             recipient_bar_color: stream_color.get_recipient_bar_color(sub.color),
             stream_privacy_icon_color: stream_color.get_stream_privacy_icon_color(sub.color),
+            channel_color: sub.color,
             invite_only: sub.invite_only,
             is_web_public: sub.is_web_public,
             match_topic_html: util.get_match_topic(message),
@@ -517,6 +536,7 @@ export function populate_group_from_message(
         pm_with_url: message.pm_with_url,
         recipient_users: get_users_for_recipient_row(message),
         is_dm_with_self: people.is_direct_message_conversation_with_self(user_ids),
+        is_group_direct_message: user_ids.length > 1,
         display_reply_to_for_tooltip: message_store.get_pm_full_names(user_ids),
         always_display_date,
     };
@@ -702,6 +722,12 @@ export class MessageListView {
 
     is_open_conversation(): boolean {
         return bubble_layout.is_open_conversation(this.list.data.filter);
+    }
+
+    is_mixed_view(): boolean {
+        return (
+            !this.list.is_conversations_view && bubble_layout.is_mixed_view(this.list.data.filter)
+        );
     }
 
     // The topic's first message, once loaded, which an open
@@ -1193,6 +1219,7 @@ export class MessageListView {
 
         let prev_message_container: MessageContainer | undefined;
         const chat_layout = this.is_chat_layout();
+        const mixed_view = this.is_mixed_view();
         // A topic card shows the sender of every message, and dates
         // next to the time rather than as dividers.
         const topic_cards_layout = this.list.is_conversations_view;
@@ -1215,6 +1242,10 @@ export class MessageListView {
                 same_day(message_for_next_group, prev_message),
                 !same_year(message_for_next_group, prev_message),
             );
+            if (mixed_view) {
+                current_group.is_conversation_fragment = true;
+                update_fragment_date_divider(current_group, message_for_next_group, prev_message);
+            }
         };
 
         const finish_group = (): void => {
@@ -1444,6 +1475,15 @@ export class MessageListView {
                 this._message_groups.unshift(first_group);
 
                 new_message_groups = new_message_groups.slice(0, -1);
+            } else if (second_group.is_conversation_fragment) {
+                // The old first fragment now has a message before it,
+                // which decides whether it keeps its date divider.
+                update_fragment_date_divider(
+                    second_group,
+                    curr_msg_container.msg,
+                    prev_msg_container?.msg,
+                );
+                message_actions.rerender_groups.push(second_group);
             } else if (
                 !same_day(
                     second_group.message_containers[0]?.msg,
@@ -1469,6 +1509,13 @@ export class MessageListView {
                 message_actions.append_messages = new_message_groups[0]!.message_containers;
                 new_message_groups = new_message_groups.slice(1);
             } else if (first_group !== undefined && second_group !== undefined) {
+                if (second_group.is_conversation_fragment) {
+                    update_fragment_date_divider(
+                        second_group,
+                        curr_msg_container.msg,
+                        prev_msg_container?.msg,
+                    );
+                }
                 if (same_day(prev_msg_container?.msg, curr_msg_container.msg)) {
                     clear_group_date(second_group);
                 } else {
@@ -2630,6 +2677,7 @@ export class MessageListView {
         this.$list.toggleClass("chat-layout", this.is_chat_layout());
         this.$list.toggleClass("bubble-layout", this.is_bubble_layout());
         this.$list.toggleClass("open-conversation", this.is_open_conversation());
+        this.$list.toggleClass("mixed-view", this.is_mixed_view());
         // Rerendering follows changes such as deleted or moved
         // messages, which change the number of replies.
         this.open_conversation_reply_count_requested = false;

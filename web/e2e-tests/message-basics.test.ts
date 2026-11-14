@@ -23,13 +23,13 @@ async function expect_home(page: Page): Promise<void> {
         ["Verona > other topic", ["verona other topic c"]],
         ["Denmark > test", ["denmark message"]],
         [
-            "You and Cordelia, Lear's daughter, King Hamlet",
+            "Group chat > Cordelia, Lear's daughter, King Hamlet",
             ["group direct message a", "group direct message b"],
         ],
-        ["You and Cordelia, Lear's daughter", ["direct message c"]],
+        ["Direct messages > Cordelia, Lear's daughter", ["direct message c"]],
         ["Verona > test", ["verona test d"]],
-        ["You and Cordelia, Lear's daughter, King Hamlet", ["group direct message d"]],
-        ["You and Cordelia, Lear's daughter", ["direct message e"]],
+        ["Group chat > Cordelia, Lear's daughter, King Hamlet", ["group direct message d"]],
+        ["Direct messages > Cordelia, Lear's daughter", ["direct message e"]],
     ]);
 }
 
@@ -267,12 +267,12 @@ async function expect_all_direct_messages(page: Page): Promise<void> {
     });
     await common.check_messages_sent(page, message_list_id, [
         [
-            "You and Cordelia, Lear's daughter, King Hamlet",
+            "Group chat > Cordelia, Lear's daughter, King Hamlet",
             ["group direct message a", "group direct message b"],
         ],
-        ["You and Cordelia, Lear's daughter", ["direct message c"]],
-        ["You and Cordelia, Lear's daughter, King Hamlet", ["group direct message d"]],
-        ["You and Cordelia, Lear's daughter", ["direct message e"]],
+        ["Direct messages > Cordelia, Lear's daughter", ["direct message c"]],
+        ["Group chat > Cordelia, Lear's daughter, King Hamlet", ["group direct message d"]],
+        ["Direct messages > Cordelia, Lear's daughter", ["direct message e"]],
     ]);
     assert.strictEqual(
         await common.get_text_from_selector(page, "#new_conversation_button"),

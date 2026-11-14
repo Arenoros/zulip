@@ -521,7 +521,10 @@ export function initialize(): void {
         e.stopPropagation();
 
         assert(message_lists.current !== undefined);
-        if ($(this).hasClass("recipient_row_date")) {
+        if (
+            $(this).hasClass("recipient_row_date") ||
+            $(this).closest(".conversation-fragment-date-divider").length > 0
+        ) {
             const $recipient_row = $(this).closest(".recipient_row");
             const message_id = rows.id_for_recipient_row($recipient_row);
             open_scroll_to_time_popover(this, message_id);

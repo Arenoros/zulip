@@ -30,31 +30,6 @@
             "message_unread_marker         messagebox" auto / 2px minmax(0, 1fr);
     }
 
-    .message_feed_divider {
-        grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
-
-        &::after {
-            display: block;
-            grid-area: right_divider_content;
-            content: " ";
-            height: 0;
-            border-bottom: 1px solid
-                var(--color-border-message-group-spacer-line);
-        }
-
-        .date-divider-content {
-            grid-area: middle_divider_content;
-            text-transform: none;
-            letter-spacing: normal;
-            color: var(--color-text-message-bubble-caption);
-
-            &::before,
-            &::after {
-                display: none;
-            }
-        }
-    }
-
     .new-messages-divider {
         grid-area: new_messages_divider;
         display: grid;
@@ -84,5 +59,31 @@
        the messages below don't move. */
     .message_row:not(.unread) .new-messages-divider {
         opacity: 0;
+    }
+}
+
+/* Date dividers sit in the middle of the feed, both in the chat
+   layout and in mixed views. */
+.message-list:is(.chat-layout, .mixed-view) .message_feed_divider {
+    grid-template-columns: minmax(20px, 1fr) auto minmax(20px, 1fr);
+
+    &::after {
+        display: block;
+        grid-area: right_divider_content;
+        content: " ";
+        height: 0;
+        border-bottom: 1px solid var(--color-border-message-group-spacer-line);
+    }
+
+    .date-divider-content {
+        grid-area: middle_divider_content;
+        text-transform: none;
+        letter-spacing: normal;
+        color: var(--color-text-message-bubble-caption);
+
+        &::before,
+        &::after {
+            display: none;
+        }
     }
 }

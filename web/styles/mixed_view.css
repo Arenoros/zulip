@@ -1,0 +1,140 @@
+/* A mixed view gathers messages from more than one conversation.
+   Each conversation fragment is a card whose header names the
+   conversation, with a link to open it on the right and Zulip's
+   topic actions next to the link on hover. The date is shown in a
+   divider above a card whose date differs from the card above. */
+.message-list.mixed-view {
+    --color-message-list-border: var(--color-border-topic-card);
+    --color-background-stream-message-content: var(
+        --color-background-topic-card
+    );
+    --color-background-private-message-content: var(
+        --color-background-topic-card
+    );
+    --last-message-row-border-radius: 0 0 8px 8px;
+
+    .conversation-fragment-date-divider {
+        /* 12px at 15px/1em */
+        padding: 0.8em 0 0;
+    }
+
+    .conversation-fragment-header {
+        .message-header-contents {
+            /* The header's text is the size of message text. */
+            font-size: 1em;
+            /* 36px at 15px/1em */
+            height: 2.4em;
+            border-color: var(--color-border-topic-card);
+            border-radius: 8px 8px 0 0;
+            background-color: var(--color-background-topic-card);
+        }
+
+        .stream_label {
+            /* 8px at 15px/1em */
+            gap: 0.5333em;
+            /* 12px at 15px/1em */
+            padding-left: 0.8em;
+            font-weight: 400;
+        }
+
+        .recipient_row_date {
+            display: none;
+        }
+    }
+
+    .message_header_stream.conversation-fragment-header {
+        .message-header-contents {
+            grid-template-areas: "stream-label separator topic controls open error date";
+            grid-template-columns:
+                minmax(0, max-content) 1em minmax(0, max-content)
+                1fr auto auto auto;
+        }
+
+        .stream_topic .message_label_clickable {
+            font-weight: 700;
+        }
+
+        .recipient_bar_controls {
+            justify-content: flex-end;
+            min-width: 0;
+        }
+    }
+
+    .message_header_private_message.conversation-fragment-header {
+        .message-header-contents {
+            grid-template-areas: "stream-label open error date";
+            grid-template-columns: minmax(0, 1fr) auto auto auto;
+        }
+
+        .message_label_clickable {
+            align-items: center;
+            height: auto;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        .private_message_header_icon {
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .conversation-fragment-kind {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .private_message_header_name {
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    }
+
+    .conversation-fragment-separator {
+        display: flex;
+        flex-shrink: 0;
+        line-height: 0;
+        color: var(--color-message-header-icon-non-interactive);
+    }
+
+    /* The square takes the channel's color as its text color. */
+    .conversation-fragment-channel-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        /* 16px at 15px/1em */
+        width: 1.0667em;
+        height: 1.0667em;
+        border-radius: 4px;
+        background-color: currentcolor;
+
+        .zulip-icon {
+            position: static;
+            /* 10px at 15px/1em */
+            font-size: 0.6667em;
+            color: hsl(0deg 0% 100%);
+        }
+    }
+
+    .conversation-fragment-open {
+        grid-area: open;
+        align-self: center;
+        /* 12px at 15px/1em */
+        padding: 0 0.8em;
+        /* 14px at 15px/1em */
+        font-size: 0.9333em;
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--color-link-message-bubble);
+        text-decoration: none;
+
+        &:hover,
+        &:focus-visible {
+            color: var(--color-link-message-bubble);
+            text-decoration: underline;
+        }
+    }
+}

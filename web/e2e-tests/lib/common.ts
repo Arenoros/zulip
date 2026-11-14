@@ -491,8 +491,12 @@ export async function send_multiple_messages(page: Page, msgs: Message[]): Promi
  * This method returns a array, which is formatted as:
  *  [
  *    ['stream > topic', ['message 1', 'message 2']],
- *    ['You and Cordelia, Lear's daughter', ['message 1', 'message 2']]
+ *    ['You and Cordelia, Lear's daughter', ['message 1', 'message 2']],
+ *    ['Direct messages > Cordelia, Lear's daughter', ['message 1']]
  *  ]
+ *
+ * The last form is the header of a conversation fragment in a view
+ * of more than one conversation.
  *
  * The messages are sorted chronologically.
  */
@@ -506,7 +510,11 @@ export async function get_rendered_messages(
     return Promise.all(
         recipient_rows.map(async (element): Promise<[string, string[]]> => {
             const stream_label = await element.$(".stream_label");
-            const stream_name = (await get_element_text(stream_label!)).trim();
+            // A conversation fragment's header lays out the kind of
+            // conversation and the names on separate lines.
+            const stream_name = (await get_element_text(stream_label!))
+                .replaceAll(/\s+/g, " ")
+                .trim();
             const topic_label = await element.$(".stream_topic a");
             const topic_name =
                 topic_label === null ? "" : (await get_element_text(topic_label)).trim();

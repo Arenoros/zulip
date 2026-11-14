@@ -56,7 +56,9 @@ function construct_recipient_header($message_row: JQuery): JQuery {
     const date_text = $header.find(".recipient_row_date").text().trim();
 
     const $header_without_date = $header.clone();
-    $header_without_date.find(".recipient_row_date").remove();
+    // A conversation fragment's link to its conversation is not part
+    // of the recipient either.
+    $header_without_date.find(".recipient_row_date, .conversation-fragment-open").remove();
     const recipient_text = $header_without_date.text().replaceAll(/\s+/g, " ").trim();
 
     return $(render_copied_recipient_header({recipient_text, date_text}));
