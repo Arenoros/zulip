@@ -8,6 +8,7 @@ import * as message_lists from "./message_lists.ts";
 import * as message_store from "./message_store.ts";
 import type {Message} from "./message_store.ts";
 import * as narrow_state from "./narrow_state.ts";
+import * as search_filters from "./search_filters.ts";
 import * as unread_ops from "./unread_ops.ts";
 import * as util from "./util.ts";
 
@@ -81,6 +82,9 @@ export function maybe_add_narrowed_messages(
             // they don't match the filter as per data from server.
             msg_list.remove_and_rerender(elsewhere_messages.map((msg) => msg.id));
             msg_list.add_messages(new_messages, {messages_are_new});
+            if (new_messages.length > 0) {
+                search_filters.update_counts();
+            }
             unread_ops.process_visible();
             compose_notifications.notify_messages_outside_current_search(elsewhere_messages);
         },
