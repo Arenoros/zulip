@@ -12,6 +12,10 @@
         --color-background-topic-card
     );
     --last-message-row-border-radius: 0 0 8px 8px;
+    /* 32px at 15px/1em */
+    --message-box-avatar-width: 2.1333em;
+    --message-box-avatar-height: var(--message-box-avatar-width);
+    --color-message-star-action: var(--color-message-bubble-star);
 
     .conversation-fragment-date-divider {
         /* 12px at 15px/1em */
@@ -137,4 +141,76 @@
             text-decoration: underline;
         }
     }
+
+    /* Each message series starts with the sender's name, the time
+       and, for a starred message, its star; the time of the other
+       messages in the series shows on hover. The star among the
+       message controls shows on hover too. */
+    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+        .message-sender-and-time {
+            grid-area: sender;
+            display: flex;
+            align-items: baseline;
+            /* 8px at 15px/1em */
+            gap: 0.5333em;
+            min-width: 0;
+        }
+
+        .message-time {
+            padding-right: 0;
+        }
+
+        &:has(.star_container:not(.empty-star)) .message-starred-indicator {
+            display: inline-block;
+            align-self: center;
+            color: var(--color-message-star-action);
+        }
+
+        .zulip-icon-bot {
+            display: none;
+        }
+
+        .message-sender-bot-label {
+            display: inline-block;
+            /* 6px at 12px/1em */
+            margin-inline-start: 0.5em;
+            /* 0 4px at 12px/1em */
+            padding: 0 0.3333em;
+            line-height: 1.5;
+            border: 1px solid var(--color-border-rendered-markdown-table);
+            border-radius: 4px;
+            /* 12px at 15px/1em */
+            font-size: 0.8em;
+            font-weight: 400;
+            color: var(--color-text-message-bubble-caption);
+        }
+    }
+
+    .messagebox-includes-sender
+        .messagebox:not(:hover)
+        .messagebox-content:not(.is-me-message)
+        .star_container:not(.empty-star) {
+        opacity: 0;
+        visibility: hidden !important;
+    }
+
+    .message_row:not(.messagebox-includes-sender, .selected_message)
+        .messagebox:not(:hover)
+        .message-time {
+        visibility: hidden;
+
+        @media (hover: none) {
+            visibility: visible;
+        }
+    }
+
+    .message_content .user-mention-me {
+        background-color: var(--color-background-self-mention-in-bubble);
+    }
+}
+
+/* Only mixed views show the star of a starred message next to its
+   time. */
+.message-sender-and-time .message-starred-indicator {
+    display: none;
 }

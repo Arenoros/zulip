@@ -7,7 +7,9 @@ import * as common from "./lib/common.ts";
 const message = "test star";
 
 async function stars_count(page: Page): Promise<number> {
-    return (await page.$$(".message-list .zulip-icon-star-filled:not(.empty-star)")).length;
+    // Count the star buttons, since mixed views also show the star of
+    // a starred message next to its time.
+    return (await page.$$(".message-list .star.zulip-icon-star-filled")).length;
 }
 
 async function toggle_test_star_message(page: Page): Promise<void> {
@@ -62,9 +64,15 @@ async function stars_test(page: Page): Promise<void> {
     await toggle_test_star_message(page);
     await page.click("#left-sidebar-navigation-list .top_left_all_messages");
     message_list_id = await common.get_current_msg_list_id(page, true);
-    await page.waitForSelector(
+    // Mixed views keep a hidden star next to the time of each message
+    // that shows its sender, so wait for any visible filled star.
+    await page.waitForFunction(
+        (selector: string) =>
+            [...document.querySelectorAll(selector)].some((star) =>
+                star.checkVisibility({checkVisibilityCSS: true}),
+            ),
+        {},
         `.message-list[data-message-list-id='${message_list_id}'] .zulip-icon-star-filled`,
-        {visible: true},
     );
     assert.strictEqual(
         await stars_count(page),

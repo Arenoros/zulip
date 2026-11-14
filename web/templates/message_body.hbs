@@ -38,6 +38,9 @@
         {{/unless}}
         {{timestr}}
     </a>
+    {{#if include_sender}}
+        <i class="zulip-icon zulip-icon-star-filled message-starred-indicator" aria-hidden="true"></i>
+    {{/if}}
 </span>
 
 {{#if topic_card_title}}
