@@ -225,7 +225,7 @@
     /*
     This is the header, aka the navbar.
     */
-    --header-height: 2.5em; /* 40px at 16px em */
+    --header-height: 3em; /* 48px at 16px em */
     --header-line-height: 40px;
     /*
     At 600px, the header starts taking up more than 5%
@@ -338,8 +338,10 @@
         var(--left-sidebar-max-width)
     );
     --right-sidebar-left-spacing: 5px;
-    /* 50px per icon * 4 icons + 3px space (legacy) = 203px at 20px/1em */
-    --right-column-collapsed-sidebar-width: 10.15em;
+    /* Four navbar buttons, square with the header, + 3px space (legacy). */
+    --right-column-collapsed-sidebar-width: calc(
+        var(--header-height) * 4 + 3px
+    );
     /* 288px at 14px/1em */
     --right-sidebar-max-width: 20.57em;
     /* We open the right sidebar at xl_min at a size of 240px,

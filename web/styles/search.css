@@ -3,7 +3,7 @@
     height: var(--header-height);
 
     .navbar-search {
-        margin: 0.2187em 0; /* 3.5px at 16px em */
+        margin: calc((var(--header-height) - var(--search-box-height)) / 2) 0;
         border-radius: 5px;
         position: absolute;
         overflow: hidden;
