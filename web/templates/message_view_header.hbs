@@ -50,6 +50,11 @@
     </span>
 {{/if}}
 {{/if}}
-{{#if can_start_call}}
-{{> message_view_header_call_buttons}}
+{{#if has_people_button}}
+<span class="message-view-header-buttons">
+    {{#if can_start_call}}
+    {{> message_view_header_call_buttons}}
+    {{/if}}
+    {{> message_view_header_people_button}}
+</span>
 {{/if}}

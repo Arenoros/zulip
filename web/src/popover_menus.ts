@@ -18,6 +18,7 @@ import * as util from "./util.ts";
 type PopoverName =
     | "compose_control_buttons"
     | "compose_plus_menu"
+    | "conversation_people"
     | "starred_messages"
     | "drafts"
     | "left_sidebar_inbox_popover"
@@ -48,6 +49,7 @@ type PopoverName =
 export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     compose_control_buttons: null,
     compose_plus_menu: null,
+    conversation_people: null,
     starred_messages: null,
     drafts: null,
     left_sidebar_inbox_popover: null,

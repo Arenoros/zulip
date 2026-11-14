@@ -88,6 +88,7 @@ type MessageViewHeaderContext = {
     has_view_switcher?: boolean;
     view_switcher_segments?: ViewSwitcherSegment[];
     can_start_call?: boolean;
+    has_people_button?: boolean;
 } & (
     | {
           zulip_icon: string;
@@ -340,6 +341,8 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
             is_spectator: page_params.is_spectator,
         }),
         can_start_call: can_start_call(filter),
+        has_people_button:
+            filter.is_conversation_view() && narrow_state.pm_ids(filter) !== undefined,
         ...get_view_switcher_context(filter),
     };
 
@@ -591,7 +594,9 @@ export function maybe_update_conversation_header(user_id?: number): void {
     if (user_id !== undefined && filter.is_common_narrow()) {
         $("#message_view_header .message-view-header-call-buttons").remove();
         if (can_start_call(filter)) {
-            $("#message_view_header").append($(render_message_view_header_call_buttons()));
+            $("#message_view_header .message-view-header-buttons").prepend(
+                $(render_message_view_header_call_buttons()),
+            );
         }
     }
 }

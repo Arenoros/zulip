@@ -41,6 +41,7 @@ import * as compose_tooltips from "./compose_tooltips.ts";
 import * as compose_validate from "./compose_validate.ts";
 import * as composebox_typeahead from "./composebox_typeahead.ts";
 import * as condense from "./condense.ts";
+import * as conversation_people_popover from "./conversation_people_popover.ts";
 import * as copy_messages from "./copy_messages.ts";
 import * as desktop_integration from "./desktop_integration.ts";
 import * as desktop_notifications from "./desktop_notifications.ts";
@@ -516,6 +517,7 @@ export async function initialize_everything(state_data) {
     message_actions_popover.initialize({message_reminder_click_handler});
     compose_send_menu_popover.initialize();
     compose_plus_menu_popover.initialize();
+    conversation_people_popover.initialize();
 
     realm_user_settings_defaults.initialize(state_data.realm_settings_defaults);
 
