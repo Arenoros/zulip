@@ -76,7 +76,11 @@ from zerver.views.message_edit import (
     json_fetch_raw_message,
     update_message_backend,
 )
-from zerver.views.message_fetch import get_messages_backend, messages_in_narrow_backend
+from zerver.views.message_fetch import (
+    get_message_count_backend,
+    get_messages_backend,
+    messages_in_narrow_backend,
+)
 from zerver.views.message_flags import (
     mark_all_as_read,
     mark_stream_as_read,
@@ -450,6 +454,7 @@ v1_api_and_json_patterns = [
     rest_path("messages/flags/narrow", POST=update_message_flags_for_narrow),
     rest_path("messages/<int:message_id>/history", GET=get_message_edit_history),
     rest_path("messages/matches_narrow", GET=messages_in_narrow_backend),
+    rest_path("messages/count", GET=get_message_count_backend),
     rest_path("users/me/subscriptions/properties", POST=update_subscription_properties_backend),
     rest_path("users/me/subscriptions/<int:stream_id>", PATCH=update_subscriptions_property),
     rest_path("submessage", POST=process_submessage),

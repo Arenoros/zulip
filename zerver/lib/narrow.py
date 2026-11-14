@@ -1503,6 +1503,30 @@ def build_narrow_query(
     )
 
 
+def count_messages_in_narrow(
+    *,
+    narrow: list[NarrowParameter] | None,
+    user_profile: UserProfile,
+    realm: Realm,
+    limit: int,
+) -> int:
+    """The number of messages in a narrow that the user can access,
+    counting no further than limit."""
+    narrow_query = build_narrow_query(
+        narrow=narrow,
+        user_profile=user_profile,
+        realm=realm,
+        is_web_public_query=False,
+    )
+    if narrow_query is None:
+        return 0
+    query = narrow_query.query
+    first_visible_message_id = get_first_visible_message_id(realm)
+    if first_visible_message_id > 0:
+        query = query.filter(id__gte=first_visible_message_id)
+    return query.values("id")[:limit].count()
+
+
 def fetch_messages(
     *,
     narrow: list[NarrowParameter] | None,

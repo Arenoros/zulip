@@ -1313,6 +1313,19 @@ def check_messages_match_narrow(client: Client) -> None:
     validate_against_openapi_schema(result, "/messages/matches_narrow", "get", "200")
 
 
+@openapi_test_function("/messages/count:get")
+def get_message_count(client: Client) -> None:
+    # {code_example|start}
+    # Count the messages in a narrow, here the ones with a link.
+    request = {
+        "narrow": [{"operator": "has", "operand": "link"}],
+    }
+    result = client.call_endpoint(url="messages/count", method="GET", request=request)
+    # {code_example|end}
+    assert_success_response(result)
+    validate_against_openapi_schema(result, "/messages/count", "get", "200")
+
+
 @openapi_test_function("/messages/{message_id}:get")
 def get_raw_message(client: Client, message_id: int) -> None:
     # {code_example|start}
@@ -2216,6 +2229,7 @@ def test_messages(client: Client, nonadmin_client: Client) -> None:
     get_raw_message(client, message_id)
     get_messages(client)
     check_messages_match_narrow(client)
+    get_message_count(client)
     get_message_history(client, message_id)
     get_read_receipts(client, message_id)
     delete_message(client, message_id)

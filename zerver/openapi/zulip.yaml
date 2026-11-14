@@ -10823,6 +10823,74 @@ paths:
                               },
                           },
                       }
+  /messages/count:
+    get:
+      operationId: get-message-count
+      summary: Count messages in a narrow
+      tags: ["messages"]
+      description: |
+        Count the messages in a [narrow](/api/construct-narrow), for
+        example the results of a search.
+
+        The messages counted are the ones that [`GET
+        /messages`](/api/get-messages) would return for the same narrow,
+        so the count follows the same access rules, including access to
+        channel history and the organization's limit on visible message
+        history.
+
+        Counting stops at 1000 messages, so that counting a broad search
+        stays quick.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-bb25d1).
+      parameters:
+        - name: narrow
+          in: query
+          description: |
+            A structure defining the narrow whose messages to count. See how to
+            [construct a narrow](/api/construct-narrow).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+              example: [{"operator": "search", "operand": "lunch"}]
+          required: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - count
+                      - count_is_limited
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      count:
+                        type: integer
+                        description: |
+                          The number of messages in the narrow, or 1000 if
+                          more messages are in it.
+                      count_is_limited:
+                        type: boolean
+                        description: |
+                          Whether more than 1000 messages are in the narrow,
+                          in which case `count` is 1000.
+                    example:
+                      {
+                        "result": "success",
+                        "msg": "",
+                        "count": 12,
+                        "count_is_limited": false,
+                      }
   /messages/{message_id}:
     get:
       operationId: get-message

@@ -3315,6 +3315,115 @@ class GetOldMessagesTest(ZulipTestCase):
             '<p><span class="highlight">KEYWORDMATCH</span> and should <span class="highlight">work</span></p>',
         )
 
+    def get_message_count_and_fetched(self, narrow: list[dict[str, str | bool]]) -> tuple[int, int]:
+        """The count from GET /messages/count for a narrow, and how many
+        messages GET /messages returns for it."""
+        params = {"narrow": orjson.dumps(narrow).decode()}
+        result = self.assert_json_success(self.client_get("/json/messages/count", params))
+        self.assertFalse(result["count_is_limited"])
+        fetched = self.assert_json_success(
+            self.client_get(
+                "/json/messages",
+                {**params, "anchor": "newest", "num_before": 1000, "num_after": 0},
+            )
+        )
+        return result["count"], len(fetched["messages"])
+
+    @override_settings(USING_PGROONGA=False)
+    def test_get_message_count(self) -> None:
+        cordelia = self.example_user("cordelia")
+        hamlet = self.example_user("hamlet")
+        self.login_user(cordelia)
+
+        for content in ["KEYWORDMATCH one", "KEYWORDMATCH two", "no match"]:
+            self.send_stream_message(cordelia, "Verona", content=content)
+        self.send_personal_message(cordelia, hamlet, content="KEYWORDMATCH in private")
+        # Messages in a public channel from before Cordelia subscribed
+        # count only in a narrow of that channel, as with GET /messages.
+        self.make_stream("shared history", realm=cordelia.realm)
+        self.subscribe(hamlet, "shared history")
+        self.send_stream_message(hamlet, "shared history", content="KEYWORDMATCH before")
+        self.subscribe(cordelia, "shared history")
+        # In a private channel without shared history, they never count.
+        self.make_stream(
+            "protected history",
+            realm=cordelia.realm,
+            invite_only=True,
+            history_public_to_subscribers=False,
+        )
+        self.subscribe(hamlet, "protected history")
+        self.send_stream_message(hamlet, "protected history", content="KEYWORDMATCH hidden")
+        self.subscribe(cordelia, "protected history")
+        self.send_stream_message(hamlet, "protected history", content="KEYWORDMATCH after")
+        # A muted topic is left out where GET /messages leaves it out.
+        self.send_stream_message(hamlet, "Verona", topic_name="muted", content="KEYWORDMATCH muted")
+        set_topic_visibility_policy(
+            cordelia, [["Verona", "muted"]], UserTopic.VisibilityPolicy.MUTED
+        )
+        self._update_tsvector_index()
+
+        search: dict[str, str | bool] = dict(operator="search", operand="KEYWORDMATCH")
+        narrows: list[tuple[list[dict[str, str | bool]], int]] = [
+            ([search], 5),
+            ([search, dict(operator="is", operand="dm")], 1),
+            ([search, dict(operator="is", operand="dm", negated=True)], 4),
+            ([dict(operator="channel", operand="Verona"), search], 3),
+            ([dict(operator="in", operand="home"), search], 4),
+            ([dict(operator="channel", operand="shared history")], 1),
+            ([dict(operator="channel", operand="protected history")], 1),
+        ]
+        for narrow, expected in narrows:
+            self.assertEqual(self.get_message_count_and_fetched(narrow), (expected, expected))
+
+        # The organization's limit on visible history applies too.
+        verona_ids = [
+            message.id
+            for message in Message.objects.filter(
+                realm_id=cordelia.realm_id,
+                recipient=get_stream("Verona", cordelia.realm).recipient,
+            ).order_by("id")
+        ]
+        verona: list[dict[str, str | bool]] = [dict(operator="channel", operand="Verona")]
+        with first_visible_id_as(verona_ids[-2]):
+            self.assertEqual(self.get_message_count_and_fetched(verona), (2, 2))
+
+    def test_get_message_count_limit(self) -> None:
+        cordelia = self.example_user("cordelia")
+        self.login_user(cordelia)
+        self.make_stream("counted", realm=cordelia.realm)
+        self.subscribe(cordelia, "counted")
+        params = {"narrow": orjson.dumps([dict(operator="channel", operand="counted")]).decode()}
+
+        with mock.patch("zerver.views.message_fetch.MAX_MESSAGES_COUNTED", 2):
+            for i in range(2):
+                self.send_stream_message(cordelia, "counted", content=f"message {i}")
+            result = self.assert_json_success(self.client_get("/json/messages/count", params))
+            self.assertEqual((result["count"], result["count_is_limited"]), (2, False))
+
+            self.send_stream_message(cordelia, "counted", content="one more")
+            result = self.assert_json_success(self.client_get("/json/messages/count", params))
+            self.assertEqual((result["count"], result["count_is_limited"]), (2, True))
+
+    def test_get_message_count_errors(self) -> None:
+        self.login("hamlet")
+        narrow = [dict(operator="foo", operand="")]
+        result = self.client_get("/json/messages/count", {"narrow": orjson.dumps(narrow).decode()})
+        self.assert_json_error_contains(result, "Invalid narrow operator: unknown operator")
+
+        # A narrow of a channel the user cannot access counts nothing.
+        self.make_stream("secret", realm=self.example_user("hamlet").realm, invite_only=True)
+        self.subscribe(self.example_user("iago"), "secret")
+        self.send_stream_message(self.example_user("iago"), "secret", content="hidden")
+        secret: list[dict[str, str | bool]] = [dict(operator="channel", operand="secret")]
+        self.assertEqual(self.get_message_count_and_fetched(secret), (0, 0))
+
+        # Spectators cannot count messages.
+        self.logout()
+        result = self.client_get("/json/messages/count", {"narrow": orjson.dumps([]).decode()})
+        self.assert_json_error(
+            result, "Not logged in: API authentication or user session required", status_code=401
+        )
+
     @override_settings(USING_PGROONGA=False)
     def test_get_messages_with_search(self) -> None:
         self.login("cordelia")

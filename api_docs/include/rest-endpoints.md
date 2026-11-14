@@ -11,6 +11,7 @@
 * [Render a message](/api/render-message)
 * [Fetch a single message](/api/get-message)
 * [Check if messages match a narrow](/api/check-messages-match-narrow)
+* [Count messages in a narrow](/api/get-message-count)
 * [Get a message's edit history](/api/get-message-history)
 * [Update personal message flags](/api/update-message-flags)
 * [Update personal message flags for narrow](/api/update-message-flags-for-narrow)
