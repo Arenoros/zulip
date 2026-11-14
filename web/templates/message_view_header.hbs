@@ -1,4 +1,13 @@
-{{#if conversation_header}}
+{{#if has_view_switcher}}
+<nav class="navbar_title view-switcher" aria-label="{{t 'Views' }}">
+    {{#each view_switcher_segments}}
+        <a class="view-switcher-segment tippy-zulip-delayed-tooltip{{#if is_active}} active{{/if}}" href="{{url}}" aria-label="{{label}}" data-tippy-content="{{label}}" data-tippy-placement="bottom"{{#if is_active}} aria-current="page"{{/if}}>
+            <i class="zulip-icon zulip-icon-{{zulip_icon}}" aria-hidden="true"></i>
+            <span class="view-switcher-label">{{label}}</span>
+        </a>
+    {{/each}}
+</nav>
+{{else if conversation_header}}
 {{> conversation_header conversation_header}}
 {{else if open_conversation_header}}
 {{> open_conversation_header open_conversation_header}}

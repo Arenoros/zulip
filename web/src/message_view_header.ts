@@ -64,6 +64,13 @@ type OpenConversationHeaderContext = {
     all_visibility_policies: AllVisibilityPolicies;
 };
 
+type ViewSwitcherSegment = {
+    label: string;
+    url: string;
+    zulip_icon: string;
+    is_active: boolean;
+};
+
 type MessageViewHeaderContext = {
     title?: string | undefined;
     title_html?: string | undefined;
@@ -78,6 +85,8 @@ type MessageViewHeaderContext = {
     stream_settings_link?: string;
     conversation_header?: ConversationHeaderContext;
     open_conversation_header?: OpenConversationHeaderContext;
+    has_view_switcher?: boolean;
+    view_switcher_segments?: ViewSwitcherSegment[];
     can_start_call?: boolean;
 } & (
     | {
@@ -219,6 +228,54 @@ function get_open_conversation_header_context(
     };
 }
 
+// The combined feed, mentions and starred messages are mixed views
+// with the same layout, so their headers switch between them.
+function get_view_switcher_context(filter: Filter | undefined): {
+    has_view_switcher?: boolean;
+    view_switcher_segments?: ViewSwitcherSegment[];
+} {
+    if (page_params.is_spectator) {
+        return {};
+    }
+    let active_view;
+    if (filter === undefined || filter.is_in_home()) {
+        active_view = "feed";
+    } else {
+        const term_types = filter.sorted_term_types();
+        if (term_types.length !== 1) {
+            return {};
+        }
+        if (term_types[0] === "is-mentioned") {
+            active_view = "mentions";
+        } else if (term_types[0] === "is-starred") {
+            active_view = "starred";
+        } else {
+            return {};
+        }
+    }
+    const view_switcher_segments = [
+        {
+            label: $t({defaultMessage: "Combined feed"}),
+            url: "#feed",
+            zulip_icon: "all-messages",
+            is_active: active_view === "feed",
+        },
+        {
+            label: $t({defaultMessage: "Mentions"}),
+            url: "#narrow/is/mentioned",
+            zulip_icon: "at-sign",
+            is_active: active_view === "mentions",
+        },
+        {
+            label: $t({defaultMessage: "Starred"}),
+            url: "#narrow/is/starred",
+            zulip_icon: "star",
+            is_active: active_view === "starred",
+        },
+    ];
+    return {has_view_switcher: true, view_switcher_segments};
+}
+
 function get_message_view_header_context(filter: Filter | undefined): MessageViewHeaderContext {
     if (recent_view_util.is_visible()) {
         return {
@@ -267,6 +324,7 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
             description,
             zulip_icon: "all-messages",
             link: "/help/combined-feed",
+            ...get_view_switcher_context(filter),
         };
     }
 
@@ -282,6 +340,7 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
             is_spectator: page_params.is_spectator,
         }),
         can_start_call: can_start_call(filter),
+        ...get_view_switcher_context(filter),
     };
 
     const conversation_header = get_conversation_header_context(filter);
