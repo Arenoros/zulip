@@ -44,7 +44,7 @@ A presentation of a single one-on-one or group direct message conversation in wh
 
 **Classic layout**
 
-The presentation of messages that Zulip uses wherever the bubble layout does not apply.
+The presentation of messages that Zulip uses for a single conversation outside the bubble layout and the open conversation.
 
 **Message series**
 
@@ -75,6 +75,18 @@ A single topic shown in full from the conversations view, with its first message
 **Reply**
 
 Any message in a topic after its first message.
+
+**Mixed view**
+
+A view that gathers messages from more than one conversation, such as the combined feed, mentions, starred messages, a channel feed, or search results.
+
+_Avoid_: Combined feed (one particular mixed view)
+
+**Conversation fragment**
+
+Consecutive messages from one conversation in a mixed view, shown together under a header that names the conversation.
+
+_Avoid_: Recipient bar (Zulip's name for the header alone), topic card
 
 **Compose box**
 
