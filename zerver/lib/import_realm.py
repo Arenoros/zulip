@@ -81,6 +81,12 @@ from zerver.models import (
     Attachment,
     BotConfigData,
     BotStorageData,
+    CalendarAttendee,
+    CalendarAttendeeOccurrenceResponse,
+    CalendarEvent,
+    CalendarEventException,
+    CalendarPinnedUser,
+    CalendarUserSettings,
     ChannelFolder,
     Client,
     CustomProfileField,
@@ -187,6 +193,12 @@ ID_MAP: dict[str, dict[int, int]] = {
     "groupgroupmembership": {},
     "botstoragedata": {},
     "botconfigdata": {},
+    "calendarevent": {},
+    "calendareventexception": {},
+    "calendarattendee": {},
+    "calendarattendeeoccurrenceresponse": {},
+    "calendarpinneduser": {},
+    "calendarusersettings": {},
     "analytics_realmcount": {},
     "analytics_streamcount": {},
     "analytics_usercount": {},
@@ -1964,6 +1976,61 @@ def do_import_realm(
         re_map_foreign_keys(data, "zerver_muteduser", "muted_user", related_table="user_profile")
         update_model_ids(MutedUser, data, "muteduser")
         bulk_import_model(data, MutedUser)
+
+    if "zerver_calendarevent" in data:
+        fix_datetime_fields(data, "zerver_calendarevent")
+        re_map_foreign_keys(data, "zerver_calendarevent", "realm", related_table="realm")
+        re_map_foreign_keys(data, "zerver_calendarevent", "organizer", related_table="user_profile")
+        re_map_foreign_keys(data, "zerver_calendarevent", "chat", related_table="stream")
+        re_map_foreign_keys(data, "zerver_calendarevent", "channel", related_table="stream")
+        update_model_ids(CalendarEvent, data, "calendarevent")
+        bulk_import_model(data, CalendarEvent)
+
+    if "zerver_calendareventexception" in data:
+        fix_datetime_fields(data, "zerver_calendareventexception")
+        re_map_foreign_keys(
+            data, "zerver_calendareventexception", "event", related_table="calendarevent"
+        )
+        update_model_ids(CalendarEventException, data, "calendareventexception")
+        bulk_import_model(data, CalendarEventException)
+
+    if "zerver_calendarattendee" in data:
+        fix_datetime_fields(data, "zerver_calendarattendee")
+        re_map_foreign_keys(data, "zerver_calendarattendee", "event", related_table="calendarevent")
+        re_map_foreign_keys(data, "zerver_calendarattendee", "user", related_table="user_profile")
+        re_map_foreign_keys(
+            data, "zerver_calendarattendee", "added_by", related_table="user_profile"
+        )
+        update_model_ids(CalendarAttendee, data, "calendarattendee")
+        bulk_import_model(data, CalendarAttendee)
+
+    if "zerver_calendarattendeeoccurrenceresponse" in data:
+        fix_datetime_fields(data, "zerver_calendarattendeeoccurrenceresponse")
+        re_map_foreign_keys(
+            data,
+            "zerver_calendarattendeeoccurrenceresponse",
+            "attendee",
+            related_table="calendarattendee",
+        )
+        update_model_ids(
+            CalendarAttendeeOccurrenceResponse, data, "calendarattendeeoccurrenceresponse"
+        )
+        bulk_import_model(data, CalendarAttendeeOccurrenceResponse)
+
+    if "zerver_calendarpinneduser" in data:
+        re_map_foreign_keys(data, "zerver_calendarpinneduser", "user", related_table="user_profile")
+        re_map_foreign_keys(
+            data, "zerver_calendarpinneduser", "pinned_user", related_table="user_profile"
+        )
+        update_model_ids(CalendarPinnedUser, data, "calendarpinneduser")
+        bulk_import_model(data, CalendarPinnedUser)
+
+    if "zerver_calendarusersettings" in data:
+        re_map_foreign_keys(
+            data, "zerver_calendarusersettings", "user", related_table="user_profile"
+        )
+        update_model_ids(CalendarUserSettings, data, "calendarusersettings")
+        bulk_import_model(data, CalendarUserSettings)
 
     if "zerver_service" in data:
         re_map_foreign_keys(data, "zerver_service", "user_profile", related_table="user_profile")

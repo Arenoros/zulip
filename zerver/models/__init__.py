@@ -3,6 +3,14 @@ from zerver.models.alert_words import AlertWord as AlertWord
 from zerver.models.bots import BotConfigData as BotConfigData
 from zerver.models.bots import BotStorageData as BotStorageData
 from zerver.models.bots import Service as Service
+from zerver.models.calendar import CalendarAttendee as CalendarAttendee
+from zerver.models.calendar import (
+    CalendarAttendeeOccurrenceResponse as CalendarAttendeeOccurrenceResponse,
+)
+from zerver.models.calendar import CalendarEvent as CalendarEvent
+from zerver.models.calendar import CalendarEventException as CalendarEventException
+from zerver.models.calendar import CalendarPinnedUser as CalendarPinnedUser
+from zerver.models.calendar import CalendarUserSettings as CalendarUserSettings
 from zerver.models.channel_folders import ChannelFolder as ChannelFolder
 from zerver.models.clients import Client as Client
 from zerver.models.custom_profile_fields import CustomProfileField as CustomProfileField

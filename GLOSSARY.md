@@ -103,3 +103,43 @@ _Avoid_: Expanded compose box (Zulip's name for a taller compose box without the
 The row above the compose box where the user picks the channel and topic or the direct message recipients.
 
 _Avoid_: To field
+
+# Calendar
+
+This glossary covers the calendar and the meetings scheduled in it.
+
+## Language
+
+**Calendar event**
+
+Something in a user's calendar with a start and an end: a meeting when other people are invited to it, or a personal event when nobody is.
+
+_Avoid_: Appointment, meeting (for an event without invitees)
+
+**Series**
+
+A calendar event that repeats by a rule, such as every weekday at 10:00.
+
+_Avoid_: Recurring meeting (for the series as a whole)
+
+**Occurrence**
+
+One of the times a series takes place, which can be moved, changed or cancelled on its own.
+
+_Avoid_: Instance
+
+**Meeting chat**
+
+The conversation of a meeting, whose members are everyone invited to it, including people invited after it was scheduled.
+
+_Avoid_: Group direct message (whose members cannot change)
+
+**Free/busy**
+
+What a user's calendar says about whether they are available at a time, without the details of their events.
+
+_Avoid_: Availability (for one user's calendar data)
+
+**Pinned colleague**
+
+A user whose calendar another user shows next to their own.
