@@ -114,7 +114,11 @@
             </span>
         </span>
         {{#if is_conversation_fragment}}
+        {{#if conversation_fragment_near_url}}
+        <a class="conversation-fragment-open narrows_by_topic" href="{{conversation_fragment_near_url}}" draggable="false">{{t "Show in conversation" }}</a>
+        {{else}}
         <a class="conversation-fragment-open narrows_by_topic" href="{{topic_url}}" draggable="false">{{t "Open conversation" }}</a>
+        {{/if}}
         {{/if}}
         <span class="recipient_row_date scroll-to-time {{#if (and (not always_display_date) date_unchanged )}}recipient_row_date_unchanged{{/if}}" role="button" tabindex="0">{{{date_html}}}</span>
     </div>
@@ -161,7 +165,11 @@
         {{/if}}
         </a>
         {{#if is_conversation_fragment}}
+        {{#if conversation_fragment_near_url}}
+        <a class="conversation-fragment-open narrows_by_recipient" href="{{conversation_fragment_near_url}}" draggable="false">{{t "Show in chat" }}</a>
+        {{else}}
         <a class="conversation-fragment-open narrows_by_recipient" href="{{pm_with_url}}" draggable="false">{{t "Open chat" }}</a>
+        {{/if}}
         {{/if}}
         <span class="recipient_row_date scroll-to-time {{#if (and (not always_display_date) date_unchanged )}}recipient_row_date_unchanged{{/if}}" role="button" tabindex="0">{{{date_html}}}</span>
     </div>

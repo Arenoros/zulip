@@ -113,6 +113,9 @@ export type MessageGroup = {
     // the date in a divider above it rather than in its header.
     is_conversation_fragment?: boolean;
     fragment_date_divider_html?: string | undefined;
+    // In search results, a fragment links to its first message in its
+    // conversation.
+    conversation_fragment_near_url?: string;
     message_containers: MessageContainer[];
     message_group_id: string;
 } & (
@@ -1225,6 +1228,7 @@ export class MessageListView {
         let prev_message_container: MessageContainer | undefined;
         const chat_layout = this.is_chat_layout();
         const mixed_view = this.is_mixed_view();
+        const search_results = mixed_view && this.list.data.filter.is_keyword_search();
         const breaks_series_on_pause = this.breaks_series_on_pause();
         // A topic card shows the sender of every message, and dates
         // next to the time rather than as dividers.
@@ -1251,6 +1255,10 @@ export class MessageListView {
             if (mixed_view) {
                 current_group.is_conversation_fragment = true;
                 update_fragment_date_divider(current_group, message_for_next_group, prev_message);
+            }
+            if (search_results) {
+                current_group.conversation_fragment_near_url =
+                    hash_util.by_conversation_and_time_url(message_for_next_group);
             }
         };
 

@@ -26,7 +26,7 @@ mock_esm("../src/timerender", {
     },
 });
 
-mock_esm("../src/people", {
+const people = mock_esm("../src/people", {
     sender_is_bot: () => false,
     sender_is_guest: () => false,
     sender_is_deactivated: () => false,
@@ -1462,6 +1462,40 @@ test("conversation fragments in mixed views", () => {
     assert.ok(view.is_mixed_view());
     view.list.is_conversations_view = true;
     assert.ok(!view.is_mixed_view());
+});
+
+test("conversation fragments in search results", ({override}) => {
+    // In search results, a fragment links to its first message in its
+    // conversation.
+    set_global("window", {location: {protocol: "https:", host: "chat.example.com", pathname: "/"}});
+    override(people, "pm_perma_link", () => "#narrow/dm/5-dm");
+    function make_view(terms) {
+        const list = new message_list.MessageList({
+            data: new MessageListData({excludes_muted_topics: false, filter: new Filter(terms)}),
+            is_node_test: true,
+        });
+        return list.view;
+    }
+    const first = bubble_test_dm_at(0);
+    const second = bubble_test_dm_at(1);
+
+    // Search results don't collapse messages of the same conversation,
+    // so each fragment is a single result.
+    let view = make_view([{operator: "search", operand: "lunch"}]);
+    let groups = view.build_message_groups([first, second]);
+    assert.deepEqual(
+        groups.map((group) => group.conversation_fragment_near_url),
+        [
+            `https://chat.example.com/#narrow/dm/5-dm/near/${first.id}`,
+            `https://chat.example.com/#narrow/dm/5-dm/near/${second.id}`,
+        ],
+    );
+
+    // Other mixed views open the conversation instead.
+    view = make_view([{operator: "is", operand: "dm"}]);
+    groups = view.build_message_groups([first, second]);
+    assert.ok(groups[0].is_conversation_fragment);
+    assert.equal(groups[0].conversation_fragment_near_url, undefined);
 });
 
 test("edited notices in the bubble layout", ({override}) => {
