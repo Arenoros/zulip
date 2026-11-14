@@ -563,6 +563,13 @@ def floatify_datetime_fields(item: Record, table: TableName) -> Record:
     return {**item, **updates}
 
 
+def floatify_datetime_fields_of_rows(rows: Iterable[Record], table: TableName) -> Iterator[Record]:
+    # A generator expression in the caller's loop would see the loop
+    # variable's last table when it is consumed.
+    for row in rows:
+        yield floatify_datetime_fields(row, table)
+
+
 class Config:
     """A Config object configures a single table for exporting (and, maybe
     some day importing as well.  This configuration defines what
@@ -897,7 +904,7 @@ def export_from_config(
             # of the exported data for the tables - e.g. to strip out private data.
             response[t] = custom_process_results(response[t], context)
         if date_fields_for_table(t):
-            response[t] = (floatify_datetime_fields(r, t) for r in response[t])
+            response[t] = floatify_datetime_fields_of_rows(response[t], t)
 
         if not config.use_iterator:
             response[t] = list(response[t])
