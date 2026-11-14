@@ -298,3 +298,16 @@
     /* 4px at 16px/1em */
     margin: 0 0.25em;
 }
+
+.search-end-of-results-notice {
+    display: none;
+    margin: 0 auto 12px;
+    padding: 5px;
+    text-align: center;
+    color: var(--color-text-message-bubble-caption);
+
+    & p {
+        margin: 0;
+        padding: 4px;
+    }
+}
