@@ -173,6 +173,9 @@ class CalendarPinnedUser(models.Model):
         unique_together = ("user", "pinned_user")
 
 
+DEFAULT_REMINDER_MINUTES = 15
+
+
 def default_work_days() -> list[int]:
     return [1, 2, 3, 4, 5]
 
@@ -193,6 +196,6 @@ class CalendarUserSettings(models.Model):
     work_day_start_minutes = models.PositiveSmallIntegerField(default=9 * 60)
     work_day_end_minutes = models.PositiveSmallIntegerField(default=18 * 60)
     # Minutes before the start, or null for no reminder.
-    default_reminder_minutes = models.PositiveIntegerField(null=True, default=15)
+    default_reminder_minutes = models.PositiveIntegerField(null=True, default=DEFAULT_REMINDER_MINUTES)
     default_view = models.PositiveSmallIntegerField(default=View.WORK_WEEK)
     time_scale_minutes = models.PositiveSmallIntegerField(default=30)
