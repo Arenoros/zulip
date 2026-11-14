@@ -188,8 +188,9 @@ function same_year(earlier_msg: Message | undefined, later_msg: Message | undefi
     );
 }
 
-// In the chat layout, a pause longer than this between two messages
-// from the same sender starts a new message series.
+// In the chat layout and in mixed views, a pause longer than this
+// between two messages from the same sender starts a new message
+// series.
 const MESSAGE_SERIES_MAX_PAUSE_SECONDS = 5 * 60;
 
 function within_message_series_pause(earlier_msg: Message, later_msg: Message): boolean {
@@ -730,6 +731,10 @@ export class MessageListView {
         );
     }
 
+    breaks_series_on_pause(): boolean {
+        return this.is_chat_layout() || this.is_mixed_view();
+    }
+
     // The topic's first message, once loaded, which an open
     // conversation shows as a card.
     open_conversation_first_message_id(): number | undefined {
@@ -1220,6 +1225,7 @@ export class MessageListView {
         let prev_message_container: MessageContainer | undefined;
         const chat_layout = this.is_chat_layout();
         const mixed_view = this.is_mixed_view();
+        const breaks_series_on_pause = this.breaks_series_on_pause();
         // A topic card shows the sender of every message, and dates
         // next to the time rather than as dividers.
         const topic_cards_layout = this.list.is_conversations_view;
@@ -1318,7 +1324,7 @@ export class MessageListView {
                 same_day(prev_message_container.msg, message) &&
                 prev_message_container.msg.historical === message.historical &&
                 prev_message_container.msg.sender_id === message.sender_id &&
-                (!chat_layout ||
+                (!breaks_series_on_pause ||
                     within_message_series_pause(prev_message_container.msg, message)) &&
                 !want_new_messages_divider
             ) {
@@ -1387,7 +1393,7 @@ export class MessageListView {
                 same_day(last_msg_container?.msg, first_msg_container.msg) &&
                 same_sender(last_msg_container, first_msg_container) &&
                 first_msg_container.msg.historical === last_msg_container?.msg.historical &&
-                (!this.is_chat_layout() ||
+                (!this.breaks_series_on_pause() ||
                     within_message_series_pause(last_msg_container.msg, first_msg_container.msg)) &&
                 !first_msg_container.want_new_messages_divider
             ) {

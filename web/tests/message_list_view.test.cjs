@@ -1319,12 +1319,15 @@ test("message series in the bubble layout", ({override}) => {
     view.merge_message_groups(view.build_message_groups([dm_at(16)]), "top");
     assert.deepEqual(senders_shown(view), [true, false, false, true]);
 
-    // Views of more than one conversation, and the classic layout,
-    // ignore pauses.
+    // Views of more than one conversation break series on pauses
+    // too, without bubbles; the classic layout ignores pauses.
     view = make_view(dm_feed);
     assert.ok(!view.is_bubble_layout());
     view._message_groups = view.build_message_groups(messages);
-    assert.deepEqual(senders_shown(view), [true, false, false, false]);
+    assert.deepEqual(senders_shown(view), [true, false, false, true]);
+    view.merge_message_groups(view.build_message_groups([dm_at(18)]), "bottom");
+    view.merge_message_groups(view.build_message_groups([dm_at(24)]), "bottom");
+    assert.deepEqual(senders_shown(view), [true, false, false, true, false, true]);
 
     override(user_settings, "web_direct_message_bubbles", false);
     view = make_view(conversation);
