@@ -2060,10 +2060,13 @@
         var(--color-markdown-pre-border)
     );
     --color-background-search-highlight: light-dark(
-        hsl(51deg 100% 79%),
-        hsl(51deg 100% 72%)
+        hsl(46.5deg 100% 77.1%),
+        hsl(47deg 61% 26.1%)
     );
-    --color-text-search-highlight: light-dark(currentcolor, hsl(0deg 0% 0%));
+    --color-text-search-highlight: light-dark(
+        currentcolor,
+        hsl(48deg 100% 88.4%)
+    );
     --color-text-alert-word: light-dark(currentcolor, hsl(0deg 0% 0%));
     --color-text-missed-call: light-dark(
         hsl(359deg 93% 39%),
@@ -2097,7 +2100,7 @@
     --color-markdown-code-link-active: var(--color-markdown-link-active);
     --color-markdown-link-highlight: light-dark(
         hsl(200deg 100% 40%),
-        hsl(210deg 100% 25%)
+        hsl(200deg 100% 80%)
     );
     /* Alert words share this underline color, since they share the
        link color it is mixed from. */
@@ -2108,7 +2111,7 @@
     );
     --color-markdown-link-highlight-hover: light-dark(
         hsl(200deg 100% 25%),
-        hsl(210deg 100% 18%)
+        hsl(200deg 100% 90%)
     );
     --color-markdown-link-alert-word: light-dark(
         hsl(200deg 100% 40%),
