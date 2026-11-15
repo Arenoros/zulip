@@ -279,6 +279,56 @@ function is_dirty(): boolean {
     return JSON.stringify(state) !== initial_state;
 }
 
+// Fills the selects of the start and the end of an event, whose end
+// is a duration from the start of up to a day.
+export function fill_time_selects(
+    $start: JQuery,
+    $end: JQuery,
+    start_minute: number,
+    duration_minutes: number,
+): void {
+    const start_options = Array.from(
+        {length: MINUTES_PER_DAY / TIME_STEP_MINUTES},
+        (_, index) => index * TIME_STEP_MINUTES,
+    );
+    if (!start_options.includes(start_minute)) {
+        start_options.push(start_minute);
+        start_options.sort((a, b) => a - b);
+    }
+    $start.empty();
+    for (const minute of start_options) {
+        $start.append(
+            $("<option>")
+                .val(minute)
+                .text(format_minutes(minute))
+                .prop("selected", minute === start_minute),
+        );
+    }
+    const durations = Array.from(
+        {length: MINUTES_PER_DAY / TIME_STEP_MINUTES},
+        (_, index) => (index + 1) * TIME_STEP_MINUTES,
+    );
+    if (!durations.includes(duration_minutes)) {
+        durations.push(duration_minutes);
+        durations.sort((a, b) => a - b);
+    }
+    $end.empty();
+    for (const duration of durations) {
+        const end = start_minute + duration;
+        const label =
+            end > MINUTES_PER_DAY ||
+            (end === MINUTES_PER_DAY && start_minute > 0 && duration > MINUTES_PER_DAY / 2)
+                ? $t({defaultMessage: "{time} (next day)"}, {time: format_minutes(end)})
+                : format_minutes(end);
+        $end.append(
+            $("<option>")
+                .val(duration)
+                .text(label)
+                .prop("selected", duration === duration_minutes),
+        );
+    }
+}
+
 function update_time_fields(): void {
     assert(state !== undefined);
     const form = state;
@@ -298,49 +348,12 @@ function update_time_fields(): void {
                 ? $t({defaultMessage: "Date: {date}"}, {date: get_date_label(form.date)})
                 : $t({defaultMessage: "Start date: {date}"}, {date: get_date_label(form.date)}),
         );
-    const start_options = Array.from(
-        {length: MINUTES_PER_DAY / TIME_STEP_MINUTES},
-        (_, index) => index * TIME_STEP_MINUTES,
+    fill_time_selects(
+        $form.find(".calendar-form-start"),
+        $form.find(".calendar-form-end"),
+        form.start_minute,
+        form.duration_minutes,
     );
-    if (!start_options.includes(form.start_minute)) {
-        start_options.push(form.start_minute);
-        start_options.sort((a, b) => a - b);
-    }
-    const $start = $form.find<HTMLSelectElement>(".calendar-form-start");
-    $start.empty();
-    for (const minute of start_options) {
-        $start.append(
-            $("<option>")
-                .val(minute)
-                .text(format_minutes(minute))
-                .prop("selected", minute === form.start_minute),
-        );
-    }
-    // The end is a duration from the start, of up to a day.
-    const durations = Array.from(
-        {length: MINUTES_PER_DAY / TIME_STEP_MINUTES},
-        (_, index) => (index + 1) * TIME_STEP_MINUTES,
-    );
-    if (!durations.includes(form.duration_minutes)) {
-        durations.push(form.duration_minutes);
-        durations.sort((a, b) => a - b);
-    }
-    const $end = $form.find<HTMLSelectElement>(".calendar-form-end");
-    $end.empty();
-    for (const duration of durations) {
-        const end = form.start_minute + duration;
-        const label =
-            end > MINUTES_PER_DAY ||
-            (end === MINUTES_PER_DAY && form.start_minute > 0 && duration > MINUTES_PER_DAY / 2)
-                ? $t({defaultMessage: "{time} (next day)"}, {time: format_minutes(end)})
-                : format_minutes(end);
-        $end.append(
-            $("<option>")
-                .val(duration)
-                .text(label)
-                .prop("selected", duration === form.duration_minutes),
-        );
-    }
     $form.find(".calendar-form-time-of-day").toggleClass("hide", form.is_all_day);
     $form.find(".calendar-form-all-day-checkbox").prop("checked", form.is_all_day);
     $form.find(".calendar-form-timezone-name").text(form.time_zone);
@@ -993,6 +1006,21 @@ function show_date_picker(
     });
 }
 
+export function set_date(date: string): void {
+    assert(state !== undefined);
+    const recurrence = state.recurrence;
+    // A weekly series on the start's weekday moves with it.
+    if (
+        recurrence?.frequency === "WEEKLY" &&
+        recurrence.weekdays.length === 1 &&
+        recurrence.weekdays[0] === calendar_recurrence.get_weekday(state.date)
+    ) {
+        recurrence.weekdays = [calendar_recurrence.get_weekday(date)];
+    }
+    state.date = date;
+    update_time_fields();
+}
+
 function move_day(days: number): void {
     assert(state !== undefined);
     state.date = calendar_util.format_date(addDays(calendar_util.parse_date(state.date)!, days));
@@ -1571,19 +1599,7 @@ export function initialize(opts: {
     $view.on("click", ".calendar-form-date", function (this: HTMLElement) {
         assert(state !== undefined);
         const form = state;
-        show_date_picker(this, form.date, (date) => {
-            const recurrence = form.recurrence;
-            // A weekly series on the start's weekday moves with it.
-            if (
-                recurrence?.frequency === "WEEKLY" &&
-                recurrence.weekdays.length === 1 &&
-                recurrence.weekdays[0] === calendar_recurrence.get_weekday(form.date)
-            ) {
-                recurrence.weekdays = [calendar_recurrence.get_weekday(date)];
-            }
-            form.date = date;
-            update_time_fields();
-        });
+        show_date_picker(this, form.date, set_date);
     });
     $view.on("click", ".calendar-form-until", function (this: HTMLElement) {
         assert(state?.recurrence !== undefined);
