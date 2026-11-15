@@ -1270,6 +1270,7 @@ export type SchedulingState = {
     time_zone: string;
     required_attendee_ids: number[];
     optional_attendee_ids: number[];
+    room_ids: number[];
     // The event being changed, whose own times do not make its
     // attendees busy.
     event_id: number | undefined;
@@ -1288,6 +1289,7 @@ export function get_scheduling_state(): SchedulingState {
         time_zone: state.time_zone,
         required_attendee_ids: state.required_attendee_ids,
         optional_attendee_ids: state.optional_attendee_ids,
+        room_ids: state.room_ids,
         event_id: editing?.occurrence.id,
         can_change_attendees: !(editing?.is_occurrence ?? false),
     };
@@ -1312,6 +1314,18 @@ export function add_attendee(user_id: number, is_required: boolean): void {
     const user = people.maybe_get_user_by_id(user_id, true);
     assert(pills !== undefined && user !== undefined);
     user_pill.append_user(user, pills);
+}
+
+export function add_room(room_id: number): void {
+    assert(room_pills !== undefined);
+    room_pills.appendValidatedData({type: "room", room_id});
+}
+
+export function remove_room(room_id: number): void {
+    const pill = room_pills?.getPillByPredicate((item) => item.room_id === room_id);
+    if (room_pills !== undefined && pill !== undefined) {
+        room_pills.removePill(util.the(pill.$element), "close");
+    }
 }
 
 export function remove_attendee(user_id: number): void {

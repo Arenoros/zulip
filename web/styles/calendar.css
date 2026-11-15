@@ -2280,6 +2280,27 @@ body.calendar-view-visible {
     white-space: nowrap;
 }
 
+.calendar-scheduler-room-icon {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* 28px at 14px/1em, as an avatar */
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    background-color: var(--color-calendar-background-hover);
+    color: var(--color-calendar-text-secondary);
+}
+
+.calendar-scheduler-room-details {
+    overflow: hidden;
+    color: var(--color-calendar-text-secondary);
+    font-size: 0.8571em; /* 12px at 14px/1em */
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 .calendar-scheduler-add-icon {
     color: var(--color-calendar-text-accent);
 }

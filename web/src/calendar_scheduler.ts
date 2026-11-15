@@ -10,6 +10,7 @@ import * as calendar_form from "./calendar_form.ts";
 import type {SchedulingState} from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_layout from "./calendar_layout.ts";
+import * as calendar_rooms from "./calendar_rooms.ts";
 import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
@@ -55,6 +56,7 @@ const working_hours_schema = z.object({
 const response_schema = z.object({
     free_busy: z.record(z.string(), z.array(block_schema)),
     working_hours: z.record(z.string(), working_hours_schema),
+    room_free_busy: z.record(z.string(), z.array(block_schema)),
 });
 
 type Block = z.infer<typeof block_schema>;
@@ -68,6 +70,7 @@ let is_scheduling = false;
 let first_date = "";
 let free_busy = new Map<number, Block[]>();
 let working_hours = new Map<number, WorkingHours>();
+let room_free_busy = new Map<number, Block[]>();
 let load_state: "loading" | "loaded" | "error" = "loading";
 let request_id = 0;
 const collapsed_sections = new Set<string>();
@@ -183,12 +186,23 @@ function get_busy_blocks(user_id: number, state: SchedulingState): Block[] {
     );
 }
 
+function get_room_blocks(room_id: number, state: SchedulingState): Block[] {
+    return (room_free_busy.get(room_id) ?? []).filter((block) => block.event_id !== state.event_id);
+}
+
+function overlaps(block: Block, interval: Interval): boolean {
+    return block.start < interval.end && block.end > interval.start;
+}
+
+// A room is available whenever no other meeting booked it.
+function is_room_available(room_id: number, interval: Interval, state: SchedulingState): boolean {
+    return get_room_blocks(room_id, state).every((block) => !overlaps(block, interval));
+}
+
 // Someone is unavailable when they are busy, or out of their work
 // hours, at the time.
 function is_available(user_id: number, interval: Interval, state: SchedulingState): boolean {
-    const is_busy = get_busy_blocks(user_id, state).some(
-        (block) => block.start < interval.end && block.end > interval.start,
-    );
+    const is_busy = get_busy_blocks(user_id, state).some((block) => overlaps(block, interval));
     const work_intervals = get_work_intervals(user_id, state.time_zone);
     const is_working =
         work_intervals === undefined ||
@@ -258,20 +272,79 @@ function get_person_row(
                           get_segments(interval, state.time_zone),
                       ),
                   ),
-        blocks: get_busy_blocks(user_id, state).flatMap((block) => {
-            const status = calendar_grid.get_free_busy_status(block.show_as);
-            const label = `${block.title ?? status.label}, ${format_time(block.start, state.time_zone)} – ${format_time(block.end, state.time_zone)}`;
-            return get_segments(block, state.time_zone).map((segment) => ({
-                ...segment,
-                class_name: status.class_name,
-                label,
-            }));
-        }),
+        blocks: get_busy_blocks(user_id, state).flatMap((block) =>
+            get_block_context(
+                block,
+                state,
+                calendar_grid.get_free_busy_status(block.show_as).class_name,
+            ),
+        ),
     };
 }
 
+function get_block_context(
+    block: Block,
+    state: SchedulingState,
+    class_name: string,
+): Record<string, unknown>[] {
+    const status = calendar_grid.get_free_busy_status(block.show_as);
+    const label = `${block.title ?? status.label}, ${format_time(block.start, state.time_zone)} – ${format_time(block.end, state.time_zone)}`;
+    return get_segments(block, state.time_zone).map((segment) => ({
+        ...segment,
+        class_name,
+        label,
+    }));
+}
+
+function get_room_row(room_id: number, state: SchedulingState): Record<string, unknown> {
+    const room = calendar_rooms.maybe_get_room(room_id);
+    const name = calendar_rooms.get_room_name(room_id);
+    return {
+        kind: "room",
+        is_hidden: collapsed_sections.has("rooms"),
+        room_id,
+        name,
+        details: room === undefined ? "" : calendar_rooms.get_room_details(room),
+        is_unavailable:
+            load_state === "loaded" && !is_room_available(room_id, get_selection(state), state),
+        can_remove: state.can_change_attendees,
+        remove_label: $t({defaultMessage: "Remove {name}"}, {name}),
+        has_no_data:
+            load_state === "error" || (load_state === "loaded" && !room_free_busy.has(room_id)),
+        blocks: get_room_blocks(room_id, state).flatMap((block) =>
+            get_block_context(block, state, "busy"),
+        ),
+    };
+}
+
+function get_room_rows(state: SchedulingState): Record<string, unknown>[] {
+    const is_collapsed = collapsed_sections.has("rooms");
+    return [
+        {
+            kind: "section",
+            section: "rooms",
+            title: $t({defaultMessage: "Rooms"}),
+            is_collapsed,
+        },
+        ...state.room_ids.map((room_id) => get_room_row(room_id, state)),
+        ...(state.can_change_attendees
+            ? [
+                  {
+                      kind: "add",
+                      section: "rooms",
+                      placeholder: $t({defaultMessage: "Add a room"}),
+                      is_hidden: is_collapsed,
+                  },
+              ]
+            : []),
+    ];
+}
+
 function get_availability_row(user_ids: number[], state: SchedulingState): Record<string, unknown> {
-    const busy = user_ids.flatMap((user_id) => get_busy_blocks(user_id, state));
+    const busy = [
+        ...user_ids.flatMap((user_id) => get_busy_blocks(user_id, state)),
+        ...state.room_ids.flatMap((room_id) => get_room_blocks(room_id, state)),
+    ];
     return {
         kind: "availability",
         blocks: busy.flatMap((block) =>
@@ -356,6 +429,7 @@ function get_context(state: SchedulingState): Record<string, unknown> {
             get_availability_row(required_ids, state),
             ...get_section_rows("required", required_ids, state),
             ...get_section_rows("optional", state.optional_attendee_ids, state),
+            ...get_room_rows(state),
         ].map((row) => ({off_hours: [], blocks: [], ...row})),
         has_selection: first_segment !== undefined,
         selection:
@@ -391,6 +465,17 @@ function get_context(state: SchedulingState): Record<string, unknown> {
 function set_up_add_pills(state: SchedulingState): void {
     $("#calendar-view .calendar-scheduler-add").each(function () {
         const $container = $(this);
+        if ($container.attr("data-section") === "rooms") {
+            calendar_rooms.set_up_typeahead(
+                $container.find(".input"),
+                (room_id) => {
+                    calendar_form.add_room(room_id);
+                    fetch();
+                },
+                () => state.room_ids,
+            );
+            return;
+        }
         const is_required = $container.attr("data-section") === "required";
         const pills = user_pill.create_pills($container, {exclude_inaccessible_users: true});
         pill_typeahead.set_up_user($container.find(".input"), pills, {
@@ -453,6 +538,7 @@ function fetch(on_loaded?: () => void): void {
         url: "/json/calendar/free_busy",
         data: {
             user_ids: JSON.stringify(user_ids),
+            room_ids: JSON.stringify(state.room_ids),
             start: calendar_layout.get_day_start(first_date, state.time_zone),
             end: calendar_layout.get_day_start(first_date, state.time_zone, SHOWN_DAYS),
         },
@@ -468,6 +554,12 @@ function fetch(on_loaded?: () => void): void {
                 Object.entries(data.working_hours).map(([user_id, hours]) => [
                     Number(user_id),
                     hours,
+                ]),
+            );
+            room_free_busy = new Map(
+                Object.entries(data.room_free_busy).map(([room_id, blocks]) => [
+                    Number(room_id),
+                    blocks,
                 ]),
             );
             load_state = "loaded";
@@ -528,8 +620,8 @@ function get_selection_offset(): number {
 }
 
 // The next time after the one chosen, in the user's work hours, when
-// everyone required is available, looking up to FIND_WEEKS weeks
-// ahead.
+// everyone required and the rooms are available, looking up to
+// FIND_WEEKS weeks ahead.
 function find_time(weeks_searched = 0): void {
     const state = calendar_form.get_scheduling_state();
     if (state.is_all_day) {
@@ -553,7 +645,8 @@ function find_time(weeks_searched = 0): void {
             if (
                 interval.start > after &&
                 interval.start > Date.now() / 1000 &&
-                required_ids.every((user_id) => is_available(user_id, interval, state))
+                required_ids.every((user_id) => is_available(user_id, interval, state)) &&
+                state.room_ids.every((room_id) => is_room_available(room_id, interval, state))
             ) {
                 calendar_form.set_date(date);
                 calendar_form.set_time(minute, state.duration_minutes);
@@ -707,7 +800,11 @@ export function initialize(): void {
         render();
     });
     $view.on("click", selector(".calendar-scheduler-remove"), function (this: HTMLElement) {
-        calendar_form.remove_attendee(Number(this.dataset["userId"]));
+        if (this.dataset["roomId"] === undefined) {
+            calendar_form.remove_attendee(Number(this.dataset["userId"]));
+        } else {
+            calendar_form.remove_room(Number(this.dataset["roomId"]));
+        }
         render();
     });
     $view.on("click", selector(".calendar-scheduler-find"), () => {

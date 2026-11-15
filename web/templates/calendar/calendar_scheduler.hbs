@@ -74,6 +74,24 @@
                                     <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
                                 </button>
                             {{/if}}
+                        {{else if (eq kind "room")}}
+                            <span class="calendar-scheduler-room-icon" aria-hidden="true">
+                                <i class="zulip-icon zulip-icon-building"></i>
+                            </span>
+                            <span class="calendar-scheduler-person">
+                                <span class="calendar-scheduler-name" title="{{name}}">{{name}}</span>
+                                {{#if is_unavailable}}
+                                    <span class="calendar-scheduler-unavailable">{{t "Unavailable" }}</span>
+                                {{/if}}
+                            </span>
+                            {{#if details}}
+                                <span class="calendar-scheduler-room-details">{{details}}</span>
+                            {{/if}}
+                            {{#if can_remove}}
+                                <button type="button" class="calendar-icon-button calendar-scheduler-remove tippy-zulip-delayed-tooltip" data-room-id="{{room_id}}" data-tippy-content="{{t 'Remove' }}" aria-label="{{remove_label}}">
+                                    <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                                </button>
+                            {{/if}}
                         {{else if (eq kind "add")}}
                             <i class="zulip-icon zulip-icon-user-plus calendar-scheduler-add-icon" aria-hidden="true"></i>
                             <div class="pill-container person_picker calendar-scheduler-add" data-section="{{section}}">
