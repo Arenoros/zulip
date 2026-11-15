@@ -503,6 +503,7 @@ export function validate_settings_hash(
         "emoji-settings",
         "linkifier-settings",
         "playground-settings",
+        "meeting-rooms",
         "users",
         "bots",
         "profile-field-settings",

@@ -1,0 +1,47 @@
+{{#with room}}
+<tr class="meeting_room_row {{#if is_archived}}archived_meeting_room_row{{/if}}" data-room-id="{{id}}">
+    <td>
+        <span class="meeting_room_name">{{name}}</span>
+        {{#if is_archived}}
+            <span class="meeting_room_archived">{{t "Archived" }}</span>
+        {{/if}}
+    </td>
+    <td>
+        <span class="meeting_room_capacity">{{../capacity_label}}</span>
+    </td>
+    <td>
+        <span class="meeting_room_location">{{location}}</span>
+    </td>
+    <td>
+        <span class="meeting_room_email">{{email}}</span>
+    </td>
+    {{#if ../can_modify}}
+    <td class="no-select actions">
+        {{> ../components/icon_button
+          icon="edit"
+          intent="neutral"
+          custom_classes="tippy-zulip-delayed-tooltip edit-meeting-room"
+          data-tippy-content=(t "Edit")
+          aria-label=(t "Edit")
+          }}
+        {{#if is_archived}}
+            {{> ../components/icon_button
+              icon="unarchive"
+              intent="neutral"
+              custom_classes="tippy-zulip-delayed-tooltip unarchive-meeting-room"
+              data-tippy-content=(t "Unarchive")
+              aria-label=(t "Unarchive")
+              }}
+        {{else}}
+            {{> ../components/icon_button
+              icon="archive"
+              intent="danger"
+              custom_classes="tippy-zulip-delayed-tooltip archive-meeting-room"
+              data-tippy-content=(t "Archive")
+              aria-label=(t "Archive")
+              }}
+        {{/if}}
+    </td>
+    {{/if}}
+</tr>
+{{/with}}

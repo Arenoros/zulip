@@ -11,6 +11,7 @@ import * as settings_exports from "./settings_exports.ts";
 import * as settings_folders from "./settings_folders.ts";
 import * as settings_invites from "./settings_invites.ts";
 import * as settings_linkifiers from "./settings_linkifiers.ts";
+import * as settings_meeting_rooms from "./settings_meeting_rooms.ts";
 import * as settings_muted_users from "./settings_muted_users.ts";
 import * as settings_notifications from "./settings_notifications.ts";
 import * as settings_org from "./settings_org.ts";
@@ -79,6 +80,7 @@ export function initialize(): void {
     load_func_dict.set("default-channels-list", settings_streams.set_up);
     load_func_dict.set("linkifier-settings", settings_linkifiers.set_up);
     load_func_dict.set("playground-settings", settings_playgrounds.set_up);
+    load_func_dict.set("meeting-rooms", settings_meeting_rooms.set_up);
     load_func_dict.set("profile-field-settings", settings_profile_fields.set_up);
     load_func_dict.set("data-exports-admin", settings_exports.set_up);
     load_func_dict.set(
@@ -116,6 +118,7 @@ export function reset_sections(): void {
     settings_exports.reset();
     settings_linkifiers.reset();
     settings_playgrounds.reset();
+    settings_meeting_rooms.reset();
     settings_invites.reset();
     settings_org.reset();
     settings_profile_fields.reset();
