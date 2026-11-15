@@ -200,7 +200,7 @@ function get_show_as_label(show_as: number): string {
     return calendar_grid.get_free_busy_status(show_as).label;
 }
 
-function get_reminder_label(minutes: number | null): string {
+export function get_reminder_label(minutes: number | null): string {
     if (minutes === null) {
         return $t({defaultMessage: "Don't remind me"});
     }
@@ -231,7 +231,7 @@ function get_reminder_label(minutes: number | null): string {
     );
 }
 
-function get_category_label(color: string): string {
+export function get_category_label(color: string): string {
     return $t(
         {
             defaultMessage:
@@ -769,7 +769,7 @@ function hide_menu(): void {
     menu_instance = undefined;
 }
 
-function show_choice_menu(
+export function show_choice_menu(
     button: HTMLElement,
     options: {value: string; label: string; checked: boolean}[],
     on_choose: (value: string) => void,
@@ -828,39 +828,55 @@ function show_menu(button: HTMLElement): void {
         }
         update_menu_buttons();
     };
-    let options: {value: string; label: string; checked: boolean}[];
-    switch (button.dataset["menu"]) {
+    const menu = button.dataset["menu"];
+    const options =
+        menu === "show_as" || menu === "reminder" || menu === "category"
+            ? get_personal_menu_options(menu, form)
+            : [
+                  {value: "private", label: get_visibility_label(true), checked: form.is_private},
+                  {
+                      value: "public",
+                      label: get_visibility_label(false),
+                      checked: !form.is_private,
+                  },
+              ];
+    show_choice_menu(button, options, choose);
+}
+
+// The choices of how an event shows the user, their reminder and its
+// category, which the meeting opened on the whole window offers too.
+export function get_personal_menu_options(
+    menu: "show_as" | "reminder" | "category",
+    values: {show_as: number; reminder_minutes: number | null; category: string},
+): {value: string; label: string; checked: boolean}[] {
+    switch (menu) {
         case "show_as":
-            options = [1, 5, 2, 3, 4].map((show_as) => ({
+            return [1, 5, 2, 3, 4].map((show_as) => ({
                 value: String(show_as),
                 label: get_show_as_label(show_as),
-                checked: show_as === form.show_as,
+                checked: show_as === values.show_as,
             }));
-            break;
         case "reminder":
-            options = REMINDERS.map((minutes) => ({
+            return REMINDERS.map((minutes) => ({
                 value: minutes === null ? "" : String(minutes),
                 label: get_reminder_label(minutes),
-                checked: minutes === form.reminder_minutes,
+                checked: minutes === values.reminder_minutes,
             }));
-            break;
         case "category":
-            options = [
-                {value: "", label: get_category_label("none"), checked: form.category === ""},
+            return [
+                {value: "", label: get_category_label("none"), checked: values.category === ""},
                 ...CATEGORIES.map(([name, color]) => ({
                     value: name,
                     label: get_category_label(color),
-                    checked: name === form.category,
+                    checked: name === values.category,
                 })),
             ];
-            break;
-        default:
-            options = [
-                {value: "private", label: get_visibility_label(true), checked: form.is_private},
-                {value: "public", label: get_visibility_label(false), checked: !form.is_private},
-            ];
     }
-    show_choice_menu(button, options, choose);
+}
+
+// The color of a category, by the name Exchange stores, or "" for none.
+export function get_category_color(category: string): string {
+    return CATEGORIES.find(([name]) => name === category)?.[1] ?? "";
 }
 
 function show_attendee_options(button: HTMLElement): void {
