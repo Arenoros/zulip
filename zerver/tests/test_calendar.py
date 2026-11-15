@@ -729,6 +729,7 @@ class CalendarAPITest(CalendarTestCase):
                 "category": "",
                 "response_requested": True,
                 "allow_forwarding": True,
+                "hide_attendees": False,
                 "has_zulip_call": False,
                 "meet_code": event.meet_code,
                 "chat_id": None,

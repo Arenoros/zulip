@@ -8488,6 +8488,12 @@ paths:
                               type: boolean
                               description: |
                                 Whether attendees may invite more people.
+                            hide_attendees:
+                              type: boolean
+                              description: |
+                                Whether the organizer hides the attendees from
+                                one another, in which case `attendees` is empty
+                                for invitees.
                             has_zulip_call:
                               type: boolean
                               description: |
@@ -8557,6 +8563,7 @@ paths:
                               "category": "",
                               "response_requested": true,
                               "allow_forwarding": true,
+                              "hide_attendees": false,
                               "has_zulip_call": false,
                               "meet_code": "Xc3oQ9pL2mKd",
                               "chat_id": null,

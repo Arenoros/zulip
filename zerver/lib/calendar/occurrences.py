@@ -63,6 +63,7 @@ class CalendarOccurrence:
     category: str
     response_requested: bool
     allow_forwarding: bool
+    hide_attendees: bool
     has_zulip_call: bool
     meet_code: str
     chat_id: int | None
@@ -293,6 +294,7 @@ def get_calendar_occurrences(
                     category=attendee.category,
                     response_requested=event.response_requested,
                     allow_forwarding=event.allow_forwarding,
+                    hide_attendees=event.hide_attendees,
                     has_zulip_call=event.has_zulip_call,
                     meet_code=event.meet_code,
                     chat_id=event.chat_id,
