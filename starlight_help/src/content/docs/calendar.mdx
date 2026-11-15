@@ -5,6 +5,7 @@ title: Calendar
 import {TabItem, Tabs} from "@astrojs/starlight/components";
 
 import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import NavigationSteps from "../../components/NavigationSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import GoToCalendar from "../include/_GoToCalendar.mdx";
 
@@ -416,3 +417,25 @@ for your week.
     </FlattenedSteps>
   </TabItem>
 </Tabs>
+
+## Change your calendar settings
+
+Your work days are the days the work week shows, and your work hours
+are when suggested meeting times fall. You can also choose the view
+the calendar opens in, its time scale, and the reminder for meetings
+you are invited to.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <NavigationSteps target="settings/calendar" />
+
+      1. Change the settings you like. They are saved right away.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  You can also open these settings from the view menu in the calendar,
+  and the view or time scale you choose there becomes your default.
+</ZulipTip>
