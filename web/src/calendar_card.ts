@@ -107,6 +107,35 @@ function hide_choices(): void {
     choices_instance = undefined;
 }
 
+// A menu under a button of the card.
+function show_choices(
+    button: HTMLElement,
+    placement: "bottom-start" | "bottom-end",
+    choices: {value: string; label: string}[],
+    on_choose: (value: string) => void,
+): void {
+    const instance = get_card_instance();
+    assert(instance !== null);
+    hide_choices();
+    choices_instance = tippy.default(button, {
+        ...popover_menus.default_popover_props,
+        theme: "popover-menu",
+        placement,
+        trigger: "manual",
+        hideOnClick: false,
+        appendTo: instance.popper,
+        content: ui_util.parse_html(render_calendar_card_choices_popover({choices})),
+    });
+    $(choices_instance.popper).on("click", ".calendar-card-choice", function (this: HTMLElement, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const choice = this.dataset["choice"]!;
+        hide_choices();
+        on_choose(choice);
+    });
+    choices_instance.show();
+}
+
 // Asks whether an action is for this occurrence or the whole series,
 // in a menu under its button.
 function choose_scope(button: HTMLElement, on_choose: (scope: calendar_actions.Scope) => void): void {
@@ -115,33 +144,17 @@ function choose_scope(button: HTMLElement, on_choose: (scope: calendar_actions.S
         on_choose("series");
         return;
     }
-    const instance = get_card_instance();
-    assert(instance !== null);
-    hide_choices();
-    choices_instance = tippy.default(button, {
-        ...popover_menus.default_popover_props,
-        theme: "popover-menu",
-        placement: "bottom-start",
-        trigger: "manual",
-        hideOnClick: false,
-        appendTo: instance.popper,
-        content: ui_util.parse_html(
-            render_calendar_card_choices_popover({
-                choices: [
-                    {value: "occurrence", label: $t({defaultMessage: "This occurrence"})},
-                    {value: "series", label: $t({defaultMessage: "The whole series"})},
-                ],
-            }),
-        ),
-    });
-    $(choices_instance.popper).on("click", ".calendar-card-choice", function (this: HTMLElement, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const scope = this.dataset["choice"] === "occurrence" ? "occurrence" : "series";
-        hide_choices();
-        on_choose(scope);
-    });
-    choices_instance.show();
+    show_choices(
+        button,
+        "bottom-start",
+        [
+            {value: "occurrence", label: $t({defaultMessage: "This occurrence"})},
+            {value: "series", label: $t({defaultMessage: "The whole series"})},
+        ],
+        (choice) => {
+            on_choose(choice === "occurrence" ? "occurrence" : "series");
+        },
+    );
 }
 
 function respond(response: string, scope: calendar_actions.Scope): void {
@@ -174,9 +187,6 @@ function confirm_remove(scope: calendar_actions.Scope): void {
 
 function show_more_menu(button: HTMLElement): void {
     assert(card_occurrence !== undefined);
-    const instance = get_card_instance();
-    assert(instance !== null);
-    hide_choices();
     const is_recurring = card_occurrence.original_start !== null;
     const choices = [
         {value: "follow", label: $t({defaultMessage: "Follow meeting"})},
@@ -187,27 +197,13 @@ function show_more_menu(button: HTMLElement): void {
               ]
             : [{value: "delete-series", label: $t({defaultMessage: "Delete from my calendar"})}]),
     ];
-    choices_instance = tippy.default(button, {
-        ...popover_menus.default_popover_props,
-        theme: "popover-menu",
-        placement: "bottom-end",
-        trigger: "manual",
-        hideOnClick: false,
-        appendTo: instance.popper,
-        content: ui_util.parse_html(render_calendar_card_choices_popover({choices})),
-    });
-    $(choices_instance.popper).on("click", ".calendar-card-choice", function (this: HTMLElement, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const choice = this.dataset["choice"];
-        hide_choices();
+    show_choices(button, "bottom-end", choices, (choice) => {
         if (choice === "follow") {
             respond("following", "series");
         } else {
             confirm_remove(choice === "delete-occurrence" ? "occurrence" : "series");
         }
     });
-    choices_instance.show();
 }
 
 export function hide(): void {
