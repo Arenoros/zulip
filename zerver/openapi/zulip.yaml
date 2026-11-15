@@ -8610,6 +8610,83 @@ paths:
                           The ID of the new calendar event.
                     example: {"msg": "", "result": "success", "id": 12}
   /calendar/events/{calendar_event_id}:
+    get:
+      operationId: get-calendar-event
+      tags: ["calendar"]
+      summary: Get a calendar event
+      description: |
+        Get an event in the current user's calendar. For a repeating
+        event, this is the series as a whole: its first occurrence, with
+        the fields of the series rather than those of a changed
+        occurrence.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      event:
+                        $ref: "#/components/schemas/CalendarEvent"
+                      has_changed_occurrences:
+                        type: boolean
+                        description: |
+                          Whether some occurrences of a repeating event were
+                          changed or cancelled. Changing when the series takes
+                          place drops those changes.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "event":
+                          {
+                            "id": 12,
+                            "uid": "1b0e7d1e-4a52-4f45-9f3c-6f5b1e2f7a10",
+                            "original_start": null,
+                            "start": 1763276400,
+                            "end": 1763278200,
+                            "timezone": "Europe/Moscow",
+                            "is_all_day": false,
+                            "title": "Planning",
+                            "location": "Room 1",
+                            "description": "",
+                            "rendered_description": "",
+                            "show_as": 3,
+                            "is_private": false,
+                            "is_cancelled": false,
+                            "rrule": "FREQ=WEEKLY;BYDAY=MO",
+                            "organizer_id": 10,
+                            "response": 2,
+                            "reminder_minutes": 15,
+                            "category": "",
+                            "response_requested": true,
+                            "allow_forwarding": true,
+                            "hide_attendees": false,
+                            "has_zulip_call": false,
+                            "meet_code": "Xc3oQ9pL2mKd",
+                            "chat_id": null,
+                            "attendees":
+                              [
+                                {
+                                  "user_id": 10,
+                                  "is_required": true,
+                                  "response": 2,
+                                  "added_by": null,
+                                },
+                              ],
+                          },
+                        "has_changed_occurrences": false,
+                      }
     patch:
       operationId: update-calendar-event
       tags: ["calendar"]
@@ -30253,7 +30330,9 @@ components:
             `occurrence` parameter of other endpoints, even if it was
             moved.
 
-            `null` for an event that does not repeat.
+            `null` for an event that does not repeat, and for a
+            repeating event as a whole, as in
+            [`GET /calendar/events/{calendar_event_id}`](/api/get-calendar-event).
         start:
           type: integer
           description: |

@@ -777,6 +777,36 @@ class CalendarAPITest(CalendarTestCase):
         )
         self.assert_json_error(result, "location is too long (limit: 255 characters)")
 
+    def test_get_event(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        series_id = self.create_event(
+            hamlet, rrule="FREQ=DAILY", required_attendees=[cordelia], hide_attendees=True
+        )
+
+        result = self.api_get(cordelia, f"/api/v1/calendar/events/{series_id}")
+        data = self.assert_json_success(result)
+        self.assertFalse(data["has_changed_occurrences"])
+        self.assertEqual(data["event"]["attendees"], [])
+
+        # The series, not its first occurrence as it was changed.
+        update_calendar_event(hamlet, series_id, original_start=MONDAY_10_00, title="Moved")
+        result = self.api_get(hamlet, f"/api/v1/calendar/events/{series_id}")
+        data = self.assert_json_success(result)
+        self.assertTrue(data["has_changed_occurrences"])
+        event = data["event"]
+        self.assertEqual(
+            (event["original_start"], event["start"], event["title"], event["rrule"]),
+            (None, timestamp(MONDAY_10_00), "Planning", "FREQ=DAILY"),
+        )
+        self.assertEqual(event["response"], CalendarResponse.ACCEPTED)
+        self.assertEqual(
+            [attendee["user_id"] for attendee in event["attendees"]], [hamlet.id, cordelia.id]
+        )
+
+        result = self.api_get(self.example_user("iago"), f"/api/v1/calendar/events/{series_id}")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
     def test_inaccessible_users(self) -> None:
         self.set_up_db_for_testing_user_access()
         polonius = self.example_user("polonius")

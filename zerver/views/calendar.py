@@ -17,6 +17,7 @@ from zerver.lib.calendar.changes import (
 )
 from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
+    get_calendar_event,
     get_calendar_occurrences,
     get_free_busy,
 )
@@ -72,6 +73,23 @@ def get_calendar_events(
     )
     return json_success(
         request, data={"events": [occurrence.to_api_dict() for occurrence in occurrences]}
+    )
+
+
+@typed_endpoint
+def get_calendar_event_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    calendar_event_id: PathOnly[int],
+) -> HttpResponse:
+    calendar_event, has_changed_occurrences = get_calendar_event(user_profile, calendar_event_id)
+    return json_success(
+        request,
+        data={
+            "event": calendar_event.to_api_dict(),
+            "has_changed_occurrences": has_changed_occurrences,
+        },
     )
 
 

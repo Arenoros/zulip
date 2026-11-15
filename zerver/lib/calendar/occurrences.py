@@ -319,6 +319,30 @@ def get_calendar_occurrences(
     return calendar_occurrences
 
 
+def get_calendar_event(user_profile: UserProfile, event_id: int) -> tuple[CalendarOccurrence, bool]:
+    """The event as it is in the user's calendar, with the series'
+    first occurrence for a series, and whether some of its occurrences
+    were changed or cancelled."""
+    event = access_calendar_event_by_id(user_profile, event_id)
+    attendee = CalendarAttendee.objects.select_related("event").get(event=event, user=user_profile)
+    attendees = [
+        CalendarAttendeeData(user_id, is_required, response, added_by_id)
+        for user_id, is_required, response, added_by_id in CalendarAttendee.objects.filter(
+            event=event
+        )
+        .order_by("id")
+        .values_list("user_id", "is_required", "response", "added_by_id")
+    ]
+    calendar_event = _make_calendar_occurrence(
+        user_profile,
+        attendee,
+        attendee.response,
+        _Occurrence(None, event.start, event.end, None),
+        attendees,
+    )
+    return calendar_event, CalendarEventException.objects.filter(event=event).exists()
+
+
 def get_free_busy(
     viewer: UserProfile, user_ids: list[int], range_start: datetime, range_end: datetime
 ) -> dict[int, list[FreeBusyBlock]]:

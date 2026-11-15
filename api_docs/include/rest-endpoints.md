@@ -57,6 +57,7 @@
 ## Calendar
 
 * [Get calendar events](/api/get-calendar-events)
+* [Get a calendar event](/api/get-calendar-event)
 * [Create a calendar event](/api/create-calendar-event)
 * [Update a calendar event](/api/update-calendar-event)
 * [Delete a calendar event](/api/delete-calendar-event)

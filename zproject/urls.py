@@ -42,6 +42,7 @@ from zerver.views.calendar import (
     add_calendar_attendees_backend,
     create_calendar_event_backend,
     delete_calendar_event,
+    get_calendar_event_backend,
     get_calendar_events,
     get_calendar_free_busy,
     get_calendar_pinned_users,
@@ -428,6 +429,7 @@ v1_api_and_json_patterns = [
     rest_path("calendar/events", GET=get_calendar_events, POST=create_calendar_event_backend),
     rest_path(
         "calendar/events/<int:calendar_event_id>",
+        GET=get_calendar_event_backend,
         PATCH=update_calendar_event_backend,
         DELETE=delete_calendar_event,
     ),
