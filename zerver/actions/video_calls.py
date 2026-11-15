@@ -190,6 +190,12 @@ def ring_livekit_call(
     send_livekit_call_rings_event(caller.realm, call, [caller.id])
 
 
+def check_livekit_is_call_provider(realm: Realm) -> None:
+    livekit = realm.get_enabled_video_chat_providers().get("livekit")
+    if livekit is None or realm.video_chat_provider != livekit["id"]:
+        raise JsonableError(_("LiveKit is not the call provider of this organization."))
+
+
 def check_start_livekit_call(
     caller: UserProfile,
     client: Client,

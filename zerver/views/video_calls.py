@@ -33,6 +33,7 @@ from typing_extensions import TypedDict, override
 
 from zerver.actions.video_calls import (
     check_invite_to_livekit_call,
+    check_livekit_is_call_provider,
     check_start_livekit_call,
     do_answer_call,
     do_cancel_call,
@@ -986,10 +987,7 @@ def start_livekit_call(
     call_id: Json[NonNegativeInt],
     voice_only: Json[bool] = False,
 ) -> HttpResponse:
-    realm = user_profile.realm
-    livekit = realm.get_enabled_video_chat_providers().get("livekit")
-    if livekit is None or realm.video_chat_provider != livekit["id"]:
-        raise JsonableError(_("LiveKit is not the call provider of this organization."))
+    check_livekit_is_call_provider(user_profile.realm)
 
     recipient_type_name: Literal["private", "stream"]
     if req_type == "channel":
