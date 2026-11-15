@@ -24,6 +24,7 @@ from datetime import timedelta
 
 from django.utils.timezone import now as timezone_now
 
+from zerver.actions.message_flags import do_mark_all_as_read
 from zerver.lib.calendar.changes import create_calendar_event
 from zerver.models.realms import get_realm
 from zerver.models.streams import get_stream
@@ -42,6 +43,9 @@ event_id = create_calendar_event(
     required_attendees=[desdemona],
     optional_attendees=[],
 )
+# The invitation from Notification Bot would add its unread count to
+# the window title.
+do_mark_all_as_read(desdemona)
 print(
     "SEEDED "
     + json.dumps({"event_id": event_id, "denmark": get_stream("Denmark", realm).id})

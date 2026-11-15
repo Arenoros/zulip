@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest import mock
+from zoneinfo import ZoneInfo
 
 import orjson
+from django.conf import settings
 from django.utils.timezone import now as timezone_now
 from typing_extensions import override
 
@@ -27,6 +29,7 @@ from zerver.lib.calendar.occurrences import (
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
+from zerver.lib.timestamp import datetime_to_global_time
 from zerver.lib.test_helpers import get_subscription
 from zerver.models import (
     CalendarAttendee,
@@ -36,12 +39,14 @@ from zerver.models import (
     CalendarPinnedUser,
     CalendarUserSettings,
     LiveKitCall,
+    Message,
     Realm,
     Stream,
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
 from zerver.models.realms import get_realm
+from zerver.models.users import get_system_bot
 from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.views.calendar import MAX_FREE_BUSY_USERS
 
@@ -795,6 +800,133 @@ class MeetingChatTest(CalendarTestCase):
         self.assertTrue(get_subscription(chat.name, othello).active)
 
 
+class CalendarNotificationTest(CalendarTestCase):
+    def get_notifications(self, user: UserProfile) -> list[str]:
+        """The direct messages that Notification Bot sent the user,
+        without the link to the calendar."""
+        bot = get_system_bot(settings.NOTIFICATION_BOT, user.realm_id)
+        return [
+            message.content.split(" [Open in calendar](")[0]
+            for message in Message.objects.filter(
+                sender=bot, usermessage__user_profile=user
+            ).order_by("id")
+        ]
+
+    def mention(self, user: UserProfile) -> str:
+        return f"@_**{user.full_name}|{user.id}**"
+
+    def test_invitation(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia], optional_attendees=[othello])
+        invitation = (
+            f"{self.mention(hamlet)} invited you to **Planning** on "
+            f"{datetime_to_global_time(MONDAY_10_00)}."
+        )
+        self.assertEqual(self.get_notifications(cordelia), [invitation])
+        self.assertEqual(self.get_notifications(othello), [invitation])
+        self.assertEqual(self.get_notifications(hamlet), [])
+
+        # The link opens the occurrence in the calendar.
+        bot = get_system_bot(settings.NOTIFICATION_BOT, hamlet.realm_id)
+        message = Message.objects.filter(sender=bot, usermessage__user_profile=cordelia).last()
+        assert message is not None
+        self.assertTrue(
+            message.content.endswith(
+                f" [Open in calendar](http://zulip.testserver/#calendar/event/{event_id}/"
+                f"{timestamp(MONDAY_10_00)})"
+            )
+        )
+
+        # Those invited by forwarding learn who invited them.
+        iago = self.example_user("iago")
+        add_calendar_attendees(cordelia, event_id, [iago], is_required=False)
+        self.assertEqual(
+            self.get_notifications(iago),
+            [
+                f"{self.mention(cordelia)} invited you to **Planning** on "
+                f"{datetime_to_global_time(MONDAY_10_00)}."
+            ],
+        )
+
+        # Times may be given in any time zone.
+        moscow_start = MONDAY_10_00.astimezone(ZoneInfo("Europe/Moscow"))
+        moscow_id = self.create_event(
+            hamlet, start=moscow_start, end=moscow_start + timedelta(hours=1), required_attendees=[iago]
+        )
+        message = Message.objects.filter(sender=bot, usermessage__user_profile=iago).last()
+        assert message is not None
+        self.assertTrue(
+            message.content.endswith(
+                f"#calendar/event/{moscow_id}/{timestamp(MONDAY_10_00)})"
+            )
+        )
+
+        # Personal events notify nobody.
+        self.create_event(hamlet, title="Dentist")
+        self.assert_length(self.get_notifications(hamlet), 0)
+
+    def test_changes(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        iago = self.example_user("iago")
+        event_id = self.create_event(
+            hamlet, rrule="FREQ=DAILY", required_attendees=[cordelia, othello]
+        )
+
+        # Changing who is invited invites and removes people; changing
+        # only the title notifies nobody.
+        update_calendar_event(hamlet, event_id, title="Standup", required_attendees=[cordelia, iago])
+        self.assertEqual(
+            self.get_notifications(iago)[-1],
+            f"{self.mention(hamlet)} invited you to **Standup** on "
+            f"{datetime_to_global_time(MONDAY_10_00)}.",
+        )
+        self.assertEqual(
+            self.get_notifications(othello)[-1],
+            f"{self.mention(hamlet)} removed you from **Standup**.",
+        )
+        self.assert_length(self.get_notifications(cordelia), 1)
+
+        # Moving the series or one occurrence tells the attendees.
+        new_start = MONDAY_10_00 + timedelta(hours=2)
+        update_calendar_event(hamlet, event_id, start=new_start)
+        moved = (
+            f"{self.mention(hamlet)} moved **Standup** to {datetime_to_global_time(new_start)}."
+        )
+        self.assertEqual(self.get_notifications(cordelia)[-1], moved)
+        self.assertEqual(self.get_notifications(iago)[-1], moved)
+
+        tuesday = new_start + timedelta(days=1)
+        update_calendar_event(
+            hamlet, event_id, original_start=tuesday, start=tuesday + timedelta(hours=1)
+        )
+        self.assertEqual(
+            self.get_notifications(cordelia)[-1],
+            f"{self.mention(hamlet)} moved **Standup** ({datetime_to_global_time(tuesday)}) to "
+            f"{datetime_to_global_time(tuesday + timedelta(hours=1))}.",
+        )
+        update_calendar_event(hamlet, event_id, original_start=tuesday, title="Retro")
+        self.assert_length(self.get_notifications(cordelia), 3)
+
+        # Cancelling an occurrence, and the series.
+        wednesday = new_start + timedelta(days=2)
+        cancel_calendar_event(hamlet, event_id, wednesday)
+        self.assertEqual(
+            self.get_notifications(iago)[-1],
+            f"{self.mention(hamlet)} cancelled **Standup** ({datetime_to_global_time(wednesday)}).",
+        )
+        cancel_calendar_event(hamlet, event_id)
+        self.assertEqual(
+            self.get_notifications(cordelia)[-1],
+            f"{self.mention(hamlet)} cancelled **Standup**.",
+        )
+        self.assert_length(self.get_notifications(othello), 2)
+        self.assert_length(self.get_notifications(hamlet), 0)
+
+
 class MeetingCallTest(CalendarTestCase):
     @override
     def setUp(self) -> None:
@@ -1284,12 +1416,18 @@ class CalendarChangeEventsTest(CalendarTestCase):
         iago = self.example_user("iago")
         CalendarPinnedUser.objects.create(user=iago, pinned_user=cordelia, order=1, color="#4f7cff")
 
-        with self.capture_send_event_calls(expected_num_events=3) as events:
+        # Besides the calendar events, Notification Bot invites cordelia
+        # and othello.
+        with self.capture_send_event_calls(expected_num_events=5) as events:
             event_id = self.create_event(
                 hamlet, required_attendees=[cordelia, othello], hide_attendees=True
             )
         self.assertCountEqual(
-            [(event["event"], sorted(event["users"])) for event in events],
+            [
+                (event["event"], sorted(event["users"]))
+                for event in events
+                if event["event"]["type"] != "message"
+            ],
             [
                 (
                     {"type": "calendar", "event_id": event_id, "unanswered_invitation_count": 0},

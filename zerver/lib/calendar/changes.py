@@ -10,6 +10,12 @@ from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
 from zerver.actions.streams import bulk_add_subscriptions, rename_stream_without_notice
+from zerver.lib.calendar.notifications import (
+    notify_cancelled,
+    notify_invited,
+    notify_moved,
+    notify_removed,
+)
 from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
     get_unanswered_invitation_counts,
@@ -248,6 +254,7 @@ def create_calendar_event(
         reminder_minutes=get_default_reminder_minutes({organizer.id})[organizer.id],
     )
     create_new_attendees(event, is_required_by_user_id)
+    notify_invited(organizer, event, set(is_required_by_user_id))
     send_calendar_change_events(organizer.realm, event, get_attendee_user_ids(event))
     return event.id
 
@@ -295,7 +302,8 @@ def update_calendar_occurrence(
     location: str | None,
     start: datetime | None,
     end: datetime | None,
-) -> None:
+) -> CalendarEventException | None:
+    """Returns the changed occurrence if its time changed."""
     check_occurrence(event, original_start)
     exception, _created = CalendarEventException.objects.get_or_create(
         event=event, original_start=original_start
@@ -330,6 +338,7 @@ def update_calendar_occurrence(
         event.sequence += 1
     event.last_modified = timezone_now()
     event.save(update_fields=["sequence", "last_modified"])
+    return exception if time_changed else None
 
 
 def update_attendees(
@@ -423,7 +432,7 @@ def update_calendar_event(
             raise JsonableError(
                 _("Only the time, title, location and description of an occurrence can be changed")
             )
-        update_calendar_occurrence(
+        moved_exception = update_calendar_occurrence(
             user_profile,
             event,
             original_start,
@@ -433,6 +442,8 @@ def update_calendar_event(
             start=start,
             end=end,
         )
+        if moved_exception is not None:
+            notify_moved(user_profile, event, old_user_ids, moved_exception)
         send_calendar_change_events(user_profile.realm, event, old_user_ids)
         return
 
@@ -499,9 +510,12 @@ def update_calendar_event(
 
     if required_attendees is not None or optional_attendees is not None:
         update_attendees(event, required_attendees, optional_attendees)
-    send_calendar_change_events(
-        user_profile.realm, event, old_user_ids | get_attendee_user_ids(event)
-    )
+    new_user_ids = get_attendee_user_ids(event)
+    if time_changed:
+        notify_moved(user_profile, event, old_user_ids & new_user_ids)
+    notify_invited(user_profile, event, new_user_ids - old_user_ids)
+    notify_removed(user_profile, event, old_user_ids - new_user_ids)
+    send_calendar_change_events(user_profile.realm, event, old_user_ids | new_user_ids)
 
 
 @transaction.atomic(durable=True)
@@ -511,17 +525,20 @@ def cancel_calendar_event(
     """Cancels the event, or with original_start, one occurrence of
     it; attendees see it as cancelled until they remove it."""
     event = access_calendar_event_as_organizer(user_profile, event_id)
+    cancelled_exception = None
     if original_start is None:
         event.is_cancelled = True
     else:
         check_occurrence(event, original_start)
-        CalendarEventException.objects.update_or_create(
+        cancelled_exception, _created = CalendarEventException.objects.update_or_create(
             event=event, original_start=original_start, defaults={"is_cancelled": True}
         )
     event.sequence += 1
     event.last_modified = timezone_now()
     event.save(update_fields=["is_cancelled", "sequence", "last_modified"])
-    send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
+    user_ids = get_attendee_user_ids(event)
+    notify_cancelled(user_profile, event, user_ids, cancelled_exception)
+    send_calendar_change_events(user_profile.realm, event, user_ids)
 
 
 @transaction.atomic(durable=True)
@@ -578,6 +595,7 @@ def add_calendar_attendees(
         if user_id not in existing_user_ids
     }
     create_new_attendees(event, new_attendees, added_by=user_profile)
+    notify_invited(user_profile, event, set(new_attendees))
     send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
 
 

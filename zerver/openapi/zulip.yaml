@@ -8450,7 +8450,8 @@ paths:
         Create an event in the current user's calendar, with the current
         user as its organizer, and invite the attendees, if any.
 
-        Attendees get a [`calendar`](/api/get-events#calendar) event.
+        The attendees get a direct message from Notification Bot inviting
+        them, and a [`calendar`](/api/get-events#calendar) event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
       requestBody:
@@ -8702,7 +8703,10 @@ paths:
         to its occurrences. Changing when an event or an occurrence takes
         place asks the attendees to respond again.
 
-        Attendees get a [`calendar`](/api/get-events#calendar) event.
+        When an event or an occurrence is moved, its attendees get a direct
+        message from Notification Bot, and so do attendees who are invited
+        or removed. Attendees get a [`calendar`](/api/get-events#calendar)
+        event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
       x-curl-examples-parameters:
@@ -8846,7 +8850,9 @@ paths:
         occurrence of it, for all attendees. For an attendee, remove it from
         their calendar by declining it.
 
-        Attendees get a [`calendar`](/api/get-events#calendar) event.
+        When the organizer cancels the event, its attendees get a direct
+        message from Notification Bot. Attendees get a
+        [`calendar`](/api/get-events#calendar) event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
       parameters:
@@ -8912,6 +8918,7 @@ paths:
         organizer may do so only if the organizer allows forwarding the
         event.
 
+        The invited users get a direct message from Notification Bot.
         Attendees get a [`calendar`](/api/get-events#calendar) event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).

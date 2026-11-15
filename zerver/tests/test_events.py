@@ -2196,12 +2196,14 @@ class NormalActionsTest(BaseAction):
             optional_attendees=[],
         )
 
-        with self.verify_action() as events:
+        # Notification Bot also invites the user.
+        with self.verify_action(num_events=2) as events:
             event_id = create_calendar_event(
                 othello, required_attendees=[self.user_profile], **event_fields
             )
-        check_calendar("events[0]", events[0])
-        self.assertEqual(events[0]["unanswered_invitation_count"], 1)
+        check_direct_message("events[0]", events[0])
+        check_calendar("events[1]", events[1])
+        self.assertEqual(events[1]["unanswered_invitation_count"], 1)
 
         with self.verify_action() as events:
             respond_to_calendar_event(self.user_profile, event_id, CalendarResponse.ACCEPTED)
