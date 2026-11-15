@@ -15,7 +15,7 @@ import * as calendar_filter from "./calendar_filter.ts";
 import * as calendar_layout from "./calendar_layout.ts";
 import type {AllDayEventPlacement, TimedEventPlacement} from "./calendar_layout.ts";
 import * as calendar_util from "./calendar_util.ts";
-import type {CalendarLocation} from "./calendar_util.ts";
+import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
 import * as people from "./people.ts";
@@ -46,17 +46,22 @@ const CATEGORY_COLORS = new Map([
 const MIN_EVENT_ROWS = 0.5;
 const MINUTES_PER_DAY = 24 * 60;
 
-const settings_schema = z.object({
-    settings: z.object({
-        work_days: z.array(z.number()),
-        work_day_start_minutes: z.number(),
-        work_day_end_minutes: z.number(),
-        default_reminder_minutes: z.nullable(z.number()),
-        time_scale_minutes: z.number(),
-    }),
+export const calendar_settings_schema = z.object({
+    work_days: z.array(z.number()),
+    work_day_start_minutes: z.number(),
+    work_day_end_minutes: z.number(),
+    default_reminder_minutes: z.nullable(z.number()),
+    default_view: z.number(),
+    time_scale_minutes: z.number(),
 });
 
-type CalendarSettings = z.infer<typeof settings_schema>["settings"];
+const settings_schema = z.object({settings: calendar_settings_schema});
+
+export type CalendarSettings = z.infer<typeof calendar_settings_schema>;
+
+// Sync this with CalendarUserSettings.View.
+const WEEK_VIEW = 1;
+const WORK_WEEK_VIEW = 2;
 
 export const occurrence_schema = z.object({
     id: z.number(),
@@ -123,6 +128,7 @@ let settings: CalendarSettings = {
     work_day_start_minutes: 9 * 60,
     work_day_end_minutes: 18 * 60,
     default_reminder_minutes: 15,
+    default_view: WORK_WEEK_VIEW,
     time_scale_minutes: 30,
 };
 let settings_state: "unloaded" | "loading" | "loaded" = "unloaded";
@@ -183,6 +189,15 @@ export function get_default_reminder(): number | null {
 
 export function get_time_scale(): number {
     return settings.time_scale_minutes;
+}
+
+export function get_settings(): CalendarSettings {
+    return settings;
+}
+
+// The view the calendar opens in.
+export function get_default_view(): CalendarView {
+    return settings.default_view === WEEK_VIEW ? "week" : "workweek";
 }
 
 function format_time(seconds: number): string {
@@ -657,6 +672,20 @@ export function update_settings(new_settings: CalendarSettings): void {
     }
 }
 
+// The view chosen in the calendar is the one it opens in next time.
+export function set_default_view(view: CalendarView, on_error: (xhr: JQuery.jqXHR) => void): void {
+    const default_view = view === "week" ? WEEK_VIEW : WORK_WEEK_VIEW;
+    if (default_view === settings.default_view) {
+        return;
+    }
+    settings = {...settings, default_view};
+    void channel.patch({
+        url: "/json/calendar/settings",
+        data: {default_view: JSON.stringify(default_view)},
+        error: on_error,
+    });
+}
+
 export function set_time_scale(minutes: number, on_error: (xhr: JQuery.jqXHR) => void): void {
     settings = {...settings, time_scale_minutes: minutes};
     if (current_location !== undefined) {
@@ -708,6 +737,8 @@ export function refresh_free_busy(user_ids: number[]): void {
 
 export function initialize({on_settings_change}: {on_settings_change: () => void}): void {
     on_settings_loaded = on_settings_change;
+    // The settings are fetched early, for the view the calendar opens in.
+    fetch_settings();
     $("#calendar-view").on("click", ".calendar-grid-retry", () => {
         assert(current_location !== undefined);
         go_to_location(current_location);

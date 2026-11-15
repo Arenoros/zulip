@@ -285,7 +285,7 @@ function setup_add_colleague_widget(): void {
 }
 
 export function get_location_from_hash(hash: string): CalendarLocation | undefined {
-    return calendar_util.parse_calendar_hash(hash, today());
+    return calendar_util.parse_calendar_hash(hash, today(), calendar_grid.get_default_view());
 }
 
 export function show(location: CalendarLocation, hash_of_view_behind: string): void {
@@ -446,6 +446,10 @@ function register_view_menu_popover(): void {
                 assert(current_location !== undefined);
                 const view = this.dataset["calendarView"] === "week" ? "week" : "workweek";
                 go_to_location({...current_location, view});
+                calendar_grid.set_default_view(
+                    view,
+                    report_error($t({defaultMessage: "Failed to save the view"})),
+                );
                 popover_menus.hide_current_popover_if_visible(instance);
             });
             $popper.on("click", ".calendar-side-by-side-option", () => {

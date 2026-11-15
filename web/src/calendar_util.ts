@@ -13,7 +13,6 @@ const CALENDAR_VIEWS = new Set<string>(["week", "workweek"]);
 // Weeks always start on Monday, like the ISO weekdays of the
 // calendar settings.
 const WEEK_OPTIONS = {weekStartsOn: 1} as const;
-const DEFAULT_VIEW: CalendarView = "workweek";
 
 let is_calendar_visible = false;
 
@@ -49,16 +48,20 @@ export function is_calendar_hash(hash: string | undefined): boolean {
     return hash === "#calendar" || (hash?.startsWith("#calendar/") ?? false);
 }
 
-// Returns the location in a #calendar hash, with the week containing
-// `today` when the hash names no date, or undefined if the hash is
-// invalid.
-export function parse_calendar_hash(hash: string, today: Date): CalendarLocation | undefined {
+// Returns the location in a #calendar hash, with default_view when
+// the hash names no view and the week containing `today` when it
+// names no date, or undefined if the hash is invalid.
+export function parse_calendar_hash(
+    hash: string,
+    today: Date,
+    default_view: CalendarView,
+): CalendarLocation | undefined {
     const [category, view, date_string, ...rest] = hash.replace(/\/$/, "").split("/");
     if (category !== "#calendar" || rest.length > 0) {
         return undefined;
     }
     if (view === undefined) {
-        return get_location_for_date(DEFAULT_VIEW, today);
+        return get_location_for_date(default_view, today);
     }
     if (!CALENDAR_VIEWS.has(view)) {
         return undefined;

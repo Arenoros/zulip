@@ -11,10 +11,15 @@ const calendar_util = zrequire("calendar_util");
 const today = new Date(2026, 10, 14);
 
 run_test("parse_calendar_hash", () => {
-    const parse = (hash) => calendar_util.parse_calendar_hash(hash, today);
+    const parse = (hash) => calendar_util.parse_calendar_hash(hash, today, "workweek");
 
     assert.deepEqual(parse("#calendar"), {view: "workweek", week_start: "2026-11-09"});
     assert.deepEqual(parse("#calendar/"), {view: "workweek", week_start: "2026-11-09"});
+    // Without a view, the calendar opens in the user's default view.
+    assert.deepEqual(calendar_util.parse_calendar_hash("#calendar", today, "week"), {
+        view: "week",
+        week_start: "2026-11-09",
+    });
     assert.deepEqual(parse("#calendar/week"), {view: "week", week_start: "2026-11-09"});
     assert.deepEqual(parse("#calendar/workweek/2026-11-09"), {
         view: "workweek",
