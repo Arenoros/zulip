@@ -78,6 +78,7 @@ EXEMPT_FILES = make_set(
         "web/src/calendar_menus.ts",
         "web/src/calendar_reminders.ts",
         "web/src/calendar_responses.ts",
+        "web/src/calendar_scheduler.ts",
         "web/src/calendar_ui.ts",
         "web/src/channel_folders_popover.ts",
         "web/src/channel_folders_ui.ts",

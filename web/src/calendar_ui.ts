@@ -22,6 +22,7 @@ import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting from "./calendar_meeting.ts";
 import * as calendar_menus from "./calendar_menus.ts";
 import * as calendar_responses from "./calendar_responses.ts";
+import * as calendar_scheduler from "./calendar_scheduler.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
 import * as channel from "./channel.ts";
@@ -304,6 +305,7 @@ export function show(location: CalendarLocation, hash_of_view_behind: string): v
     setup_add_colleague_widget();
     calendar_grid.show(location, calendar_colleagues.get_shown_colleagues());
     calendar_form.restore();
+    calendar_scheduler.restore();
     calendar_meeting.restore();
     calendar_colleagues.fetch(
         report_error($t({defaultMessage: "Failed to load your colleagues' calendars"})),
@@ -600,10 +602,12 @@ export function initialize({
     });
     calendar_form.initialize({
         on_close() {
+            calendar_scheduler.close();
             $("#calendar-view .calendar-new-event-button").trigger("focus");
         },
         get_mini_month_context,
     });
+    calendar_scheduler.initialize();
     $view.on("click", ".calendar-new-event-button", () => {
         calendar_form.open_now();
     });

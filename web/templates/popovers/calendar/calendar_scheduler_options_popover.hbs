@@ -1,0 +1,19 @@
+<div class="popover-menu calendar-menu" id="calendar-scheduler-options-menu">
+    <ul role="menu" class="popover-menu-list">
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitemcheckbox" tabindex="0" class="popover-menu-link calendar-scheduler-work-hours-option" aria-checked="{{#if only_work_hours}}true{{else}}false{{/if}}">
+                <i class="popover-menu-icon zulip-icon {{#if only_work_hours}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Show only work hours" }}</span>
+            </a>
+        </li>
+        <li role="separator" class="popover-menu-separator"></li>
+        {{#each scales}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitemradio" tabindex="0" class="popover-menu-link calendar-scheduler-scale-option" data-scale="{{minutes}}" aria-checked="{{#if is_checked}}true{{else}}false{{/if}}">
+                    <i class="popover-menu-icon zulip-icon {{#if is_checked}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                    <span class="popover-menu-label">{{label}}</span>
+                </a>
+            </li>
+        {{/each}}
+    </ul>
+</div>

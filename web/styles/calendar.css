@@ -1992,3 +1992,320 @@ body.calendar-view-visible {
     width: var(--modal-input-width);
     max-width: 100%;
 }
+
+/* The scheduler takes the place of the form of the event. */
+.calendar-scheduler-container {
+    display: none;
+}
+
+#calendar-view.editing-event.scheduling {
+    .calendar-form-container {
+        display: none;
+    }
+
+    .calendar-scheduler-container {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+.calendar-scheduler {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    /* 16px at 14px/1em */
+    gap: 1.1429em;
+    min-width: 0;
+    min-height: 0;
+    padding: 1.1429em;
+    box-sizing: border-box;
+
+    .hide {
+        display: none;
+    }
+}
+
+.calendar-scheduler-body {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.calendar-scheduler-time {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5714em; /* 8px at 14px/1em */
+    /* 12px and 16px at 14px/1em */
+    padding: 0.8571em 1.1429em;
+    border-bottom: 1px solid var(--color-calendar-border);
+}
+
+.calendar-scheduler-to {
+    color: var(--color-calendar-text-secondary);
+}
+
+.calendar-scheduler-all-day {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5714em; /* 8px at 14px/1em */
+    margin-left: 0.8571em; /* 12px at 14px/1em */
+}
+
+.calendar-scheduler-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.calendar-scheduler-grid {
+    /* An hour is 63px at the half-hour scale, as in the design. */
+    --calendar-scheduler-minute: calc(2.25em / var(--calendar-scheduler-scale));
+    /* 280px and 84px at 14px/1em */
+    --calendar-scheduler-people-width: 20em;
+    --calendar-scheduler-header-height: 6em;
+    --calendar-person-color: var(--color-calendar-legend);
+    position: relative;
+    display: grid;
+    grid-template-columns:
+        var(--calendar-scheduler-people-width)
+        calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-total));
+    /* 44px at 14px/1em */
+    grid-auto-rows: minmax(3.1429em, auto);
+    align-content: start;
+    width: max-content;
+    min-width: 100%;
+    min-height: 100%;
+}
+
+.calendar-scheduler-corner,
+.calendar-scheduler-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    box-sizing: border-box;
+    height: var(--calendar-scheduler-header-height);
+    border-bottom: 1px solid var(--color-calendar-border);
+    background-color: var(--color-calendar-background-toolbar);
+}
+
+.calendar-scheduler-corner {
+    left: 0;
+    z-index: 3;
+    border-right: 1px solid var(--color-calendar-border);
+}
+
+.calendar-scheduler-header {
+    display: flex;
+}
+
+.calendar-scheduler-day {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    border-left: 1px solid var(--color-calendar-border);
+
+    &.selected .calendar-scheduler-day-label {
+        box-shadow: inset 0 2px 0 var(--color-calendar-accent);
+        color: var(--color-calendar-text-accent);
+        font-weight: 600;
+    }
+}
+
+.calendar-scheduler-day-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 0.8571em; /* 12px at 14px/1em */
+    overflow: hidden;
+    border-bottom: 1px solid var(--color-calendar-border);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.calendar-scheduler-hours {
+    flex: 1;
+    display: flex;
+}
+
+.calendar-scheduler-hour {
+    flex: none;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    padding: 0 0.5714em; /* 8px at 14px/1em */
+    overflow: hidden;
+    color: var(--color-calendar-text-secondary);
+    white-space: nowrap;
+}
+
+.calendar-scheduler-label {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.5714em; /* 8px at 14px/1em */
+    min-width: 0;
+    padding: 0 0.8571em; /* 12px at 14px/1em */
+    border-right: 1px solid var(--color-calendar-border);
+    border-bottom: 1px solid var(--color-calendar-border);
+    background-color: var(--color-calendar-background-toolbar);
+}
+
+.calendar-scheduler-availability-title {
+    color: var(--color-calendar-text-secondary);
+    font-weight: 600;
+}
+
+.calendar-scheduler-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5714em; /* 8px at 14px/1em */
+    font-weight: 600;
+}
+
+.calendar-scheduler-track {
+    position: relative;
+    border-bottom: 1px solid var(--color-calendar-border);
+    /* A line every hour. */
+    background-image: repeating-linear-gradient(
+        to right,
+        var(--color-calendar-border) 0 1px,
+        transparent 1px calc(var(--calendar-scheduler-minute) * 60)
+    );
+}
+
+.calendar-scheduler-off-hours,
+.calendar-scheduler-no-data,
+.calendar-scheduler-track .calendar-scheduler-block {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-start));
+    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+}
+
+.calendar-scheduler-off-hours,
+.calendar-scheduler-off-hours-swatch {
+    background-color: color-mix(in srgb, var(--color-calendar-text) 9%, transparent);
+}
+
+.calendar-scheduler-no-data,
+.calendar-scheduler-no-data-swatch {
+    background-image: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--color-calendar-text) 35%, transparent) 0 1px,
+        transparent 1px 5px
+    );
+}
+
+.calendar-scheduler-track .calendar-scheduler-block {
+    /* 6px at 14px/1em */
+    top: 0.4286em;
+    bottom: 0.4286em;
+    padding: 0;
+    border-left-width: 3px;
+    font-size: inherit;
+    cursor: default;
+
+    &:hover {
+        filter: none;
+    }
+}
+
+.calendar-scheduler-selection {
+    position: absolute;
+    top: var(--calendar-scheduler-header-height);
+    bottom: 0;
+    left: calc(
+        var(--calendar-scheduler-people-width) +
+            var(--calendar-scheduler-minute) * var(--calendar-scheduler-start)
+    );
+    z-index: 1;
+    box-sizing: border-box;
+    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    min-width: 4px;
+    border: 2px solid var(--color-calendar-accent);
+    border-radius: 3px;
+    background-color: color-mix(in srgb, var(--color-calendar-accent) 22%, transparent);
+    cursor: grab;
+    touch-action: none;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-calendar-text);
+        outline-offset: 1px;
+    }
+}
+
+.calendar-scheduler-avatar {
+    flex: none;
+    /* 28px at 14px/1em */
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+}
+
+.calendar-scheduler-person {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.calendar-scheduler-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.calendar-scheduler-unavailable {
+    color: light-dark(#c4314b, #f1707b);
+    font-size: 0.8571em; /* 12px at 14px/1em */
+}
+
+.calendar-scheduler-local-time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    color: var(--color-calendar-text-secondary);
+    font-size: 0.8571em; /* 12px at 14px/1em */
+    white-space: nowrap;
+}
+
+.calendar-scheduler-add-icon {
+    color: var(--color-calendar-text-accent);
+}
+
+.calendar-scheduler-add {
+    flex: 1;
+    min-width: 0;
+}
+
+.calendar-scheduler-find {
+    position: absolute;
+    bottom: 1.1429em; /* 16px at 14px/1em */
+    left: 50%;
+    z-index: 3;
+    transform: translateX(-50%);
+    border: 1px solid var(--color-calendar-border);
+    background-color: var(--color-calendar-background-toolbar);
+    box-shadow: 0 2px 8px hsl(0deg 0% 0% / 20%);
+}
+
+.calendar-scheduler-legend {
+    display: flex;
+    flex-wrap: wrap;
+    /* 8px and 24px at 13px/1em */
+    gap: 0.6154em 1.8462em;
+    padding: 0 0.6154em;
+    color: var(--color-calendar-text-secondary);
+    font-size: 0.9286em; /* 13px at 14px/1em */
+}

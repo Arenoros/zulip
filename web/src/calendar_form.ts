@@ -38,6 +38,7 @@ import * as timerender from "./timerender.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
 import * as user_pill from "./user_pill.ts";
+import * as util from "./util.ts";
 import type {UserPill} from "./user_pill.ts";
 import {user_settings} from "./user_settings.ts";
 
@@ -960,7 +961,7 @@ function show_attendee_options(button: HTMLElement): void {
     });
 }
 
-function show_date_picker(
+export function show_date_picker(
     button: HTMLElement,
     date: string,
     on_pick: (date: string) => void,
@@ -1159,7 +1160,7 @@ function save_personal_settings(event_id: number, form: FormState, on_done: () =
     });
 }
 
-function save(): void {
+export function save(): void {
     if (state === undefined || is_saving) {
         return;
     }
@@ -1248,6 +1249,71 @@ export function close(): void {
     $("#calendar-view").removeClass("editing-event");
     $("#calendar-view .calendar-form-container").empty();
     on_close?.();
+}
+
+// The scheduler is another view of the event in the form: it shows
+// and changes the event's time and attendees, and saves it.
+export type SchedulingState = {
+    date: string;
+    start_minute: number;
+    duration_minutes: number;
+    is_all_day: boolean;
+    time_zone: string;
+    required_attendee_ids: number[];
+    optional_attendee_ids: number[];
+    // The event being changed, whose own times do not make its
+    // attendees busy.
+    event_id: number | undefined;
+    // Only the time of an occurrence of a series can change.
+    can_change_attendees: boolean;
+};
+
+export function get_scheduling_state(): SchedulingState {
+    assert(state !== undefined);
+    read_fields();
+    return {
+        date: state.date,
+        start_minute: state.start_minute,
+        duration_minutes: state.duration_minutes,
+        is_all_day: state.is_all_day,
+        time_zone: state.time_zone,
+        required_attendee_ids: state.required_attendee_ids,
+        optional_attendee_ids: state.optional_attendee_ids,
+        event_id: editing?.occurrence.id,
+        can_change_attendees: !(editing?.is_occurrence ?? false),
+    };
+}
+
+export function set_time(start_minute: number, duration_minutes: number): void {
+    assert(state !== undefined);
+    state.start_minute = start_minute;
+    state.duration_minutes = duration_minutes;
+    update_time_fields();
+}
+
+export function set_all_day(is_all_day: boolean): void {
+    assert(state !== undefined);
+    state.is_all_day = is_all_day;
+    update_time_fields();
+}
+
+// The pills of the form tell it of the change.
+export function add_attendee(user_id: number, is_required: boolean): void {
+    const pills = is_required ? required_pills : optional_pills;
+    const user = people.maybe_get_user_by_id(user_id, true);
+    assert(pills !== undefined && user !== undefined);
+    user_pill.append_user(user, pills);
+}
+
+export function remove_attendee(user_id: number): void {
+    for (const pills of [required_pills, optional_pills]) {
+        const pill = pills?.getPillByPredicate(
+            (item) => item.user_id === user_id,
+        );
+        if (pills !== undefined && pill !== undefined) {
+            pills.removePill(util.the(pill.$element), "close");
+        }
+    }
 }
 
 // Asks before losing changes.
