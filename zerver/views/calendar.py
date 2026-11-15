@@ -10,7 +10,7 @@ from django.views.decorators.cache import never_cache
 from pydantic import Json, StringConstraints
 from pydantic_partials.sentinels import Missing, MissingType
 
-from zerver.decorator import zulip_login_required
+from zerver.decorator import require_realm_admin, zulip_login_required
 from zerver.lib.calendar.calls import (
     access_calendar_event_call,
     can_join_calendar_event_call,
@@ -35,6 +35,12 @@ from zerver.lib.calendar.occurrences import (
     get_calendar_occurrences,
     get_free_busy,
 )
+from zerver.lib.calendar.rooms import (
+    access_calendar_room,
+    create_calendar_room,
+    get_calendar_rooms,
+    update_calendar_room,
+)
 from zerver.lib.calendar.user_settings import (
     calendar_user_settings_to_api_dict,
     get_calendar_user_settings,
@@ -53,7 +59,7 @@ from zerver.lib.timestamp import timestamp_to_datetime
 from zerver.lib.typed_endpoint import PathOnly, typed_endpoint
 from zerver.lib.types import UNSET
 from zerver.lib.users import get_inaccessible_user_ids, user_ids_to_users
-from zerver.models import CalendarEvent, UserProfile
+from zerver.models import CalendarEvent, CalendarRoom, UserProfile
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
 from zerver.views.video_calls import render_livekit_call_access_denied
 
@@ -62,6 +68,10 @@ MAX_FREE_BUSY_USERS = 100
 
 CalendarDescription = Annotated[str, StringConstraints(max_length=settings.MAX_MESSAGE_LENGTH)]
 CalendarLocation = Annotated[str, StringConstraints(max_length=CalendarEvent.MAX_LOCATION_LENGTH)]
+CalendarRoomLocation = Annotated[
+    str, StringConstraints(max_length=CalendarRoom.MAX_LOCATION_LENGTH)
+]
+CalendarRoomEmail = Annotated[str, StringConstraints(max_length=CalendarRoom.MAX_EMAIL_LENGTH)]
 
 
 def access_calendar_users(user_profile: UserProfile, user_ids: list[int]) -> list[UserProfile]:
@@ -466,5 +476,50 @@ def update_calendar_settings(
         else default_reminder_minutes,
         default_view=default_view,
         time_scale_minutes=time_scale_minutes,
+    )
+    return json_success(request)
+
+
+def get_calendar_rooms_backend(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
+    return json_success(request, data={"rooms": get_calendar_rooms(user_profile.realm)})
+
+
+@require_realm_admin
+@typed_endpoint
+def create_calendar_room_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    name: str,
+    capacity: Json[int] | None = None,
+    location: CalendarRoomLocation = "",
+    email: CalendarRoomEmail = "",
+) -> HttpResponse:
+    room_id = create_calendar_room(
+        user_profile.realm, name=name, capacity=capacity, location=location, email=email
+    )
+    return json_success(request, data={"id": room_id})
+
+
+@require_realm_admin
+@typed_endpoint
+def update_calendar_room_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    room_id: PathOnly[int],
+    name: str | None = None,
+    capacity: Json[int | None] | MissingType = Missing,
+    location: CalendarRoomLocation | None = None,
+    email: CalendarRoomEmail | None = None,
+    is_archived: Json[bool] | None = None,
+) -> HttpResponse:
+    update_calendar_room(
+        access_calendar_room(user_profile.realm, room_id),
+        name=name,
+        capacity=UNSET if isinstance(capacity, MissingType) else capacity,
+        location=location,
+        email=email,
+        is_archived=is_archived,
     )
     return json_success(request)

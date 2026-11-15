@@ -57,7 +57,9 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarEventRoom,
     CalendarPinnedUser,
+    CalendarRoom,
     CalendarUserSettings,
     ChannelFolder,
     Client,
@@ -164,7 +166,9 @@ ALL_ZULIP_TABLES = {
     "zerver_calendarattendeeoccurrenceresponse",
     "zerver_calendarevent",
     "zerver_calendareventexception",
+    "zerver_calendareventroom",
     "zerver_calendarpinneduser",
+    "zerver_calendarroom",
     "zerver_calendarusersettings",
     "zerver_channelemailaddress",
     "zerver_channelfolder",
@@ -1181,9 +1185,17 @@ def get_realm_config() -> Config:
     )
 
     Config(
+        table="zerver_calendarroom",
+        model=CalendarRoom,
+        normal_parent=realm_config,
+        include_rows="realm_id__in",
+    )
+
+    Config(
         custom_tables=[
             "zerver_calendarevent",
             "zerver_calendareventexception",
+            "zerver_calendareventroom",
             "zerver_calendarattendee",
             "zerver_calendarattendeeoccurrenceresponse",
         ],
@@ -1721,6 +1733,9 @@ def custom_fetch_calendar_events(response: TableData, context: Context) -> None:
     response["zerver_calendarevent"] = make_raw(events.order_by("id"))
     response["zerver_calendareventexception"] = make_raw(
         CalendarEventException.objects.filter(event_id__in=event_ids).order_by("id")
+    )
+    response["zerver_calendareventroom"] = make_raw(
+        CalendarEventRoom.objects.filter(event_id__in=event_ids).order_by("id")
     )
     response["zerver_calendarattendee"] = make_raw(
         CalendarAttendee.objects.filter(event_id__in=event_ids).order_by("id")

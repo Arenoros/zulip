@@ -28,6 +28,7 @@ from zerver.lib.calendar.occurrences import (
     get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
+from zerver.lib.calendar.rooms import create_calendar_room
 from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
@@ -39,6 +40,7 @@ from zerver.models import (
     CalendarEvent,
     CalendarEventException,
     CalendarPinnedUser,
+    CalendarRoom,
     CalendarUserSettings,
     LiveKitCall,
     Message,
@@ -1644,3 +1646,86 @@ class CalendarUserSettingsTest(CalendarTestCase):
         ]:
             result = self.api_patch(hamlet, "/api/v1/calendar/settings", params)
             self.assert_json_error(result, error)
+
+
+class CalendarRoomsTest(CalendarTestCase):
+    def get_rooms(self, user: UserProfile) -> list[dict[str, Any]]:
+        result = self.api_get(user, "/api/v1/calendar/rooms")
+        return self.assert_json_success(result)["rooms"]
+
+    def test_manage_rooms(self) -> None:
+        iago = self.example_user("iago")
+        hamlet = self.example_user("hamlet")
+        result = self.api_post(
+            iago,
+            "/api/v1/calendar/rooms",
+            {
+                "name": " Blue room ",
+                "capacity": 8,
+                "location": "Floor 2",
+                "email": "blue-room@zulip.com",
+            },
+        )
+        blue_id = self.assert_json_success(result)["id"]
+        result = self.api_post(iago, "/api/v1/calendar/rooms", {"name": "Attic"})
+        attic_id = self.assert_json_success(result)["id"]
+        blue_room = {
+            "id": blue_id,
+            "name": "Blue room",
+            "capacity": 8,
+            "location": "Floor 2",
+            "email": "blue-room@zulip.com",
+            "is_archived": False,
+        }
+        attic = {
+            "id": attic_id,
+            "name": "Attic",
+            "capacity": None,
+            "location": "",
+            "email": "",
+            "is_archived": False,
+        }
+        self.assertEqual(self.get_rooms(hamlet), [attic, blue_room])
+        result = self.api_get(self.lear_user("king"), "/api/v1/calendar/rooms", subdomain="lear")
+        self.assertEqual(self.assert_json_success(result)["rooms"], [])
+
+        result = self.api_post(hamlet, "/api/v1/calendar/rooms", {"name": "Den"})
+        self.assert_json_error(result, "Must be an organization administrator")
+        result = self.api_patch(hamlet, f"/api/v1/calendar/rooms/{blue_id}", {"name": "Den"})
+        self.assert_json_error(result, "Must be an organization administrator")
+
+        invalid_rooms: list[tuple[dict[str, object], str]] = [
+            ({"name": " "}, "The name must not be empty"),
+            ({"name": "x" * (CalendarRoom.MAX_NAME_LENGTH + 1)}, "The name is too long"),
+            ({"name": "blue ROOM"}, "A meeting room with this name already exists"),
+            ({"name": "Den", "capacity": 0}, "Invalid capacity"),
+            ({"name": "Den", "email": "not an email"}, "Invalid email address"),
+        ]
+        for params, error in invalid_rooms:
+            result = self.api_post(iago, "/api/v1/calendar/rooms", params)
+            self.assert_json_error(result, error)
+        self.assert_length(self.get_rooms(iago), 2)
+
+        result = self.api_patch(
+            iago,
+            f"/api/v1/calendar/rooms/{blue_id}",
+            {"name": "Blue Room", "capacity": "null", "location": "", "is_archived": "true"},
+        )
+        self.assert_json_success(result)
+        blue_room |= {"name": "Blue Room", "capacity": None, "location": "", "is_archived": True}
+        self.assertEqual(self.get_rooms(hamlet), [attic, blue_room])
+        result = self.api_patch(
+            iago, f"/api/v1/calendar/rooms/{blue_id}", {"email": "", "is_archived": "false"}
+        )
+        self.assert_json_success(result)
+        blue_room |= {"email": "", "is_archived": False}
+        self.assertEqual(self.get_rooms(hamlet), [attic, blue_room])
+
+        result = self.api_patch(iago, f"/api/v1/calendar/rooms/{attic_id}", {"name": "blue room"})
+        self.assert_json_error(result, "A meeting room with this name already exists")
+        lear_room_id = create_calendar_room(
+            get_realm("lear"), name="Throne room", capacity=None, location="", email=""
+        )
+        result = self.api_patch(iago, f"/api/v1/calendar/rooms/{lear_room_id}", {"name": "Den"})
+        self.assert_json_error(result, "Invalid meeting room")
+

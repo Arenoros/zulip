@@ -102,6 +102,43 @@ class CalendarEvent(models.Model):
         ]
 
 
+class CalendarRoom(models.Model):
+    """A meeting room of the organization, which meetings book by
+    inviting it, like a room mailbox in Exchange."""
+
+    MAX_NAME_LENGTH = 60
+    MAX_LOCATION_LENGTH = 255
+    # As in Django's EmailField.
+    MAX_EMAIL_LENGTH = 254
+
+    realm = models.ForeignKey(Realm, on_delete=CASCADE)
+    name = models.CharField(max_length=MAX_NAME_LENGTH)
+    # How many people fit in the room, if known.
+    capacity = models.PositiveIntegerField(null=True)
+    # Where the room is, like the building and floor.
+    location = models.TextField(default="")
+    # The address of the room's mailbox in Exchange, which identifies
+    # the room when the calendar moves to Exchange.
+    email = models.TextField(default="")
+    # Rooms are archived rather than deleted, so that the meetings
+    # that booked them keep them.
+    is_archived = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("realm", "name")
+
+
+class CalendarEventRoom(models.Model):
+    """A meeting room booked by an event; a room is booked only if it
+    is free, so it accepts all its bookings."""
+
+    event = models.ForeignKey(CalendarEvent, on_delete=CASCADE)
+    room = models.ForeignKey(CalendarRoom, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("event", "room")
+
+
 class CalendarEventException(models.Model):
     """An occurrence of a series that was changed or cancelled. Fields
     left null are those of the series."""

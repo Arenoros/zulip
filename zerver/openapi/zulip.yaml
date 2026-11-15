@@ -9611,6 +9611,205 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
+  /calendar/rooms:
+    get:
+      operationId: get-calendar-rooms
+      tags: ["calendar"]
+      summary: Get meeting rooms
+      description: |
+        Get the meeting rooms of the organization, which meetings book by
+        inviting them, including archived ones.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      rooms:
+                        type: array
+                        description: |
+                          The rooms, by their names.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: integer
+                              description: |
+                                The ID of the room.
+                            name:
+                              type: string
+                              description: |
+                                The name of the room.
+                            capacity:
+                              type: integer
+                              nullable: true
+                              description: |
+                                How many people fit in the room, or `null` if
+                                unknown.
+                            location:
+                              type: string
+                              description: |
+                                Where the room is, like the building and floor.
+                            email:
+                              type: string
+                              description: |
+                                The address of the room's mailbox in Exchange,
+                                or `""`.
+                            is_archived:
+                              type: boolean
+                              description: |
+                                Whether the room is archived, which means it can
+                                no longer be booked. Meetings keep the archived
+                                rooms they booked.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "rooms":
+                          [
+                            {
+                              "id": 3,
+                              "name": "Blue room",
+                              "capacity": 8,
+                              "location": "Floor 2",
+                              "email": "blue-room@example.com",
+                              "is_archived": false,
+                            },
+                          ],
+                      }
+    post:
+      operationId: create-calendar-room
+      tags: ["calendar"]
+      summary: Create a meeting room
+      description: |
+        Add a meeting room to the organization.
+
+        This endpoint is only available to organization administrators.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: |
+                    The name of the room, unique in the organization.
+                  type: string
+                  example: Blue room
+                capacity:
+                  description: |
+                    How many people fit in the room, or `null` if unknown.
+                  type: integer
+                  nullable: true
+                  example: 8
+                location:
+                  description: |
+                    Where the room is, like the building and floor.
+                  type: string
+                  example: Floor 2
+                email:
+                  description: |
+                    The address of the room's mailbox in Exchange, if any.
+                  type: string
+                  example: blue-room@example.com
+              required:
+                - name
+            encoding:
+              capacity:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      id:
+                        type: integer
+                        description: |
+                          The ID of the new room.
+                    example: {"msg": "", "result": "success", "id": 3}
+  /calendar/rooms/{room_id}:
+    patch:
+      operationId: update-calendar-room
+      tags: ["calendar"]
+      summary: Update a meeting room
+      description: |
+        Change a meeting room of the organization, or archive it.
+
+        This endpoint is only available to organization administrators.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - name: room_id
+          in: path
+          description: |
+            The ID of the room.
+          schema:
+            type: integer
+          example: 3
+          required: true
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: |
+                    The name of the room, unique in the organization.
+                  type: string
+                  example: Blue room
+                capacity:
+                  description: |
+                    How many people fit in the room, or `null` if unknown.
+                  type: integer
+                  nullable: true
+                  example: 8
+                location:
+                  description: |
+                    Where the room is, like the building and floor.
+                  type: string
+                  example: Floor 2
+                email:
+                  description: |
+                    The address of the room's mailbox in Exchange, if any.
+                  type: string
+                  example: blue-room@example.com
+                is_archived:
+                  description: |
+                    Whether the room is archived. An archived room can no longer
+                    be booked, but the meetings that booked it keep it.
+                  type: boolean
+                  example: true
+            encoding:
+              capacity:
+                contentType: application/json
+              is_archived:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
   /saved_snippets:
     get:
       operationId: get-saved-snippets

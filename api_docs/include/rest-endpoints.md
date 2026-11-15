@@ -73,6 +73,9 @@
 * [Unpin a calendar](/api/unpin-calendar-user)
 * [Get calendar settings](/api/get-calendar-settings)
 * [Update calendar settings](/api/update-calendar-settings)
+* [Get meeting rooms](/api/get-calendar-rooms)
+* [Create a meeting room](/api/create-calendar-room)
+* [Update a meeting room](/api/update-calendar-room)
 
 ## Channels
 

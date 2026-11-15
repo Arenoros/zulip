@@ -85,7 +85,9 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarEventRoom,
     CalendarPinnedUser,
+    CalendarRoom,
     CalendarUserSettings,
     ChannelFolder,
     Client,
@@ -195,9 +197,11 @@ ID_MAP: dict[str, dict[int, int]] = {
     "botconfigdata": {},
     "calendarevent": {},
     "calendareventexception": {},
+    "calendareventroom": {},
     "calendarattendee": {},
     "calendarattendeeoccurrenceresponse": {},
     "calendarpinneduser": {},
+    "calendarroom": {},
     "calendarusersettings": {},
     "analytics_realmcount": {},
     "analytics_streamcount": {},
@@ -1977,6 +1981,11 @@ def do_import_realm(
         update_model_ids(MutedUser, data, "muteduser")
         bulk_import_model(data, MutedUser)
 
+    if "zerver_calendarroom" in data:
+        re_map_foreign_keys(data, "zerver_calendarroom", "realm", related_table="realm")
+        update_model_ids(CalendarRoom, data, "calendarroom")
+        bulk_import_model(data, CalendarRoom)
+
     if "zerver_calendarevent" in data:
         fix_datetime_fields(data, "zerver_calendarevent")
         re_map_foreign_keys(data, "zerver_calendarevent", "realm", related_table="realm")
@@ -1993,6 +2002,14 @@ def do_import_realm(
         )
         update_model_ids(CalendarEventException, data, "calendareventexception")
         bulk_import_model(data, CalendarEventException)
+
+    if "zerver_calendareventroom" in data:
+        re_map_foreign_keys(
+            data, "zerver_calendareventroom", "event", related_table="calendarevent"
+        )
+        re_map_foreign_keys(data, "zerver_calendareventroom", "room", related_table="calendarroom")
+        update_model_ids(CalendarEventRoom, data, "calendareventroom")
+        bulk_import_model(data, CalendarEventRoom)
 
     if "zerver_calendarattendee" in data:
         fix_datetime_fields(data, "zerver_calendarattendee")

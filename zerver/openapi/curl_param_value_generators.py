@@ -21,6 +21,7 @@ from zerver.actions.realm_linkifiers import do_add_linkifier
 from zerver.actions.realm_playgrounds import check_add_realm_playground
 from zerver.lib.bot_storage import set_bot_storage
 from zerver.lib.calendar.changes import create_calendar_event
+from zerver.lib.calendar.rooms import create_calendar_room
 from zerver.lib.calendar.user_settings import pin_user
 from zerver.lib.events import do_events_register
 from zerver.lib.initial_password import initial_password
@@ -581,6 +582,12 @@ def create_weekly_calendar_event(organizer: UserProfile, attendees: list[UserPro
     )
 
 
+def create_example_calendar_room(name: str) -> int:
+    return create_calendar_room(
+        helpers.example_user("iago").realm, name=name, capacity=4, location="", email=""
+    )
+
+
 @openapi_param_value_generator(
     [
         "/calendar/events/{calendar_event_id}:get",
@@ -617,3 +624,10 @@ def unpin_calendar_user() -> dict[str, object]:
     cordelia = helpers.example_user("cordelia")
     pin_user(helpers.example_user("iago"), cordelia, "#4f7cff")
     return {"user_id": cordelia.id}
+
+
+@openapi_param_value_generator(["/calendar/rooms/{room_id}:patch"])
+def update_calendar_room() -> dict[str, object]:
+    # Renamed to a name other than that of the room the example of
+    # POST /calendar/rooms adds.
+    return {"room_id": create_example_calendar_room("Small room"), "name": "Large room"}

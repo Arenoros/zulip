@@ -92,7 +92,9 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarEventRoom,
     CalendarPinnedUser,
+    CalendarRoom,
     CalendarUserSettings,
     ChannelFolder,
     CustomProfileField,
@@ -1824,6 +1826,11 @@ class RealmImportExportTest(ExportFile):
             user=hamlet, pinned_user=cordelia, order=0, color="#4f7cff"
         )
         CalendarUserSettings.objects.create(user=hamlet, work_day_start_minutes=8 * 60 + 30)
+        calendar_room = CalendarRoom.objects.create(
+            realm=original_realm, name="Blue room", capacity=8, email="blue-room@zulip.com"
+        )
+        CalendarRoom.objects.create(realm=original_realm, name="Attic", is_archived=True)
+        CalendarEventRoom.objects.create(event=calendar_event, room=calendar_room)
 
         user_status = UserStatus.objects.order_by("id").last()
         assert user_status
@@ -2589,6 +2596,19 @@ class RealmImportExportTest(ExportFile):
                 for user_settings in CalendarUserSettings.objects.filter(user__realm=r)
             }
             return pinned_users | user_settings
+
+        @getter
+        def get_calendar_rooms(r: Realm) -> set[tuple[object, ...]]:
+            return {
+                (
+                    room.name,
+                    room.capacity,
+                    room.email,
+                    room.is_archived,
+                    tuple(room.calendareventroom_set.values_list("event__uid", flat=True)),
+                )
+                for room in CalendarRoom.objects.filter(realm=r)
+            }
 
         @getter
         def get_channel_folders(r: Realm) -> set[str]:

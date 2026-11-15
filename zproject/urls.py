@@ -41,11 +41,13 @@ from zerver.views.auth import (
 from zerver.views.calendar import (
     add_calendar_attendees_backend,
     create_calendar_event_backend,
+    create_calendar_room_backend,
     delete_calendar_event,
     get_calendar_event_backend,
     get_calendar_events,
     get_calendar_free_busy,
     get_calendar_pinned_users,
+    get_calendar_rooms_backend,
     get_calendar_settings,
     get_or_create_calendar_event_chat_backend,
     join_calendar_event_call_backend,
@@ -56,6 +58,7 @@ from zerver.views.calendar import (
     update_calendar_event_backend,
     update_calendar_personal_settings,
     update_calendar_pinned_user,
+    update_calendar_room_backend,
     update_calendar_settings,
 )
 from zerver.views.channel_folders import (
@@ -463,6 +466,8 @@ v1_api_and_json_patterns = [
         DELETE=unpin_calendar_user,
     ),
     rest_path("calendar/settings", GET=get_calendar_settings, PATCH=update_calendar_settings),
+    rest_path("calendar/rooms", GET=get_calendar_rooms_backend, POST=create_calendar_room_backend),
+    rest_path("calendar/rooms/<int:room_id>", PATCH=update_calendar_room_backend),
     # saved_snippets -> zerver.views.saved_snippets
     rest_path("saved_snippets", GET=get_saved_snippets, POST=create_saved_snippet),
     rest_path(

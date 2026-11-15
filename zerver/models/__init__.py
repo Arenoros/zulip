@@ -9,7 +9,9 @@ from zerver.models.calendar import (
 )
 from zerver.models.calendar import CalendarEvent as CalendarEvent
 from zerver.models.calendar import CalendarEventException as CalendarEventException
+from zerver.models.calendar import CalendarEventRoom as CalendarEventRoom
 from zerver.models.calendar import CalendarPinnedUser as CalendarPinnedUser
+from zerver.models.calendar import CalendarRoom as CalendarRoom
 from zerver.models.calendar import CalendarUserSettings as CalendarUserSettings
 from zerver.models.channel_folders import ChannelFolder as ChannelFolder
 from zerver.models.clients import Client as Client
