@@ -383,6 +383,11 @@ function is_table_focused(): boolean {
     return $current_focus_elem === "table";
 }
 
+// Meeting chats are channels, but are shown like direct messages.
+function is_meeting_chat_message(msg: Message): boolean {
+    return msg.type === "stream" && stream_data.is_meeting_chat(msg.stream_id);
+}
+
 function row_has_mute_column(row: number, $topic_rows: JQuery): boolean {
     const type = get_row_type(row);
     if (type === "private") {
@@ -409,6 +414,11 @@ function get_row_type(row: number): string {
     const current_list = topics_widget.get_current_list();
     const current_row = current_list[row];
     assert(current_row !== undefined);
+    const last_msg = message_store.get(current_row.last_msg_id);
+    assert(last_msg !== undefined);
+    if (is_meeting_chat_message(last_msg)) {
+        return "private";
+    }
     return current_row.type;
 }
 
@@ -484,7 +494,13 @@ function set_table_focus(row: number, col: number, using_keyboard = false): bool
     }
 
     let reply_recipient_information: compose_closed_ui.ReplyRecipientInformation;
-    if (type === "private") {
+    const meeting_chat_stream_id = $topic_row.attr("data-meeting-chat-stream-id");
+    if (meeting_chat_stream_id !== undefined) {
+        reply_recipient_information = {
+            stream_id: Number(meeting_chat_stream_id),
+            topic: "",
+        };
+    } else if (type === "private") {
         const $recipients_info = $topic_row.find(".recent-view-table-link");
         const narrow_url = $recipients_info.attr("href");
         assert(narrow_url !== undefined);
@@ -796,6 +812,7 @@ type ConversationContext = {
           topic_display_name: string;
           is_empty_string_topic: boolean;
           topic_url: string;
+          is_meeting_chat: boolean;
           mention_in_unread: boolean;
           visibility_policy: number | false;
           all_visibility_policies: {
@@ -837,6 +854,7 @@ function format_conversation(conversation_data: ConversationData): ConversationC
         const topic_display_name = util.get_final_topic_display_name(topic);
         const is_empty_string_topic = topic === "";
         const topic_url = stream_topic_history.channel_topic_permalink_hash(stream_id, topic);
+        const is_meeting_chat = stream_data.is_meeting_chat(stream_id);
 
         // We hide the row according to filters or if it's muted.
         // We only supply the data to the topic rows and let jquery
@@ -866,6 +884,7 @@ function format_conversation(conversation_data: ConversationData): ConversationC
             topic_display_name,
             is_empty_string_topic,
             topic_url,
+            is_meeting_chat,
             mention_in_unread,
             visibility_policy,
             all_visibility_policies,
@@ -1088,7 +1107,7 @@ export function filters_should_hide_row(topic_data: ConversationData): boolean {
     const folder_filters = folder_dropdown_widget.FOLDER_FILTERS;
     if (folder_filter_value !== folder_filters.ANY_FOLDER_DROPDOWN_OPTION) {
         // When a folder filter is active, hide all DMs.
-        if (msg.type === "private") {
+        if (msg.type === "private" || stream_data.is_meeting_chat(msg.stream_id)) {
             return true;
         }
         const sub = sub_store.get(msg.stream_id);
@@ -1136,7 +1155,11 @@ export function filters_should_hide_row(topic_data: ConversationData): boolean {
 
     // Most calls are in direct messages, so the missed calls filter
     // shows them even when direct messages are otherwise excluded.
-    if (!filters.has("include_private") && !filter_missed_calls && topic_data.type === "private") {
+    if (
+        !filters.has("include_private") &&
+        !filter_missed_calls &&
+        (topic_data.type === "private" || is_meeting_chat_message(msg))
+    ) {
         return true;
     }
 
@@ -1151,6 +1174,7 @@ export function filters_should_hide_row(topic_data: ConversationData): boolean {
     if (
         dropdown_filters.has(views_util.FILTERS.FOLLOWED_TOPICS) &&
         msg.type === "stream" &&
+        !stream_data.is_meeting_chat(msg.stream_id) &&
         !user_topics.is_topic_followed(msg.stream_id, msg.topic)
     ) {
         return true;

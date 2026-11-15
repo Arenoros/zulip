@@ -1,9 +1,14 @@
-<tr id="recent_conversation:{{conversation_key}}" class="{{#unless (eq unread_count 0)}}unread_topic{{/unless}} {{#if is_private}}private_conversation_row{{/if}} recent-view-body-row recent_view_focusable {{#if is_archived}}recent-view-archived-channel-row{{/if}}"  data-col-index="{{ column_indexes.topic }}" tabindex="0">
+<tr id="recent_conversation:{{conversation_key}}" class="{{#unless (eq unread_count 0)}}unread_topic{{/unless}} {{#if (or is_private is_meeting_chat)}}private_conversation_row{{/if}} recent-view-body-row recent_view_focusable {{#if is_archived}}recent-view-archived-channel-row{{/if}}"  data-col-index="{{ column_indexes.topic }}" tabindex="0" {{#if is_meeting_chat}}data-meeting-chat-stream-id="{{stream_id}}"{{/if}}>
     {{!-- TODO: Rename recent_topic_name to recent-view-conversation-column--}}
     <td class="recent_topic_name">
         <div class="recent-view-conversation-with-unread-wrapper">
             <div class="recent-view-conversation-type-wrapper">
-                {{#if is_private}}
+                {{#if is_meeting_chat}}
+                <span class="pm_status_icon">
+                    <span class="conversation-partners-icon zulip-icon zulip-icon-calendar" aria-hidden="true"></span>
+                </span>
+                <a href="{{topic_url}}" class="recent-view-dm-name recent-view-table-link" tabindex="-1">{{t "Meeting" }}</a>
+                {{else if is_private}}
                 {{!-- For presence/group indicator --}}
                 <span class="pm_status_icon {{#unless is_group}}show-tooltip{{/unless}}" data-tippy-placement="top" data-user-ids-string="{{user_ids_string}}">
                     {{#if is_group}}
@@ -21,12 +26,14 @@
                 {{/if}}
                 {{#if is_private}}
                 <a href="{{pm_url}}" class="recent-view-dm-name recent-view-table-link" tabindex="-1">{{t "DM" }}</a>
-                {{else}}
+                {{else if (not is_meeting_chat)}}
                 <a href="{{topic_url}}" class="recent-view-channel-name recent-view-table-link" data-tippy-content="{{stream_name}}" tabindex="-1">{{stream_name}}</a>
                 {{/if}}
             </div>
             <i class="zulip-icon zulip-icon-chevron-right"></i>
-            {{#if is_private}}
+            {{#if is_meeting_chat}}
+            <a href="{{topic_url}}" class="recent-view-conversation-link recent-view-table-link" data-tippy-content="{{stream_name}}" tabindex="-1">{{stream_name}}</a>
+            {{else if is_private}}
             <a href="{{pm_url}}" class="recent-view-conversation-link recent-view-table-link {{#if is_group}}recent-view-dm-group{{else}}recent-view-dm{{/if}}" data-tippy-content="{{pm_users_as_plain}}" tabindex="-1">{{{rendered_pm_with_html}}}</a>
             {{else}}
             <a class="recent-view-conversation-link recent-view-table-link {{#if is_empty_string_topic}}empty-topic-display{{/if}}" data-tippy-content="{{topic_display_name}}" href="{{topic_url}}" tabindex="-1">{{topic_display_name}}</a>
@@ -80,7 +87,7 @@
             <div class="last_msg_time tippy-zulip-tooltip" data-tippy-content="{{this.full_last_msg_date_time}}">
                 <a class="last-msg-link" href="{{last_msg_url}}" tabindex="-1">{{ last_msg_time }}</a>
             </div>
-            {{#unless (or is_archived is_private)}}
+            {{#unless (or is_archived is_private is_meeting_chat)}}
                 <div class="recent_topic_actions hidden-for-spectators recent_view_focusable recent-view-topic-visibility" data-col-index="{{ column_indexes.mute }}" tabindex="0">
                     <span class="change_visibility_policy" data-stream-id="{{stream_id}}" data-topic-name="{{topic}}">
                         {{#if (eq visibility_policy all_visibility_policies.FOLLOWED)}}
