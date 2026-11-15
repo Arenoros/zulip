@@ -13,6 +13,9 @@ import CalendarPlusIcon from "~icons/zulip-icon/calendar-plus";
 import ChevronLeftIcon from "~icons/zulip-icon/chevron-left";
 import ChevronRightIcon from "~icons/zulip-icon/chevron-right";
 import CloseIcon from "~icons/zulip-icon/close";
+import CopyIcon from "~icons/zulip-icon/copy";
+import ForwardMessageIcon from "~icons/zulip-icon/forward-message";
+import MaximizeDiagonalIcon from "~icons/zulip-icon/maximize-diagonal";
 import MoreVerticalIcon from "~icons/zulip-icon/more-vertical";
 import PanelLeftIcon from "~icons/zulip-icon/panel-left";
 import UserPlusIcon from "~icons/zulip-icon/user-plus";
@@ -189,6 +192,42 @@ undoes the changes made to its occurrences, after you confirm.
   meeting**. Select **Delete from my calendar** there to decline a
   meeting and remove it.
 </ZulipTip>
+
+## Open a meeting
+
+You can open a meeting on the whole window to read its description and
+see how its attendees responded.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click the **open the meeting** (<MaximizeDiagonalIcon />) icon.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+**Attendee responses** on the right lists the organizer and the
+attendees by their response to the meeting, or to this occurrence of a
+series. If the organizer hid the list of attendees, only they see it.
+
+From there you can also:
+
+- Answer the invitation, and choose how the meeting shows your time,
+  your reminder, and a category.
+- Invite more people with the **forward** (<ForwardMessageIcon />)
+  icon, if the organizer allows it. The organizer sees who invited
+  them.
+- Make a new event with the same details with the **copy**
+  (<CopyIcon />) icon.
+- Open the next occurrences of a series with **All occurrences**, or
+  the series itself with **The whole series**.
+
+When you open a meeting you organize, you can change it, and click
+**Attendee responses** to see the responses next to it.
 
 ## Cancel a meeting or delete an event
 
