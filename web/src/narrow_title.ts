@@ -1,5 +1,6 @@
 import assert from "minimalistic-assert";
 
+import * as calendar_util from "./calendar_util.ts";
 import {electron_bridge} from "./electron_bridge.ts";
 import * as favicon from "./favicon.ts";
 import type {Filter} from "./filter.ts";
@@ -69,9 +70,10 @@ export function compute_narrow_title(filter?: Filter): string {
 
 export function redraw_title(): void {
     // Update window title to reflect unread messages in current view
+    const view_title = calendar_util.is_visible() ? $t({defaultMessage: "Calendar"}) : narrow_title;
     const new_title =
         (unread_count ? "(" + unread_count + ") " : "") +
-        narrow_title +
+        view_title +
         " - " +
         realm.realm_name +
         " - " +

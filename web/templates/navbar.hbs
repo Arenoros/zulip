@@ -43,6 +43,12 @@
                     {{t 'Log in' }}
                 </a>
             </div>
+            <div id="calendar-navbar-item" class="hidden-for-spectators navbar-item">
+                <a id="calendar-navbar-button" href="#calendar" class="header-button tippy-zulip-delayed-tooltip" role="button" aria-pressed="false" data-tippy-content="{{t 'Calendar' }}" aria-label="{{t 'Calendar' }}">
+                    <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+                    <span class="calendar-navbar-count hide" aria-hidden="true"></span>
+                </a>
+            </div>
             <div id="help-menu" class="navbar-item">
                 <a class="header-button tippy-zulip-delayed-tooltip" tabindex="0" role="button" data-tooltip-template-id="help-menu-tooltip-template" aria-label="{{t 'Help menu' }}">
                     <i class="zulip-icon zulip-icon-help-bigger" aria-hidden="true"></i>

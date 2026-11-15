@@ -25,6 +25,7 @@ const alert_words_ui = mock_esm("../src/alert_words_ui");
 const attachments_ui = mock_esm("../src/attachments_ui");
 const audible_notifications = mock_esm("../src/audible_notifications");
 const bot_data = mock_esm("../src/bot_data");
+const calendar_ui = mock_esm("../src/calendar_ui");
 const call_ringing = mock_esm("../src/call_ringing");
 const compose_pm_pill = mock_esm("../src/compose_pm_pill");
 const compose = mock_esm("../src/compose");
@@ -316,6 +317,15 @@ run_test("attachments", ({override}) => {
     dispatch(event);
     assert.equal(stub.num_calls, 1);
     assert_same(stub.get_args("event").event, event);
+});
+
+run_test("calendar", ({override}) => {
+    const event = event_fixtures.calendar;
+    const stub = make_stub();
+    override(calendar_ui, "update_unanswered_invitation_count", stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.equal(stub.get_args("count").count, 2);
 });
 
 run_test("call", ({override}) => {

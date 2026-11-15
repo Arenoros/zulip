@@ -1,0 +1,23 @@
+<div class="calendar-mini-month" data-month="{{month}}">
+    <div class="calendar-mini-month-header">
+        <span class="calendar-mini-month-title">{{month_label}}</span>
+        <button type="button" class="calendar-icon-button calendar-mini-month-previous tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Previous month' }}" aria-label="{{t 'Previous month' }}">
+            <i class="zulip-icon zulip-icon-chevron-down calendar-chevron-up" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-icon-button calendar-mini-month-next tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Next month' }}" aria-label="{{t 'Next month' }}">
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+    </div>
+    <div class="calendar-mini-month-weekdays" aria-hidden="true">
+        {{#each weekday_labels}}
+            <span>{{this}}</span>
+        {{/each}}
+    </div>
+    {{#each weeks}}
+        <div class="calendar-mini-month-week {{#if is_selected}}selected{{/if}}">
+            {{#each days}}
+                <button type="button" class="calendar-mini-month-day {{#if is_today}}today{{/if}} {{#if is_other_month}}other-month{{/if}}" data-date="{{date}}" aria-label="{{label}}" {{#if is_today}}aria-current="date"{{/if}}>{{day_number}}</button>
+            {{/each}}
+        </div>
+    {{/each}}
+</div>

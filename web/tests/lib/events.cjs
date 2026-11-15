@@ -157,6 +157,12 @@ exports.fixtures = {
         upload_space_used: 90000,
     },
 
+    calendar: {
+        type: "calendar",
+        event_id: 7,
+        unanswered_invitation_count: 2,
+    },
+
     call__ring: {
         type: "call",
         op: "ring",

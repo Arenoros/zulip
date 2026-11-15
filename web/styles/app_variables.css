@@ -338,9 +338,9 @@
         var(--left-sidebar-max-width)
     );
     --right-sidebar-left-spacing: 5px;
-    /* Four navbar buttons, square with the header, + 3px space (legacy). */
+    /* Five navbar buttons, square with the header, + 3px space (legacy). */
     --right-column-collapsed-sidebar-width: calc(
-        var(--header-height) * 4 + 3px
+        var(--header-height) * 5 + 3px
     );
     /* 288px at 14px/1em */
     --right-sidebar-max-width: 20.57em;
@@ -2516,6 +2516,21 @@
         0 12.177px 21.4737px 0 hsl(0deg 0% 0% / 11%),
         0 18.7257px 35.4802px 0 hsl(0deg 0% 0% / 15%),
         0 41px 80px 0 hsl(0deg 0% 0% / 20%);
+    /* Calendar colors, from the Teams-style calendar design. */
+    --color-calendar-background: light-dark(#f5f5f5, #1c1c1c);
+    --color-calendar-background-left-panel: light-dark(#fafafa, #202020);
+    --color-calendar-background-toolbar: light-dark(#fff, #242424);
+    --color-calendar-background-hover: light-dark(#ebebeb, #333);
+    --color-calendar-background-selected-week: light-dark(#e8ebfa, #34365c);
+    --color-calendar-border: light-dark(#e0e0e0, #333);
+    --color-calendar-text: light-dark(#242424, #e8e8e8);
+    --color-calendar-text-secondary: light-dark(#616161, #a3a3a3);
+    --color-calendar-text-selected-week: light-dark(#2b2e6e, #e8e9ff);
+    --color-calendar-text-accent: light-dark(#4f52b2, #a9adff);
+    --color-calendar-icon: light-dark(#424242, #c8c8c8);
+    --color-calendar-accent: #5b5fc7;
+    --color-calendar-text-on-accent: #fff;
+    --color-calendar-checkbox: light-dark(#5b5fc7, #7f85f5);
     --color-navbar-icon: light-dark(hsl(240deg 20% 50%), hsl(240deg 35% 60%));
     --color-navbar-spectator-low-attention-brand-button-text: light-dark(
         hsl(240deg 40% 50%),

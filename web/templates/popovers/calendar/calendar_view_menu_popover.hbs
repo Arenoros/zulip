@@ -1,0 +1,12 @@
+<div class="popover-menu" id="calendar-view-menu" data-simplebar data-simplebar-tab-index="-1">
+    <ul role="menu" class="popover-menu-list">
+        {{#each views}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitemradio" tabindex="0" class="popover-menu-link calendar-view-option" data-calendar-view="{{view}}" aria-checked="{{#if is_current}}true{{else}}false{{/if}}">
+                    <i class="popover-menu-icon zulip-icon {{#if is_current}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                    <span class="popover-menu-label">{{label}}</span>
+                </a>
+            </li>
+        {{/each}}
+    </ul>
+</div>

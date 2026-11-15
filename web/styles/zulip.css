@@ -1868,7 +1868,7 @@ body:not(.spectator-view) {
        inappropriate for that view. */
     @container header-container (width < $cq_xl_min) {
         #navbar-middle {
-            /* = (width of button, square with header) * 4 (number of buttons) + 3px extra margin. */
+            /* = (width of button, square with header) * 5 (number of buttons) + 3px extra margin. */
             margin-right: var(--right-column-collapsed-sidebar-width);
         }
     }
@@ -1978,8 +1978,8 @@ body:not(.spectator-view) {
         }
 
         #navbar-middle {
-            /* = (width of button, square with header) * 4 (number of buttons) + 3px extra margin. */
-            margin-right: calc(var(--header-height) * 4 + 3px);
+            /* = (width of button, square with header) * 5 (number of buttons) + 3px extra margin. */
+            margin-right: var(--right-column-collapsed-sidebar-width);
         }
 
         #typing_notifications,

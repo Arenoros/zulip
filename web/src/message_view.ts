@@ -8,6 +8,7 @@ import * as activity_ui from "./activity_ui.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
 import * as bubble_layout from "./bubble_layout.ts";
+import * as calendar_ui from "./calendar_ui.ts";
 import * as channel from "./channel.ts";
 import * as compose_actions from "./compose_actions.ts";
 import type {NarrowActivateOpts} from "./compose_actions.ts";
@@ -764,6 +765,7 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
         } else if (coming_from_inbox) {
             inbox_ui.hide();
         }
+        calendar_ui.hide();
 
         blueslip.debug("Narrowed", {
             operators: terms.map((e) => e.operator),

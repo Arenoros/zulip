@@ -1,0 +1,83 @@
+<aside class="calendar-left-panel" aria-label="{{t 'Calendars' }}">
+    <h1 class="calendar-left-panel-title">{{t "Calendar" }}</h1>
+    <div class="calendar-left-panel-mini-month">
+        {{> calendar_mini_month mini_month}}
+    </div>
+    <div class="calendar-left-panel-separator"></div>
+    <button type="button" class="calendar-text-button calendar-add-calendar-button">
+        <i class="zulip-icon zulip-icon-calendar-plus" aria-hidden="true"></i>
+        {{t "Add calendar" }}
+    </button>
+    <section class="calendar-list">
+        <div class="calendar-list-header">
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            {{t "My calendars" }}
+        </div>
+        <label class="calendar-list-item">
+            <input type="checkbox" class="calendar-list-checkbox" checked/>
+            <span class="calendar-list-item-name">{{t "Calendar" }}</span>
+        </label>
+        <div class="calendar-list-header">
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            {{t "Colleagues' calendars" }}
+        </div>
+        {{#each pinned_users}}
+            <label class="calendar-list-item">
+                <input type="checkbox" class="calendar-list-checkbox" style="accent-color: {{color}};" data-user-id="{{user_id}}"/>
+                <span class="calendar-list-item-name">{{full_name}}</span>
+            </label>
+        {{/each}}
+        <button type="button" class="calendar-text-button calendar-show-all-button">{{t "Show all" }}</button>
+    </section>
+</aside>
+<div class="calendar-main">
+    <div class="calendar-toolbar">
+        <button type="button" class="calendar-icon-button calendar-toggle-left-panel tippy-zulip-delayed-tooltip" data-tippy-content="{{#if is_left_panel_collapsed}}{{t 'Show calendar panel' }}{{else}}{{t 'Hide calendar panel' }}{{/if}}" aria-label="{{#if is_left_panel_collapsed}}{{t 'Show calendar panel' }}{{else}}{{t 'Hide calendar panel' }}{{/if}}" aria-expanded="{{#if is_left_panel_collapsed}}false{{else}}true{{/if}}">
+            <i class="zulip-icon zulip-icon-panel-left" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        <button type="button" class="calendar-toolbar-button calendar-today-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Today' }}" aria-label="{{t 'Today' }}">
+            <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+            <span class="calendar-toolbar-label">{{t "Today" }}</span>
+        </button>
+        <button type="button" class="calendar-icon-button calendar-previous-week tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Previous week' }}" aria-label="{{t 'Previous week' }}">
+            <i class="zulip-icon zulip-icon-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-icon-button calendar-next-week tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Next week' }}" aria-label="{{t 'Next week' }}">
+            <i class="zulip-icon zulip-icon-chevron-right" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-range-button" aria-haspopup="true">
+            <span class="calendar-range-label">{{range_label}}</span>
+            <span class="calendar-short-range-label">{{short_range_label}}</span>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-spacer"></span>
+        <div class="calendar-view-menu-trigger">
+            <button type="button" class="calendar-toolbar-button calendar-view-button tippy-zulip-delayed-tooltip" data-tippy-content="{{view_label}}" aria-label="{{view_label}}" aria-haspopup="true">
+                <i class="zulip-icon zulip-icon-calendar" aria-hidden="true"></i>
+                <span class="calendar-toolbar-label calendar-view-label">{{view_label}}</span>
+                <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            </button>
+        </div>
+        <button type="button" class="calendar-toolbar-button calendar-filter-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Filter' }}" aria-label="{{t 'Filter' }}" aria-haspopup="true">
+            <i class="zulip-icon zulip-icon-filter" aria-hidden="true"></i>
+            <span class="calendar-toolbar-label">{{t "Filter" }}</span>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        <button type="button" class="calendar-toolbar-button calendar-meet-now-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Meet now' }}" aria-label="{{t 'Meet now' }}">
+            <i class="zulip-icon zulip-icon-video-call" aria-hidden="true"></i>
+            <span class="calendar-toolbar-label">{{t "Meet now" }}</span>
+        </button>
+        <div class="calendar-new-button-group">
+            <button type="button" class="calendar-toolbar-button calendar-new-event-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'New event' }}" aria-label="{{t 'New event' }}">
+                <i class="zulip-icon zulip-icon-calendar-plus" aria-hidden="true"></i>
+                <span class="calendar-toolbar-label">{{t "Create" }}</span>
+            </button>
+            <button type="button" class="calendar-icon-button calendar-new-menu-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'More ways to create' }}" aria-label="{{t 'More ways to create' }}" aria-haspopup="true">
+                <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
+    <div class="calendar-grid-container"></div>
+</div>

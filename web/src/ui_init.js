@@ -19,6 +19,7 @@ import * as banners from "./banners.ts";
 import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import {is_browser_unsupported_old_version} from "./browser_support.ts";
+import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel from "./channel.ts";
 import * as channel_folders from "./channel_folders.ts";
@@ -595,10 +596,19 @@ export async function initialize_everything(state_data) {
                 first_unread_message_id,
             });
         },
-        hide_other_views: inbox_ui.hide,
+        hide_other_views() {
+            inbox_ui.hide();
+            calendar_ui.hide();
+        },
     });
     inbox_ui.initialize({
-        hide_other_views: recent_view_ui.hide,
+        hide_other_views() {
+            recent_view_ui.hide();
+            calendar_ui.hide();
+        },
+    });
+    calendar_ui.initialize({
+        unanswered_invitation_count: state_data.calendar.calendar_unanswered_invitation_count,
     });
     alert_words.initialize(state_data.alert_words);
     saved_snippets.initialize(state_data.saved_snippets);

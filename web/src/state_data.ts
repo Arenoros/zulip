@@ -659,6 +659,7 @@ export const split_state_data_schema = z.object({
     emoji: z.object({realm_emoji: realm_emoji_map_schema}),
     realm_billing: z.object({realm_billing: realm_billing_schema}),
     bot: z.object({realm_bots: z.array(server_add_bot_schema)}),
+    calendar: z.object({calendar_unanswered_invitation_count: z.number()}),
     people: z.object({
         realm_users: z.array(user_schema),
         realm_non_active_users: z.array(user_schema),
