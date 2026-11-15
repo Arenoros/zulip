@@ -1079,25 +1079,29 @@ body.calendar-view-visible {
 }
 
 /* The form of an event takes the place of the calendar's panels. */
-.calendar-form-container {
+.calendar-form-container,
+.calendar-meeting-container {
     display: none;
-
-    #calendar-view.editing-event & {
-        display: flex;
-        flex: 1;
-        min-width: 0;
-        container: calendar-form / inline-size;
-    }
 }
 
-#calendar-view.editing-event {
+#calendar-view.editing-event .calendar-form-container,
+#calendar-view.viewing-meeting .calendar-meeting-container {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    container: calendar-form / inline-size;
+}
+
+#calendar-view.editing-event,
+#calendar-view.viewing-meeting {
     .calendar-left-panel,
     .calendar-main {
         display: none;
     }
 }
 
-.calendar-form {
+.calendar-form,
+.calendar-meeting {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1250,6 +1254,7 @@ body.calendar-view-visible {
 }
 
 .calendar-form-attendees .pill-container,
+.calendar-meeting-forward .pill-container,
 .calendar-form-optional-attendees {
     flex: 1;
     min-width: 0;
@@ -1590,7 +1595,8 @@ body.calendar-view-visible {
     }
 }
 
-.calendar-form-description {
+.calendar-form-description,
+.calendar-meeting-description {
     flex: 1;
     display: flex;
     align-items: flex-start;
@@ -1652,7 +1658,8 @@ body.calendar-view-visible {
     }
 }
 
-.calendar-form-day {
+.calendar-form-day,
+.calendar-responses {
     flex: none;
     display: flex;
     flex-direction: column;
@@ -1779,9 +1786,174 @@ body.calendar-view-visible {
         flex-direction: column;
     }
 
-    .calendar-form-day {
+    .calendar-form-day,
+    .calendar-responses {
         width: auto;
         /* 420px at 14px/1em */
         height: 30em;
     }
+}
+
+.calendar-meeting-title {
+    margin: 0;
+    /* 6px at 20px/1em */
+    padding: 0.3em 0;
+    font-size: 1.4286em; /* 20px at 14px/1em */
+    font-weight: 600;
+    line-height: 1.3;
+
+    &:focus {
+        outline: none;
+    }
+}
+
+.calendar-meeting-attendees,
+.calendar-meeting-time {
+    min-width: 0;
+}
+
+.calendar-meeting-location {
+    /* 4px and 12px at 14px/1em */
+    padding: 0.2857em 0.8571em;
+    border: 1px solid var(--color-calendar-border);
+    border-radius: 1em;
+}
+
+.calendar-meeting-copy-wrapper,
+.calendar-meeting-delete-wrapper {
+    display: inline-flex;
+}
+
+.calendar-meeting-description-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.calendar-meeting-no-description {
+    margin: 0;
+    color: var(--color-calendar-text-secondary);
+}
+
+.calendar-meeting-call {
+    /* 16px at 14px/1em */
+    margin-top: 1.1429em;
+    padding-top: 1.1429em;
+    border-top: 1px solid var(--color-calendar-border);
+}
+
+.calendar-meeting-call-title {
+    margin: 0 0 0.4286em;
+    font-size: 1.1429em; /* 16px at 14px/1em */
+    font-weight: 600;
+}
+
+.calendar-meeting-call-time {
+    margin: 0;
+}
+
+.calendar-responses-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5714em; /* 8px at 14px/1em */
+    /* 12px and 16px at 14px/1em */
+    padding: 0.8571em 1.1429em;
+    border-bottom: 1px solid var(--color-calendar-border);
+}
+
+.calendar-responses-title {
+    flex: 1;
+    margin: 0;
+    font-size: 1.1429em; /* 16px at 14px/1em */
+    font-weight: 600;
+}
+
+.calendar-responses-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.calendar-responses-section {
+    /* 12px and 16px at 14px/1em */
+    padding: 0.8571em 1.1429em;
+
+    & + & {
+        border-top: 1px solid var(--color-calendar-border);
+    }
+}
+
+.calendar-responses-heading {
+    margin: 0 0 0.5714em;
+    color: var(--color-calendar-text-secondary);
+    font-size: 1em;
+    font-weight: 600;
+}
+
+.calendar-responses-own {
+    margin: 0 0 0.5714em;
+}
+
+.calendar-responses-group-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4286em; /* 6px at 14px/1em */
+    padding: 0.4286em 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--color-calendar-text-secondary);
+    font: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid var(--color-calendar-accent);
+    }
+}
+
+.calendar-responses-group.collapsed {
+    .zulip-icon-chevron-down {
+        transform: rotate(-90deg);
+    }
+
+    .calendar-responses-people {
+        display: none;
+    }
+}
+
+.calendar-responses-people {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.calendar-responses-person {
+    display: flex;
+    align-items: center;
+    gap: 0.7143em; /* 10px at 14px/1em */
+    padding: 0.4286em 0;
+}
+
+.calendar-responses-avatar {
+    flex: none;
+    /* 32px at 14px/1em */
+    width: 2.2857em;
+    height: 2.2857em;
+    border-radius: 50%;
+}
+
+.calendar-responses-person-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.calendar-responses-name {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendar-responses-detail {
+    color: var(--color-calendar-text-secondary);
+    font-size: 0.8571em; /* 12px at 14px/1em */
 }

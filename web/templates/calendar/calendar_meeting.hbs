@@ -1,0 +1,143 @@
+<div class="calendar-meeting" role="region" aria-label="{{title}}">
+    <div class="calendar-form-card calendar-form-toolbar calendar-meeting-toolbar">
+        {{#unless is_cancelled}}
+            {{#each responses}}
+                <button type="button" class="calendar-toolbar-button calendar-meeting-respond {{#if is_selected}}selected{{/if}}" data-response="{{response}}" aria-pressed="{{#if is_selected}}true{{else}}false{{/if}}" {{#if ../has_scope_choice}}aria-haspopup="true"{{/if}}>
+                    <i class="zulip-icon zulip-icon-{{icon}}" aria-hidden="true"></i>
+                    {{label}}
+                </button>
+            {{/each}}
+            <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        {{/unless}}
+        {{!-- A wrapper span, since the menu of the button cannot
+        attach to a button that already has a tooltip. --}}
+        <span class="calendar-meeting-delete-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Delete from my calendar' }}">
+            <button type="button" class="calendar-toolbar-button calendar-meeting-delete" {{#if has_scope_choice}}aria-haspopup="true"{{/if}} aria-label="{{t 'Delete from my calendar' }}">
+                <i class="zulip-icon zulip-icon-trash" aria-hidden="true"></i>
+                {{#if has_scope_choice}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
+            </button>
+        </span>
+        {{#if can_forward}}
+            <button type="button" class="calendar-toolbar-button calendar-meeting-forward-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Forward' }}" aria-label="{{t 'Forward' }}" aria-expanded="false">
+                <i class="zulip-icon zulip-icon-forward-message" aria-hidden="true"></i>
+            </button>
+        {{/if}}
+        <span class="calendar-meeting-copy-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Copy to a new event' }}">
+            <button type="button" class="calendar-toolbar-button calendar-meeting-copy" aria-label="{{t 'Copy to a new event' }}">
+                <i class="zulip-icon zulip-icon-copy" aria-hidden="true"></i>
+            </button>
+        </span>
+        <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        <button type="button" class="calendar-toolbar-button calendar-meeting-menu-button" data-menu="show_as" aria-haspopup="true" aria-label="{{show_as_aria_label}}">
+            <span class="calendar-event free-busy calendar-legend-swatch {{show_as_class}}" aria-hidden="true"></span>
+            <span class="calendar-form-menu-label">{{show_as_label}}</span>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-meeting-menu-button" data-menu="reminder" aria-haspopup="true" aria-label="{{reminder_aria_label}}">
+            <i class="zulip-icon zulip-icon-alarm-clock" aria-hidden="true"></i>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-meeting-menu-button" data-menu="category" aria-haspopup="true" aria-label="{{category_aria_label}}">
+            <span class="calendar-form-category-swatch {{category_color}}" aria-hidden="true"></span>
+            <i class="zulip-icon zulip-icon-flag" aria-hidden="true"></i>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-spacer"></span>
+        <button type="button" class="calendar-toolbar-button calendar-meeting-close">
+            <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+            {{t "Close" }}
+        </button>
+    </div>
+    <div class="calendar-form-error calendar-meeting-error alert-error" role="alert"></div>
+    <div class="calendar-form-body">
+        <div class="calendar-form-main">
+            <div class="calendar-form-card calendar-form-fields">
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-calendar calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <h1 class="calendar-meeting-title">{{title}}</h1>
+                    </div>
+                </div>
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-users calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <span class="calendar-meeting-attendees">{{attendees_label}}</span>
+                        <span class="calendar-toolbar-spacer"></span>
+                        <button type="button" class="calendar-toolbar-button calendar-meeting-responses-button" aria-expanded="true" aria-controls="calendar-meeting-responses">
+                            <i class="zulip-icon zulip-icon-user-list" aria-hidden="true"></i>
+                            {{t "Attendee responses" }}
+                        </button>
+                    </div>
+                </div>
+                {{#if can_forward}}
+                    <div class="calendar-form-row calendar-meeting-forward hide">
+                        <i class="zulip-icon zulip-icon-forward-message calendar-form-row-icon" aria-hidden="true"></i>
+                        <div class="calendar-form-field">
+                            <div class="pill-container person_picker calendar-meeting-forward-people">
+                                <div class="input" contenteditable="true" data-placeholder="{{t 'Forward to' }}" aria-label="{{t 'Forward to' }}">
+                                    {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
+                                </div>
+                            </div>
+                            <button type="button" class="calendar-toolbar-button calendar-meeting-forward-send">{{t "Forward" }}</button>
+                        </div>
+                    </div>
+                {{/if}}
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-clock calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <span class="calendar-meeting-time">{{time_label}}</span>
+                        <span class="calendar-toolbar-spacer"></span>
+                        {{#if is_occurrence}}
+                            <button type="button" class="calendar-toolbar-button calendar-meeting-series">
+                                <i class="zulip-icon zulip-icon-refresh-cw" aria-hidden="true"></i>
+                                {{t "The whole series" }}
+                            </button>
+                        {{/if}}
+                        {{#if is_recurring}}
+                            <button type="button" class="calendar-toolbar-button calendar-meeting-occurrences" aria-haspopup="true">
+                                <i class="zulip-icon zulip-icon-file-text" aria-hidden="true"></i>
+                                {{t "All occurrences" }}
+                            </button>
+                        {{/if}}
+                        <button type="button" class="calendar-toolbar-button calendar-meeting-scheduler">
+                            <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+                            {{t "Scheduler" }}
+                        </button>
+                    </div>
+                </div>
+                {{#if location}}
+                    <div class="calendar-form-row">
+                        <i class="zulip-icon zulip-icon-globe calendar-form-row-icon" aria-hidden="true"></i>
+                        <div class="calendar-form-field">
+                            <span class="calendar-meeting-location">{{location}}</span>
+                        </div>
+                    </div>
+                {{/if}}
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-video-call calendar-form-row-icon" aria-hidden="true"></i>
+                    <label class="calendar-form-field calendar-form-call">
+                        <input type="checkbox" class="calendar-switch" {{#if has_zulip_call}}checked{{/if}} disabled/>
+                        {{t "Zulip call — only the organizer can change it" }}
+                    </label>
+                </div>
+            </div>
+            <div class="calendar-form-card calendar-meeting-description">
+                <i class="zulip-icon zulip-icon-file-text calendar-form-row-icon" aria-hidden="true"></i>
+                <div class="calendar-meeting-description-content">
+                    {{#if rendered_description}}
+                        <div class="rendered_markdown calendar-meeting-description-text">{{rendered_markdown rendered_description}}</div>
+                    {{else}}
+                        <p class="calendar-meeting-no-description">{{t "No description" }}</p>
+                    {{/if}}
+                    {{#if has_zulip_call}}
+                        <div class="calendar-meeting-call">
+                            <h2 class="calendar-meeting-call-title">{{t "Zulip call" }}</h2>
+                            <p class="calendar-meeting-call-time">{{call_time_label}}</p>
+                        </div>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+        <aside class="calendar-form-card calendar-responses" id="calendar-meeting-responses" aria-label="{{t 'Attendee responses' }}"></aside>
+    </div>
+</div>

@@ -68,6 +68,7 @@ export const occurrence_schema = z.object({
     title: z.string(),
     location: z.string(),
     description: z.string(),
+    rendered_description: z.string(),
     show_as: z.number(),
     is_private: z.boolean(),
     is_cancelled: z.boolean(),
@@ -80,8 +81,14 @@ export const occurrence_schema = z.object({
     allow_forwarding: z.boolean(),
     hide_attendees: z.boolean(),
     has_zulip_call: z.boolean(),
+    date_created: z.number(),
     attendees: z.array(
-        z.object({user_id: z.number(), response: z.number(), is_required: z.boolean()}),
+        z.object({
+            user_id: z.number(),
+            response: z.number(),
+            is_required: z.boolean(),
+            added_by: z.nullable(z.number()),
+        }),
     ),
 });
 

@@ -56,6 +56,12 @@
                                 {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
                             </div>
                         </div>
+                        {{#if has_responses}}
+                            <button type="button" class="calendar-toolbar-button calendar-form-responses-button" aria-expanded="false" aria-controls="calendar-form-responses">
+                                <i class="zulip-icon zulip-icon-user-list" aria-hidden="true"></i>
+                                {{t "Attendee responses" }}
+                            </button>
+                        {{/if}}
                         <div class="calendar-form-attendee-options-trigger">
                             <button type="button" class="calendar-icon-button calendar-form-attendee-options tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Attendee options' }}" aria-label="{{t 'Attendee options' }}" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
                                 <i class="zulip-icon zulip-icon-user-plus" aria-hidden="true"></i>
@@ -195,5 +201,8 @@
                 <div class="calendar-form-day-grid"></div>
             </div>
         </aside>
+        {{#if has_responses}}
+            <aside class="calendar-form-card calendar-responses hide" id="calendar-form-responses" aria-label="{{t 'Attendee responses' }}"></aside>
+        {{/if}}
     </div>
 </form>

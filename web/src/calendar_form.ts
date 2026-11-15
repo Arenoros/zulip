@@ -14,11 +14,13 @@ import render_calendar_form_attendee_options_popover from "../templates/popovers
 import render_calendar_submenu_popover from "../templates/popovers/calendar/calendar_submenu_popover.hbs";
 import timezones from "../generated/timezones.json";
 
+import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_layout from "./calendar_layout.ts";
 import * as calendar_recurrence from "./calendar_recurrence.ts";
 import type {Recurrence} from "./calendar_recurrence.ts";
+import * as calendar_responses from "./calendar_responses.ts";
 import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import * as compose_ui from "./compose_ui.ts";
@@ -104,6 +106,9 @@ let editing: Editing | undefined;
 // some of its occurrences.
 let has_changed_occurrences = false;
 let is_time_expanded = false;
+// Whether the attendees' responses show next to the form instead of
+// its day.
+let is_responses_shown = false;
 let is_saving = false;
 let required_pills: InputPillContainer<UserPill> | undefined;
 let optional_pills: InputPillContainer<UserPill> | undefined;
@@ -1252,6 +1257,23 @@ function create_pills(selector: string, user_ids: number[], is_disabled: boolean
     return pills;
 }
 
+function has_responses(occurrence: CalendarOccurrence): boolean {
+    return !calendar_actions.is_personal(occurrence);
+}
+
+// Shows the attendees' responses or the day next to the form.
+function update_side_panel(): void {
+    const $form = $("#calendar-view .calendar-form");
+    const $responses = $form.find(".calendar-responses");
+    const shown = is_responses_shown && $responses.length > 0;
+    $responses.toggleClass("hide", !shown);
+    $form.find(".calendar-form-day").toggleClass("hide", shown);
+    $form
+        .find(".calendar-form-responses-button")
+        .attr("aria-expanded", String(shown))
+        .toggleClass("selected", shown);
+}
+
 function on_attendees_change(): void {
     read_fields();
     update_suggestions();
@@ -1292,6 +1314,8 @@ function render_form(): void {
     $("#calendar-view .calendar-form-container").html(
         render_calendar_form({
             is_editing: form_editing !== undefined,
+            has_responses:
+                form_editing !== undefined && has_responses(form_editing.occurrence),
             is_occurrence,
             title: form.title,
             location: form.location,
@@ -1337,6 +1361,13 @@ function render_form(): void {
         pills.onPillRemove(on_attendees_change);
     }
     set_up_timezone_widget();
+    if (form_editing !== undefined && has_responses(form_editing.occurrence)) {
+        calendar_responses.render(
+            $("#calendar-view .calendar-form .calendar-responses"),
+            form_editing.occurrence,
+        );
+    }
+    update_side_panel();
     update_menu_buttons();
     update_time_fields();
     scroll_day_to_event();
@@ -1374,6 +1405,7 @@ function get_default_reminder(): number | null {
 
 // A new event, at a time or at the next half hour of today.
 export function open_new(date: string, start_minute: number): void {
+    is_responses_shown = false;
     open(
         {
             title: "",
@@ -1412,19 +1444,13 @@ export function open_now(): void {
     }
 }
 
-function open_event(
-    occurrence: CalendarOccurrence,
-    is_occurrence: boolean,
-    event_has_changed_occurrences: boolean,
-): void {
+function get_event_state(occurrence: CalendarOccurrence, is_occurrence: boolean): FormState {
     // The time is that of the event's timezone.
     const start = new TZDate(occurrence.start * 1000, occurrence.timezone);
     const attendees = occurrence.attendees.filter(
         (attendee) => attendee.user_id !== occurrence.organizer_id,
     );
-    has_changed_occurrences = event_has_changed_occurrences;
-    open(
-        {
+    return {
             title: occurrence.title,
             required_attendee_ids: attendees
                 .filter((attendee) => attendee.is_required)
@@ -1453,14 +1479,42 @@ function open_event(
             response_requested: occurrence.response_requested,
             allow_forwarding: occurrence.allow_forwarding,
             hide_attendees: occurrence.hide_attendees,
+    };
+}
+
+function open_event(
+    occurrence: CalendarOccurrence,
+    is_occurrence: boolean,
+    event_has_changed_occurrences: boolean,
+    show_responses: boolean,
+): void {
+    has_changed_occurrences = event_has_changed_occurrences;
+    is_responses_shown = show_responses;
+    open(get_event_state(occurrence, is_occurrence), {occurrence, is_occurrence});
+}
+
+// A new event with the fields of another one, without its attendees.
+export function open_copy(occurrence: CalendarOccurrence, is_series: boolean): void {
+    is_responses_shown = false;
+    open(
+        {
+            ...get_event_state(occurrence, !is_series),
+            required_attendee_ids: [],
+            optional_attendee_ids: [],
         },
-        {occurrence, is_occurrence},
+        undefined,
     );
 }
 
-export function open_edit(occurrence: CalendarOccurrence, is_occurrence: boolean): void {
+// Changes an event, showing its attendees' responses next to the form
+// rather than its day when show_responses is set.
+export function open_edit(
+    occurrence: CalendarOccurrence,
+    is_occurrence: boolean,
+    show_responses = false,
+): void {
     if (is_occurrence || occurrence.original_start === null) {
-        open_event(occurrence, is_occurrence, false);
+        open_event(occurrence, is_occurrence, false, show_responses);
         return;
     }
     // A series is changed from its start, with its own fields rather
@@ -1474,7 +1528,7 @@ export function open_edit(occurrence: CalendarOccurrence, is_occurrence: boolean
                     has_changed_occurrences: z.boolean(),
                 })
                 .parse(raw_data);
-            open_event(data.event, false, data.has_changed_occurrences);
+            open_event(data.event, false, data.has_changed_occurrences, show_responses);
         },
         error(xhr) {
             ui_report.error(
@@ -1631,6 +1685,15 @@ export function initialize(opts: {
         compose_ui.format_text($textarea, this.dataset["formatType"]!);
         $textarea.trigger("focus");
     });
+    for (const button of [
+        ".calendar-form-responses-button",
+        ".calendar-form .calendar-responses-hide",
+    ]) {
+        $view.on("click", button, () => {
+            is_responses_shown = !is_responses_shown;
+            update_side_panel();
+        });
+    }
     $view.on("click", ".calendar-form-preview", () => {
         toggle_preview();
     });

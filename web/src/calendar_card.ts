@@ -8,6 +8,7 @@ import render_calendar_card_popover from "../templates/popovers/calendar/calenda
 import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
+import * as calendar_meeting from "./calendar_meeting.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
@@ -272,6 +273,25 @@ function open(element: HTMLElement): void {
                     hide();
                     calendar_form.open_edit(edited, scope === "occurrence");
                 });
+            });
+            $popper.on("click", ".calendar-card-expand", function (this: HTMLElement) {
+                assert(card_occurrence !== undefined);
+                const expanded = card_occurrence;
+                if (expanded.organizer_id === current_user.user_id) {
+                    // The organizer changes the meeting, next to its
+                    // attendees' responses.
+                    choose_scope(this, (scope) => {
+                        hide();
+                        calendar_form.open_edit(
+                            expanded,
+                            scope === "occurrence",
+                            !calendar_actions.is_personal(expanded),
+                        );
+                    });
+                    return;
+                }
+                hide();
+                calendar_meeting.open(expanded);
             });
             $popper.on("click", ".calendar-card-cancel", function (this: HTMLElement) {
                 choose_scope(this, confirm_remove);
