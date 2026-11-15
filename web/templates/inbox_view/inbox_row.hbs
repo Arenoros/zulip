@@ -1,11 +1,26 @@
 {{#if is_stream}}
     {{> inbox_stream_header_row .}}
 {{else}}
-    <div id="inbox-row-conversation-{{conversation_key}}" class="inbox-row {{#if is_hidden}}hidden_by_filters{{/if}}" tabindex="0" data-col-index="{{ column_indexes.FULL_ROW }}">
+    <div id="inbox-row-conversation-{{conversation_key}}" class="inbox-row {{#if is_hidden}}hidden_by_filters{{/if}}" tabindex="0" data-col-index="{{ column_indexes.FULL_ROW }}" {{#if meeting_chat_name}}data-meeting-chat-stream-id="{{meeting_chat_stream_id}}"{{/if}}>
         <div class="inbox-focus-border">
             <div class="inbox-left-part-wrapper">
                 <div class="inbox-left-part">
-                    {{#if is_direct}}
+                    {{#if meeting_chat_name}}
+                        <a class="recipients_info inbox-group-or-bot-dm" href="{{dm_url}}" tabindex="-1">
+                            <span class="user_block">
+                                <span class="conversation-partners-icon zulip-icon zulip-icon-calendar" aria-hidden="true"></span>
+                                <span class="recipients_name">{{meeting_chat_name}}</span>
+                            </span>
+                        </a>
+                        <span class="unread_mention_info tippy-zulip-tooltip
+                          {{#unless has_unread_mention}}hidden{{/unless}}"
+                          data-tippy-content="{{t 'You have unread mentions' }}">@</span>
+                        <div class="unread-count-focus-outline" tabindex="0" data-col-index="{{ column_indexes.UNREAD_COUNT }}">
+                            <span class="unread_count tippy-zulip-delayed-tooltip"
+                              data-stream-id="{{meeting_chat_stream_id}}" data-topic-name=""
+                              data-tippy-content="{{t 'Mark as read' }}" aria-label="{{t 'Mark as read' }}">{{unread_count}}</span>
+                        </div>
+                    {{else if is_direct}}
                         <a class="recipients_info {{#unless user_circle_class}}inbox-group-or-bot-dm{{/unless}}" href="{{dm_url}}" tabindex="-1">
                             <span class="user_block">
                                 {{#if is_bot}}
