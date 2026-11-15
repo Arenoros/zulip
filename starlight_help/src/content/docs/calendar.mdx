@@ -19,6 +19,7 @@ import MaximizeDiagonalIcon from "~icons/zulip-icon/maximize-diagonal";
 import MoreVerticalIcon from "~icons/zulip-icon/more-vertical";
 import PanelLeftIcon from "~icons/zulip-icon/panel-left";
 import UserPlusIcon from "~icons/zulip-icon/user-plus";
+import VideoCallIcon from "~icons/zulip-icon/video-call";
 
 Zulip's calendar shows your meetings and events a week at a time. It
 opens in place of your conversations, and you can go back to the
@@ -254,6 +255,59 @@ The chat is named after the meeting, and its header shows when the
 meeting next takes place. To leave the chat, click the **more actions**
 (<MoreVerticalIcon />) icon next to it in the left sidebar, and select
 **Leave chat**. **Discussion** in the meeting brings you back.
+
+## Join a meeting's call
+
+A meeting with a Zulip call has its call in the meeting's chat. The
+first person to join starts it, which posts its link in the chat, and
+the people who join after them join the same call. Anyone in the
+meeting's chat can join it.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click **Join**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  To join without your camera, click the arrow next to **Join**, and
+  select **Join without video**.
+</ZulipTip>
+
+You can also join from the header of the meeting's chat, or with the
+**Join the call** link under **Zulip call** in the opened meeting. The
+link stays the same for the whole meeting, so you can share it with
+the people invited. When the call has not started, the link offers to
+start it.
+
+Zulip calls need LiveKit to be your organization's [call
+provider](/help/configure-call-provider).
+
+## Meet now
+
+**Meet now** schedules a 30-minute meeting starting now, with a Zulip
+call, and joins its call.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Meet now** (<VideoCallIcon />) in the upper right of the
+         calendar.
+
+      1. Change the title if you like, and add the colleagues to invite.
+
+      1. Click **Join now**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
 
 ## Cancel a meeting or delete an event
 
