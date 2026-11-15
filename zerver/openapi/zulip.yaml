@@ -9141,6 +9141,276 @@ paths:
                             "11": [],
                           },
                       }
+  /calendar/pinned_users:
+    get:
+      operationId: get-calendar-pinned-users
+      tags: ["calendar"]
+      summary: Get pinned calendars
+      description: |
+        Get the colleagues whose calendars the current user shows next to
+        their own.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      pinned_users:
+                        type: array
+                        description: |
+                          The pinned colleagues, in the order the user pinned them.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            user_id:
+                              type: integer
+                              description: |
+                                The ID of the colleague.
+                            color:
+                              type: string
+                              description: |
+                                The color of the colleague's calendar, like `"#4f7cff"`.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "pinned_users": [{"user_id": 9, "color": "#4f7cff"}],
+                      }
+    post:
+      operationId: pin-calendar-user
+      tags: ["calendar"]
+      summary: Pin a calendar
+      description: |
+        Show a colleague's calendar next to the current user's own, after
+        the calendars the user already pinned.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  description: |
+                    The ID of the colleague.
+                  type: integer
+                  example: 9
+                color:
+                  description: |
+                    The color of the colleague's calendar, as `#` and six
+                    hexadecimal digits.
+                  type: string
+                  example: "#4f7cff"
+              required:
+                - user_id
+                - color
+            encoding:
+              user_id:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/pinned_users/{user_id}:
+    patch:
+      operationId: update-calendar-pinned-user
+      tags: ["calendar"]
+      summary: Update a pinned calendar
+      description: |
+        Change the color of a colleague's pinned calendar.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarPinnedUserId"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                color:
+                  description: |
+                    The color of the colleague's calendar, as `#` and six
+                    hexadecimal digits.
+                  type: string
+                  example: "#30a46c"
+              required:
+                - color
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+    delete:
+      operationId: unpin-calendar-user
+      tags: ["calendar"]
+      summary: Unpin a calendar
+      description: |
+        Stop showing a colleague's calendar next to the current user's own.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarPinnedUserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/settings:
+    get:
+      operationId: get-calendar-settings
+      tags: ["calendar"]
+      summary: Get calendar settings
+      description: |
+        Get the current user's calendar settings.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      settings:
+                        type: object
+                        description: |
+                          The settings, with their defaults if the user never
+                          changed them.
+                        additionalProperties: false
+                        properties:
+                          work_days:
+                            type: array
+                            items:
+                              type: integer
+                            description: |
+                              The ISO weekdays the user works on, Monday being 1.
+                          work_day_start_minutes:
+                            type: integer
+                            description: |
+                              When the user's work day starts, in minutes after
+                              midnight in the user's timezone.
+                          work_day_end_minutes:
+                            type: integer
+                            description: |
+                              When the user's work day ends, in minutes after
+                              midnight in the user's timezone.
+                          default_reminder_minutes:
+                            type: integer
+                            nullable: true
+                            description: |
+                              The reminder for events the user is invited to, in
+                              minutes before the start, or `null` for no reminder.
+                          default_view:
+                            type: integer
+                            enum: [1, 2]
+                            description: |
+                              The view the calendar opens in:
+
+                              - 1 = Week
+                              - 2 = Work week
+                          time_scale_minutes:
+                            type: integer
+                            enum: [15, 30, 60]
+                            description: |
+                              How many minutes each row of the calendar grid takes.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "settings":
+                          {
+                            "work_days": [1, 2, 3, 4, 5],
+                            "work_day_start_minutes": 540,
+                            "work_day_end_minutes": 1080,
+                            "default_reminder_minutes": 15,
+                            "default_view": 2,
+                            "time_scale_minutes": 30,
+                          },
+                      }
+    patch:
+      operationId: update-calendar-settings
+      tags: ["calendar"]
+      summary: Update calendar settings
+      description: |
+        Change the current user's calendar settings, which are described in
+        [`GET /calendar/settings`](/api/get-calendar-settings).
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                work_days:
+                  description: |
+                    The ISO weekdays the user works on, at least one.
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3, 4]
+                work_day_start_minutes:
+                  description: |
+                    When the user's work day starts, in minutes after midnight.
+                  type: integer
+                  example: 480
+                work_day_end_minutes:
+                  description: |
+                    When the user's work day ends, in minutes after midnight. Must
+                    be after the start.
+                  type: integer
+                  example: 1020
+                default_reminder_minutes:
+                  description: |
+                    The reminder for events the user is invited to, in minutes
+                    before the start, or `null` for no reminder.
+                  type: integer
+                  nullable: true
+                  example: 30
+                default_view:
+                  description: |
+                    The view the calendar opens in: 1 for the week, 2 for the work
+                    week.
+                  type: integer
+                  enum: [1, 2]
+                  example: 1
+                time_scale_minutes:
+                  description: |
+                    How many minutes each row of the calendar grid takes.
+                  type: integer
+                  enum: [15, 30, 60]
+                  example: 15
+            encoding:
+              work_days:
+                contentType: application/json
+              work_day_start_minutes:
+                contentType: application/json
+              work_day_end_minutes:
+                contentType: application/json
+              default_reminder_minutes:
+                contentType: application/json
+              default_view:
+                contentType: application/json
+              time_scale_minutes:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
   /saved_snippets:
     get:
       operationId: get-saved-snippets
@@ -34238,6 +34508,15 @@ components:
       schema:
         type: integer
       example: 12
+      required: true
+    CalendarPinnedUserId:
+      name: user_id
+      in: path
+      description: |
+        The ID of the colleague whose calendar is pinned.
+      schema:
+        type: integer
+      example: 9
       required: true
     CalendarRangeStart:
       name: start

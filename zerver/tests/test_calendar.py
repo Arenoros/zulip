@@ -972,3 +972,124 @@ class CalendarChangeEventsTest(CalendarTestCase):
             ],
         )
 
+
+class CalendarPinnedUsersTest(CalendarTestCase):
+    def get_pinned_users(self, user: UserProfile) -> list[dict[str, Any]]:
+        result = self.api_get(user, "/api/v1/calendar/pinned_users")
+        return self.assert_json_success(result)["pinned_users"]
+
+    def test_pin_and_unpin(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        self.assertEqual(self.get_pinned_users(hamlet), [])
+
+        for user, color in [(othello, "#4f7cff"), (cordelia, "#E5484D")]:
+            result = self.api_post(
+                hamlet, "/api/v1/calendar/pinned_users", {"user_id": user.id, "color": color}
+            )
+            self.assert_json_success(result)
+        self.assertEqual(
+            self.get_pinned_users(hamlet),
+            [{"user_id": othello.id, "color": "#4f7cff"}, {"user_id": cordelia.id, "color": "#E5484D"}],
+        )
+        self.assertEqual(self.get_pinned_users(cordelia), [])
+
+        result = self.api_patch(
+            hamlet, f"/api/v1/calendar/pinned_users/{othello.id}", {"color": "#30a46c"}
+        )
+        self.assert_json_success(result)
+        result = self.api_delete(hamlet, f"/api/v1/calendar/pinned_users/{cordelia.id}")
+        self.assert_json_success(result)
+        self.assertEqual(self.get_pinned_users(hamlet), [{"user_id": othello.id, "color": "#30a46c"}])
+
+        result = self.api_post(
+            hamlet, "/api/v1/calendar/pinned_users", {"user_id": cordelia.id, "color": "#e5484d"}
+        )
+        self.assert_json_success(result)
+        self.assertEqual(
+            [pinned_user["user_id"] for pinned_user in self.get_pinned_users(hamlet)],
+            [othello.id, cordelia.id],
+        )
+
+    def test_invalid_pins(self) -> None:
+        hamlet = self.example_user("hamlet")
+        othello = self.example_user("othello")
+        url = "/api/v1/calendar/pinned_users"
+        self.assert_json_success(self.api_post(hamlet, url, {"user_id": othello.id, "color": "#4f7cff"}))
+
+        for params, error in [
+            ({"user_id": othello.id, "color": "#4f7cff"}, "This calendar is already pinned"),
+            ({"user_id": hamlet.id, "color": "#4f7cff"}, "You cannot pin your own calendar"),
+            ({"user_id": self.example_user("default_bot").id, "color": "#4f7cff"}, "Invalid user ID"),
+            ({"user_id": self.example_user("iago").id, "color": "blue"}, "Invalid color"),
+        ]:
+            self.assert_json_error_contains(self.api_post(hamlet, url, params), error)
+
+        cordelia = self.example_user("cordelia")
+        result = self.api_patch(hamlet, f"{url}/{cordelia.id}", {"color": "#4f7cff"})
+        self.assert_json_error(result, "This calendar is not pinned")
+        result = self.api_patch(hamlet, f"{url}/{othello.id}", {"color": "#4f7cf"})
+        self.assert_json_error(result, "Invalid color")
+        result = self.api_delete(hamlet, f"{url}/{cordelia.id}")
+        self.assert_json_error(result, "This calendar is not pinned")
+
+
+class CalendarUserSettingsTest(CalendarTestCase):
+    def get_settings(self, user: UserProfile) -> dict[str, Any]:
+        result = self.api_get(user, "/api/v1/calendar/settings")
+        return self.assert_json_success(result)["settings"]
+
+    def test_get_and_update_settings(self) -> None:
+        hamlet = self.example_user("hamlet")
+        defaults = {
+            "work_days": [1, 2, 3, 4, 5],
+            "work_day_start_minutes": 540,
+            "work_day_end_minutes": 1080,
+            "default_reminder_minutes": 15,
+            "default_view": CalendarUserSettings.View.WORK_WEEK,
+            "time_scale_minutes": 30,
+        }
+        self.assertEqual(self.get_settings(hamlet), defaults)
+        self.assertFalse(CalendarUserSettings.objects.filter(user=hamlet).exists())
+
+        result = self.api_patch(
+            hamlet,
+            "/api/v1/calendar/settings",
+            {
+                "work_days": "[7, 1, 2, 1]",
+                "work_day_start_minutes": 480,
+                "default_reminder_minutes": "null",
+                "default_view": CalendarUserSettings.View.WEEK,
+                "time_scale_minutes": 15,
+            },
+        )
+        self.assert_json_success(result)
+        changed = {
+            "work_days": [1, 2, 7],
+            "work_day_start_minutes": 480,
+            "work_day_end_minutes": 1080,
+            "default_reminder_minutes": None,
+            "default_view": CalendarUserSettings.View.WEEK,
+            "time_scale_minutes": 15,
+        }
+        self.assertEqual(self.get_settings(hamlet), changed)
+        self.assertEqual(self.get_settings(self.example_user("cordelia")), defaults)
+
+        result = self.api_patch(
+            hamlet, "/api/v1/calendar/settings", {"default_reminder_minutes": 30}
+        )
+        self.assert_json_success(result)
+        self.assertEqual(self.get_settings(hamlet), {**changed, "default_reminder_minutes": 30})
+
+        for params, error in [
+            ({"work_days": "[]"}, "Invalid work days"),
+            ({"work_days": "[0, 1]"}, "Invalid work days"),
+            ({"work_day_start_minutes": 1080}, "Invalid work hours"),
+            ({"work_day_end_minutes": 1441}, "Invalid work hours"),
+            ({"default_reminder_minutes": -1}, "Invalid reminder"),
+            ({"default_view": 3}, "Invalid view"),
+            ({"time_scale_minutes": 10}, "Invalid time scale"),
+        ]:
+            result = self.api_patch(hamlet, "/api/v1/calendar/settings", params)
+            self.assert_json_error(result, error)

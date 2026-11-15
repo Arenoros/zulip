@@ -64,6 +64,12 @@
 * [Forward a calendar event](/api/add-calendar-attendees)
 * [Update personal settings for a calendar event](/api/update-calendar-personal-settings)
 * [Get free/busy times](/api/get-calendar-free-busy)
+* [Get pinned calendars](/api/get-calendar-pinned-users)
+* [Pin a calendar](/api/pin-calendar-user)
+* [Update a pinned calendar](/api/update-calendar-pinned-user)
+* [Unpin a calendar](/api/unpin-calendar-user)
+* [Get calendar settings](/api/get-calendar-settings)
+* [Update calendar settings](/api/update-calendar-settings)
 
 ## Channels
 

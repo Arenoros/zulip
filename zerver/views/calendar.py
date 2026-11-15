@@ -20,6 +20,15 @@ from zerver.lib.calendar.occurrences import (
     get_calendar_occurrences,
     get_free_busy,
 )
+from zerver.lib.calendar.user_settings import (
+    calendar_user_settings_to_api_dict,
+    get_calendar_user_settings,
+    get_pinned_users,
+    pin_user,
+    unpin_user,
+    update_calendar_user_settings,
+    update_pinned_user_color,
+)
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.response import json_success
 from zerver.lib.timestamp import timestamp_to_datetime
@@ -258,3 +267,75 @@ def update_calendar_personal_settings(
     )
     return json_success(request)
 
+
+def get_calendar_pinned_users(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
+    return json_success(request, data={"pinned_users": get_pinned_users(user_profile)})
+
+
+@typed_endpoint
+def pin_calendar_user(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    user_id: Json[int],
+    color: str,
+) -> HttpResponse:
+    (pinned_user,) = access_calendar_users(user_profile, [user_id])
+    pin_user(user_profile, pinned_user, color)
+    return json_success(request)
+
+
+@typed_endpoint
+def update_calendar_pinned_user(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    user_id: PathOnly[int],
+    color: str,
+) -> HttpResponse:
+    update_pinned_user_color(user_profile, user_id, color)
+    return json_success(request)
+
+
+@typed_endpoint
+def unpin_calendar_user(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    user_id: PathOnly[int],
+) -> HttpResponse:
+    unpin_user(user_profile, user_id)
+    return json_success(request)
+
+
+def get_calendar_settings(request: HttpRequest, user_profile: UserProfile) -> HttpResponse:
+    user_settings = get_calendar_user_settings(user_profile)
+    return json_success(
+        request, data={"settings": calendar_user_settings_to_api_dict(user_settings)}
+    )
+
+
+@typed_endpoint
+def update_calendar_settings(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    work_days: Json[list[int]] | None = None,
+    work_day_start_minutes: Json[int] | None = None,
+    work_day_end_minutes: Json[int] | None = None,
+    default_reminder_minutes: Json[int | None] | MissingType = Missing,
+    default_view: Json[int] | None = None,
+    time_scale_minutes: Json[int] | None = None,
+) -> HttpResponse:
+    update_calendar_user_settings(
+        user_profile,
+        work_days=work_days,
+        work_day_start_minutes=work_day_start_minutes,
+        work_day_end_minutes=work_day_end_minutes,
+        default_reminder_minutes=UNSET
+        if isinstance(default_reminder_minutes, MissingType)
+        else default_reminder_minutes,
+        default_view=default_view,
+        time_scale_minutes=time_scale_minutes,
+    )
+    return json_success(request)
