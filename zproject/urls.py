@@ -38,6 +38,16 @@ from zerver.views.auth import (
     start_social_login,
     start_social_signup,
 )
+from zerver.views.calendar import (
+    add_calendar_attendees_backend,
+    create_calendar_event_backend,
+    delete_calendar_event,
+    get_calendar_events,
+    get_calendar_free_busy,
+    respond_to_calendar_event_backend,
+    update_calendar_event_backend,
+    update_calendar_personal_settings,
+)
 from zerver.views.channel_folders import (
     create_channel_folder,
     get_channel_folders,
@@ -408,6 +418,25 @@ v1_api_and_json_patterns = [
         PATCH=update_navigation_view,
         DELETE=remove_navigation_view,
     ),
+    # calendar -> zerver.views.calendar
+    rest_path("calendar/events", GET=get_calendar_events, POST=create_calendar_event_backend),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>",
+        PATCH=update_calendar_event_backend,
+        DELETE=delete_calendar_event,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/response",
+        POST=respond_to_calendar_event_backend,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/attendees", POST=add_calendar_attendees_backend
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/personal_settings",
+        PATCH=update_calendar_personal_settings,
+    ),
+    rest_path("calendar/free_busy", GET=get_calendar_free_busy),
     # saved_snippets -> zerver.views.saved_snippets
     rest_path("saved_snippets", GET=get_saved_snippets, POST=create_saved_snippet),
     rest_path(

@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import orjson
+from django.utils.timezone import now as timezone_now
+
 from zerver.lib.calendar.changes import (
     add_calendar_attendees,
     cancel_calendar_event,
@@ -14,6 +17,7 @@ from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
     get_calendar_occurrences,
     get_free_busy,
+    get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
 from zerver.lib.exceptions import JsonableError
@@ -23,10 +27,12 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarPinnedUser,
     CalendarUserSettings,
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
+from zerver.views.calendar import MAX_FREE_BUSY_USERS
 
 
 def utc(*args: int) -> datetime:
@@ -640,3 +646,329 @@ class RespondToCalendarEventTest(CalendarTestCase):
             update_calendar_attendee_settings(cordelia, event_id, category="Pink category")
         with self.assertRaisesRegex(JsonableError, "Invalid value for show as"):
             update_calendar_attendee_settings(cordelia, event_id, show_as=9)
+
+
+def timestamp(value: datetime) -> int:
+    return int(value.timestamp())
+
+
+class CalendarAPITest(CalendarTestCase):
+    def get_events(self, user: UserProfile) -> list[dict[str, Any]]:
+        result = self.api_get(
+            user,
+            "/api/v1/calendar/events",
+            {"start": timestamp(WEEK_START), "end": timestamp(WEEK_END)},
+        )
+        return self.assert_json_success(result)["events"]
+
+    def test_create_and_get_events(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        result = self.api_post(
+            hamlet,
+            "/api/v1/calendar/events",
+            {
+                "title": "Planning",
+                "start": timestamp(MONDAY_10_00),
+                "end": timestamp(MONDAY_10_00 + timedelta(minutes=30)),
+                "timezone": "Europe/Moscow",
+                "description": "**Agenda**",
+                "location": "Room 1",
+                "rrule": "FREQ=DAILY;UNTIL=20261117T235959Z",
+                "required_attendees": orjson.dumps([cordelia.id]).decode(),
+                "optional_attendees": orjson.dumps([othello.id]).decode(),
+            },
+        )
+        event_id = self.assert_json_success(result)["id"]
+        event = CalendarEvent.objects.get(id=event_id)
+
+        first, second = self.get_events(cordelia)
+        self.assertEqual(
+            first,
+            {
+                "id": event_id,
+                "uid": event.uid,
+                "original_start": timestamp(MONDAY_10_00),
+                "start": timestamp(MONDAY_10_00),
+                "end": timestamp(MONDAY_10_00 + timedelta(minutes=30)),
+                "timezone": "Europe/Moscow",
+                "is_all_day": False,
+                "title": "Planning",
+                "location": "Room 1",
+                "description": "**Agenda**",
+                "rendered_description": "<p><strong>Agenda</strong></p>",
+                "show_as": CalendarShowAs.BUSY,
+                "is_private": False,
+                "is_cancelled": False,
+                "rrule": "FREQ=DAILY;UNTIL=20261117T235959Z",
+                "organizer_id": hamlet.id,
+                "response": CalendarResponse.NONE,
+                "reminder_minutes": 15,
+                "category": "",
+                "response_requested": True,
+                "allow_forwarding": True,
+                "has_zulip_call": False,
+                "meet_code": event.meet_code,
+                "chat_id": None,
+                "attendees": [
+                    {
+                        "user_id": hamlet.id,
+                        "is_required": True,
+                        "response": CalendarResponse.ACCEPTED,
+                        "added_by": None,
+                    },
+                    {
+                        "user_id": cordelia.id,
+                        "is_required": True,
+                        "response": CalendarResponse.NONE,
+                        "added_by": None,
+                    },
+                    {
+                        "user_id": othello.id,
+                        "is_required": False,
+                        "response": CalendarResponse.NONE,
+                        "added_by": None,
+                    },
+                ],
+            },
+        )
+        self.assertEqual(second["original_start"], timestamp(MONDAY_10_00 + timedelta(days=1)))
+
+        result = self.api_get(
+            cordelia,
+            "/api/v1/calendar/events",
+            {"start": timestamp(WEEK_START), "end": timestamp(WEEK_START + timedelta(days=63))},
+        )
+        self.assert_json_error(result, "The range is too long")
+
+        result = self.api_post(
+            hamlet,
+            "/api/v1/calendar/events",
+            {
+                "title": "Planning",
+                "start": timestamp(MONDAY_10_00),
+                "end": timestamp(MONDAY_10_00),
+                "timezone": "Europe/Moscow",
+                "location": "x" * (CalendarEvent.MAX_LOCATION_LENGTH + 1),
+            },
+        )
+        self.assert_json_error(result, "location is too long (limit: 255 characters)")
+
+    def test_inaccessible_users(self) -> None:
+        self.set_up_db_for_testing_user_access()
+        polonius = self.example_user("polonius")
+        othello = self.example_user("othello")
+        params = {
+            "title": "Planning",
+            "start": timestamp(MONDAY_10_00),
+            "end": timestamp(MONDAY_10_00 + timedelta(minutes=30)),
+            "timezone": "Europe/Moscow",
+        }
+        result = self.api_post(
+            polonius,
+            "/api/v1/calendar/events",
+            {**params, "required_attendees": orjson.dumps([othello.id]).decode()},
+        )
+        self.assert_json_error(result, f"Invalid user ID: {othello.id}")
+
+        result = self.api_post(
+            polonius, "/api/v1/calendar/events", {**params, "required_attendees": "[9999]"}
+        )
+        self.assert_json_error(result, "Invalid user ID: 9999")
+
+    def test_update_and_delete(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        series_id = self.create_event(hamlet, rrule="FREQ=DAILY", required_attendees=[cordelia])
+
+        result = self.api_patch(
+            hamlet,
+            f"/api/v1/calendar/events/{series_id}",
+            {"title": "Weekly planning", "optional_attendees": orjson.dumps([othello.id]).decode()},
+        )
+        self.assert_json_success(result)
+        self.assertEqual(CalendarEvent.objects.get(id=series_id).title, "Weekly planning")
+        self.assertFalse(self.get_attendee(series_id, othello).is_required)
+
+        tuesday = MONDAY_10_00 + timedelta(days=1)
+        result = self.api_patch(
+            hamlet,
+            f"/api/v1/calendar/events/{series_id}",
+            {"occurrence": timestamp(tuesday), "start": timestamp(tuesday + timedelta(hours=1))},
+        )
+        self.assert_json_success(result)
+        exception = CalendarEventException.objects.get(event_id=series_id)
+        self.assertEqual(exception.start, tuesday + timedelta(hours=1))
+
+        result = self.api_patch(cordelia, f"/api/v1/calendar/events/{series_id}", {"title": "Mine"})
+        self.assert_json_error(result, "Only the organizer can change this event")
+
+        # An attendee removes an occurrence from their own calendar.
+        wednesday = MONDAY_10_00 + timedelta(days=2)
+        result = self.api_delete(
+            cordelia, f"/api/v1/calendar/events/{series_id}", {"occurrence": timestamp(wednesday)}
+        )
+        self.assert_json_success(result)
+        self.assertEqual(
+            CalendarAttendeeOccurrenceResponse.objects.get(
+                attendee=self.get_attendee(series_id, cordelia), original_start=wednesday
+            ).response,
+            CalendarResponse.DECLINED,
+        )
+        self.assertFalse(
+            CalendarEventException.objects.filter(event_id=series_id, original_start=wednesday).exists()
+        )
+
+        # The organizer cancels the series for everyone.
+        result = self.api_delete(hamlet, f"/api/v1/calendar/events/{series_id}")
+        self.assert_json_success(result)
+        self.assertTrue(CalendarEvent.objects.get(id=series_id).is_cancelled)
+
+        result = self.api_delete(self.example_user("iago"), f"/api/v1/calendar/events/{series_id}")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+    def test_respond_forward_and_personal_settings(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia])
+
+        result = self.api_post(
+            cordelia,
+            f"/api/v1/calendar/events/{event_id}/response",
+            {"response": CalendarResponse.TENTATIVE},
+        )
+        self.assert_json_success(result)
+        self.assertEqual(self.get_attendee(event_id, cordelia).response, CalendarResponse.TENTATIVE)
+
+        result = self.api_post(
+            cordelia,
+            f"/api/v1/calendar/events/{event_id}/attendees",
+            {"user_ids": orjson.dumps([othello.id]).decode()},
+        )
+        self.assert_json_success(result)
+        attendee = self.get_attendee(event_id, othello)
+        self.assertFalse(attendee.is_required)
+        self.assertEqual(attendee.added_by, cordelia)
+
+        url = f"/api/v1/calendar/events/{event_id}/personal_settings"
+        result = self.api_patch(
+            cordelia, url, {"reminder_minutes": "null", "show_as": CalendarShowAs.TENTATIVE}
+        )
+        self.assert_json_success(result)
+        attendee = self.get_attendee(event_id, cordelia)
+        self.assertIsNone(attendee.reminder_minutes)
+        self.assertEqual(attendee.show_as, CalendarShowAs.TENTATIVE)
+
+        result = self.api_patch(cordelia, url, {"category": "Blue category", "show_as": "null"})
+        self.assert_json_success(result)
+        attendee = self.get_attendee(event_id, cordelia)
+        self.assertIsNone(attendee.reminder_minutes)
+        self.assertEqual(attendee.category, "Blue category")
+        self.assertIsNone(attendee.show_as)
+
+        result = self.api_patch(cordelia, url, {"reminder_minutes": -5})
+        self.assert_json_error(result, "Invalid reminder")
+
+    def test_free_busy(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia])
+
+        def get_free_busy(viewer: UserProfile, user_ids: list[int]) -> Any:
+            return self.api_get(
+                viewer,
+                "/api/v1/calendar/free_busy",
+                {
+                    "user_ids": orjson.dumps(user_ids).decode(),
+                    "start": timestamp(WEEK_START),
+                    "end": timestamp(WEEK_END),
+                },
+            )
+
+        result = get_free_busy(othello, [cordelia.id, othello.id])
+        self.assertEqual(
+            self.assert_json_success(result)["free_busy"],
+            {
+                str(cordelia.id): [
+                    {
+                        "start": timestamp(MONDAY_10_00),
+                        "end": timestamp(MONDAY_10_00 + timedelta(minutes=30)),
+                        "show_as": CalendarShowAs.BUSY,
+                        "event_id": None,
+                        "title": None,
+                    }
+                ],
+                str(othello.id): [],
+            },
+        )
+
+        result = get_free_busy(hamlet, [cordelia.id])
+        (block,) = self.assert_json_success(result)["free_busy"][str(cordelia.id)]
+        self.assertEqual((block["event_id"], block["title"]), (event_id, "Planning"))
+
+        result = get_free_busy(hamlet, list(range(1, MAX_FREE_BUSY_USERS + 2)))
+        self.assert_json_error(result, "Too many users")
+
+
+class CalendarChangeEventsTest(CalendarTestCase):
+    def test_unanswered_invitation_counts(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        now = timezone_now().replace(microsecond=0)
+        tomorrow = now + timedelta(days=1)
+        yesterday = now - timedelta(days=1)
+
+        def create(start: datetime, **kwargs: Any) -> int:
+            return self.create_event(
+                hamlet,
+                start=start,
+                end=start + timedelta(hours=1),
+                event_timezone="UTC",
+                required_attendees=[cordelia],
+                **kwargs,
+            )
+
+        create(tomorrow)
+        create(yesterday, rrule="FREQ=DAILY")
+        create(yesterday)
+        until = (now - timedelta(hours=2)).strftime("%Y%m%dT%H%M%SZ")
+        create(yesterday, rrule=f"FREQ=DAILY;UNTIL={until}")
+        create(tomorrow, response_requested=False)
+        cancel_calendar_event(hamlet, create(tomorrow))
+        respond_to_calendar_event(cordelia, create(tomorrow), CalendarResponse.ACCEPTED)
+
+        self.assertEqual(
+            get_unanswered_invitation_counts({hamlet.id, cordelia.id}),
+            {hamlet.id: 0, cordelia.id: 2},
+        )
+
+    def test_free_busy_events_name_only_pinned_users(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        iago = self.example_user("iago")
+        CalendarPinnedUser.objects.create(user=iago, pinned_user=cordelia, order=1, color="#4f7cff")
+
+        with self.capture_send_event_calls(expected_num_events=3) as events:
+            event_id = self.create_event(
+                hamlet, required_attendees=[cordelia, othello], hide_attendees=True
+            )
+        self.assertCountEqual(
+            [(event["event"], sorted(event["users"])) for event in events],
+            [
+                (
+                    {"type": "calendar", "event_id": event_id, "unanswered_invitation_count": 0},
+                    [hamlet.id],
+                ),
+                (
+                    {"type": "calendar", "event_id": event_id, "unanswered_invitation_count": 1},
+                    sorted([cordelia.id, othello.id]),
+                ),
+                ({"type": "calendar_free_busy", "user_ids": [cordelia.id]}, [iago.id]),
+            ],
+        )
+

@@ -54,6 +54,17 @@
 * [Update the navigation view](/api/edit-navigation-view)
 * [Remove a navigation view](/api/remove-navigation-view)
 
+## Calendar
+
+* [Get calendar events](/api/get-calendar-events)
+* [Create a calendar event](/api/create-calendar-event)
+* [Update a calendar event](/api/update-calendar-event)
+* [Delete a calendar event](/api/delete-calendar-event)
+* [Respond to a calendar event](/api/respond-to-calendar-event)
+* [Forward a calendar event](/api/add-calendar-attendees)
+* [Update personal settings for a calendar event](/api/update-calendar-personal-settings)
+* [Get free/busy times](/api/get-calendar-free-busy)
+
 ## Channels
 
 * [Get subscribed channels](/api/get-subscriptions)

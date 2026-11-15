@@ -36,6 +36,7 @@ class CalendarEvent(models.Model):
     """An event or a meeting, or a series of them if rrule is set."""
 
     MAX_TITLE_LENGTH = 255
+    MAX_LOCATION_LENGTH = 255
 
     realm = models.ForeignKey(Realm, on_delete=CASCADE)
     # The iCalendar UID, which identifies the event when it moves to

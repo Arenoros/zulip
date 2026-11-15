@@ -71,6 +71,17 @@ class AttachmentUpdateEvent(BaseEvent):
     upload_space_used: int
 
 
+class CalendarChangeEvent(BaseEvent):
+    type: Literal["calendar"] = "calendar"
+    event_id: int
+    unanswered_invitation_count: int
+
+
+class CalendarFreeBusyEvent(BaseEvent):
+    type: Literal["calendar_free_busy"] = "calendar_free_busy"
+    user_ids: list[int]
+
+
 class CallConversation(BaseEventModel):
     message_id: int
     stream_id: int | None = None

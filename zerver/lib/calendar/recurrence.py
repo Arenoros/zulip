@@ -69,3 +69,10 @@ def is_occurrence_start(
             start, event_timezone, rrule, original_start, original_start + timedelta(seconds=1)
         )
     )
+
+
+def has_occurrence_ending_after(
+    start: datetime, end: datetime, event_timezone: str, rrule: str, moment: datetime
+) -> bool:
+    rule = rrulestr(rrule, dtstart=start.astimezone(ZoneInfo(event_timezone)))
+    return rule.after(moment - (end - start)) is not None

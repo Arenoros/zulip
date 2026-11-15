@@ -1,12 +1,15 @@
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from django.db.models import Q
+from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
-from zerver.lib.calendar.recurrence import get_occurrence_starts
+from zerver.lib.calendar.recurrence import get_occurrence_starts, has_occurrence_ending_after
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.timestamp import datetime_to_timestamp
 from zerver.models import (
     CalendarAttendee,
     CalendarAttendeeOccurrenceResponse,
@@ -66,6 +69,18 @@ class CalendarOccurrence:
     # Empty when the organizer hides the attendees from others.
     attendees: list[CalendarAttendeeData]
 
+    def to_api_dict(self) -> dict[str, Any]:
+        result = asdict(self)
+        result["id"] = result.pop("event_id")
+        result["original_start"] = (
+            None if self.original_start is None else datetime_to_timestamp(self.original_start)
+        )
+        result["start"] = datetime_to_timestamp(self.start)
+        result["end"] = datetime_to_timestamp(self.end)
+        for attendee in result["attendees"]:
+            attendee["added_by"] = attendee.pop("added_by_id")
+        return result
+
 
 @dataclass
 class FreeBusyBlock:
@@ -76,6 +91,12 @@ class FreeBusyBlock:
     # details of.
     event_id: int | None
     title: str | None
+
+    def to_api_dict(self) -> dict[str, Any]:
+        result = asdict(self)
+        result["start"] = datetime_to_timestamp(self.start)
+        result["end"] = datetime_to_timestamp(self.end)
+        return result
 
 
 def check_calendar_range(start: datetime, end: datetime) -> None:
@@ -335,3 +356,27 @@ def get_free_busy(
     for blocks in free_busy.values():
         blocks.sort(key=lambda block: block.start)
     return free_busy
+
+
+def get_unanswered_invitation_counts(user_ids: set[int]) -> dict[int, int]:
+    """How many invitations to events that have not ended each user
+    has not responded to, among those whose organizer asked for
+    responses."""
+    now = timezone_now()
+    counts = dict.fromkeys(user_ids, 0)
+    for attendee in (
+        CalendarAttendee.objects.filter(
+            user_id__in=user_ids,
+            response=CalendarResponse.NONE,
+            event__response_requested=True,
+            event__is_cancelled=False,
+        )
+        .filter(Q(event__rrule="", event__end__gt=now) | ~Q(event__rrule=""))
+        .select_related("event")
+    ):
+        event = attendee.event
+        if not event.rrule or has_occurrence_ending_after(
+            event.start, event.end, event.timezone, event.rrule, now
+        ):
+            counts[attendee.user_id] += 1
+    return counts

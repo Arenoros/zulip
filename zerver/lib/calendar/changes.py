@@ -1,14 +1,19 @@
 import secrets
 import uuid
 import zoneinfo
+from collections import defaultdict
 from datetime import datetime, time
 
 from django.db import transaction
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
-from zerver.lib.calendar.occurrences import access_calendar_event_by_id
+from zerver.lib.calendar.occurrences import (
+    access_calendar_event_by_id,
+    get_unanswered_invitation_counts,
+)
 from zerver.lib.calendar.recurrence import is_occurrence_start, validate_rrule
+from zerver.lib.event_types import CalendarChangeEvent, CalendarFreeBusyEvent
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.timezone import canonicalize_timezone
 from zerver.lib.types import UNSET, Unset
@@ -17,10 +22,13 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarPinnedUser,
     CalendarUserSettings,
+    Realm,
     UserProfile,
 )
 from zerver.models.calendar import DEFAULT_REMINDER_MINUTES, CalendarResponse, CalendarShowAs
+from zerver.tornado.django_api import send_event_on_commit
 
 # Outlook's default color categories, by the names Exchange stores.
 CALENDAR_CATEGORIES = [
@@ -101,6 +109,40 @@ def get_default_reminder_minutes(user_ids: set[int]) -> dict[int, int | None]:
     return reminder_minutes
 
 
+def get_attendee_user_ids(event: CalendarEvent) -> set[int]:
+    return set(CalendarAttendee.objects.filter(event=event).values_list("user_id", flat=True))
+
+
+def send_calendar_change_events(realm: Realm, event: CalendarEvent, user_ids: set[int]) -> None:
+    """Tells the users that the event changed in their calendars, and
+    those who pinned any of the users that their free/busy times may
+    have changed."""
+    user_ids_by_count: dict[int, list[int]] = defaultdict(list)
+    for user_id, count in get_unanswered_invitation_counts(user_ids).items():
+        user_ids_by_count[count].append(user_id)
+    for count, count_user_ids in user_ids_by_count.items():
+        send_event_on_commit(
+            realm,
+            CalendarChangeEvent(event_id=event.id, unanswered_invitation_count=count),
+            count_user_ids,
+        )
+
+    # Each viewer learns only about the users they pinned, which keeps
+    # hidden attendees hidden.
+    pinned_user_ids_by_viewer_id: dict[int, list[int]] = defaultdict(list)
+    for viewer_id, pinned_user_id in CalendarPinnedUser.objects.filter(
+        pinned_user_id__in=user_ids
+    ).values_list("user_id", "pinned_user_id"):
+        pinned_user_ids_by_viewer_id[viewer_id].append(pinned_user_id)
+    viewer_ids_by_pinned_user_ids: dict[tuple[int, ...], list[int]] = defaultdict(list)
+    for viewer_id, pinned_user_ids in pinned_user_ids_by_viewer_id.items():
+        viewer_ids_by_pinned_user_ids[tuple(sorted(pinned_user_ids))].append(viewer_id)
+    for user_ids_of_viewers, viewer_ids in viewer_ids_by_pinned_user_ids.items():
+        send_event_on_commit(
+            realm, CalendarFreeBusyEvent(user_ids=list(user_ids_of_viewers)), viewer_ids
+        )
+
+
 def create_new_attendees(
     event: CalendarEvent,
     is_required_by_user_id: dict[int, bool],
@@ -178,6 +220,7 @@ def create_calendar_event(
         reminder_minutes=get_default_reminder_minutes({organizer.id})[organizer.id],
     )
     create_new_attendees(event, is_required_by_user_id)
+    send_calendar_change_events(organizer.realm, event, get_attendee_user_ids(event))
     return event.id
 
 
@@ -332,6 +375,7 @@ def update_calendar_event(
     as Exchange does, and asks attendees to respond again.
     """
     event = access_calendar_event_as_organizer(user_profile, event_id)
+    old_user_ids = get_attendee_user_ids(event)
 
     if original_start is not None:
         series_fields = [
@@ -361,6 +405,7 @@ def update_calendar_event(
             start=start,
             end=end,
         )
+        send_calendar_change_events(user_profile.realm, event, old_user_ids)
         return
 
     old_time = (event.start, event.end, event.timezone, event.is_all_day, event.rrule)
@@ -417,6 +462,9 @@ def update_calendar_event(
 
     if required_attendees is not None or optional_attendees is not None:
         update_attendees(event, required_attendees, optional_attendees)
+    send_calendar_change_events(
+        user_profile.realm, event, old_user_ids | get_attendee_user_ids(event)
+    )
 
 
 @transaction.atomic(durable=True)
@@ -436,6 +484,7 @@ def cancel_calendar_event(
     event.sequence += 1
     event.last_modified = timezone_now()
     event.save(update_fields=["is_cancelled", "sequence", "last_modified"])
+    send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
 
 
 @transaction.atomic(durable=True)
@@ -461,11 +510,12 @@ def respond_to_calendar_event(
         attendee.response = response
         attendee.response_date = timezone_now()
         attendee.save(update_fields=["response", "response_date"])
-        return
-    check_occurrence(event, original_start)
-    CalendarAttendeeOccurrenceResponse.objects.update_or_create(
-        attendee=attendee, original_start=original_start, defaults={"response": response}
-    )
+    else:
+        check_occurrence(event, original_start)
+        CalendarAttendeeOccurrenceResponse.objects.update_or_create(
+            attendee=attendee, original_start=original_start, defaults={"response": response}
+        )
+    send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
 
 
 @transaction.atomic(durable=True)
@@ -491,6 +541,7 @@ def add_calendar_attendees(
         if user_id not in existing_user_ids
     }
     create_new_attendees(event, new_attendees, added_by=user_profile)
+    send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
 
 
 @transaction.atomic(durable=True)
@@ -508,6 +559,8 @@ def update_calendar_attendee_settings(
     event = access_calendar_event_by_id(user_profile, event_id)
     attendee = CalendarAttendee.objects.get(event=event, user=user_profile)
     if not isinstance(reminder_minutes, Unset):
+        if reminder_minutes is not None and reminder_minutes < 0:
+            raise JsonableError(_("Invalid reminder"))
         attendee.reminder_minutes = reminder_minutes
     if category is not None:
         if category and category not in CALENDAR_CATEGORIES:
@@ -518,3 +571,4 @@ def update_calendar_attendee_settings(
             check_show_as(show_as)
         attendee.show_as = show_as
     attendee.save(update_fields=["reminder_minutes", "category", "show_as"])
+    send_calendar_change_events(user_profile.realm, event, {user_profile.id})
