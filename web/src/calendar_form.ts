@@ -57,7 +57,7 @@ const MAX_CHECKED_OCCURRENCES = 8;
 const MAX_CHECKED_DAYS = 60;
 // Free and working elsewhere.
 const FREE_SHOW_AS = new Set([1, 5]);
-const REMINDERS: (number | null)[] = [null, 0, 5, 15, 30, 60, 120, 720, 1440, 10_080];
+export const REMINDERS: (number | null)[] = [null, 0, 5, 15, 30, 60, 120, 720, 1440, 10_080];
 // Outlook's default color categories, by the names Exchange stores.
 const CATEGORIES = [
     ["Blue category", "blue"],
@@ -135,7 +135,7 @@ export function is_open(): boolean {
     return state !== undefined;
 }
 
-function format_minutes(minutes: number): string {
+export function format_minutes(minutes: number): string {
     return new Intl.DateTimeFormat(user_settings.default_language, {
         hour: "numeric",
         minute: "2-digit",

@@ -58,13 +58,13 @@ function format_date(date: Date, options: Intl.DateTimeFormatOptions): string {
     return new Intl.DateTimeFormat(user_settings.default_language, options).format(date);
 }
 
-const TIME_SCALES = [15, 30, 60];
+export const TIME_SCALES = [15, 30, 60];
 
-function get_time_scale_label(minutes: number): string {
+export function get_time_scale_label(minutes: number): string {
     return $t({defaultMessage: "{minutes} minutes"}, {minutes});
 }
 
-function get_view_label(view: CalendarView): string {
+export function get_view_label(view: CalendarView): string {
     if (view === "week") {
         return $t({defaultMessage: "Week"});
     }
@@ -451,6 +451,10 @@ function register_view_menu_popover(): void {
                     report_error($t({defaultMessage: "Failed to save the view"})),
                 );
                 popover_menus.hide_current_popover_if_visible(instance);
+            });
+            $popper.on("click", ".calendar-settings-option", () => {
+                popover_menus.hide_current_popover_if_visible(instance);
+                browser_history.go_to_location("#settings/calendar");
             });
             $popper.on("click", ".calendar-side-by-side-option", () => {
                 calendar_colleagues.set_side_by_side_enabled(

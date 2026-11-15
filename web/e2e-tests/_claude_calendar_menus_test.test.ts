@@ -181,13 +181,14 @@ async function calendar_menus_test(page: Page): Promise<void> {
         items.map((item) => item.textContent.trim()),
     );
     check(
-        "the view menu has the views, side by side and the time scale",
+        "the view menu has the views, side by side, the time scale and the settings",
         JSON.stringify(labels) ===
             JSON.stringify([
                 "Work week",
                 "Week",
                 "Colleagues' calendars side by side",
                 "Time scale",
+                "Calendar settings",
             ]) &&
             (await page.$eval(".calendar-menu-value", (value) => value.textContent.trim())) ===
                 "30 minutes",

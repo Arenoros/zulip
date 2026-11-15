@@ -489,6 +489,7 @@ export function validate_settings_hash(
         "account-and-privacy",
         "preferences",
         "notifications",
+        "calendar",
         "bots",
         "alert-words",
         "uploaded-files",

@@ -72,6 +72,7 @@ import * as scheduled_messages_ui from "./scheduled_messages_ui.ts";
 import * as scroll_bar from "./scroll_bar.ts";
 import * as settings_account from "./settings_account.ts";
 import * as settings_bots from "./settings_bots.ts";
+import * as settings_calendar from "./settings_calendar.ts";
 import * as settings_components from "./settings_components.ts";
 import * as settings_config from "./settings_config.ts";
 import * as settings_emoji from "./settings_emoji.ts";
@@ -146,6 +147,7 @@ export function dispatch_normal_event(event) {
 
         case "calendar_settings":
             calendar_grid.update_settings(event.settings);
+            settings_calendar.update();
             break;
 
         case "call":

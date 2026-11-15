@@ -85,6 +85,7 @@ const scheduled_messages_ui = mock_esm("../src/scheduled_messages_ui");
 const scroll_bar = mock_esm("../src/scroll_bar");
 const settings_account = mock_esm("../src/settings_account");
 const settings_bots = mock_esm("../src/settings_bots");
+const settings_calendar = mock_esm("../src/settings_calendar");
 const settings_data = mock_esm("../src/settings_data");
 const settings_emoji = mock_esm("../src/settings_emoji");
 const settings_exports = mock_esm("../src/settings_exports");
@@ -365,9 +366,12 @@ run_test("calendar_settings", ({override}) => {
     const event = event_fixtures.calendar_settings;
     const stub = make_stub();
     override(calendar_grid, "update_settings", stub.f);
+    const settings_stub = make_stub();
+    override(settings_calendar, "update", settings_stub.f);
     dispatch(event);
     assert.equal(stub.num_calls, 1);
     assert.deepEqual(stub.get_args("settings").settings, event.settings);
+    assert.equal(settings_stub.num_calls, 1);
 });
 
 run_test("call", ({override}) => {

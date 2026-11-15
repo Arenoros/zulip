@@ -1,0 +1,66 @@
+<div class="calendar-work-time-settings subsection-parent">
+    <div class="subsection-header">
+        <h3 class="settings-subsection-title">{{t "Work time" }}</h3>
+        {{> settings_save_discard_widget section_name="calendar-work-time-settings" show_save_discard_buttons=false }}
+    </div>
+    <p>{{t "The work week shows your work days, and suggested meeting times fall within your work hours." }}</p>
+    <div class="input-group">
+        <label class="settings-field-label">{{t "Work days" }}</label>
+        {{#each work_days}}
+            <div class="settings-checkbox-wrapper calendar-settings-work-day">
+                <label class="checkbox">
+                    <input type="checkbox" class="calendar-settings-work-day-checkbox inline-block" id="calendar_work_day_{{day}}" value="{{day}}" {{#if is_work_day}}checked="checked"{{/if}}/>
+                    <span class="rendered-checkbox"></span>
+                </label>
+                <label for="calendar_work_day_{{day}}" class="inline">{{label}}</label>
+            </div>
+        {{/each}}
+    </div>
+    <div class="input-group">
+        <label for="calendar_work_day_start_minutes" class="settings-field-label">{{t "Work day starts at" }}</label>
+        <select id="calendar_work_day_start_minutes" class="settings_select bootstrap-focus-style">
+            {{#each work_day_start_options}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+        </select>
+    </div>
+    <div class="input-group">
+        <label for="calendar_work_day_end_minutes" class="settings-field-label">{{t "Work day ends at" }}</label>
+        <select id="calendar_work_day_end_minutes" class="settings_select bootstrap-focus-style">
+            {{#each work_day_end_options}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+        </select>
+    </div>
+</div>
+
+<div class="calendar-view-settings subsection-parent">
+    <div class="subsection-header">
+        <h3 class="settings-subsection-title">{{t "Calendar" }}</h3>
+        {{> settings_save_discard_widget section_name="calendar-view-settings" show_save_discard_buttons=false }}
+    </div>
+    <div class="input-group">
+        <label for="calendar_default_view" class="settings-field-label">{{t "Default view" }}</label>
+        <select id="calendar_default_view" class="settings_select bootstrap-focus-style">
+            {{#each view_options}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+        </select>
+    </div>
+    <div class="input-group">
+        <label for="calendar_time_scale_minutes" class="settings-field-label">{{t "Time scale" }}</label>
+        <select id="calendar_time_scale_minutes" class="settings_select bootstrap-focus-style">
+            {{#each time_scale_options}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+        </select>
+    </div>
+    <div class="input-group">
+        <label for="calendar_default_reminder_minutes" class="settings-field-label">{{t "Default reminder" }}</label>
+        <select id="calendar_default_reminder_minutes" class="settings_select bootstrap-focus-style">
+            {{#each reminder_options}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+        </select>
+    </div>
+</div>
