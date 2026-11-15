@@ -8990,6 +8990,74 @@ paths:
                         description: |
                           The ID of the meeting's chat.
                     example: {"msg": "", "result": "success", "stream_id": 15}
+  /calendar/events/{calendar_event_id}/call:
+    post:
+      operationId: join-calendar-event-call
+      tags: ["calendar"]
+      summary: Join the call of a meeting
+      description: |
+        Get the link to the [LiveKit](/help/configure-call-provider) call of a
+        meeting with a Zulip call, starting the call if it is not taking place.
+
+        The call takes place in the [meeting's
+        chat](/api/get-calendar-event-chat), where starting it posts its link.
+        The meeting's attendees can join it, and so can people removed from the
+        meeting who are still in its chat. Attendees who left the chat join it
+        again.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+        - name: voice_only
+          in: query
+          description: |
+            Whether to join the call without video.
+          schema:
+            type: boolean
+            default: false
+          example: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - url
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      url:
+                        type: string
+                        description: |
+                          The path of the link to join the call.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "url": "/calls/livekit/join?call_id=4281396815&channel_id=15&voice_only=true",
+                      }
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CodedError"
+                  - example:
+                      {
+                        "code": "BAD_REQUEST",
+                        "msg": "This event has no Zulip call",
+                        "result": "error",
+                      }
+                    description: |
+                      An example JSON response for when the meeting has no Zulip call:
   /calendar/events/{calendar_event_id}/personal_settings:
     patch:
       operationId: update-calendar-personal-settings

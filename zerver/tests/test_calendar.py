@@ -1,8 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from unittest import mock
 
 import orjson
 from django.utils.timezone import now as timezone_now
+from typing_extensions import override
+
+from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.video_calls import do_end_livekit_call
 
 from zerver.lib.calendar.changes import (
     add_calendar_attendees,
@@ -30,10 +35,13 @@ from zerver.models import (
     CalendarEventException,
     CalendarPinnedUser,
     CalendarUserSettings,
+    LiveKitCall,
+    Realm,
     Stream,
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
+from zerver.models.realms import get_realm
 from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.views.calendar import MAX_FREE_BUSY_USERS
 
@@ -785,6 +793,162 @@ class MeetingChatTest(CalendarTestCase):
         self.unsubscribe(othello, chat.name)
         self.assertEqual(self.get_chat(othello, event_id), chat)
         self.assertTrue(get_subscription(chat.name, othello).active)
+
+
+class MeetingCallTest(CalendarTestCase):
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.set_call_provider("livekit")
+
+    def set_call_provider(self, provider: str) -> None:
+        do_set_realm_property(
+            get_realm("zulip"),
+            "video_chat_provider",
+            Realm.VIDEO_CHAT_PROVIDERS[provider]["id"],
+            acting_user=None,
+        )
+
+    def join_call(self, user: UserProfile, event_id: int, **params: str) -> str:
+        result = self.api_post(user, f"/api/v1/calendar/events/{event_id}/call", params)
+        return self.assert_json_success(result)["url"]
+
+    def call_id(self, call_id: int) -> "mock._patch[mock.MagicMock]":
+        return mock.patch("zerver.lib.calendar.calls.secrets.randbelow", return_value=call_id)
+
+    def test_join_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia], has_zulip_call=True)
+
+        # The first to join starts the call in the meeting's chat.
+        with self.call_id(123):
+            url = self.join_call(cordelia, event_id)
+        chat = CalendarEvent.objects.get(id=event_id).chat
+        assert chat is not None
+        self.assertEqual(url, f"/calls/livekit/join?call_id=123&channel_id={chat.id}")
+        message = self.get_last_message()
+        self.assertEqual(message.sender, cordelia)
+        self.assertEqual(message.recipient.type_id, chat.id)
+        self.assertEqual(message.topic_name(), "")
+        self.assertEqual(message.content, f"[Join video call.]({url})")
+
+        # Others join the same call, with video or without.
+        self.assertEqual(
+            self.join_call(hamlet, event_id, voice_only="true"), f"{url}&voice_only=true"
+        )
+        self.assertEqual(LiveKitCall.objects.filter(message__recipient=chat.recipient).count(), 1)
+
+        # Once it ends, joining starts another call.
+        do_end_livekit_call(LiveKitCall.objects.get(message=message).room)
+        with self.call_id(456):
+            self.assertEqual(
+                self.join_call(hamlet, event_id),
+                f"/calls/livekit/join?call_id=456&channel_id={chat.id}",
+            )
+
+    def test_who_can_join_call(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        iago = self.example_user("iago")
+        event_id = self.create_event(
+            hamlet, required_attendees=[cordelia, othello], has_zulip_call=True
+        )
+        result = self.api_post(iago, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+        url = self.join_call(hamlet, event_id)
+        chat = CalendarEvent.objects.get(id=event_id).chat
+        assert chat is not None
+        result = self.api_post(iago, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+        # Attendees who left the chat join it again.
+        self.unsubscribe(cordelia, chat.name)
+        self.assertEqual(self.join_call(cordelia, event_id), url)
+        self.assertTrue(get_subscription(chat.name, cordelia).active)
+
+        # People removed from the meeting stay in its chat, and can join
+        # its call until they leave the chat.
+        update_calendar_event(hamlet, event_id, required_attendees=[cordelia])
+        self.assertEqual(self.join_call(othello, event_id), url)
+        self.unsubscribe(othello, chat.name)
+        result = self.api_post(othello, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+    def test_join_call_errors(self) -> None:
+        hamlet = self.example_user("hamlet")
+        event_id = self.create_event(hamlet)
+        result = self.api_post(hamlet, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "This event has no Zulip call")
+
+        update_calendar_event(hamlet, event_id, has_zulip_call=True)
+        self.set_call_provider("jitsi_meet")
+        result = self.api_post(hamlet, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "LiveKit is not the call provider of this organization.")
+
+        self.set_call_provider("livekit")
+        cancel_calendar_event(hamlet, event_id)
+        result = self.api_post(hamlet, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "This event was cancelled")
+        # A call that cannot take place does not create the chat.
+        self.assertIsNone(CalendarEvent.objects.get(id=event_id).chat)
+
+    def test_meet_link(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia], has_zulip_call=True)
+        meet_url = f"/meet/{CalendarEvent.objects.get(id=event_id).meet_code}"
+
+        response = self.client_get(meet_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/login/"))
+
+        self.login("iago")
+        response = self.client_get(meet_url)
+        self.assertEqual(response.status_code, 403)
+        self.assert_in_response("No access to this call", response)
+        response = self.client_get("/meet/unknown")
+        self.assertEqual(response.status_code, 403)
+
+        # Opening the link before the call starts only offers to start
+        # it.
+        self.login_user(cordelia)
+        response = self.client_get(meet_url, {"voice_only": "true"})
+        self.assert_in_success_response(
+            ["Planning", "Start the call", 'name="voice_only" value="true"'], response
+        )
+        self.assertIsNone(CalendarEvent.objects.get(id=event_id).chat)
+        with self.call_id(123):
+            response = self.client_post(meet_url, {"voice_only": "true"})
+        chat = CalendarEvent.objects.get(id=event_id).chat
+        assert chat is not None
+        url = f"/calls/livekit/join?call_id=123&channel_id={chat.id}"
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"{url}&voice_only=true")
+
+        # Once the call has started, the link joins it.
+        self.login_user(hamlet)
+        self.unsubscribe(hamlet, chat.name)
+        response = self.client_get(meet_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], url)
+        self.assertTrue(get_subscription(chat.name, hamlet).active)
+
+        cancel_calendar_event(hamlet, event_id)
+        response = self.client_get(meet_url)
+        self.assertEqual(response.status_code, 404)
+        self.assert_in_response("This event was cancelled", response)
+
+    def test_call_window_title(self) -> None:
+        hamlet = self.example_user("hamlet")
+        event_id = self.create_event(hamlet, title="Design review", has_zulip_call=True)
+        url = self.join_call(hamlet, event_id)
+        self.login_user(hamlet)
+        self.assert_in_success_response(
+            ["<title>Design review | Zulip</title>"], self.client_get(url)
+        )
 
 
 class CalendarAPITest(CalendarTestCase):

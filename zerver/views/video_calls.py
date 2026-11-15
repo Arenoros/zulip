@@ -73,6 +73,7 @@ from zerver.lib.typed_endpoint import (
 from zerver.lib.url_encoding import append_url_query_string, pm_message_url, stream_message_url
 from zerver.lib.utils import assert_is_not_none
 from zerver.models import (
+    CalendarEvent,
     LiveKitCall,
     LiveKitCallParticipant,
     LiveKitCallRing,
@@ -877,7 +878,14 @@ def join_livekit_call(
         call_chat_message = get_livekit_call_chat_message(call)
         conversation_url = get_livekit_call_conversation_url(user_profile.realm, call_chat_message)
         call_chat = get_livekit_call_conversation(call_chat_message).model_dump(exclude_unset=True)
-        if stream is not None:
+        meeting = (
+            None
+            if stream is None or not stream.is_meeting_chat
+            else CalendarEvent.objects.filter(chat=stream).first()
+        )
+        if meeting is not None:
+            call_title = meeting.title
+        elif stream is not None:
             call_title = f"#{stream.name} > {call.message.topic_name()}"
         else:
             names = sorted(

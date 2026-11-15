@@ -64,6 +64,7 @@
 * [Respond to a calendar event](/api/respond-to-calendar-event)
 * [Forward a calendar event](/api/add-calendar-attendees)
 * [Get the chat of a meeting](/api/get-calendar-event-chat)
+* [Join the call of a meeting](/api/join-calendar-event-call)
 * [Update personal settings for a calendar event](/api/update-calendar-personal-settings)
 * [Get free/busy times](/api/get-calendar-free-busy)
 * [Get pinned calendars](/api/get-calendar-pinned-users)

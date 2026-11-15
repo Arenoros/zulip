@@ -1,0 +1,21 @@
+{% extends "zerver/portico_error_pages/portico_error_page.html" %}
+
+{% block title %}
+<title>{{ event_title }} | Zulip</title>
+{% endblock %}
+
+{% block error_page_content %}
+<div class="errorbox">
+    <div class="errorcontent">
+        <h1 class="lead">{{ event_title }}</h1>
+        <p>{{ _("The call of this meeting has not started yet.") }}</p>
+        <form method="post" class="calendar-meet-form">
+            {{ csrf_input }}
+            {% if voice_only %}
+            <input type="hidden" name="voice_only" value="true"/>
+            {% endif %}
+            <button type="submit" class="calendar-meet-start-button">{{ _("Start the call") }}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

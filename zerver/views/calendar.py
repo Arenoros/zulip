@@ -3,10 +3,23 @@ from typing import Annotated
 
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
+from django.utils import translation
 from django.utils.translation import gettext as _
+from django.views.decorators.cache import never_cache
 from pydantic import Json, StringConstraints
 from pydantic_partials.sentinels import Missing, MissingType
 
+from zerver.decorator import zulip_login_required
+from zerver.lib.calendar.calls import (
+    access_calendar_event_call,
+    can_join_calendar_event_call,
+    check_calendar_event_call,
+    get_calendar_event_call,
+    get_calendar_event_call_chat,
+    get_calendar_event_call_url,
+    join_calendar_event_call,
+)
 from zerver.lib.calendar.changes import (
     get_or_create_calendar_event_chat,
     add_calendar_attendees,
@@ -32,6 +45,8 @@ from zerver.lib.calendar.user_settings import (
     update_pinned_user_color,
 )
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.i18n import get_and_set_request_language
+from zerver.lib.request import RequestNotes
 from zerver.lib.response import json_success
 from zerver.lib.timestamp import timestamp_to_datetime
 from zerver.lib.typed_endpoint import PathOnly, typed_endpoint
@@ -39,6 +54,7 @@ from zerver.lib.types import UNSET
 from zerver.lib.users import get_inaccessible_user_ids, user_ids_to_users
 from zerver.models import CalendarEvent, UserProfile
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
+from zerver.views.video_calls import render_livekit_call_access_denied
 
 # Like Exchange's free/busy queries.
 MAX_FREE_BUSY_USERS = 100
@@ -276,6 +292,76 @@ def get_or_create_calendar_event_chat_backend(
 ) -> HttpResponse:
     chat = get_or_create_calendar_event_chat(user_profile, calendar_event_id)
     return json_success(request, data={"stream_id": chat.id})
+
+
+@typed_endpoint
+def join_calendar_event_call_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    calendar_event_id: PathOnly[int],
+    voice_only: Json[bool] = False,
+) -> HttpResponse:
+    event = access_calendar_event_call(user_profile, calendar_event_id)
+    client = RequestNotes.get_notes(request).client
+    assert client is not None
+    url = join_calendar_event_call(user_profile, client, event, voice_only)
+    return json_success(request, data={"url": url})
+
+
+# The permanent link to a meeting's call, for invitations. It joins
+# the call if it is taking place; starting it takes a click, so that
+# opening the link cannot post to the meeting's chat by itself.
+@zulip_login_required
+@never_cache
+@typed_endpoint
+def meet_calendar_event(
+    request: HttpRequest,
+    *,
+    meet_code: PathOnly[str],
+    voice_only: Json[bool] = False,
+) -> HttpResponse:
+    assert request.user.is_authenticated
+    user_profile = request.user
+    get_and_set_request_language(
+        request,
+        user_profile.default_language,
+        translation.get_language_from_path(request.path_info),
+    )
+
+    event = (
+        CalendarEvent.objects.filter(realm_id=user_profile.realm_id, meet_code=meet_code)
+        .select_related("realm", "chat")
+        .first()
+    )
+    if event is None or not can_join_calendar_event_call(user_profile, event):
+        return render_livekit_call_access_denied(request)
+    try:
+        check_calendar_event_call(event)
+    except JsonableError as e:
+        return render(
+            request,
+            "zerver/portico_error_pages/calendar_meeting_without_call.html",
+            context={"event_title": event.title, "reason": e.msg},
+            status=404,
+        )
+
+    if request.method == "POST":
+        client = RequestNotes.get_notes(request).client
+        assert client is not None
+        return redirect(join_calendar_event_call(user_profile, client, event, voice_only))
+
+    call = None if event.chat is None else get_calendar_event_call(event.chat)
+    if call is not None:
+        # Attendees who left the meeting's chat join it again to join
+        # its call.
+        get_calendar_event_call_chat(user_profile, event)
+        return redirect(get_calendar_event_call_url(call, voice_only))
+    return render(
+        request,
+        "zerver/calendar_meet.html",
+        context={"event_title": event.title, "voice_only": voice_only},
+    )
 
 
 @typed_endpoint

@@ -48,6 +48,8 @@ from zerver.views.calendar import (
     get_calendar_pinned_users,
     get_calendar_settings,
     get_or_create_calendar_event_chat_backend,
+    join_calendar_event_call_backend,
+    meet_calendar_event,
     pin_calendar_user,
     respond_to_calendar_event_backend,
     unpin_calendar_user,
@@ -446,6 +448,10 @@ v1_api_and_json_patterns = [
         POST=get_or_create_calendar_event_chat_backend,
     ),
     rest_path(
+        "calendar/events/<int:calendar_event_id>/call",
+        POST=join_calendar_event_call_backend,
+    ),
+    rest_path(
         "calendar/events/<int:calendar_event_id>/personal_settings",
         PATCH=update_calendar_personal_settings,
     ),
@@ -821,6 +827,7 @@ i18n_urls = [
     path("calls/bigbluebutton/join", join_bigbluebutton),
     # Used to join a LiveKit video call
     path("calls/livekit/join", join_livekit_call),
+    path("meet/<str:meet_code>", meet_calendar_event),
     path("calls/livekit/webhook", livekit_webhook),
     # Integrations documentation
     path(
