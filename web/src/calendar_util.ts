@@ -74,6 +74,22 @@ export function parse_calendar_hash(hash: string, today: Date): CalendarLocation
     return get_location_for_date(calendar_view, date);
 }
 
+export type CalendarEventLink = {
+    event_id: number;
+    // When the occurrence starts, in seconds.
+    start: number;
+};
+
+// The link to an occurrence of an event, as in the messages of
+// Notification Bot: #calendar/event/<event id>/<start>.
+export function parse_calendar_event_hash(hash: string): CalendarEventLink | undefined {
+    const match = /^#calendar\/event\/(\d+)\/(\d+)$/.exec(hash);
+    if (match === null) {
+        return undefined;
+    }
+    return {event_id: Number(match[1]), start: Number(match[2])};
+}
+
 export function calendar_hash(location: CalendarLocation): string {
     return `#calendar/${location.view}/${location.week_start}`;
 }

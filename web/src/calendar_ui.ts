@@ -1,4 +1,5 @@
-import {addMonths, addWeeks, isSameMonth, startOfMonth} from "date-fns";
+import {TZDate} from "@date-fns/tz";
+import {addMonths, addWeeks, format, getISODay, isSameMonth, startOfMonth} from "date-fns";
 import {$} from "jquery";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
@@ -11,6 +12,7 @@ import render_calendar_date_picker_popover from "../templates/popovers/calendar/
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
 import * as browser_history from "./browser_history.ts";
+import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_call from "./calendar_call.ts";
 import * as calendar_card from "./calendar_card.ts";
 import * as calendar_colleagues from "./calendar_colleagues.ts";
@@ -22,6 +24,7 @@ import * as calendar_menus from "./calendar_menus.ts";
 import * as calendar_responses from "./calendar_responses.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
+import * as channel from "./channel.ts";
 import * as compose_call from "./compose_call.ts";
 import * as dropdown_widget from "./dropdown_widget.ts";
 import {$t} from "./i18n.ts";
@@ -305,6 +308,56 @@ export function show(location: CalendarLocation, hash_of_view_behind: string): v
     calendar_colleagues.fetch(
         report_error($t({defaultMessage: "Failed to load your colleagues' calendars"})),
     );
+}
+
+// Shows the week of the occurrence, and opens it: as the organizer,
+// to change it next to the responses, as an attendee, to answer it.
+// The week is all that shows of an occurrence no longer in the user's
+// calendar, such as one they declined.
+export function open_event_link(
+    link: calendar_util.CalendarEventLink,
+    hash_of_view_behind: string,
+): void {
+    const date = calendar_util.parse_date(
+        format(new TZDate(link.start * 1000, calendar_grid.get_time_zone()), "yyyy-MM-dd"),
+    )!;
+    // The work week shows the occurrence only on a work day.
+    const iso_weekday = getISODay(date);
+    const view =
+        calendar_grid.get_work_days().includes(iso_weekday) && current_location?.view !== "week"
+            ? "workweek"
+            : "week";
+    const location = calendar_util.get_location_for_date(view, date);
+    if (calendar_util.is_visible()) {
+        go_to_location(location);
+    } else {
+        show(location, hash_of_view_behind);
+    }
+    void channel.get({
+        url: "/json/calendar/events",
+        data: {start: link.start, end: link.start + 1},
+        success(data) {
+            const occurrence = calendar_grid.events_schema
+                .parse(data)
+                .events.find(
+                    (occurrence) =>
+                        occurrence.id === link.event_id && occurrence.start === link.start,
+                );
+            if (occurrence === undefined || !calendar_util.is_visible()) {
+                return;
+            }
+            if (occurrence.organizer_id === people.my_current_user_id()) {
+                calendar_form.open_edit(
+                    occurrence,
+                    occurrence.original_start !== null,
+                    !calendar_actions.is_personal(occurrence),
+                );
+            } else {
+                calendar_meeting.open(occurrence);
+            }
+        },
+        error: report_error($t({defaultMessage: "Failed to open the event"})),
+    });
 }
 
 export function hide(): void {

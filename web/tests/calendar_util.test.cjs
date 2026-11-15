@@ -38,6 +38,16 @@ run_test("parse_calendar_hash", () => {
     assert.equal(parse("#calendars"), undefined);
 });
 
+run_test("parse_calendar_event_hash", () => {
+    assert.deepEqual(calendar_util.parse_calendar_event_hash("#calendar/event/12/1763276400"), {
+        event_id: 12,
+        start: 1763276400,
+    });
+    assert.equal(calendar_util.parse_calendar_event_hash("#calendar/event/12"), undefined);
+    assert.equal(calendar_util.parse_calendar_event_hash("#calendar/event/x/1"), undefined);
+    assert.equal(calendar_util.parse_calendar_event_hash("#calendar/week/2026-11-16"), undefined);
+});
+
 run_test("visibility", () => {
     assert.ok(!calendar_util.is_visible());
     calendar_util.set_visible(true);

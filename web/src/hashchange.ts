@@ -193,6 +193,11 @@ function get_hash_of_view_behind_calendar(old_hash: string | undefined): string 
 }
 
 function show_calendar(old_hash: string | undefined): void {
+    const event_link = calendar_util.parse_calendar_event_hash(window.location.hash);
+    if (event_link !== undefined) {
+        calendar_ui.open_event_link(event_link, get_hash_of_view_behind_calendar(old_hash));
+        return;
+    }
     let location = calendar_ui.get_location_from_hash(window.location.hash);
     if (location === undefined) {
         show_invalid_url_error();
