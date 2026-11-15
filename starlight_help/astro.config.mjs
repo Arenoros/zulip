@@ -418,6 +418,10 @@ export default defineConfig({
                     ],
                 },
                 {
+                    label: "Calendar",
+                    items: ["calendar"],
+                },
+                {
                     label: "People",
                     items: [
                         "introduction-to-users",

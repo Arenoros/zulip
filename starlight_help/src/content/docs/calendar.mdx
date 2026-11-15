@@ -1,0 +1,83 @@
+---
+title: Calendar
+---
+
+import {TabItem, Tabs} from "@astrojs/starlight/components";
+
+import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import ZulipTip from "../../components/ZulipTip.astro";
+import GoToCalendar from "../include/_GoToCalendar.mdx";
+
+import CalendarDaysIcon from "~icons/zulip-icon/calendar-days";
+import ChevronLeftIcon from "~icons/zulip-icon/chevron-left";
+import ChevronRightIcon from "~icons/zulip-icon/chevron-right";
+import PanelLeftIcon from "~icons/zulip-icon/panel-left";
+
+Zulip's calendar shows your meetings and events a week at a time. It
+opens in place of your conversations, and you can go back to the
+conversation you were reading without losing your place.
+
+The **calendar** (<CalendarDaysIcon />) icon in the upper right shows
+how many meeting invitations you haven't answered yet.
+
+## Open the calendar
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+    </FlattenedSteps>
+
+    <ZulipTip>
+      To go back to your conversations, click the **calendar**
+      (<CalendarDaysIcon />) icon again, or use your browser's back
+      button.
+    </ZulipTip>
+  </TabItem>
+</Tabs>
+
+## Choose the week to show
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Today** to show the current week, or the
+         **previous week** (<ChevronLeftIcon />) and **next week**
+         (<ChevronRightIcon />) icons next to it. You can also click
+         the dates of the week shown to pick a day, or click a day in
+         the small calendar on the left.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Show the whole week or the work week
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the name of the current view in the upper right of the
+         calendar, and select a view.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Hide the calendar panel
+
+The panel on the left of the calendar can be hidden to make more room
+for your week.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the **hide calendar panel** (<PanelLeftIcon />) icon in
+         the upper left of the calendar. Click it again to show the
+         panel.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
