@@ -63,9 +63,9 @@ run_test("calendar_hash", () => {
 });
 
 run_test("get_shown_days", () => {
-    const days = (view) =>
+    const days = (view, work_days = [1, 2, 3, 4, 5]) =>
         calendar_util
-            .get_shown_days({view, week_start: "2026-11-09"})
+            .get_shown_days({view, week_start: "2026-11-09"}, work_days)
             .map((day) => calendar_util.format_date(day));
 
     assert.deepEqual(days("workweek"), [
@@ -75,7 +75,15 @@ run_test("get_shown_days", () => {
         "2026-11-12",
         "2026-11-13",
     ]);
-    assert.deepEqual(days("week"), [
+    // Work days that are not Monday to Friday.
+    assert.deepEqual(days("workweek", [7, 1, 2, 3, 4]), [
+        "2026-11-09",
+        "2026-11-10",
+        "2026-11-11",
+        "2026-11-12",
+        "2026-11-15",
+    ]);
+    assert.deepEqual(days("week", [1]), [
         "2026-11-09",
         "2026-11-10",
         "2026-11-11",
@@ -114,4 +122,10 @@ run_test("get_month_weeks", () => {
     for (const week of calendar_util.get_month_weeks(new Date(2026, 10, 1))) {
         assert.equal(week.length, 7);
     }
+});
+
+run_test("capitalize", () => {
+    assert.equal(calendar_util.capitalize("пн", "ru"), "Пн");
+    assert.equal(calendar_util.capitalize("Mon", "en"), "Mon");
+    assert.equal(calendar_util.capitalize("", "en"), "");
 });

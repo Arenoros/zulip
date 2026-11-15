@@ -1,0 +1,11 @@
+{{#each events}}
+    <button type="button" class="calendar-event calendar-timed-event {{class_names}}" style="top: calc({{top}}% + 1px); height: calc({{height}}% - 3px); left: calc({{left}}% + 3px); width: calc({{width}}% - 7px);{{#if category_color}} --calendar-event-bar-color: {{category_color}};{{/if}}" aria-label="{{label}}">
+        <span class="calendar-event-title">{{title}}</span>
+        {{#if organizer_name}}
+            <span class="calendar-event-organizer">{{organizer_name}}</span>
+        {{/if}}
+        {{#if is_recurring}}
+            <i class="zulip-icon zulip-icon-refresh-cw calendar-event-series-icon" aria-hidden="true"></i>
+        {{/if}}
+    </button>
+{{/each}}

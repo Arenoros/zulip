@@ -1,0 +1,5 @@
+{{#each events}}
+    <button type="button" class="calendar-event calendar-all-day-event {{class_names}}" style="grid-column: {{grid_column_start}} / {{grid_column_end}}; grid-row: {{grid_row}};{{#if category_color}} --calendar-event-bar-color: {{category_color}};{{/if}}" aria-label="{{label}}">
+        <span class="calendar-event-title">{{title}}</span>
+    </button>
+{{/each}}

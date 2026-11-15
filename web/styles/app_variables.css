@@ -2531,6 +2531,13 @@
     --color-calendar-accent: #5b5fc7;
     --color-calendar-text-on-accent: #fff;
     --color-calendar-checkbox: light-dark(#5b5fc7, #7f85f5);
+    --color-calendar-grid-row-line: light-dark(#f0f0f0, #292929);
+    --color-calendar-event-background: light-dark(#e8ebfa, #272a4a);
+    --color-calendar-event-bar: light-dark(#5b5fc7, #7f85f5);
+    --color-calendar-event-text: light-dark(#242424, #eceeff);
+    --color-calendar-event-text-secondary: light-dark(#555, #b6b9e0);
+    --color-calendar-personal-event-background: light-dark(#d6f0f0, #103d40);
+    --color-calendar-personal-event-bar: light-dark(#038387, #35c0c0);
     --color-navbar-icon: light-dark(hsl(240deg 20% 50%), hsl(240deg 35% 60%));
     --color-navbar-spectator-low-attention-brand-button-text: light-dark(
         hsl(240deg 40% 50%),

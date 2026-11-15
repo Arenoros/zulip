@@ -1,15 +1,17 @@
-import {addMonths, addWeeks, isSameDay, isSameMonth, startOfMonth, startOfToday} from "date-fns";
+import {addMonths, addWeeks, isSameMonth, startOfMonth} from "date-fns";
 import {$} from "jquery";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
 import * as z from "zod/mini";
 
 import render_calendar_mini_month from "../templates/calendar/calendar_mini_month.hbs";
+import render_calendar_pinned_users from "../templates/calendar/calendar_pinned_users.hbs";
 import render_calendar_view from "../templates/calendar/calendar_view.hbs";
 import render_calendar_date_picker_popover from "../templates/popovers/calendar/calendar_date_picker_popover.hbs";
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
 import * as browser_history from "./browser_history.ts";
+import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
 import * as channel from "./channel.ts";
@@ -19,7 +21,6 @@ import * as narrow_title from "./narrow_title.ts";
 import * as overlay_util from "./overlay_util.ts";
 import * as people from "./people.ts";
 import * as popover_menus from "./popover_menus.ts";
-import * as timerender from "./timerender.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
 import {user_settings} from "./user_settings.ts";
@@ -43,11 +44,7 @@ let pinned_users: PinnedUser[] = [];
 let unanswered_invitation_count = 0;
 
 function today(): Date {
-    return startOfToday({in: timerender.display_tz});
-}
-
-function capitalize(text: string): string {
-    return text.charAt(0).toLocaleUpperCase(user_settings.default_language) + text.slice(1);
+    return calendar_util.parse_date(calendar_grid.get_today())!;
 }
 
 function format_date(date: Date, options: Intl.DateTimeFormatOptions): string {
@@ -64,7 +61,7 @@ function get_view_label(view: CalendarView): string {
 // Narrow windows show the short range, without the year, which the
 // small calendar of the left panel shows.
 function get_range_label(location: CalendarLocation, length: "long" | "short"): string {
-    const days = calendar_util.get_shown_days(location);
+    const days = calendar_util.get_shown_days(location, calendar_grid.get_work_days());
     const first_day = days[0]!;
     const last_day = days.at(-1)!;
     if (length === "long") {
@@ -85,46 +82,41 @@ function get_range_label(location: CalendarLocation, length: "long" | "short"): 
     return formatter.formatRange(first_day, last_day);
 }
 
-function get_mini_month_context(
-    month: Date,
-    selected_week_start: Date | undefined,
-): Record<string, unknown> {
-    const today_date = today();
+function get_mini_month_context(month: Date): Record<string, unknown> {
+    const today_date = calendar_grid.get_today();
     const weeks = calendar_util.get_month_weeks(month);
     return {
         month: calendar_util.format_date(month),
         month_label:
-            capitalize(format_date(month, {month: "long"})) +
+            calendar_util.capitalize(
+                format_date(month, {month: "long"}),
+                user_settings.default_language,
+            ) +
             " " +
             format_date(month, {year: "numeric"}),
-        weekday_labels: weeks[0]!.map((day) => capitalize(format_date(day, {weekday: "short"}))),
+        weekday_labels: weeks[0]!.map((day) =>
+            calendar_util.capitalize(
+                format_date(day, {weekday: "short"}),
+                user_settings.default_language,
+            ),
+        ),
         weeks: weeks.map((days) => ({
-            is_selected:
-                selected_week_start !== undefined && isSameDay(days[0]!, selected_week_start),
+            is_selected: calendar_util.format_date(days[0]!) === current_location?.week_start,
             days: days.map((day) => ({
                 date: calendar_util.format_date(day),
                 day_number: day.getDate(),
                 label: format_date(day, {dateStyle: "full"}),
-                is_today: isSameDay(day, today_date),
+                is_today: calendar_util.format_date(day) === today_date,
                 is_other_month: !isSameMonth(day, month),
             })),
         })),
     };
 }
 
-function get_selected_week_start(): Date | undefined {
-    if (current_location === undefined) {
-        return undefined;
-    }
-    return calendar_util.parse_date(current_location.week_start);
-}
-
 function render_left_panel_mini_month(): void {
     assert(left_panel_month !== undefined);
     $("#calendar-view .calendar-left-panel-mini-month").html(
-        render_calendar_mini_month(
-            get_mini_month_context(left_panel_month, get_selected_week_start()),
-        ),
+        render_calendar_mini_month(get_mini_month_context(left_panel_month)),
     );
 }
 
@@ -149,7 +141,7 @@ function render_view(): void {
     $view.html(
         render_calendar_view({
             is_left_panel_collapsed: is_left_panel_collapsed(),
-            mini_month: get_mini_month_context(left_panel_month!, get_selected_week_start()),
+            mini_month: get_mini_month_context(left_panel_month!),
             pinned_users: get_pinned_users_context(),
             range_label: get_range_label(current_location, "long"),
             short_range_label: get_range_label(current_location, "short"),
@@ -158,16 +150,21 @@ function render_view(): void {
     );
 }
 
-export function go_to_location(location: CalendarLocation): void {
-    current_location = location;
-    left_panel_month = startOfMonth(calendar_util.parse_date(location.week_start)!);
-    // Moving between weeks replaces the URL instead of adding to the
-    // browser history, so that going back leaves the calendar.
-    window.history.replaceState(
-        null,
-        "",
-        browser_history.get_full_url(calendar_util.calendar_hash(location)),
-    );
+function toggle_left_panel(): void {
+    const is_collapsed = !is_left_panel_collapsed();
+    localstorage().set(LEFT_PANEL_COLLAPSED_KEY, is_collapsed);
+    $("#calendar-view").toggleClass("left-panel-collapsed", is_collapsed);
+    const label = is_collapsed
+        ? $t({defaultMessage: "Show calendar panel"})
+        : $t({defaultMessage: "Hide calendar panel"});
+    $("#calendar-view .calendar-toggle-left-panel").attr({
+        "aria-label": label,
+        "data-tippy-content": label,
+        "aria-expanded": String(!is_collapsed),
+    });
+}
+
+function update_toolbar(location: CalendarLocation): void {
     $("#calendar-view .calendar-range-label").text(get_range_label(location, "long"));
     $("#calendar-view .calendar-short-range-label").text(get_range_label(location, "short"));
     const view_label = get_view_label(location.view);
@@ -176,7 +173,25 @@ export function go_to_location(location: CalendarLocation): void {
         "aria-label": view_label,
         "data-tippy-content": view_label,
     });
+}
+
+function replace_url(location: CalendarLocation): void {
+    // Moving between weeks replaces the URL instead of adding to the
+    // browser history, so that going back leaves the calendar.
+    window.history.replaceState(
+        null,
+        "",
+        browser_history.get_full_url(calendar_util.calendar_hash(location)),
+    );
+}
+
+export function go_to_location(location: CalendarLocation): void {
+    current_location = location;
+    left_panel_month = startOfMonth(calendar_util.parse_date(location.week_start)!);
+    replace_url(location);
+    update_toolbar(location);
     render_left_panel_mini_month();
+    calendar_grid.go_to_location(location);
 }
 
 function go_to_date(date: Date): void {
@@ -194,9 +209,9 @@ function fetch_pinned_users(): void {
         url: "/json/calendar/pinned_users",
         success(raw_data) {
             pinned_users = pinned_users_schema.parse(raw_data).pinned_users;
-            if (calendar_util.is_visible()) {
-                render_view();
-            }
+            $("#calendar-view .calendar-pinned-users").html(
+                render_calendar_pinned_users({pinned_users: get_pinned_users_context()}),
+            );
         },
         error(xhr) {
             ui_report.error(
@@ -222,9 +237,10 @@ export function show(location: CalendarLocation, hash_of_view_behind: string): v
     narrow_title.redraw_title();
     current_location = location;
     left_panel_month = startOfMonth(calendar_util.parse_date(location.week_start)!);
+    replace_url(location);
     render_view();
+    calendar_grid.show(location);
     fetch_pinned_users();
-    go_to_location(location);
 }
 
 export function hide(): void {
@@ -235,6 +251,7 @@ export function hide(): void {
     popover_menus.hide_current_popover_if_visible(
         popover_menus.popover_instances.calendar_date_picker,
     );
+    calendar_grid.hide();
     calendar_util.set_visible(false);
     $("body").removeClass("calendar-view-visible");
     $("#calendar-view").empty();
@@ -321,9 +338,7 @@ function register_view_menu_popover(): void {
 function render_date_picker(instance: tippy.Instance, month: Date): void {
     instance.setContent(
         ui_util.parse_html(
-            render_calendar_date_picker_popover(
-                get_mini_month_context(month, get_selected_week_start()),
-            ),
+            render_calendar_date_picker_popover(get_mini_month_context(month)),
         ),
     );
 }
@@ -381,8 +396,7 @@ export function initialize({
 
     const $view = $("#calendar-view");
     $view.on("click", ".calendar-toggle-left-panel", () => {
-        localstorage().set(LEFT_PANEL_COLLAPSED_KEY, !is_left_panel_collapsed());
-        render_view();
+        toggle_left_panel();
     });
     $view.on("click", ".calendar-today-button", () => {
         go_to_date(today());
@@ -408,5 +422,12 @@ export function initialize({
 
     register_view_menu_popover();
     register_date_picker_popover();
+    calendar_grid.initialize({
+        // The work days in the user's settings change the work week.
+        on_settings_change() {
+            assert(current_location !== undefined);
+            update_toolbar(current_location);
+        },
+    });
 }
 

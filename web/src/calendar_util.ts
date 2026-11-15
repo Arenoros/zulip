@@ -78,10 +78,15 @@ export function calendar_hash(location: CalendarLocation): string {
     return `#calendar/${location.view}/${location.week_start}`;
 }
 
-export function get_shown_days(location: CalendarLocation): Date[] {
+// The days a location shows: the whole week, or the user's work days,
+// as ISO weekdays, Monday being 1.
+export function get_shown_days(location: CalendarLocation, work_days: number[]): Date[] {
     const week_start = parse_date(location.week_start)!;
-    const day_count = location.view === "week" ? 7 : 5;
-    return Array.from({length: day_count}, (_, index) => addDays(week_start, index));
+    const days = Array.from({length: 7}, (_, index) => addDays(week_start, index));
+    if (location.view === "week") {
+        return days;
+    }
+    return days.filter((_day, index) => work_days.includes(index + 1));
 }
 
 // The weeks of a small month calendar, from the week containing the
@@ -94,4 +99,11 @@ export function get_month_weeks(month: Date): Date[][] {
             addDays(first_week_start, week_index * 7 + day_index),
         ),
     );
+}
+
+// Names of months and weekdays start with a capital letter in the
+// calendar, also in languages like Russian that write them in lower
+// case.
+export function capitalize(text: string, language: string): string {
+    return text.charAt(0).toLocaleUpperCase(language) + text.slice(1);
 }

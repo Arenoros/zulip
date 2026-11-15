@@ -21,12 +21,9 @@
             <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
             {{t "Colleagues' calendars" }}
         </div>
-        {{#each pinned_users}}
-            <label class="calendar-list-item">
-                <input type="checkbox" class="calendar-list-checkbox" style="accent-color: {{color}};" data-user-id="{{user_id}}"/>
-                <span class="calendar-list-item-name">{{full_name}}</span>
-            </label>
-        {{/each}}
+        <div class="calendar-pinned-users">
+            {{> calendar_pinned_users .}}
+        </div>
         <button type="button" class="calendar-text-button calendar-show-all-button">{{t "Show all" }}</button>
     </section>
 </aside>
@@ -79,5 +76,6 @@
             </button>
         </div>
     </div>
+    <div class="calendar-grid-error-container"></div>
     <div class="calendar-grid-container"></div>
 </div>

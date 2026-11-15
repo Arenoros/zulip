@@ -1,0 +1,29 @@
+<div class="calendar-grid" style="--calendar-day-count: {{day_count}}; --calendar-rows-per-hour: {{rows_per_hour}};">
+    <div class="calendar-grid-top">
+        <div class="calendar-grid-header">
+            <span class="calendar-grid-corner"></span>
+            {{#each days}}
+                <div class="calendar-day-header {{#if is_today}}today{{/if}}" title="{{label}}">
+                    <span class="calendar-day-number">{{number}}</span>
+                    <span class="calendar-day-weekday">{{weekday}}</span>
+                </div>
+            {{/each}}
+        </div>
+        <div class="calendar-all-day-events"></div>
+    </div>
+    <div class="calendar-grid-body">
+        <div class="calendar-time-column" aria-hidden="true">
+            {{#each hours}}
+                <span class="calendar-hour-label" style="top: {{top}}%;">{{label}}</span>
+            {{/each}}
+        </div>
+        {{#each days}}
+            <div class="calendar-day-column {{#if is_today}}today{{/if}}" data-date="{{date}}">
+                <div class="calendar-day-events"></div>
+                {{#if is_today}}
+                    <div class="calendar-now-line"></div>
+                {{/if}}
+            </div>
+        {{/each}}
+    </div>
+</div>
