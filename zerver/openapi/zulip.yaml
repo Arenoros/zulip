@@ -8389,152 +8389,7 @@ paths:
                         description: |
                           The occurrences, by their start.
                         items:
-                          type: object
-                          additionalProperties: false
-                          properties:
-                            id:
-                              type: integer
-                              description: |
-                                The ID of the calendar event.
-                            uid:
-                              type: string
-                              description: |
-                                The iCalendar UID of the event, shared by all of its
-                                occurrences.
-                            original_start:
-                              type: integer
-                              nullable: true
-                              description: |
-                                For an occurrence of a repeating event, when the
-                                occurrence starts according to the repetition rule, as a
-                                UNIX timestamp. This identifies the occurrence in the
-                                `occurrence` parameter of other endpoints, even if it was
-                                moved.
-
-                                `null` for an event that does not repeat.
-                            start:
-                              type: integer
-                              description: |
-                                When the occurrence starts, as a UNIX timestamp.
-                            end:
-                              type: integer
-                              description: |
-                                When the occurrence ends, as a UNIX timestamp.
-                            timezone:
-                              type: string
-                              description: |
-                                The IANA timezone the event repeats in.
-                            is_all_day:
-                              type: boolean
-                              description: |
-                                Whether the event takes whole days in its timezone.
-                            title:
-                              type: string
-                              description: |
-                                The title of the occurrence.
-                            location:
-                              type: string
-                              description: |
-                                Where the occurrence takes place.
-                            description:
-                              type: string
-                              description: |
-                                The description in [Zulip-flavored Markdown](/help/format-your-message-using-markdown).
-                            rendered_description:
-                              type: string
-                              description: |
-                                The description rendered as HTML.
-                            show_as:
-                              $ref: "#/components/schemas/CalendarShowAs"
-                            is_private:
-                              type: boolean
-                              description: |
-                                Whether only the organizer sees the title of the event
-                                in the free/busy times of the attendees.
-                            is_cancelled:
-                              type: boolean
-                              description: |
-                                Whether the organizer cancelled the event or the
-                                occurrence.
-                            rrule:
-                              type: string
-                              description: |
-                                The repetition rule of the event, in the subset of
-                                iCalendar `RRULE` syntax described in
-                                [`POST /calendar/events`](/api/create-calendar-event),
-                                or an empty string if the event does not repeat.
-                            organizer_id:
-                              type: integer
-                              description: |
-                                The ID of the user who organizes the event.
-                            response:
-                              $ref: "#/components/schemas/CalendarResponse"
-                            reminder_minutes:
-                              type: integer
-                              nullable: true
-                              description: |
-                                How many minutes before the start the current user wants
-                                a reminder, or `null` for no reminder.
-                            category:
-                              type: string
-                              description: |
-                                The color category the current user gave the event, like
-                                `"Red category"`, or an empty string.
-                            response_requested:
-                              type: boolean
-                              description: |
-                                Whether the organizer asks the attendees to respond.
-                            allow_forwarding:
-                              type: boolean
-                              description: |
-                                Whether attendees may invite more people.
-                            hide_attendees:
-                              type: boolean
-                              description: |
-                                Whether the organizer hides the attendees from
-                                one another, in which case `attendees` is empty
-                                for invitees.
-                            has_zulip_call:
-                              type: boolean
-                              description: |
-                                Whether the event has a Zulip call.
-                            meet_code:
-                              type: string
-                              description: |
-                                The code that identifies the call of the event.
-                            chat_id:
-                              type: integer
-                              nullable: true
-                              description: |
-                                The ID of the channel for the chat of the event, if any.
-                            attendees:
-                              type: array
-                              description: |
-                                The attendees, including the organizer. Empty if the
-                                organizer hides the attendees and the current user is not
-                                the organizer.
-                              items:
-                                type: object
-                                additionalProperties: false
-                                properties:
-                                  user_id:
-                                    type: integer
-                                    description: |
-                                      The ID of the attendee.
-                                  is_required:
-                                    type: boolean
-                                    description: |
-                                      Whether the attendee is required, rather than
-                                      optional.
-                                  response:
-                                    $ref: "#/components/schemas/CalendarResponse"
-                                  added_by:
-                                    type: integer
-                                    nullable: true
-                                    description: |
-                                      The ID of the attendee who forwarded the event to
-                                      this attendee, or `null` if the organizer invited
-                                      them.
+                          $ref: "#/components/schemas/CalendarEvent"
                     example:
                       {
                         "msg": "",
@@ -30372,6 +30227,156 @@ components:
         - 4 = Declined
         - 5 = Following, which keeps the attendee informed without
           showing them as busy
+    CalendarEvent:
+      type: object
+      description: |
+        An event in the user's calendar, or an occurrence of a repeating
+        event.
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          description: |
+            The ID of the calendar event.
+        uid:
+          type: string
+          description: |
+            The iCalendar UID of the event, shared by all of its
+            occurrences.
+        original_start:
+          type: integer
+          nullable: true
+          description: |
+            For an occurrence of a repeating event, when the
+            occurrence starts according to the repetition rule, as a
+            UNIX timestamp. This identifies the occurrence in the
+            `occurrence` parameter of other endpoints, even if it was
+            moved.
+
+            `null` for an event that does not repeat.
+        start:
+          type: integer
+          description: |
+            When the occurrence starts, as a UNIX timestamp.
+        end:
+          type: integer
+          description: |
+            When the occurrence ends, as a UNIX timestamp.
+        timezone:
+          type: string
+          description: |
+            The IANA timezone the event repeats in.
+        is_all_day:
+          type: boolean
+          description: |
+            Whether the event takes whole days in its timezone.
+        title:
+          type: string
+          description: |
+            The title of the occurrence.
+        location:
+          type: string
+          description: |
+            Where the occurrence takes place.
+        description:
+          type: string
+          description: |
+            The description in [Zulip-flavored Markdown](/help/format-your-message-using-markdown).
+        rendered_description:
+          type: string
+          description: |
+            The description rendered as HTML.
+        show_as:
+          $ref: "#/components/schemas/CalendarShowAs"
+        is_private:
+          type: boolean
+          description: |
+            Whether only the organizer sees the title of the event
+            in the free/busy times of the attendees.
+        is_cancelled:
+          type: boolean
+          description: |
+            Whether the organizer cancelled the event or the
+            occurrence.
+        rrule:
+          type: string
+          description: |
+            The repetition rule of the event, in the subset of
+            iCalendar `RRULE` syntax described in
+            [`POST /calendar/events`](/api/create-calendar-event),
+            or an empty string if the event does not repeat.
+        organizer_id:
+          type: integer
+          description: |
+            The ID of the user who organizes the event.
+        response:
+          $ref: "#/components/schemas/CalendarResponse"
+        reminder_minutes:
+          type: integer
+          nullable: true
+          description: |
+            How many minutes before the start the current user wants
+            a reminder, or `null` for no reminder.
+        category:
+          type: string
+          description: |
+            The color category the current user gave the event, like
+            `"Red category"`, or an empty string.
+        response_requested:
+          type: boolean
+          description: |
+            Whether the organizer asks the attendees to respond.
+        allow_forwarding:
+          type: boolean
+          description: |
+            Whether attendees may invite more people.
+        hide_attendees:
+          type: boolean
+          description: |
+            Whether the organizer hides the attendees from
+            one another, in which case `attendees` is empty
+            for invitees.
+        has_zulip_call:
+          type: boolean
+          description: |
+            Whether the event has a Zulip call.
+        meet_code:
+          type: string
+          description: |
+            The code that identifies the call of the event.
+        chat_id:
+          type: integer
+          nullable: true
+          description: |
+            The ID of the channel for the chat of the event, if any.
+        attendees:
+          type: array
+          description: |
+            The attendees, including the organizer. Empty if the
+            organizer hides the attendees and the current user is not
+            the organizer.
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              user_id:
+                type: integer
+                description: |
+                  The ID of the attendee.
+              is_required:
+                type: boolean
+                description: |
+                  Whether the attendee is required, rather than
+                  optional.
+              response:
+                $ref: "#/components/schemas/CalendarResponse"
+              added_by:
+                type: integer
+                nullable: true
+                description: |
+                  The ID of the attendee who forwarded the event to
+                  this attendee, or `null` if the organizer invited
+                  them.
     CalendarOccurrenceParameter:
       type: integer
       description: |
