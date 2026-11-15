@@ -2,7 +2,6 @@ import {addMonths, addWeeks, isSameMonth, startOfMonth} from "date-fns";
 import {$} from "jquery";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
-import * as z from "zod/mini";
 
 import render_calendar_mini_month from "../templates/calendar/calendar_mini_month.hbs";
 import render_calendar_pinned_users from "../templates/calendar/calendar_pinned_users.hbs";
@@ -11,10 +10,11 @@ import render_calendar_date_picker_popover from "../templates/popovers/calendar/
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
 import * as browser_history from "./browser_history.ts";
+import * as calendar_colleagues from "./calendar_colleagues.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
-import * as channel from "./channel.ts";
+import * as dropdown_widget from "./dropdown_widget.ts";
 import {$t} from "./i18n.ts";
 import {localstorage} from "./localstorage.ts";
 import * as narrow_title from "./narrow_title.ts";
@@ -25,12 +25,6 @@ import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
 import {user_settings} from "./user_settings.ts";
 
-const pinned_users_schema = z.object({
-    pinned_users: z.array(z.object({user_id: z.number(), color: z.string()})),
-});
-
-type PinnedUser = z.infer<typeof pinned_users_schema>["pinned_users"][number];
-
 const LEFT_PANEL_COLLAPSED_KEY = "calendar-left-panel-collapsed";
 
 let current_location: CalendarLocation | undefined;
@@ -40,7 +34,8 @@ let left_panel_month: Date | undefined;
 // The hash of the chat view behind the calendar, which the calendar
 // returns to.
 let hash_behind_calendar: string | undefined;
-let pinned_users: PinnedUser[] = [];
+// Whether the list of colleagues shows all of them.
+let is_colleague_list_expanded = false;
 let unanswered_invitation_count = 0;
 
 function today(): Date {
@@ -120,14 +115,28 @@ function render_left_panel_mini_month(): void {
     );
 }
 
-function get_pinned_users_context(): {user_id: number; color: string; full_name: string}[] {
-    return pinned_users.flatMap((pinned_user) => {
-        const user = people.maybe_get_user_by_id(pinned_user.user_id, true);
-        if (user === undefined) {
-            return [];
-        }
-        return [{...pinned_user, full_name: user.full_name}];
-    });
+function get_colleague_list_context(): Record<string, unknown> {
+    const colleagues = calendar_colleagues.get_colleagues();
+    return {
+        colleagues: colleagues.map((colleague, index) => ({
+            ...colleague,
+            is_hidden_in_list:
+                !is_colleague_list_expanded &&
+                index >= calendar_colleagues.COLLAPSED_LIST_LENGTH,
+        })),
+        has_more: colleagues.length > calendar_colleagues.COLLAPSED_LIST_LENGTH,
+        is_expanded: is_colleague_list_expanded,
+    };
+}
+
+function render_colleague_list(): void {
+    $("#calendar-view .calendar-colleagues").html(
+        render_calendar_pinned_users(get_colleague_list_context()),
+    );
+}
+
+function is_side_by_side(): boolean {
+    return calendar_colleagues.get_shown_colleagues().length > 0;
 }
 
 function is_left_panel_collapsed(): boolean {
@@ -142,7 +151,8 @@ function render_view(): void {
         render_calendar_view({
             is_left_panel_collapsed: is_left_panel_collapsed(),
             mini_month: get_mini_month_context(left_panel_month!),
-            pinned_users: get_pinned_users_context(),
+            colleague_list: get_colleague_list_context(),
+            legend: calendar_grid.get_legend(),
             range_label: get_range_label(current_location, "long"),
             short_range_label: get_range_label(current_location, "short"),
             view_label: get_view_label(current_location.view),
@@ -167,7 +177,12 @@ function toggle_left_panel(): void {
 function update_toolbar(location: CalendarLocation): void {
     $("#calendar-view .calendar-range-label").text(get_range_label(location, "long"));
     $("#calendar-view .calendar-short-range-label").text(get_range_label(location, "short"));
-    const view_label = get_view_label(location.view);
+    const view_label = is_side_by_side()
+        ? $t(
+              {defaultMessage: "{view} · side by side"},
+              {view: get_view_label(location.view)},
+          )
+        : get_view_label(location.view);
     $("#calendar-view .calendar-view-label").text(view_label);
     $("#calendar-view .calendar-view-button").attr({
         "aria-label": view_label,
@@ -204,23 +219,49 @@ function move_by_weeks(weeks: number): void {
     go_to_date(addWeeks(calendar_util.parse_date(current_location.week_start)!, weeks));
 }
 
-function fetch_pinned_users(): void {
-    void channel.get({
-        url: "/json/calendar/pinned_users",
-        success(raw_data) {
-            pinned_users = pinned_users_schema.parse(raw_data).pinned_users;
-            $("#calendar-view .calendar-pinned-users").html(
-                render_calendar_pinned_users({pinned_users: get_pinned_users_context()}),
+function report_error(message: string): (xhr: JQuery.jqXHR) => void {
+    return (xhr) => {
+        ui_report.error(message, xhr, $("#home-error"));
+    };
+}
+
+function on_colleagues_change(): void {
+    if (!calendar_util.is_visible()) {
+        return;
+    }
+    assert(current_location !== undefined);
+    render_colleague_list();
+    $("#calendar-view").toggleClass("side-by-side", is_side_by_side());
+    update_toolbar(current_location);
+    calendar_grid.set_colleagues(calendar_colleagues.get_shown_colleagues());
+}
+
+function setup_add_colleague_widget(): void {
+    new dropdown_widget.DropdownWidget({
+        widget_name: "calendar-add-colleague",
+        get_options: () =>
+            people
+                .get_realm_active_human_users()
+                .filter(
+                    (user) =>
+                        !people.is_my_user_id(user.user_id) &&
+                        !calendar_colleagues.is_pinned(user.user_id),
+                )
+                .map((user) => ({unique_id: user.user_id, name: user.full_name})),
+        item_click_callback(event, instance) {
+            event.preventDefault();
+            event.stopPropagation();
+            instance.hide();
+            calendar_colleagues.pin(
+                Number($(event.currentTarget).attr("data-unique-id")),
+                report_error($t({defaultMessage: "Failed to add the calendar"})),
             );
         },
-        error(xhr) {
-            ui_report.error(
-                $t({defaultMessage: "Failed to load your colleagues' calendars"}),
-                xhr,
-                $("#home-error"),
-            );
-        },
-    });
+        $events_container: $("#calendar-view .calendar-left-panel"),
+        unique_id_type: "number",
+        search_placeholder_text: $t({defaultMessage: "Find a colleague"}),
+        tippy_props: {placement: "bottom-start"},
+    }).setup();
 }
 
 export function get_location_from_hash(hash: string): CalendarLocation | undefined {
@@ -238,9 +279,13 @@ export function show(location: CalendarLocation, hash_of_view_behind: string): v
     current_location = location;
     left_panel_month = startOfMonth(calendar_util.parse_date(location.week_start)!);
     replace_url(location);
+    $("#calendar-view").toggleClass("side-by-side", is_side_by_side());
     render_view();
-    calendar_grid.show(location);
-    fetch_pinned_users();
+    setup_add_colleague_widget();
+    calendar_grid.show(location, calendar_colleagues.get_shown_colleagues());
+    calendar_colleagues.fetch(
+        report_error($t({defaultMessage: "Failed to load your colleagues' calendars"})),
+    );
 }
 
 export function hide(): void {
@@ -422,6 +467,21 @@ export function initialize({
 
     register_view_menu_popover();
     register_date_picker_popover();
+    $view.on("change", ".calendar-colleague-checkbox", function (this: HTMLInputElement) {
+        calendar_colleagues.set_shown(Number(this.dataset["userId"]), this.checked);
+    });
+    $view.on("click", ".calendar-colleague-remove", function (this: HTMLElement) {
+        calendar_colleagues.unpin(
+            Number(this.dataset["userId"]),
+            report_error($t({defaultMessage: "Failed to remove the calendar"})),
+        );
+    });
+    $view.on("click", ".calendar-show-all-button", () => {
+        is_colleague_list_expanded = !is_colleague_list_expanded;
+        render_colleague_list();
+    });
+
+    calendar_colleagues.initialize({on_colleagues_change});
     calendar_grid.initialize({
         // The work days in the user's settings change the work week.
         on_settings_change() {

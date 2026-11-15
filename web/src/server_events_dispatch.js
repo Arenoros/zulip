@@ -132,6 +132,10 @@ export function dispatch_normal_event(event) {
             calendar_grid.refresh();
             break;
 
+        case "calendar_free_busy":
+            calendar_grid.refresh_free_busy(event.user_ids);
+            break;
+
         case "call":
             call_ringing.dispatch(event);
             break;

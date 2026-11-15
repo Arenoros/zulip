@@ -9,6 +9,8 @@ import render_calendar_day_events from "../templates/calendar/calendar_day_event
 import render_calendar_grid from "../templates/calendar/calendar_grid.hbs";
 import render_calendar_grid_error from "../templates/calendar/calendar_grid_error.hbs";
 
+import * as calendar_colleagues from "./calendar_colleagues.ts";
+import type {Colleague} from "./calendar_colleagues.ts";
 import * as calendar_layout from "./calendar_layout.ts";
 import type {AllDayEventPlacement, TimedEventPlacement} from "./calendar_layout.ts";
 import * as calendar_util from "./calendar_util.ts";
@@ -23,7 +25,9 @@ import {user_settings} from "./user_settings.ts";
 // The values of CalendarShowAs and CalendarResponse on the server.
 const SHOW_AS_FREE = 1;
 const SHOW_AS_TENTATIVE = 2;
-const RESPONSE_TENTATIVE = 3;
+const SHOW_AS_BUSY = 3;
+const SHOW_AS_OOF = 4;
+const SHOW_AS_WORKING_ELSEWHERE = 5;
 
 // Outlook's default color categories, by the names Exchange stores.
 const CATEGORY_COLORS = new Map([
@@ -62,7 +66,6 @@ const occurrence_schema = z.object({
     title: z.string(),
     show_as: z.number(),
     is_cancelled: z.boolean(),
-    response: z.number(),
     organizer_id: z.number(),
     category: z.string(),
     attendees: z.array(z.object({user_id: z.number()})),
@@ -71,6 +74,25 @@ const occurrence_schema = z.object({
 type CalendarOccurrence = z.infer<typeof occurrence_schema>;
 
 const events_schema = z.object({events: z.array(occurrence_schema)});
+
+const free_busy_block_schema = z.object({
+    start: z.number(),
+    end: z.number(),
+    show_as: z.number(),
+    // Only for events the user is invited to and may see.
+    title: z.nullable(z.string()),
+});
+
+type FreeBusyBlock = z.infer<typeof free_busy_block_schema> & {
+    is_all_day: false;
+    timezone: string;
+};
+
+const free_busy_schema = z.object({
+    free_busy: z.record(z.string(), z.array(free_busy_block_schema)),
+});
+
+type LoadState = "loading" | "loaded" | "error";
 
 let settings: CalendarSettings = {
     work_days: [1, 2, 3, 4, 5],
@@ -83,10 +105,16 @@ let on_settings_loaded: (() => void) | undefined;
 
 let current_location: CalendarLocation | undefined;
 let occurrences: CalendarOccurrence[] = [];
-let load_state: "loading" | "loaded" | "error" = "loading";
+let events_state: LoadState = "loading";
+// The colleagues whose calendars are shown next to the user's own,
+// and when they are busy.
+let colleagues: Colleague[] = [];
+let free_busy = new Map<number, FreeBusyBlock[]>();
+let free_busy_state: LoadState = "loaded";
 // Responses to requests for a week that is no longer shown are
 // dropped.
-let request_id = 0;
+let events_request_id = 0;
+let free_busy_request_id = 0;
 let now_timer: ReturnType<typeof setInterval> | undefined;
 // The grid opens at the start of the work day once the week is
 // loaded, since all-day events above the hours move them down.
@@ -126,6 +154,16 @@ function format_hour(hour: number): string {
     }).format(new Date(2000, 0, 1, hour));
 }
 
+function get_load_state(): LoadState {
+    if (events_state === "error" || free_busy_state === "error") {
+        return "error";
+    }
+    if (events_state === "loading" || free_busy_state === "loading") {
+        return "loading";
+    }
+    return "loaded";
+}
+
 function get_shown_dates(): string[] {
     assert(current_location !== undefined);
     return calendar_util
@@ -140,18 +178,11 @@ function is_personal_event(occurrence: CalendarOccurrence): boolean {
     );
 }
 
-// An event the user may not go to: shown so, or answered so.
-function is_tentative(occurrence: CalendarOccurrence): boolean {
-    return (
-        occurrence.show_as === SHOW_AS_TENTATIVE || occurrence.response === RESPONSE_TENTATIVE
-    );
-}
-
 function get_event_class_names(occurrence: CalendarOccurrence): string {
     return [
         is_personal_event(occurrence) ? "personal" : "meeting",
         occurrence.is_cancelled && "cancelled",
-        is_tentative(occurrence) && "tentative",
+        occurrence.show_as === SHOW_AS_TENTATIVE && "tentative",
         occurrence.show_as === SHOW_AS_FREE && "free",
         occurrence.original_start !== null && "recurring",
     ]
@@ -170,12 +201,11 @@ function get_event_context(occurrence: CalendarOccurrence): Record<string, unkno
     const time = occurrence.is_all_day
         ? $t({defaultMessage: "All day"})
         : `${format_time(occurrence.start)} – ${format_time(occurrence.end)}`;
-    let status: string | undefined;
-    if (is_tentative(occurrence)) {
-        status = $t({defaultMessage: "Tentative"});
-    } else if (occurrence.show_as === SHOW_AS_FREE) {
-        status = $t({defaultMessage: "Free"});
-    }
+    // Being busy goes without saying for the user's own events.
+    const status =
+        occurrence.show_as === SHOW_AS_BUSY
+            ? undefined
+            : get_free_busy_status(occurrence.show_as).label;
     return {
         title,
         organizer_name: organizer?.full_name,
@@ -186,13 +216,62 @@ function get_event_context(occurrence: CalendarOccurrence): Record<string, unkno
     };
 }
 
-function get_timed_event_context(
-    placement: TimedEventPlacement<CalendarOccurrence>,
+const SHOW_AS_CLASS_NAMES = new Map([
+    [SHOW_AS_FREE, "free"],
+    [SHOW_AS_TENTATIVE, "tentative"],
+    [SHOW_AS_BUSY, "busy"],
+    [SHOW_AS_OOF, "away"],
+    [SHOW_AS_WORKING_ELSEWHERE, "elsewhere"],
+]);
+
+// How a user shows during an event. One message names all of these,
+// since words like "Busy" are translated differently for statuses
+// elsewhere in Zulip.
+export function get_free_busy_status(show_as: number): {class_name: string; label: string} {
+    const class_name = SHOW_AS_CLASS_NAMES.get(show_as);
+    assert(class_name !== undefined);
+    return {
+        class_name,
+        label: $t(
+            {
+                defaultMessage:
+                    "{show_as, select, free {Free} tentative {Tentative} busy {Busy} away {Away} other {Working elsewhere}}",
+            },
+            {show_as: class_name},
+        ),
+    };
+}
+
+export function get_legend(): {class_name: string; label: string}[] {
+    return [...SHOW_AS_CLASS_NAMES.keys()].map((show_as) => get_free_busy_status(show_as));
+}
+
+function get_free_busy_context(block: FreeBusyBlock): Record<string, unknown> {
+    const status = get_free_busy_status(block.show_as);
+    const title = block.title ?? status.label;
+    const time = `${format_time(block.start)} – ${format_time(block.end)}`;
+    return {
+        title,
+        class_names: `free-busy ${status.class_name}`,
+        label: [title, time, block.title === null ? undefined : status.label]
+            .filter(Boolean)
+            .join(", "),
+    };
+}
+
+type CalendarItem = CalendarOccurrence | FreeBusyBlock;
+
+function get_item_context(item: CalendarItem): Record<string, unknown> {
+    return "id" in item ? get_event_context(item) : get_free_busy_context(item);
+}
+
+function get_timed_item_context(
+    placement: TimedEventPlacement<CalendarItem>,
 ): Record<string, unknown> {
     const percent = (minutes: number): number => (minutes / MINUTES_PER_DAY) * 100;
     const min_minutes = settings.time_scale_minutes * MIN_EVENT_ROWS;
     const height = Math.max(placement.end_minute - placement.start_minute, min_minutes);
-    const context = get_event_context(placement.event);
+    const context = get_item_context(placement.event);
     return {
         ...context,
         // Events shorter than a row only have room for their title.
@@ -207,44 +286,65 @@ function get_timed_event_context(
     };
 }
 
-function get_all_day_event_context(
-    placement: AllDayEventPlacement<CalendarOccurrence>,
+function get_all_day_item_context(
+    placement: AllDayEventPlacement<CalendarItem>,
+    first_column: number,
 ): Record<string, unknown> {
     return {
-        ...get_event_context(placement.event),
-        // The first grid column holds the hours.
-        grid_column_start: placement.first_day + 2,
-        grid_column_end: placement.last_day + 3,
+        ...get_item_context(placement.event),
+        grid_column_start: first_column + placement.first_day + 1,
+        grid_column_end: first_column + placement.last_day + 2,
         grid_row: placement.lane + 1,
     };
 }
 
+// The items of each calendar shown: the user's own events first, then
+// when each colleague is busy.
+function get_calendar_items(): CalendarItem[][] {
+    if (get_load_state() !== "loaded") {
+        return [[], ...colleagues.map(() => [])];
+    }
+    return [
+        occurrences,
+        ...colleagues.map((colleague) => free_busy.get(colleague.user_id) ?? []),
+    ];
+}
+
 function render_events(): void {
     const dates = get_shown_dates();
-    const layout = calendar_layout.get_week_layout(
-        load_state === "loaded" ? occurrences : [],
-        dates,
-        get_time_zone(),
-        settings.time_scale_minutes * MIN_EVENT_ROWS,
-    );
     const $grid = $("#calendar-view .calendar-grid");
-    $grid.find(".calendar-day-column").each(function (index) {
-        $(this)
-            .find(".calendar-day-events")
-            .html(
-                render_calendar_day_events({
-                    events: layout.days[index]!.map((placement) =>
-                        get_timed_event_context(placement),
-                    ),
-                }),
-            );
-    });
+    const $columns = $grid.find(".calendar-day-column");
+    const all_day_events: Record<string, unknown>[] = [];
+    let has_all_day_events = false;
+    for (const [calendar_index, items] of get_calendar_items().entries()) {
+        const layout = calendar_layout.get_week_layout(
+            items,
+            dates,
+            get_time_zone(),
+            settings.time_scale_minutes * MIN_EVENT_ROWS,
+        );
+        for (const [day_index, placements] of layout.days.entries()) {
+            $columns
+                .eq(calendar_index * dates.length + day_index)
+                .find(".calendar-day-events")
+                .html(
+                    render_calendar_day_events({
+                        events: placements.map((placement) => get_timed_item_context(placement)),
+                    }),
+                );
+        }
+        all_day_events.push(
+            ...layout.all_day.map((placement) =>
+                get_all_day_item_context(placement, calendar_index * dates.length),
+            ),
+        );
+        has_all_day_events ||= layout.all_day_lane_count > 0;
+    }
     $grid.find(".calendar-all-day-events").html(
-        render_calendar_all_day_events({
-            events: layout.all_day.map((placement) => get_all_day_event_context(placement)),
-        }),
+        render_calendar_all_day_events({events: all_day_events}),
     );
-    $grid.toggleClass("has-all-day-events", layout.all_day_lane_count > 0);
+    const load_state = get_load_state();
+    $grid.toggleClass("has-all-day-events", has_all_day_events);
     $grid.toggleClass("loading", load_state === "loading");
     $grid.toggleClass("load-failed", load_state === "error");
     $("#calendar-view .calendar-grid-error-container").html(
@@ -270,9 +370,20 @@ function render_grid(): void {
     const today = get_today();
     rendered_today = today;
     const rows_per_hour = 60 / settings.time_scale_minutes;
+    const day_count = get_shown_dates().length;
     $("#calendar-view .calendar-grid-container").html(
         render_calendar_grid({
-            day_count: get_shown_dates().length,
+            day_count,
+            column_count: day_count * (colleagues.length + 1),
+            is_side_by_side: colleagues.length > 0,
+            calendars: [
+                {name: $t({defaultMessage: "My calendar"}), is_mine: true},
+                ...colleagues.map((colleague) => ({
+                    name: colleague.full_name,
+                    user_id: colleague.user_id,
+                    color: colleague.color,
+                })),
+            ],
             rows_per_hour,
             days: calendar_util.get_shown_days(current_location, settings.work_days).map((day) => {
                 const date = calendar_util.format_date(day);
@@ -322,48 +433,99 @@ function scroll_to_work_day_start(): void {
 }
 
 function maybe_scroll_to_work_day_start(): void {
-    if (should_scroll_to_work_day && load_state !== "loading") {
+    if (should_scroll_to_work_day && get_load_state() !== "loading") {
         should_scroll_to_work_day = false;
         scroll_to_work_day_start();
     }
 }
 
-function fetch_events(): void {
+// The week shown, in seconds.
+function get_week_range(): {start: number; end: number} {
     assert(current_location !== undefined);
     const dates = calendar_util
         .get_shown_days({...current_location, view: "week"}, settings.work_days)
         .map((day) => calendar_util.format_date(day));
     const time_zone = get_time_zone();
-    request_id += 1;
-    const this_request_id = request_id;
+    return {
+        start: calendar_layout.get_day_start(dates[0]!, time_zone),
+        end: calendar_layout.get_day_start(dates.at(-1)!, time_zone, 1),
+    };
+}
+
+function on_loaded(): void {
+    if (calendar_util.is_visible()) {
+        render_events();
+        maybe_scroll_to_work_day_start();
+    }
+}
+
+function fetch_events(): void {
+    events_state = "loading";
+    events_request_id += 1;
+    const request_id = events_request_id;
     void channel.get({
         url: "/json/calendar/events",
-        data: {
-            start: calendar_layout.get_day_start(dates[0]!, time_zone),
-            end: calendar_layout.get_day_start(dates.at(-1)!, time_zone, 1),
-        },
+        data: get_week_range(),
         success(raw_data) {
-            if (this_request_id !== request_id) {
-                return;
-            }
-            occurrences = events_schema.parse(raw_data).events;
-            load_state = "loaded";
-            if (calendar_util.is_visible()) {
-                render_events();
-                maybe_scroll_to_work_day_start();
+            if (request_id === events_request_id) {
+                occurrences = events_schema.parse(raw_data).events;
+                events_state = "loaded";
+                on_loaded();
             }
         },
         error() {
-            if (this_request_id !== request_id) {
-                return;
-            }
-            load_state = "error";
-            if (calendar_util.is_visible()) {
-                render_events();
-                maybe_scroll_to_work_day_start();
+            if (request_id === events_request_id) {
+                events_state = "error";
+                on_loaded();
             }
         },
     });
+}
+
+function fetch_free_busy(): void {
+    free_busy_request_id += 1;
+    if (colleagues.length === 0) {
+        free_busy_state = "loaded";
+        return;
+    }
+    free_busy_state = "loading";
+    const request_id = free_busy_request_id;
+    const user_ids = colleagues.map((colleague) => colleague.user_id);
+    void channel.get({
+        url: "/json/calendar/free_busy",
+        data: {user_ids: JSON.stringify(user_ids), ...get_week_range()},
+        success(raw_data) {
+            if (request_id !== free_busy_request_id) {
+                return;
+            }
+            const time_zone = get_time_zone();
+            free_busy = new Map(
+                Object.entries(free_busy_schema.parse(raw_data).free_busy).map(
+                    ([user_id, blocks]) => [
+                        Number(user_id),
+                        blocks.map((block) => ({
+                            ...block,
+                            is_all_day: false,
+                            timezone: time_zone,
+                        })),
+                    ],
+                ),
+            );
+            free_busy_state = "loaded";
+            on_loaded();
+        },
+        error() {
+            if (request_id === free_busy_request_id) {
+                free_busy_state = "error";
+                on_loaded();
+            }
+        },
+    });
+}
+
+function fetch_week(): void {
+    fetch_events();
+    fetch_free_busy();
 }
 
 function fetch_settings(): void {
@@ -387,34 +549,54 @@ function fetch_settings(): void {
     });
 }
 
-export function show(location: CalendarLocation): void {
+export function show(location: CalendarLocation, shown_colleagues: Colleague[]): void {
     current_location = location;
-    occurrences = [];
-    load_state = "loading";
+    colleagues = shown_colleagues;
     if (settings_state === "unloaded") {
         fetch_settings();
     }
+    // The week starts loading before it is drawn, so that it is not
+    // drawn as free.
+    events_state = "loading";
+    fetch_week();
     render_grid();
     should_scroll_to_work_day = true;
-    fetch_events();
     now_timer = setInterval(update_now_line, 60 * 1000);
+}
+
+// Draws the grid again, where the user was looking.
+function redraw_grid(): void {
+    const $container = $("#calendar-view .calendar-grid-container");
+    const scroll_top = $container.scrollTop() ?? 0;
+    const scroll_left = $container.scrollLeft() ?? 0;
+    render_grid();
+    $container.scrollTop(scroll_top);
+    $container.scrollLeft(scroll_left);
 }
 
 export function go_to_location(location: CalendarLocation): void {
     current_location = location;
-    occurrences = [];
-    load_state = "loading";
-    const scroll_top = $("#calendar-view .calendar-grid-container").scrollTop();
-    render_grid();
-    $("#calendar-view .calendar-grid-container").scrollTop(scroll_top ?? 0);
-    fetch_events();
+    fetch_week();
+    redraw_grid();
+}
+
+export function set_colleagues(shown_colleagues: Colleague[]): void {
+    if (JSON.stringify(shown_colleagues) === JSON.stringify(colleagues)) {
+        return;
+    }
+    colleagues = shown_colleagues;
+    if (current_location !== undefined) {
+        fetch_free_busy();
+        redraw_grid();
+    }
 }
 
 export function hide(): void {
     clearInterval(now_timer);
     now_timer = undefined;
     current_location = undefined;
-    request_id += 1;
+    events_request_id += 1;
+    free_busy_request_id += 1;
 }
 
 // Called when one of the user's events changes; the occurrences
@@ -425,10 +607,23 @@ export function refresh(): void {
     }
 }
 
+// Called when some users' free/busy times change.
+export function refresh_free_busy(user_ids: number[]): void {
+    if (
+        current_location !== undefined &&
+        colleagues.some((colleague) => user_ids.includes(colleague.user_id))
+    ) {
+        fetch_free_busy();
+    }
+}
+
 export function initialize({on_settings_change}: {on_settings_change: () => void}): void {
     on_settings_loaded = on_settings_change;
     $("#calendar-view").on("click", ".calendar-grid-retry", () => {
         assert(current_location !== undefined);
         go_to_location(current_location);
+    });
+    $("#calendar-view").on("click", ".calendar-grid-calendar-close", function (this: HTMLElement) {
+        calendar_colleagues.set_shown(Number(this.dataset["userId"]), false);
     });
 }

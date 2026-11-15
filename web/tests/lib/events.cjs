@@ -163,6 +163,11 @@ exports.fixtures = {
         unanswered_invitation_count: 2,
     },
 
+    calendar_free_busy: {
+        type: "calendar_free_busy",
+        user_ids: [9, 10],
+    },
+
     call__ring: {
         type: "call",
         op: "ring",

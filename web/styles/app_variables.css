@@ -2538,6 +2538,9 @@
     --color-calendar-event-text-secondary: light-dark(#555, #b6b9e0);
     --color-calendar-personal-event-background: light-dark(#d6f0f0, #103d40);
     --color-calendar-personal-event-bar: light-dark(#038387, #35c0c0);
+    /* Outlook's color for out of office. */
+    --color-calendar-away: light-dark(#8764b8, #a283d6);
+    --color-calendar-legend: light-dark(#2f6fc4, #4d94e8);
     --color-navbar-icon: light-dark(hsl(240deg 20% 50%), hsl(240deg 35% 60%));
     --color-navbar-spectator-low-attention-brand-button-text: light-dark(
         hsl(240deg 40% 50%),

@@ -332,6 +332,15 @@ run_test("calendar", ({override}) => {
     assert.equal(refresh_stub.num_calls, 1);
 });
 
+run_test("calendar_free_busy", ({override}) => {
+    const event = event_fixtures.calendar_free_busy;
+    const stub = make_stub();
+    override(calendar_grid, "refresh_free_busy", stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.deepEqual(stub.get_args("user_ids").user_ids, [9, 10]);
+});
+
 run_test("call", ({override}) => {
     const event = event_fixtures.call__ring;
     const stub = make_stub();

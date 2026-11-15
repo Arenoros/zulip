@@ -1,6 +1,16 @@
-{{#each pinned_users}}
-    <label class="calendar-list-item">
-        <input type="checkbox" class="calendar-list-checkbox" style="accent-color: {{color}};" data-user-id="{{user_id}}"/>
-        <span class="calendar-list-item-name">{{full_name}}</span>
-    </label>
+{{#each colleagues}}
+    <div class="calendar-list-item calendar-colleague {{#if is_hidden_in_list}}hidden-in-list{{/if}}">
+        <label class="calendar-colleague-label">
+            <input type="checkbox" class="calendar-list-checkbox calendar-colleague-checkbox" style="accent-color: {{color}};" data-user-id="{{user_id}}" {{#if is_shown}}checked{{/if}}/>
+            <span class="calendar-list-item-name">{{full_name}}</span>
+        </label>
+        <button type="button" class="calendar-icon-button calendar-colleague-remove tippy-zulip-delayed-tooltip" data-user-id="{{user_id}}" data-tippy-content="{{t 'Remove from the list' }}" aria-label="{{t 'Remove {full_name} from the list' }}">
+            <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+        </button>
+    </div>
 {{/each}}
+{{#if has_more}}
+    <button type="button" class="calendar-text-button calendar-show-all-button" aria-expanded="{{#if is_expanded}}true{{else}}false{{/if}}">
+        {{#if is_expanded}}{{t "Show less" }}{{else}}{{t "Show all" }}{{/if}}
+    </button>
+{{/if}}

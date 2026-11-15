@@ -130,7 +130,7 @@ async function open_week(page: Page, hash: string): Promise<void> {
         visible: true,
     });
     await page.waitForFunction(
-        () => document.querySelectorAll(".calendar-event").length > 0,
+        () => document.querySelectorAll(".calendar-grid .calendar-event").length > 0,
         {polling: 100},
     );
 }
@@ -146,7 +146,7 @@ type EventFacts = {
 };
 
 async function event_facts(page: Page): Promise<EventFacts[]> {
-    return await page.$$eval(".calendar-event", (events) =>
+    return await page.$$eval(".calendar-grid .calendar-event", (events) =>
         events.map((event) => {
             const column = event.closest(".calendar-day-column");
             const rect = event.getBoundingClientRect();
@@ -220,7 +220,7 @@ async function calendar_grid_test(page: Page): Promise<void> {
         "an event shown as free is marked",
         by_title("Webinar")[0]?.class_name.includes("free") === true,
     );
-    const webinar_bar = await page.$$eval(".calendar-event.free", (elements) =>
+    const webinar_bar = await page.$$eval(".calendar-grid .calendar-event.free", (elements) =>
         getComputedStyle(elements[0]!).borderLeftColor,
     );
     check("a category colors the bar", webinar_bar === "rgb(19, 161, 14)", webinar_bar);
@@ -236,13 +236,28 @@ async function calendar_grid_test(page: Page): Promise<void> {
         JSON.stringify(by_title("Night release").map((e) => e.day)) ===
             JSON.stringify([add_days(seeded.monday, 3), add_days(seeded.monday, 4)]),
     );
-    const conference = await page.$eval(".calendar-all-day-event", (element) => ({
-        title: element.textContent.trim(),
-        column: getComputedStyle(element).gridColumnStart,
-    }));
+    const conference = await page.evaluate((thursday) => {
+        const bar = document.querySelector(".calendar-all-day-event")!;
+        const bar_rect = bar.getBoundingClientRect();
+        const column = document
+            .querySelector(`.calendar-day-column[data-date="${thursday}"]`)!
+            .getBoundingClientRect();
+        return {
+            title: bar.textContent.trim(),
+            // The bar spans its day, inside its small margins.
+            left_inset: bar_rect.left - column.left,
+            right_inset: column.right - bar_rect.right,
+            above_hours: bar.closest(".calendar-grid-top") !== null,
+        };
+    }, add_days(seeded.monday, 3));
     check(
         "an all-day event is above the hours, on its day",
-        conference.title === "Conference" && conference.column === "5",
+        conference.title === "Conference" &&
+            conference.left_inset >= 0 &&
+            conference.left_inset < 6 &&
+            conference.right_inset >= 0 &&
+            conference.right_inset < 6 &&
+            conference.above_hours,
         JSON.stringify(conference),
     );
     // The hour right under the day headers, which stay at the top.
@@ -315,7 +330,7 @@ async function calendar_grid_test(page: Page): Promise<void> {
     check(
         "retrying loads the week",
         (await page.$(".calendar-grid.load-failed")) === null &&
-            (await page.$$(".calendar-event")).length > 0,
+            (await page.$$(".calendar-grid .calendar-event")).length > 0,
     );
 
     // 24-hour time, a larger time scale and the light theme.

@@ -266,6 +266,37 @@ body.calendar-view-visible {
     accent-color: var(--color-calendar-checkbox);
 }
 
+.calendar-colleague {
+    /* 4px at 14px/1em */
+    padding-right: 0.2857em;
+
+    &.hidden-in-list {
+        display: none;
+    }
+}
+
+.calendar-colleague-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 0.7143em; /* 10px at 14px/1em */
+    cursor: pointer;
+}
+
+.calendar-colleague-remove {
+    visibility: hidden;
+    /* 24px at 14px/1em */
+    width: 1.7143em;
+    height: 1.7143em;
+
+    .calendar-colleague:hover &,
+    .calendar-colleague:focus-within &,
+    &:focus-visible {
+        visibility: visible;
+    }
+}
+
 .calendar-list-item-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -389,10 +420,53 @@ body.calendar-view-visible {
 .calendar-grid {
     /* 42px and 56px at 14px/1em */
     --calendar-row-height: 3em;
-    --calendar-grid-columns: 4em repeat(var(--calendar-day-count), minmax(0, 1fr));
+    --calendar-time-column-width: 4em;
+    --calendar-min-column-width: 0px;
     --calendar-hour-height: calc(
         var(--calendar-row-height) * var(--calendar-rows-per-hour)
     );
+    /* Wider than the window when the days do not fit, which scrolls
+       them sideways. */
+    min-width: calc(
+        var(--calendar-time-column-width) + var(--calendar-column-count) *
+            var(--calendar-min-column-width)
+    );
+
+    &.side-by-side {
+        /* Days stay wide enough to read. 84px at 14px/1em */
+        --calendar-min-column-width: 6em;
+    }
+}
+
+.calendar-grid-calendar-headers {
+    height: 3.4286em; /* 48px at 14px/1em */
+}
+
+.calendar-grid-calendar-header {
+    grid-column: span var(--calendar-day-count);
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    /* 8px and 12px at 14px/1em */
+    gap: 0.5714em;
+    padding: 0 0.5714em 0 0.8571em;
+    border-left: 2px solid var(--color-calendar-border);
+    border-bottom: 1px solid var(--color-calendar-border);
+}
+
+.calendar-grid-calendar-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--calendar-person-color);
+    font-size: 1.0714em; /* 15px at 14px/1em */
+    font-weight: 600;
+
+    .calendar-grid-calendar-header.mine & {
+        color: var(--color-calendar-text-accent);
+    }
 }
 
 .calendar-grid-error {
@@ -417,11 +491,29 @@ body.calendar-view-visible {
     border-bottom: 1px solid var(--color-calendar-border);
 }
 
-.calendar-grid-header,
-.calendar-all-day-events,
-.calendar-grid-body {
+.calendar-grid-row {
+    display: flex;
+}
+
+.calendar-grid-days {
+    flex: 1;
+    min-width: 0;
     display: grid;
-    grid-template-columns: var(--calendar-grid-columns);
+    grid-template-columns: repeat(
+        var(--calendar-column-count),
+        minmax(var(--calendar-min-column-width), 1fr)
+    );
+}
+
+/* The hours stay in sight when the days scroll sideways. */
+.calendar-grid-corner,
+.calendar-time-column {
+    flex: none;
+    width: var(--calendar-time-column-width);
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--color-calendar-background);
 }
 
 .calendar-day-header {
@@ -436,6 +528,10 @@ body.calendar-view-visible {
 .calendar-day-number {
     font-size: 1.7143em; /* 24px at 14px/1em */
     line-height: 1.1;
+
+    .calendar-grid.side-by-side & {
+        font-size: 1.4286em; /* 20px at 14px/1em */
+    }
 
     .calendar-day-header.today & {
         color: var(--color-calendar-text-accent);
@@ -454,6 +550,9 @@ body.calendar-view-visible {
     max-height: calc(3 * 1.7143em + 4 * 0.1429em);
     padding: 0.1429em 0;
     overflow-y: auto;
+}
+
+.calendar-all-day-row {
     border-top: 1px solid var(--color-calendar-border);
 
     .calendar-grid:not(.has-all-day-events) & {
@@ -466,10 +565,6 @@ body.calendar-view-visible {
     padding-top: 0.5714em;
 }
 
-.calendar-time-column {
-    position: relative;
-}
-
 .calendar-hour-label {
     position: absolute;
     right: 0.5714em; /* 8px at 14px/1em */
@@ -477,6 +572,14 @@ body.calendar-view-visible {
     font-size: 0.8571em; /* 12px at 14px/1em */
     color: var(--color-calendar-text-secondary);
     white-space: nowrap;
+}
+
+/* The first day of each calendar shown side by side. */
+.calendar-grid.side-by-side {
+    .calendar-day-header.first-of-calendar,
+    .calendar-day-column.first-of-calendar {
+        border-left-width: 2px;
+    }
 }
 
 .calendar-day-column {
@@ -623,6 +726,87 @@ body.calendar-view-visible {
 
     .calendar-all-day-event & {
         white-space: nowrap;
+    }
+}
+
+/* When a colleague is busy, in their color. */
+.calendar-event.free-busy {
+    --calendar-event-bar-color: var(--calendar-person-color);
+    background-color: color-mix(
+        in srgb,
+        var(--calendar-person-color) 25%,
+        var(--color-calendar-background)
+    );
+    color: var(--color-calendar-text);
+
+    &.tentative {
+        background-color: color-mix(
+            in srgb,
+            var(--calendar-person-color) 8%,
+            var(--color-calendar-background)
+        );
+    }
+
+    &.away {
+        --calendar-event-bar-color: var(--color-calendar-away);
+        background-color: color-mix(
+            in srgb,
+            var(--color-calendar-away) 35%,
+            var(--color-calendar-background)
+        );
+    }
+
+    &.elsewhere {
+        background-image: radial-gradient(
+            var(--calendar-person-color) 1px,
+            transparent 1.5px
+        );
+        background-size: 6px 6px;
+        background-color: color-mix(
+            in srgb,
+            var(--calendar-person-color) 8%,
+            var(--color-calendar-background)
+        );
+    }
+}
+
+.calendar-legend {
+    display: none;
+    flex-direction: column;
+    /* 6px at 13px/1em */
+    gap: 0.4615em;
+    margin-top: auto;
+    font-size: 0.9286em; /* 13px at 14px/1em */
+    color: var(--color-calendar-text-secondary);
+
+    #calendar-view.side-by-side & {
+        display: flex;
+    }
+}
+
+.calendar-legend-title {
+    font-weight: 600;
+    color: var(--color-calendar-text);
+}
+
+.calendar-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6154em; /* 8px at 13px/1em */
+}
+
+.calendar-legend-swatch {
+    --calendar-person-color: var(--color-calendar-legend);
+    flex: none;
+    /* 14px at 13px/1em */
+    width: 1.0769em;
+    height: 1.0769em;
+    padding: 0;
+    border-radius: 3px;
+    cursor: default;
+
+    &:hover {
+        filter: none;
     }
 }
 
