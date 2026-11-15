@@ -11,6 +11,7 @@ import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting from "./calendar_meeting.ts";
 import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
+import * as calendar_rooms from "./calendar_rooms.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
@@ -61,7 +62,7 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
             {name: organizer?.full_name ?? $t({defaultMessage: "Unknown user"})},
         );
     }
-    let location = occurrence.location;
+    let location = calendar_rooms.get_location_label(occurrence.room_ids, occurrence.location);
     if (location === "" && occurrence.has_zulip_call) {
         location = $t({defaultMessage: "Zulip call"});
     }

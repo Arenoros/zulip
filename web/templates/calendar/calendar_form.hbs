@@ -150,7 +150,11 @@
                 <div class="calendar-form-row">
                     <i class="zulip-icon zulip-icon-globe calendar-form-row-icon" aria-hidden="true"></i>
                     <div class="calendar-form-field">
-                        <input type="text" class="input-element calendar-form-location" placeholder="{{t 'Add a place or a room' }}" aria-label="{{t 'Place' }}" maxlength="255" value="{{location}}"/>
+                        <div class="pill-container calendar-form-location">
+                            <div class="input" contenteditable="true" data-placeholder="{{t 'Add a place or a room' }}" aria-label="{{t 'Place or room' }}">
+                                {{~location~}}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="calendar-form-row">

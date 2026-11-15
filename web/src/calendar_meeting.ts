@@ -14,6 +14,7 @@ import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_recurrence from "./calendar_recurrence.ts";
 import * as calendar_responses from "./calendar_responses.ts";
+import * as calendar_rooms from "./calendar_rooms.ts";
 import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
@@ -171,7 +172,7 @@ function get_context(current: Meeting): Record<string, unknown> {
         time_label: get_time_label(occurrence, is_series),
         is_occurrence: is_recurring && !is_series,
         is_recurring,
-        location: occurrence.location,
+        location: calendar_rooms.get_location_label(occurrence.room_ids, occurrence.location),
         has_zulip_call: occurrence.has_zulip_call,
         can_join_call: calendar_call.can_join(occurrence),
         meet_url: `/meet/${occurrence.meet_code}`,
@@ -220,8 +221,13 @@ function show_error(xhr: JQuery.jqXHR): void {
 function open_meeting(current: Meeting): void {
     meeting = current;
     forward_pills = undefined;
-    render();
-    $("#calendar-view .calendar-meeting-title").attr("tabindex", "-1").trigger("focus");
+    // The place of the meeting shows the names of its rooms.
+    calendar_rooms.ensure_loaded(() => {
+        if (meeting === current) {
+            render();
+            $("#calendar-view .calendar-meeting-title").attr("tabindex", "-1").trigger("focus");
+        }
+    });
 }
 
 export function open(occurrence: CalendarOccurrence): void {

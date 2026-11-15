@@ -97,6 +97,7 @@ export const occurrence_schema = z.object({
             added_by: z.nullable(z.number()),
         }),
     ),
+    room_ids: z.array(z.number()),
 });
 
 export type CalendarOccurrence = z.infer<typeof occurrence_schema>;

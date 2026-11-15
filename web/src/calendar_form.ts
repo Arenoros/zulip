@@ -21,6 +21,8 @@ import * as calendar_layout from "./calendar_layout.ts";
 import * as calendar_recurrence from "./calendar_recurrence.ts";
 import type {Recurrence} from "./calendar_recurrence.ts";
 import * as calendar_responses from "./calendar_responses.ts";
+import * as calendar_rooms from "./calendar_rooms.ts";
+import type {RoomPillWidget} from "./calendar_rooms.ts";
 import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import * as compose_ui from "./compose_ui.ts";
@@ -83,6 +85,7 @@ type FormState = {
     // Undefined for an event that does not repeat.
     recurrence: Recurrence | undefined;
     location: string;
+    room_ids: number[];
     has_zulip_call: boolean;
     description: string;
     show_as: number;
@@ -113,6 +116,7 @@ let is_responses_shown = false;
 let is_saving = false;
 let required_pills: InputPillContainer<UserPill> | undefined;
 let optional_pills: InputPillContainer<UserPill> | undefined;
+let room_pills: RoomPillWidget | undefined;
 let menu_instance: tippy.Instance | undefined;
 let on_close: (() => void) | undefined;
 let get_mini_month_context: ((month: Date) => Record<string, unknown>) | undefined;
@@ -262,7 +266,10 @@ function read_fields(): void {
     assert(state !== undefined);
     const $form = $("#calendar-view .calendar-form");
     state.title = $form.find<HTMLInputElement>(".calendar-form-title").val() ?? "";
-    state.location = $form.find<HTMLInputElement>(".calendar-form-location").val() ?? "";
+    state.location = $form.find(".calendar-form-location .input").text().trim();
+    if (room_pills !== undefined) {
+        state.room_ids = calendar_rooms.get_room_ids(room_pills);
+    }
     state.description =
         $form.find<HTMLTextAreaElement>(".calendar-form-description-input").val() ?? "";
     state.has_zulip_call = $form.find<HTMLInputElement>(".calendar-form-call-checkbox").prop(
@@ -1099,6 +1106,7 @@ function get_event_data(form: FormState): Record<string, string> {
         has_zulip_call: JSON.stringify(form.has_zulip_call),
         required_attendees: JSON.stringify(form.required_attendee_ids),
         optional_attendees: JSON.stringify(form.optional_attendee_ids),
+        room_ids: JSON.stringify(form.room_ids),
     };
 }
 
@@ -1246,6 +1254,7 @@ export function close(): void {
     is_saving = false;
     required_pills = undefined;
     optional_pills = undefined;
+    room_pills = undefined;
     $("#calendar-view").removeClass("editing-event");
     $("#calendar-view .calendar-form-container").empty();
     on_close?.();
@@ -1454,6 +1463,13 @@ function render_form(): void {
         pills.onPillCreate(on_attendees_change);
         pills.onPillRemove(on_attendees_change);
     }
+    // Only the place of an occurrence of a series can change, not its
+    // rooms.
+    room_pills = calendar_rooms.create_pills(
+        $("#calendar-view .calendar-form-location"),
+        form.room_ids,
+        is_occurrence,
+    );
     set_up_timezone_widget();
     if (form_editing !== undefined && has_responses(form_editing.occurrence)) {
         calendar_responses.render(
@@ -1472,9 +1488,14 @@ function open(form: FormState, form_editing: Editing | undefined): void {
     state = form;
     editing = form_editing;
     is_time_expanded = false;
-    render_form();
-    read_fields();
-    initial_state = JSON.stringify(state);
+    // The room pills show the names of the rooms.
+    calendar_rooms.ensure_loaded(() => {
+        if (state === form) {
+            render_form();
+            read_fields();
+            initial_state = JSON.stringify(state);
+        }
+    });
 }
 
 // Draws the form again when the calendar shows again, with the
@@ -1512,6 +1533,7 @@ export function open_new(date: string, start_minute: number): void {
             is_all_day: false,
             recurrence: undefined,
             location: "",
+            room_ids: [],
             has_zulip_call: false,
             description: "",
             show_as: SHOW_AS_BUSY,
@@ -1545,34 +1567,35 @@ function get_event_state(occurrence: CalendarOccurrence, is_occurrence: boolean)
         (attendee) => attendee.user_id !== occurrence.organizer_id,
     );
     return {
-            title: occurrence.title,
-            required_attendee_ids: attendees
-                .filter((attendee) => attendee.is_required)
-                .map((attendee) => attendee.user_id),
-            optional_attendee_ids: attendees
-                .filter((attendee) => !attendee.is_required)
-                .map((attendee) => attendee.user_id),
-            date: format(start, "yyyy-MM-dd"),
-            start_minute: occurrence.is_all_day ? 0 : start.getHours() * 60 + start.getMinutes(),
-            duration_minutes: occurrence.is_all_day
-                ? MINUTES_PER_DAY
-                : Math.round((occurrence.end - occurrence.start) / 60),
-            time_zone: occurrence.timezone,
-            is_all_day: occurrence.is_all_day,
-            // An occurrence is changed on its own date.
-            recurrence: is_occurrence
-                ? undefined
-                : calendar_recurrence.parse_rrule(occurrence.rrule, occurrence.timezone),
-            location: occurrence.location,
-            has_zulip_call: occurrence.has_zulip_call,
-            description: occurrence.description,
-            show_as: occurrence.show_as,
-            reminder_minutes: occurrence.reminder_minutes,
-            category: occurrence.category,
-            is_private: occurrence.is_private,
-            response_requested: occurrence.response_requested,
-            allow_forwarding: occurrence.allow_forwarding,
-            hide_attendees: occurrence.hide_attendees,
+        title: occurrence.title,
+        required_attendee_ids: attendees
+            .filter((attendee) => attendee.is_required)
+            .map((attendee) => attendee.user_id),
+        optional_attendee_ids: attendees
+            .filter((attendee) => !attendee.is_required)
+            .map((attendee) => attendee.user_id),
+        date: format(start, "yyyy-MM-dd"),
+        start_minute: occurrence.is_all_day ? 0 : start.getHours() * 60 + start.getMinutes(),
+        duration_minutes: occurrence.is_all_day
+            ? MINUTES_PER_DAY
+            : Math.round((occurrence.end - occurrence.start) / 60),
+        time_zone: occurrence.timezone,
+        is_all_day: occurrence.is_all_day,
+        // An occurrence is changed on its own date.
+        recurrence: is_occurrence
+            ? undefined
+            : calendar_recurrence.parse_rrule(occurrence.rrule, occurrence.timezone),
+        location: occurrence.location,
+        room_ids: occurrence.room_ids,
+        has_zulip_call: occurrence.has_zulip_call,
+        description: occurrence.description,
+        show_as: occurrence.show_as,
+        reminder_minutes: occurrence.reminder_minutes,
+        category: occurrence.category,
+        is_private: occurrence.is_private,
+        response_requested: occurrence.response_requested,
+        allow_forwarding: occurrence.allow_forwarding,
+        hide_attendees: occurrence.hide_attendees,
     };
 }
 
@@ -1587,7 +1610,8 @@ function open_event(
     open(get_event_state(occurrence, is_occurrence), {occurrence, is_occurrence});
 }
 
-// A new event with the fields of another one, without its attendees.
+// A new event with the fields of another one, without its attendees
+// and the rooms they would meet in.
 export function open_copy(occurrence: CalendarOccurrence, is_series: boolean): void {
     is_responses_shown = false;
     open(
@@ -1595,6 +1619,7 @@ export function open_copy(occurrence: CalendarOccurrence, is_series: boolean): v
             ...get_event_state(occurrence, !is_series),
             required_attendee_ids: [],
             optional_attendee_ids: [],
+            room_ids: [],
         },
         undefined,
     );

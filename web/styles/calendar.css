@@ -1256,7 +1256,6 @@ body.calendar-view-visible {
 }
 
 .calendar-form-title,
-.calendar-form-location,
 .calendar-form-description-input {
     width: 100%;
     border: 0;
@@ -1278,7 +1277,8 @@ body.calendar-view-visible {
 
 .calendar-form-attendees .pill-container,
 .calendar-meeting-forward .pill-container,
-.calendar-form-optional-attendees {
+.calendar-form-optional-attendees,
+.calendar-form-location {
     flex: 1;
     min-width: 0;
     border: 0;

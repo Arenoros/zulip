@@ -251,7 +251,7 @@ async function calendar_form_test(page: Page): Promise<void> {
         JSON.stringify(times),
     );
     await page.select(".calendar-form-end", "60");
-    await page.type(".calendar-form-location", "Room 5");
+    await page.type(".calendar-form-location .input", "Room 5");
     await page.click(".calendar-form-call-checkbox");
     await page.type(".calendar-form-description-input", "Agenda");
     await page.evaluate(() => {
