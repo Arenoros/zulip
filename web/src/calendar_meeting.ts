@@ -7,6 +7,7 @@ import render_calendar_meeting from "../templates/calendar/calendar_meeting.hbs"
 import render_calendar_card_choices_popover from "../templates/popovers/calendar/calendar_card_choices_popover.hbs";
 
 import * as calendar_actions from "./calendar_actions.ts";
+import * as calendar_call from "./calendar_call.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
@@ -172,6 +173,8 @@ function get_context(current: Meeting): Record<string, unknown> {
         is_recurring,
         location: occurrence.location,
         has_zulip_call: occurrence.has_zulip_call,
+        can_join_call: calendar_call.can_join(occurrence),
+        meet_url: `/meet/${occurrence.meet_code}`,
         rendered_description: occurrence.rendered_description,
         call_time_label: get_call_time_label(occurrence),
     };
@@ -432,6 +435,34 @@ export function initialize(opts: {on_close: () => void}): void {
     const selector = (child: string): string => `.calendar-meeting ${child}`;
     $view.on("click", selector(".calendar-meeting-close"), () => {
         close();
+    });
+    $view.on("click", selector(".calendar-join-button"), () => {
+        assert(meeting !== undefined);
+        calendar_call.join(meeting.occurrence.id, false, $("#calendar-view .calendar-meeting-error"));
+    });
+    $view.on("click", selector(".calendar-join-options-button"), function (this: HTMLElement) {
+        show_choices(
+            this,
+            [{value: "voice_only", label: $t({defaultMessage: "Join without video"})}],
+            () => {
+                assert(meeting !== undefined);
+                calendar_call.join(
+                    meeting.occurrence.id,
+                    true,
+                    $("#calendar-view .calendar-meeting-error"),
+                );
+            },
+        );
+    });
+    // The link to the meeting's call can be copied; opening it here
+    // joins the call right away.
+    $view.on("click", selector(".calendar-meeting-call-link"), (e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) {
+            return;
+        }
+        e.preventDefault();
+        assert(meeting !== undefined);
+        calendar_call.join(meeting.occurrence.id, false, $("#calendar-view .calendar-meeting-error"));
     });
     $view.on("click", selector(".calendar-meeting-chat"), () => {
         assert(meeting !== undefined);

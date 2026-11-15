@@ -7,6 +7,7 @@ import render_message_view_header_call_buttons from "../templates/message_view_h
 
 import * as bubble_layout from "./bubble_layout.ts";
 import * as buddy_data from "./buddy_data.ts";
+import * as calendar_call from "./calendar_call.ts";
 import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as compose_call from "./compose_call.ts";
@@ -89,6 +90,7 @@ type MessageViewHeaderContext = {
     has_view_switcher?: boolean;
     view_switcher_segments?: ViewSwitcherSegment[];
     can_start_call?: boolean;
+    can_join_meeting_call?: boolean;
     has_people_button?: boolean;
 } & (
     | {
@@ -101,6 +103,24 @@ type MessageViewHeaderContext = {
 
 // The header of a meeting's chat names the meeting, with the time of
 // its next occurrence, where a group chat shows its participants.
+function get_meeting_chat_next_occurrence(
+    stream_id: number,
+): ReturnType<typeof calendar_meeting_chat.get_next_occurrence> {
+    return calendar_meeting_chat.get_next_occurrence(stream_id, () => {
+        maybe_rerender_title_area_for_stream(stream_id);
+    });
+}
+
+// The header of a meeting's chat offers to join the meeting's call.
+function can_join_meeting_call(filter: Filter): boolean {
+    if (!filter.is_conversation_view() || !bubble_layout.is_meeting_chat(filter)) {
+        return false;
+    }
+    const stream_id = narrow_state.stream_id(filter);
+    assert(stream_id !== undefined);
+    return get_meeting_chat_next_occurrence(stream_id)?.can_join_call ?? false;
+}
+
 function get_meeting_chat_header_context(filter: Filter): ConversationHeaderContext {
     const sub = narrow_state.stream_sub(filter);
     assert(sub !== undefined);
@@ -111,11 +131,9 @@ function get_meeting_chat_header_context(filter: Filter): ConversationHeaderCont
             {N: peer_data.get_subscriber_count(sub.stream_id)},
         ),
     ];
-    const time_label = calendar_meeting_chat.get_next_time_label(sub.stream_id, () => {
-        maybe_rerender_title_area_for_stream(sub.stream_id);
-    });
-    if (time_label) {
-        subtitle_parts.push(time_label);
+    const next_occurrence = get_meeting_chat_next_occurrence(sub.stream_id);
+    if (next_occurrence) {
+        subtitle_parts.push(next_occurrence.time_label);
     }
     return {
         title: sub.name,
@@ -374,6 +392,7 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
             is_spectator: page_params.is_spectator,
         }),
         can_start_call: can_start_call(filter),
+        can_join_meeting_call: can_join_meeting_call(filter),
         has_people_button:
             filter.is_conversation_view() && narrow_state.pm_ids(filter) !== undefined,
         ...get_view_switcher_context(filter),
@@ -493,6 +512,16 @@ export function initialize(): void {
             );
         },
     );
+
+    $("#message_view_header").on("click", ".message-view-header-join-meeting-call", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const stream_id = narrow_state.stream_id();
+        assert(stream_id !== undefined);
+        const next_occurrence = get_meeting_chat_next_occurrence(stream_id);
+        assert(next_occurrence);
+        calendar_call.join(next_occurrence.event_id, false, $("#home-error"));
+    });
 
     const hide_stream_settings_button_width_threshold = 620;
     $("body").on("mouseenter mouseleave", ".narrow_description", function (event) {

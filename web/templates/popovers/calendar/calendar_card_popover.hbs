@@ -8,14 +8,19 @@
             <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
         </button>
     </div>
-    {{#unless is_personal}}
+    {{#if (or can_join_call (not is_personal))}}
         <div class="calendar-card-join">
-            <button type="button" class="calendar-card-button calendar-card-chat">
-                <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
-                {{t "Discussion" }}
-            </button>
+            {{#if can_join_call}}
+                {{> ../../calendar/calendar_join_button button_class="calendar-card-button"}}
+            {{/if}}
+            {{#unless is_personal}}
+                <button type="button" class="calendar-card-button calendar-card-chat">
+                    <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
+                    {{t "Discussion" }}
+                </button>
+            {{/unless}}
         </div>
-    {{/unless}}
+    {{/if}}
     <div class="calendar-card-section">
         <div class="calendar-card-row">
             <i class="zulip-icon zulip-icon-clock calendar-card-row-icon" aria-hidden="true"></i>

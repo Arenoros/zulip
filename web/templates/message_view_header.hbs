@@ -50,6 +50,11 @@
     </span>
 {{/if}}
 {{/if}}
+{{#if can_join_meeting_call}}
+<span class="message-view-header-buttons">
+    {{> components/action_button label=(t "Join") icon="video-call" variant="solid" intent="brand" custom_classes="message-view-header-join-meeting-call" }}
+</span>
+{{/if}}
 {{#if has_people_button}}
 <span class="message-view-header-buttons">
     {{#if can_start_call}}

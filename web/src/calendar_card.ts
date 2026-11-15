@@ -6,6 +6,7 @@ import render_calendar_card_choices_popover from "../templates/popovers/calendar
 import render_calendar_card_popover from "../templates/popovers/calendar/calendar_card_popover.hbs";
 
 import * as calendar_actions from "./calendar_actions.ts";
+import * as calendar_call from "./calendar_call.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting from "./calendar_meeting.ts";
@@ -68,6 +69,7 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
         title,
         is_organizer_of_meeting: is_organizer && !personal,
         is_personal: personal,
+        can_join_call: calendar_call.can_join(occurrence),
         is_invitee: !is_organizer && !occurrence.is_cancelled,
         is_recurring: occurrence.original_start !== null,
         time_label: calendar_actions.get_time_label(occurrence),
@@ -289,6 +291,25 @@ function open(element: HTMLElement): void {
                 }
                 hide();
                 calendar_meeting.open(expanded);
+            });
+            $popper.on("click", ".calendar-join-button", () => {
+                assert(card_occurrence !== undefined);
+                calendar_call.join(card_occurrence.id, false, $popper.find(".calendar-card-error"));
+            });
+            $popper.on("click", ".calendar-join-options-button", function (this: HTMLElement) {
+                show_choices(
+                    this,
+                    "bottom-start",
+                    [{value: "voice_only", label: $t({defaultMessage: "Join without video"})}],
+                    () => {
+                        assert(card_occurrence !== undefined);
+                        calendar_call.join(
+                            card_occurrence.id,
+                            true,
+                            $popper.find(".calendar-card-error"),
+                        );
+                    },
+                );
             });
             $popper.on("click", ".calendar-card-chat", () => {
                 assert(card_occurrence !== undefined);

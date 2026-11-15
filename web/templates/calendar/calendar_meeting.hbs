@@ -43,6 +43,9 @@
             <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
         </button>
         <span class="calendar-toolbar-spacer"></span>
+        {{#if can_join_call}}
+            {{> calendar_join_button button_class="calendar-toolbar-button"}}
+        {{/if}}
         <button type="button" class="calendar-toolbar-button calendar-meeting-chat">
             <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
             {{t "Discussion" }}
@@ -137,6 +140,9 @@
                         <div class="calendar-meeting-call">
                             <h2 class="calendar-meeting-call-title">{{t "Zulip call" }}</h2>
                             <p class="calendar-meeting-call-time">{{call_time_label}}</p>
+                            {{#if can_join_call}}
+                                <a class="calendar-meeting-call-link" href="{{meet_url}}" target="_blank" rel="noopener noreferrer">{{t "Join the call" }}</a>
+                            {{/if}}
                         </div>
                     {{/if}}
                 </div>

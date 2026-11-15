@@ -378,17 +378,19 @@ body.calendar-view-visible {
     border: 1px solid var(--color-calendar-border);
 }
 
-.calendar-new-button-group {
+.calendar-new-button-group,
+.calendar-join-button-group {
     display: inline-flex;
     flex: none;
-    margin-left: 0.4286em; /* 6px at 14px/1em */
     border-radius: 0.4286em; /* 6px at 14px/1em */
     overflow: hidden;
     background-color: var(--color-calendar-accent);
     color: var(--color-calendar-text-on-accent);
 
     .calendar-toolbar-button,
-    .calendar-icon-button {
+    .calendar-icon-button,
+    .calendar-card-button {
+        border: none;
         border-radius: 0;
         color: inherit;
 
@@ -401,10 +403,22 @@ body.calendar-view-visible {
         }
     }
 
-    .calendar-new-menu-button {
-        width: 2.1429em; /* 30px at 14px/1em */
+    .calendar-new-menu-button,
+    .calendar-join-options-button {
         border-left: 1px solid hsl(0deg 0% 100% / 35%);
     }
+
+    .calendar-new-menu-button {
+        width: 2.1429em; /* 30px at 14px/1em */
+    }
+
+    .calendar-join-options-button {
+        padding: 0 0.5714em; /* 8px at 14px/1em */
+    }
+}
+
+.calendar-new-button-group {
+    margin-left: 0.4286em; /* 6px at 14px/1em */
 }
 
 .calendar-grid-container {
@@ -1858,6 +1872,11 @@ body.calendar-view-visible {
 
 .calendar-meeting-call-time {
     margin: 0;
+}
+
+.calendar-meeting-call-link {
+    display: inline-block;
+    margin-top: 0.5714em; /* 8px at 14px/1em */
 }
 
 .calendar-responses-header {

@@ -328,7 +328,7 @@ run_test("calendar", ({override}) => {
     const refresh_stub = make_stub();
     override(calendar_grid, "refresh", refresh_stub.f);
     const clear_stub = make_stub();
-    override(calendar_meeting_chat, "clear_next_time_labels", clear_stub.f);
+    override(calendar_meeting_chat, "clear_next_occurrences", clear_stub.f);
     // Nothing is narrowed to here; the stub stands in for the
     // narrow's channel being a meeting's chat or not.
     let is_meeting_chat = false;

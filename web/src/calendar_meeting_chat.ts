@@ -6,6 +6,7 @@ import render_left_sidebar_meeting_chat_popover from "../templates/popovers/left
 
 import * as browser_history from "./browser_history.ts";
 import * as calendar_actions from "./calendar_actions.ts";
+import * as calendar_call from "./calendar_call.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
@@ -32,9 +33,15 @@ const NEXT_OCCURRENCE_DAYS = 62;
 // subscribed to it.
 let pending_chat_id: number | undefined;
 
-// The time of the next occurrence of the meeting of each chat, or ""
-// if it has none soon, once fetched.
-const next_time_labels = new Map<number, string>();
+type NextOccurrence = {
+    time_label: string;
+    event_id: number;
+    can_join_call: boolean;
+};
+
+// The next occurrence of the meeting of each chat, or null if it has
+// none soon, once fetched.
+const next_occurrences = new Map<number, NextOccurrence | null>();
 const fetching_chat_ids = new Set<number>();
 
 function go_to_chat(stream_id: number): void {
@@ -65,12 +72,15 @@ export function on_subscribed(sub: StreamSubscription): void {
     }
 }
 
-// The time of the meeting's next occurrence, for the header of its
-// chat: undefined until it is fetched, when on_fetched is called.
-export function get_next_time_label(stream_id: number, on_fetched: () => void): string | undefined {
-    const label = next_time_labels.get(stream_id);
-    if (label !== undefined || fetching_chat_ids.has(stream_id)) {
-        return label;
+// The meeting's next occurrence, for the header of its chat, which
+// shows when it is and offers to join its call: undefined until it is
+// fetched, when on_fetched is called.
+export function get_next_occurrence(
+    stream_id: number,
+    on_fetched: () => void,
+): NextOccurrence | null | undefined {
+    if (next_occurrences.has(stream_id) || fetching_chat_ids.has(stream_id)) {
+        return next_occurrences.get(stream_id);
     }
     fetching_chat_ids.add(stream_id);
     const now = Math.floor(Date.now() / 1000);
@@ -84,9 +94,15 @@ export function get_next_time_label(stream_id: number, on_fetched: () => void): 
                     (occurrence) => occurrence.chat_id === stream_id && !occurrence.is_cancelled,
                 )
                 .toSorted((a, b) => a.start - b.start)[0];
-            next_time_labels.set(
+            next_occurrences.set(
                 stream_id,
-                next === undefined ? "" : calendar_actions.get_time_label(next),
+                next === undefined
+                    ? null
+                    : {
+                          time_label: calendar_actions.get_time_label(next),
+                          event_id: next.id,
+                          can_join_call: calendar_call.can_join(next),
+                      },
             );
             fetching_chat_ids.delete(stream_id);
             on_fetched();
@@ -99,8 +115,8 @@ export function get_next_time_label(stream_id: number, on_fetched: () => void): 
 }
 
 // Changes to meetings may change when they next take place.
-export function clear_next_time_labels(): void {
-    next_time_labels.clear();
+export function clear_next_occurrences(): void {
+    next_occurrences.clear();
 }
 
 // Leaving the chat unsubscribes the user; opening it from the meeting

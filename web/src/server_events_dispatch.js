@@ -132,7 +132,7 @@ export function dispatch_normal_event(event) {
         case "calendar":
             calendar_ui.update_unanswered_invitation_count(event.unanswered_invitation_count);
             calendar_grid.refresh();
-            calendar_meeting_chat.clear_next_time_labels();
+            calendar_meeting_chat.clear_next_occurrences();
             if (stream_data.is_meeting_chat(narrow_state.stream_id())) {
                 message_view_header.render_title_area();
             }

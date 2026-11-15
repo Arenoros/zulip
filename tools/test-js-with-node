@@ -69,6 +69,7 @@ EXEMPT_FILES = make_set(
         "web/src/buddy_list_presence.ts",
         "web/src/buttons.ts",
         "web/src/calendar_actions.ts",
+        "web/src/calendar_call.ts",
         "web/src/calendar_card.ts",
         "web/src/calendar_form.ts",
         "web/src/calendar_grid.ts",
