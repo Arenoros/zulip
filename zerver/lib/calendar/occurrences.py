@@ -212,6 +212,51 @@ def _get_show_as(attendee: CalendarAttendee, response: int) -> int:
     return attendee.event.show_as
 
 
+def _make_calendar_occurrence(
+    user_profile: UserProfile,
+    attendee: CalendarAttendee,
+    response: int,
+    occurrence: _Occurrence,
+    attendees: list[CalendarAttendeeData],
+) -> CalendarOccurrence:
+    event = attendee.event
+    exception = occurrence.exception
+    show_attendees = not event.hide_attendees or event.organizer_id == user_profile.id
+    return CalendarOccurrence(
+        event_id=event.id,
+        uid=event.uid,
+        original_start=occurrence.original_start,
+        start=occurrence.start,
+        end=occurrence.end,
+        timezone=event.timezone,
+        is_all_day=event.is_all_day,
+        title=_override(exception.title if exception is not None else None, event.title),
+        location=_override(exception.location if exception is not None else None, event.location),
+        description=_override(
+            exception.description if exception is not None else None, event.description
+        ),
+        rendered_description=_override(
+            exception.rendered_description if exception is not None else None,
+            event.rendered_description,
+        ),
+        show_as=_get_show_as(attendee, response),
+        is_private=event.is_private,
+        is_cancelled=event.is_cancelled or (exception is not None and exception.is_cancelled),
+        rrule=event.rrule,
+        organizer_id=event.organizer_id,
+        response=response,
+        reminder_minutes=attendee.reminder_minutes,
+        category=attendee.category,
+        response_requested=event.response_requested,
+        allow_forwarding=event.allow_forwarding,
+        hide_attendees=event.hide_attendees,
+        has_zulip_call=event.has_zulip_call,
+        meet_code=event.meet_code,
+        chat_id=event.chat_id,
+        attendees=attendees if show_attendees else [],
+    )
+
+
 def get_calendar_occurrences(
     user_profile: UserProfile, range_start: datetime, range_end: datetime
 ) -> list[CalendarOccurrence]:
@@ -261,44 +306,13 @@ def get_calendar_occurrences(
             ):
                 continue
 
-            show_attendees = not event.hide_attendees or event.organizer_id == user_profile.id
             calendar_occurrences.append(
-                CalendarOccurrence(
-                    event_id=event.id,
-                    uid=event.uid,
-                    original_start=occurrence.original_start,
-                    start=occurrence.start,
-                    end=occurrence.end,
-                    timezone=event.timezone,
-                    is_all_day=event.is_all_day,
-                    title=_override(
-                        exception.title if exception is not None else None, event.title
-                    ),
-                    location=_override(
-                        exception.location if exception is not None else None, event.location
-                    ),
-                    description=_override(
-                        exception.description if exception is not None else None, event.description
-                    ),
-                    rendered_description=_override(
-                        exception.rendered_description if exception is not None else None, event.rendered_description
-                    ),
-                    show_as=_get_show_as(attendee, response),
-                    is_private=event.is_private,
-                    is_cancelled=event.is_cancelled
-                    or (exception is not None and exception.is_cancelled),
-                    rrule=event.rrule,
-                    organizer_id=event.organizer_id,
-                    response=response,
-                    reminder_minutes=attendee.reminder_minutes,
-                    category=attendee.category,
-                    response_requested=event.response_requested,
-                    allow_forwarding=event.allow_forwarding,
-                    hide_attendees=event.hide_attendees,
-                    has_zulip_call=event.has_zulip_call,
-                    meet_code=event.meet_code,
-                    chat_id=event.chat_id,
-                    attendees=attendees_by_event_id[event.id] if show_attendees else [],
+                _make_calendar_occurrence(
+                    user_profile,
+                    attendee,
+                    response,
+                    occurrence,
+                    attendees_by_event_id[event.id],
                 )
             )
     calendar_occurrences.sort(key=lambda occurrence: occurrence.start)
