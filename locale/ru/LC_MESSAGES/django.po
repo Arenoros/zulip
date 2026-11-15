@@ -8920,3 +8920,9 @@ msgstr "{user} исключает вас из участников встреч�
 #, python-brace-format
 msgid "{user} tentatively accepted {title}."
 msgstr "{user} под вопросом принимает приглашение на встречу {title}."
+
+msgid "Invalid work days"
+msgstr "Неверные рабочие дни"
+
+msgid "Invalid work hours"
+msgstr "Неверные рабочие часы"
