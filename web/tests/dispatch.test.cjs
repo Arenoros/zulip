@@ -27,6 +27,7 @@ const audible_notifications = mock_esm("../src/audible_notifications");
 const bot_data = mock_esm("../src/bot_data");
 const calendar_grid = mock_esm("../src/calendar_grid");
 const calendar_meeting_chat = mock_esm("../src/calendar_meeting_chat");
+const calendar_reminders = mock_esm("../src/calendar_reminders");
 const calendar_ui = mock_esm("../src/calendar_ui");
 const call_ringing = mock_esm("../src/call_ringing");
 const compose_pm_pill = mock_esm("../src/compose_pm_pill");
@@ -329,6 +330,8 @@ run_test("calendar", ({override}) => {
     override(calendar_grid, "refresh", refresh_stub.f);
     const clear_stub = make_stub();
     override(calendar_meeting_chat, "clear_next_occurrences", clear_stub.f);
+    const reminders_stub = make_stub();
+    override(calendar_reminders, "fetch", reminders_stub.f);
     // Nothing is narrowed to here; the stub stands in for the
     // narrow's channel being a meeting's chat or not.
     let is_meeting_chat = false;
@@ -339,6 +342,7 @@ run_test("calendar", ({override}) => {
     assert.equal(stub.num_calls, 1);
     assert.equal(stub.get_args("count").count, 2);
     assert.equal(refresh_stub.num_calls, 1);
+    assert.equal(reminders_stub.num_calls, 1);
     assert.equal(clear_stub.num_calls, 1);
     assert.equal(render_stub.num_calls, 0);
 

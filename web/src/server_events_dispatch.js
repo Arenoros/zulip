@@ -11,6 +11,7 @@ import * as browser_history from "./browser_history.ts";
 import {buddy_list} from "./buddy_list.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
+import * as calendar_reminders from "./calendar_reminders.ts";
 import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel_folders from "./channel_folders.ts";
@@ -132,6 +133,7 @@ export function dispatch_normal_event(event) {
         case "calendar":
             calendar_ui.update_unanswered_invitation_count(event.unanswered_invitation_count);
             calendar_grid.refresh();
+            calendar_reminders.fetch();
             calendar_meeting_chat.clear_next_occurrences();
             if (stream_data.is_meeting_chat(narrow_state.stream_id())) {
                 message_view_header.render_title_area();
