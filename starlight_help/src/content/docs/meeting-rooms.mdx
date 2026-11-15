@@ -1,0 +1,57 @@
+---
+title: Meeting rooms
+---
+
+import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import NavigationSteps from "../../components/NavigationSteps.astro";
+import ZulipTip from "../../components/ZulipTip.astro";
+import AdminOnly from "../include/_AdminOnly.mdx";
+
+import ArchiveIcon from "~icons/zulip-icon/archive";
+import EditIcon from "~icons/zulip-icon/edit";
+import UnarchiveIcon from "~icons/zulip-icon/unarchive";
+
+<AdminOnly />
+
+Users can book your organization's meeting rooms for meetings in the
+[calendar](/help/calendar#book-a-meeting-room). A room accepts a meeting
+only if no other meeting booked it at that time.
+
+## Add a meeting room
+
+<FlattenedSteps>
+  <NavigationSteps target="settings/meeting-rooms" />
+
+  1. Click **Add meeting room**.
+  1. Enter the room's **Name**, and if you like, its **Capacity**, its
+     **Location**, such as the building and floor, and its **Exchange
+     mailbox**.
+  1. Click **Add**.
+</FlattenedSteps>
+
+## Edit a meeting room
+
+<FlattenedSteps>
+  <NavigationSteps target="settings/meeting-rooms" />
+
+  1. In the **Actions** column, click the **edit** (<EditIcon />) icon
+     for the room you want to edit.
+  1. Make the changes you want, and click **Save changes**.
+</FlattenedSteps>
+
+## Archive a meeting room
+
+An archived room can no longer be booked, but the meetings that booked
+it keep it.
+
+<FlattenedSteps>
+  <NavigationSteps target="settings/meeting-rooms" />
+
+  1. In the **Actions** column, click the **archive** (<ArchiveIcon />)
+     icon for the room you want to archive.
+</FlattenedSteps>
+
+<ZulipTip>
+  To make an archived room bookable again, click the **unarchive**
+  (<UnarchiveIcon />) icon.
+</ZulipTip>

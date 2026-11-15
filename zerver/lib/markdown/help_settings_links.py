@@ -96,6 +96,11 @@ link_mapping = {
         "Code playgrounds",
         "/#organization/playground-settings",
     ],
+    "meeting-rooms": [
+        "Organization settings",
+        "Meeting rooms",
+        "/#organization/meeting-rooms",
+    ],
     "profile-field-settings": [
         "Organization settings",
         "Custom profile fields",

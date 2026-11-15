@@ -419,7 +419,7 @@ export default defineConfig({
                 },
                 {
                     label: "Calendar",
-                    items: ["calendar"],
+                    items: ["calendar", "meeting-rooms"],
                 },
                 {
                     label: "People",
