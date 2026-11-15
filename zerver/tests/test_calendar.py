@@ -303,6 +303,30 @@ class CalendarOccurrencesTest(CalendarTestCase):
         self.assert_length(self.get_occurrences(hamlet)[0].attendees, 2)
         self.assertEqual(self.get_occurrences(cordelia)[0].attendees, [])
 
+    def test_attendees_respond_to_occurrences(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        event_id = self.create_event(
+            hamlet, rrule="FREQ=DAILY", required_attendees=[cordelia, othello]
+        )
+        respond_to_calendar_event(othello, event_id, CalendarResponse.ACCEPTED)
+        tuesday = MONDAY_10_00 + timedelta(days=1)
+        respond_to_calendar_event(
+            cordelia, event_id, CalendarResponse.TENTATIVE, original_start=tuesday
+        )
+
+        monday, tuesday_occurrence = self.get_occurrences(othello)[:2]
+        responses = {
+            attendee.user_id: attendee.response for attendee in tuesday_occurrence.attendees
+        }
+        self.assertEqual(
+            (responses[cordelia.id], responses[othello.id]),
+            (CalendarResponse.TENTATIVE, CalendarResponse.ACCEPTED),
+        )
+        responses = {attendee.user_id: attendee.response for attendee in monday.attendees}
+        self.assertEqual(responses[cordelia.id], CalendarResponse.NONE)
+
     def test_access_calendar_event(self) -> None:
         hamlet = self.example_user("hamlet")
         event_id = self.create_event(hamlet)

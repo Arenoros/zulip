@@ -1,5 +1,5 @@
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -275,17 +275,24 @@ def get_calendar_occurrences(
     ]
     event_ids = {attendee.event_id for attendee in own_attendees}
     exceptions_by_event_id = _get_exceptions_by_event_id(event_ids)
-    occurrence_responses = _get_occurrence_responses({attendee.id for attendee in own_attendees})
 
-    attendees_by_event_id: dict[int, list[CalendarAttendeeData]] = defaultdict(list)
-    for user_id, event_id, is_required, response, added_by_id in (
+    # The attendees of each event, by the ID of their attendance.
+    attendees_by_event_id: dict[int, list[tuple[int, CalendarAttendeeData]]] = defaultdict(list)
+    for attendee_id, user_id, event_id, is_required, response, added_by_id in (
         CalendarAttendee.objects.filter(event_id__in=event_ids)
         .order_by("id")
-        .values_list("user_id", "event_id", "is_required", "response", "added_by_id")
+        .values_list("id", "user_id", "event_id", "is_required", "response", "added_by_id")
     ):
         attendees_by_event_id[event_id].append(
-            CalendarAttendeeData(user_id, is_required, response, added_by_id)
+            (attendee_id, CalendarAttendeeData(user_id, is_required, response, added_by_id))
         )
+    occurrence_responses = _get_occurrence_responses(
+        {
+            attendee_id
+            for attendees in attendees_by_event_id.values()
+            for attendee_id, _ in attendees
+        }
+    )
 
     calendar_occurrences = []
     for attendee in own_attendees:
@@ -306,14 +313,20 @@ def get_calendar_occurrences(
             ):
                 continue
 
-            calendar_occurrences.append(
-                _make_calendar_occurrence(
-                    user_profile,
-                    attendee,
-                    response,
-                    occurrence,
-                    attendees_by_event_id[event.id],
+            # The attendees' responses to this occurrence.
+            attendees = [
+                data
+                if occurrence.original_start is None
+                else replace(
+                    data,
+                    response=occurrence_responses.get(
+                        (attendee_id, occurrence.original_start), data.response
+                    ),
                 )
+                for attendee_id, data in attendees_by_event_id[event.id]
+            ]
+            calendar_occurrences.append(
+                _make_calendar_occurrence(user_profile, attendee, response, occurrence, attendees)
             )
     calendar_occurrences.sort(key=lambda occurrence: occurrence.start)
     return calendar_occurrences
