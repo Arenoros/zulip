@@ -127,6 +127,11 @@ class Stream(models.Model):
     # inheriting from the user's account-level default.
     default_push_notifications = models.BooleanField(default=False, db_default=False)
 
+    # Whether the channel is the chat of a calendar meeting, which
+    # clients show among direct message conversations rather than
+    # among channels.
+    is_meeting_chat = models.BooleanField(default=False, db_default=False)
+
     # on_delete field for group value settings is set to RESTRICT
     # because we don't want to allow deleting a user group in case it
     # is referenced by the respective setting. We are not using PROTECT
@@ -277,6 +282,7 @@ class Stream(models.Model):
         "date_created",
         "deactivated",
         "default_push_notifications",
+        "is_meeting_chat",
         "description",
         "first_message_id",
         "folder_id",

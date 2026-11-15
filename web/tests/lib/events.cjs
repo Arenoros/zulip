@@ -70,6 +70,7 @@ exports.test_streams = {
         folder_id: null,
         is_recently_active: true,
         default_push_notifications: false,
+        is_meeting_chat: false,
         subscriber_count: 10,
     },
     test: {
@@ -102,6 +103,7 @@ exports.test_streams = {
         folder_id: null,
         is_recently_active: true,
         default_push_notifications: false,
+        is_meeting_chat: false,
         subscriber_count: 2,
     },
 };

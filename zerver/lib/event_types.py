@@ -979,6 +979,7 @@ class BasicStreamFields(BaseEventModel):
     creator_id: int | None
     date_created: int
     default_push_notifications: bool
+    is_meeting_chat: bool
     description: str
     first_message_id: int | None
     folder_id: int | None
@@ -1053,6 +1054,7 @@ class SingleSubscription(BaseEventModel):
     creator_id: int | None
     date_created: int
     default_push_notifications: bool
+    is_meeting_chat: bool
     description: str
     first_message_id: int | None
     folder_id: int | None

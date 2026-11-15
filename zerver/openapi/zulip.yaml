@@ -1957,6 +1957,7 @@ paths:
                                         "is_recently_active": true,
                                         "message_retention_days": null,
                                         "default_push_notifications": false,
+                                        "is_meeting_chat": false,
                                         "is_announcement_only": false,
                                         "can_add_subscribers_group": 2,
                                         "can_remove_subscribers_group": 2,
@@ -21220,6 +21221,7 @@ paths:
                                 message_retention_days:
                                   nullable: true
                                 default_push_notifications: {}
+                                is_meeting_chat: {}
                                 history_public_to_subscribers: {}
                                 topics_policy: {}
                                 first_message_id:
@@ -26391,6 +26393,7 @@ paths:
                                 message_retention_days:
                                   nullable: true
                                 default_push_notifications: {}
+                                is_meeting_chat: {}
                                 history_public_to_subscribers: {}
                                 topics_policy: {}
                                 first_message_id:
@@ -26449,6 +26452,7 @@ paths:
                                 - stream_post_policy
                                 - message_retention_days
                                 - default_push_notifications
+                                - is_meeting_chat
                                 - history_public_to_subscribers
                                 - first_message_id
                                 - folder_id
@@ -26482,6 +26486,7 @@ paths:
                               "is_web_public": false,
                               "message_retention_days": null,
                               "default_push_notifications": false,
+                              "is_meeting_chat": false,
                               "name": "management",
                               "rendered_description": "<p>A private channel</p>",
                               "stream_id": 2,
@@ -26507,6 +26512,7 @@ paths:
                               "is_web_public": false,
                               "message_retention_days": null,
                               "default_push_notifications": false,
+                              "is_meeting_chat": false,
                               "name": "welcome",
                               "rendered_description": "<p>A default public channel</p>",
                               "stream_id": 1,
@@ -26564,6 +26570,7 @@ paths:
                             "is_web_public": false,
                             "message_retention_days": null,
                             "default_push_notifications": false,
+                            "is_meeting_chat": false,
                             "name": "Denmark",
                             "rendered_description": "<p>A Scandinavian country</p>",
                             "stream_id": 7,
@@ -30595,6 +30602,7 @@ components:
             message_retention_days:
               nullable: true
             default_push_notifications: {}
+            is_meeting_chat: {}
             history_public_to_subscribers: {}
             topics_policy: {}
             first_message_id:
@@ -30644,6 +30652,7 @@ components:
             - subscriber_count
             - message_retention_days
             - default_push_notifications
+            - is_meeting_chat
             - history_public_to_subscribers
             - first_message_id
             - folder_id
@@ -30772,6 +30781,8 @@ components:
             **Changes**: New in Zulip 3.0 (feature level 17).
         default_push_notifications:
           $ref: "#/components/schemas/DefaultPushNotifications"
+        is_meeting_chat:
+          $ref: "#/components/schemas/IsMeetingChat"
         history_public_to_subscribers:
           type: boolean
           description: |
@@ -32008,6 +32019,8 @@ components:
             **Changes**: New in Zulip 3.0 (feature level 17).
         default_push_notifications:
           $ref: "#/components/schemas/DefaultPushNotifications"
+        is_meeting_chat:
+          $ref: "#/components/schemas/IsMeetingChat"
         history_public_to_subscribers:
           type: boolean
           description: |
@@ -34147,6 +34160,16 @@ components:
 
         **Changes**: New in Zulip 13.0 (feature level 507).
       example: true
+    IsMeetingChat:
+      type: boolean
+      description: |
+        Whether the channel is the chat of a calendar meeting. Such a
+        channel is created for the meeting's attendees, has no topics, and
+        is shown among direct message conversations rather than among
+        channels.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      example: false
     TopicsPolicy:
       type: string
       enum:
