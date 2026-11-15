@@ -9,8 +9,10 @@ import ZulipTip from "../../components/ZulipTip.astro";
 import GoToCalendar from "../include/_GoToCalendar.mdx";
 
 import CalendarDaysIcon from "~icons/zulip-icon/calendar-days";
+import CalendarPlusIcon from "~icons/zulip-icon/calendar-plus";
 import ChevronLeftIcon from "~icons/zulip-icon/chevron-left";
 import ChevronRightIcon from "~icons/zulip-icon/chevron-right";
+import CloseIcon from "~icons/zulip-icon/close";
 import PanelLeftIcon from "~icons/zulip-icon/panel-left";
 
 Zulip's calendar shows your meetings and events a week at a time. It
@@ -72,6 +74,33 @@ hours of the day.
 
 The work week shows your work days, and the calendar opens at the
 start of your work day.
+
+## Show your colleagues' calendars
+
+You can show the calendars of colleagues next to your own, to see when
+they are busy. You see the titles only of the meetings you are invited
+to, and never of a colleague's private events. Your list of colleagues
+is the same on all your devices.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click <CalendarPlusIcon /> **Add calendar** in the panel on the
+         left of the calendar.
+
+      1. Select a colleague.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  Use the checkboxes under **Colleagues' calendars** to choose whose
+  calendars to show. Click the **remove from the list**
+  (<CloseIcon />) icon next to a colleague's name to remove them from
+  the list.
+</ZulipTip>
 
 ## Hide the calendar panel
 
