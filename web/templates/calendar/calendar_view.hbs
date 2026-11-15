@@ -72,10 +72,12 @@
             </button>
         </div>
         <span class="calendar-toolbar-separator" aria-hidden="true"></span>
-        <button type="button" class="calendar-toolbar-button calendar-meet-now-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Meet now' }}" aria-label="{{t 'Meet now' }}">
-            <i class="zulip-icon zulip-icon-video-call" aria-hidden="true"></i>
-            <span class="calendar-toolbar-label">{{t "Meet now" }}</span>
-        </button>
+        {{#if can_meet_now}}
+            <button type="button" class="calendar-toolbar-button calendar-meet-now-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Meet now' }}" aria-label="{{t 'Meet now' }}">
+                <i class="zulip-icon zulip-icon-video-call" aria-hidden="true"></i>
+                <span class="calendar-toolbar-label">{{t "Meet now" }}</span>
+            </button>
+        {{/if}}
         <div class="calendar-new-button-group">
             <button type="button" class="calendar-toolbar-button calendar-new-event-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'New event' }}" aria-label="{{t 'New event' }}">
                 <i class="zulip-icon zulip-icon-calendar-plus" aria-hidden="true"></i>

@@ -1985,3 +1985,10 @@ body.calendar-view-visible {
     color: var(--color-calendar-text-secondary);
     font-size: 0.8571em; /* 12px at 14px/1em */
 }
+
+/* As wide as the title above it. */
+.calendar-meet-now-attendees {
+    box-sizing: border-box;
+    width: var(--modal-input-width);
+    max-width: 100%;
+}

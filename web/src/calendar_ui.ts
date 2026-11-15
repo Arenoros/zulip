@@ -11,6 +11,7 @@ import render_calendar_date_picker_popover from "../templates/popovers/calendar/
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
 import * as browser_history from "./browser_history.ts";
+import * as calendar_call from "./calendar_call.ts";
 import * as calendar_card from "./calendar_card.ts";
 import * as calendar_colleagues from "./calendar_colleagues.ts";
 import * as calendar_filter from "./calendar_filter.ts";
@@ -21,6 +22,7 @@ import * as calendar_menus from "./calendar_menus.ts";
 import * as calendar_responses from "./calendar_responses.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
+import * as compose_call from "./compose_call.ts";
 import * as dropdown_widget from "./dropdown_widget.ts";
 import {$t} from "./i18n.ts";
 import {localstorage} from "./localstorage.ts";
@@ -170,6 +172,7 @@ function render_view(): void {
             range_label: get_range_label(current_location, "long"),
             short_range_label: get_range_label(current_location, "short"),
             view_label: get_view_label(current_location.view),
+            can_meet_now: compose_call.is_livekit_call_provider(),
         }),
     );
 }
@@ -542,6 +545,9 @@ export function initialize({
     });
     $view.on("click", ".calendar-new-event-button", () => {
         calendar_form.open_now();
+    });
+    $view.on("click", ".calendar-meet-now-button", () => {
+        calendar_call.show_meet_now_dialog();
     });
     // The menu belongs to a wrapper of the button, since an element
     // with a tooltip cannot also open a popover.
