@@ -1,0 +1,14 @@
+<div class="calendar-form-day-hours" aria-hidden="true">
+    {{#each hours}}
+        <span class="calendar-hour-label" style="top: {{top}}%;">{{label}}</span>
+    {{/each}}
+</div>
+<div class="calendar-day-column calendar-form-day-column">
+    <div class="calendar-day-events"></div>
+    {{#unless is_all_day}}
+        <div class="calendar-form-day-block" style="top: {{top}}%; height: {{height}}%;" tabindex="0" role="slider" aria-label="{{t 'Time of the event' }}" aria-valuetext="{{time_label}}">
+            <span class="calendar-form-day-block-time">{{time_label}}</span>
+            <span class="calendar-form-day-block-resize" aria-hidden="true"></span>
+        </div>
+    {{/unless}}
+</div>

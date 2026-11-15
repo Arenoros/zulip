@@ -5,6 +5,7 @@ import * as tippy from "tippy.js";
 import render_calendar_card_choices_popover from "../templates/popovers/calendar/calendar_card_choices_popover.hbs";
 import render_calendar_card_popover from "../templates/popovers/calendar/calendar_card_popover.hbs";
 
+import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_util from "./calendar_util.ts";
@@ -381,6 +382,14 @@ function open(element: HTMLElement): void {
                         respond(response, scope);
                     });
                 }
+            });
+            $popper.on("click", ".calendar-card-edit", function (this: HTMLElement) {
+                choose_scope(this, (scope) => {
+                    assert(card_occurrence !== undefined);
+                    const edited = card_occurrence;
+                    hide();
+                    calendar_form.open_edit(edited, scope === "occurrence");
+                });
             });
             $popper.on("click", ".calendar-card-cancel", function (this: HTMLElement) {
                 choose_scope(this, confirm_remove);

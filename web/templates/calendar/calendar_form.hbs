@@ -1,0 +1,151 @@
+<form class="calendar-form" novalidate aria-label="{{#if is_editing}}{{t 'Edit event' }}{{else}}{{t 'New event' }}{{/if}}">
+    <div class="calendar-form-card calendar-form-toolbar">
+        <button type="button" class="calendar-toolbar-button calendar-form-event-button selected" aria-pressed="true">
+            <i class="zulip-icon zulip-icon-calendar" aria-hidden="true"></i>
+            {{t "Event" }}
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-form-series-button" aria-pressed="false" {{#if is_occurrence}}disabled{{/if}}>
+            <i class="zulip-icon zulip-icon-refresh-cw" aria-hidden="true"></i>
+            {{t "Series" }}
+        </button>
+        <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="show_as" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
+            <span class="calendar-event free-busy calendar-legend-swatch calendar-form-show-as-swatch" aria-hidden="true"></span>
+            <span class="calendar-form-menu-label"></span>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="reminder" aria-haspopup="true">
+            <i class="zulip-icon zulip-icon-alarm-clock" aria-hidden="true"></i>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="category" aria-haspopup="true">
+            <span class="calendar-form-category-swatch" aria-hidden="true"></span>
+            <i class="zulip-icon zulip-icon-flag" aria-hidden="true"></i>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="visibility" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
+            <i class="zulip-icon zulip-icon-lock" aria-hidden="true"></i>
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-spacer"></span>
+        <button type="button" class="calendar-toolbar-button calendar-form-cancel">{{t "Cancel" }}</button>
+        <button type="submit" class="calendar-toolbar-button calendar-form-save">
+            <i class="zulip-icon zulip-icon-check" aria-hidden="true"></i>
+            {{t "Save" }}
+        </button>
+    </div>
+    <div class="calendar-form-error alert-error" role="alert"></div>
+    <div class="calendar-form-body">
+        <div class="calendar-form-main">
+            <div class="calendar-form-card calendar-form-fields">
+                {{#if is_occurrence}}
+                    <p class="calendar-form-occurrence-note">{{t "You are changing one occurrence. The attendees and the other settings are those of the whole series." }}</p>
+                {{/if}}
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-calendar calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <input type="text" class="input-element calendar-form-title" placeholder="{{t 'Add a title' }}" aria-label="{{t 'Title' }}" maxlength="255" value="{{title}}"/>
+                        <div class="calendar-form-field-error calendar-form-title-error" role="alert"></div>
+                    </div>
+                </div>
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-users calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field calendar-form-attendees">
+                        <div class="pill-container person_picker calendar-form-required-attendees {{#if is_occurrence}}not-editable-by-user{{/if}}">
+                            <div class="input" {{#unless is_occurrence}}contenteditable="true"{{/unless}} data-placeholder="{{t 'Invite required attendees' }}" aria-label="{{t 'Required attendees' }}">
+                                {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
+                            </div>
+                        </div>
+                        <div class="calendar-form-attendee-options-trigger">
+                            <button type="button" class="calendar-icon-button calendar-form-attendee-options tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Attendee options' }}" aria-label="{{t 'Attendee options' }}" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
+                                <i class="zulip-icon zulip-icon-user-plus" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="calendar-form-row calendar-form-optional-row {{#unless has_optional_attendees}}hide{{/unless}}">
+                    <i class="zulip-icon zulip-icon-users calendar-form-row-icon calendar-form-optional-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <div class="pill-container person_picker calendar-form-optional-attendees {{#if is_occurrence}}not-editable-by-user{{/if}}">
+                            <div class="input" {{#unless is_occurrence}}contenteditable="true"{{/unless}} data-placeholder="{{t 'Invite optional attendees' }}" aria-label="{{t 'Optional attendees' }}">
+                                {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-clock calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field calendar-form-time">
+                        <button type="button" class="calendar-text-button calendar-form-date" aria-haspopup="true"></button>
+                        <span class="calendar-form-time-range">
+                            <select class="calendar-form-start" aria-label="{{t 'Start' }}"></select>
+                            <span aria-hidden="true">–</span>
+                            <select class="calendar-form-end" aria-label="{{t 'End' }}"></select>
+                        </span>
+                        <label class="calendar-form-all-day">
+                            <input type="checkbox" class="calendar-list-checkbox calendar-form-all-day-checkbox" {{#if is_occurrence}}disabled{{/if}}/>
+                            {{t "All day" }}
+                        </label>
+                        <span class="calendar-toolbar-spacer"></span>
+                        <button type="button" class="calendar-toolbar-button calendar-form-scheduler">
+                            <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+                            {{t "Scheduler" }}
+                        </button>
+                    </div>
+                </div>
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-globe calendar-form-row-icon" aria-hidden="true"></i>
+                    <div class="calendar-form-field">
+                        <input type="text" class="input-element calendar-form-location" placeholder="{{t 'Add a place or a room' }}" aria-label="{{t 'Place' }}" maxlength="255" value="{{location}}"/>
+                    </div>
+                </div>
+                <div class="calendar-form-row">
+                    <i class="zulip-icon zulip-icon-video-call calendar-form-row-icon" aria-hidden="true"></i>
+                    <label class="calendar-form-field calendar-form-call">
+                        <input type="checkbox" class="calendar-switch calendar-form-call-checkbox" {{#if has_zulip_call}}checked{{/if}} {{#if is_occurrence}}disabled{{/if}}/>
+                        {{t "Zulip call" }}
+                    </label>
+                </div>
+            </div>
+            <div class="calendar-form-card calendar-form-description compose-icon-textarea-container">
+                <i class="zulip-icon zulip-icon-file-text calendar-form-row-icon" aria-hidden="true"></i>
+                <div class="calendar-form-field calendar-form-editor">
+                    <div class="calendar-form-formatting">
+                        {{#each formatting_buttons}}
+                            <button type="button" class="calendar-icon-button calendar-form-format tippy-zulip-delayed-tooltip" data-format-type="{{type}}" data-tippy-content="{{label}}" aria-label="{{label}}">
+                                <i class="zulip-icon zulip-icon-{{icon}}" aria-hidden="true"></i>
+                            </button>
+                        {{/each}}
+                        {{!-- A wrapper span, since the emoji picker cannot
+                        attach to a button that already has a tooltip. --}}
+                        <span class="calendar-form-emoji-wrapper tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Add emoji' }}">
+                            <button type="button" class="calendar-icon-button emoji_map" aria-label="{{t 'Add emoji' }}">
+                                <i class="zulip-icon zulip-icon-smile-bigger" aria-hidden="true"></i>
+                            </button>
+                        </span>
+                        <span class="calendar-toolbar-spacer"></span>
+                        <button type="button" class="calendar-icon-button calendar-form-preview tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Preview' }}" aria-label="{{t 'Preview' }}" aria-pressed="false">
+                            <i class="zulip-icon zulip-icon-preview" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <textarea class="calendar-form-description-input" placeholder="{{t 'Meeting description' }}" aria-label="{{t 'Description' }}">{{description}}</textarea>
+                    <div class="calendar-form-description-preview rendered_markdown"></div>
+                </div>
+            </div>
+        </div>
+        <aside class="calendar-form-card calendar-form-day" aria-label="{{t 'Day' }}">
+            <div class="calendar-form-day-header">
+                <button type="button" class="calendar-icon-button calendar-form-previous-day" aria-label="{{t 'Previous day' }}">
+                    <i class="zulip-icon zulip-icon-chevron-left" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="calendar-icon-button calendar-form-next-day" aria-label="{{t 'Next day' }}">
+                    <i class="zulip-icon zulip-icon-chevron-right" aria-hidden="true"></i>
+                </button>
+                <span class="calendar-form-day-label"></span>
+            </div>
+            <div class="calendar-form-day-scroll">
+                <div class="calendar-form-day-grid"></div>
+            </div>
+        </aside>
+    </div>
+</form>

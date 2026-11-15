@@ -6,6 +6,7 @@ import type * as tippy from "tippy.js";
 import render_calendar_mini_month from "../templates/calendar/calendar_mini_month.hbs";
 import render_calendar_pinned_users from "../templates/calendar/calendar_pinned_users.hbs";
 import render_calendar_view from "../templates/calendar/calendar_view.hbs";
+import render_calendar_card_choices_popover from "../templates/popovers/calendar/calendar_card_choices_popover.hbs";
 import render_calendar_date_picker_popover from "../templates/popovers/calendar/calendar_date_picker_popover.hbs";
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
@@ -13,6 +14,7 @@ import * as browser_history from "./browser_history.ts";
 import * as calendar_card from "./calendar_card.ts";
 import * as calendar_colleagues from "./calendar_colleagues.ts";
 import * as calendar_filter from "./calendar_filter.ts";
+import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_menus from "./calendar_menus.ts";
 import * as calendar_util from "./calendar_util.ts";
@@ -293,6 +295,7 @@ export function show(location: CalendarLocation, hash_of_view_behind: string): v
     render_view();
     setup_add_colleague_widget();
     calendar_grid.show(location, calendar_colleagues.get_shown_colleagues());
+    calendar_form.restore();
     calendar_colleagues.fetch(
         report_error($t({defaultMessage: "Failed to load your colleagues' calendars"})),
     );
@@ -306,6 +309,7 @@ export function hide(): void {
     popover_menus.hide_current_popover_if_visible(
         popover_menus.popover_instances.calendar_date_picker,
     );
+    calendar_form.save_draft();
     calendar_grid.hide();
     calendar_util.set_visible(false);
     $("body").removeClass("calendar-view-visible");
@@ -521,6 +525,56 @@ export function initialize({
 
     calendar_colleagues.initialize({on_colleagues_change});
     calendar_card.initialize();
+    calendar_form.initialize({
+        on_close() {
+            $("#calendar-view .calendar-new-event-button").trigger("focus");
+        },
+        get_mini_month_context,
+    });
+    $view.on("click", ".calendar-new-event-button", () => {
+        calendar_form.open_now();
+    });
+    // The menu belongs to a wrapper of the button, since an element
+    // with a tooltip cannot also open a popover.
+    $view.on("click", ".calendar-new-menu-trigger", function (this: HTMLElement) {
+        popover_menus.toggle_popover_menu(this, {
+            theme: "popover-menu",
+            placement: "bottom-end",
+            onShow(instance) {
+                instance.setContent(
+                    ui_util.parse_html(
+                        render_calendar_card_choices_popover({
+                            choices: [{value: "event", label: $t({defaultMessage: "Event"})}],
+                        }),
+                    ),
+                );
+                popover_menus.on_show_prep(instance);
+            },
+            onMount(instance) {
+                $(instance.popper).on("click", ".calendar-card-choice", (e) => {
+                    e.preventDefault();
+                    popover_menus.hide_current_popover_if_visible(instance);
+                    calendar_form.open_now();
+                });
+            },
+            onHidden(instance) {
+                instance.destroy();
+            },
+        });
+    });
+    $view.on("click", ".calendar-day-column", function (this: HTMLElement, e) {
+        if ($(e.target).closest(".calendar-event").length > 0) {
+            return;
+        }
+        // A new event of half an hour at the place clicked.
+        const minute =
+            Math.floor(
+                ((e.clientY - this.getBoundingClientRect().top) /
+                    this.getBoundingClientRect().height) *
+                    48,
+            ) * 30;
+        calendar_form.open_new(this.dataset["date"]!, Math.min(Math.max(minute, 0), 23 * 60 + 30));
+    });
     calendar_menus.register_filter_menu(() => {
         calendar_grid.redraw_events();
         $("#calendar-view .calendar-filter-button").toggleClass(

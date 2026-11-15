@@ -129,3 +129,10 @@ run_test("capitalize", () => {
     assert.equal(calendar_util.capitalize("Mon", "en"), "Mon");
     assert.equal(calendar_util.capitalize("", "en"), "");
 });
+
+run_test("snap_minutes", () => {
+    assert.equal(calendar_util.snap_minutes(22, 15), 15);
+    assert.equal(calendar_util.snap_minutes(23, 15), 30);
+    assert.equal(calendar_util.snap_minutes(-8, 15), -15);
+    assert.equal(calendar_util.snap_minutes(-7, 15), 0);
+});

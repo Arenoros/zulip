@@ -101,6 +101,12 @@ export function get_month_weeks(month: Date): Date[][] {
     );
 }
 
+// Rounds minutes to the nearest step. Small negative values round to
+// 0, not to -0.
+export function snap_minutes(minutes: number, step: number): number {
+    return Math.round(minutes / step) * step || 0;
+}
+
 // Names of months and weekdays start with a capital letter in the
 // calendar, also in languages like Russian that write them in lower
 // case.

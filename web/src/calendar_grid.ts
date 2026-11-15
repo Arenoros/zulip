@@ -51,13 +51,14 @@ const settings_schema = z.object({
         work_days: z.array(z.number()),
         work_day_start_minutes: z.number(),
         work_day_end_minutes: z.number(),
+        default_reminder_minutes: z.nullable(z.number()),
         time_scale_minutes: z.number(),
     }),
 });
 
 type CalendarSettings = z.infer<typeof settings_schema>["settings"];
 
-const occurrence_schema = z.object({
+export const occurrence_schema = z.object({
     id: z.number(),
     original_start: z.nullable(z.number()),
     start: z.number(),
@@ -66,13 +67,21 @@ const occurrence_schema = z.object({
     is_all_day: z.boolean(),
     title: z.string(),
     location: z.string(),
+    description: z.string(),
     show_as: z.number(),
+    is_private: z.boolean(),
     is_cancelled: z.boolean(),
     response: z.number(),
     organizer_id: z.number(),
+    reminder_minutes: z.nullable(z.number()),
     category: z.string(),
+    response_requested: z.boolean(),
+    allow_forwarding: z.boolean(),
+    hide_attendees: z.boolean(),
     has_zulip_call: z.boolean(),
-    attendees: z.array(z.object({user_id: z.number(), response: z.number()})),
+    attendees: z.array(
+        z.object({user_id: z.number(), response: z.number(), is_required: z.boolean()}),
+    ),
 });
 
 export type CalendarOccurrence = z.infer<typeof occurrence_schema>;
@@ -102,6 +111,7 @@ let settings: CalendarSettings = {
     work_days: [1, 2, 3, 4, 5],
     work_day_start_minutes: 9 * 60,
     work_day_end_minutes: 18 * 60,
+    default_reminder_minutes: 15,
     time_scale_minutes: 30,
 };
 let settings_state: "unloaded" | "loading" | "loaded" = "unloaded";
@@ -149,6 +159,10 @@ export function get_occurrence(
         (occurrence) =>
             occurrence.id === event_id && occurrence.original_start === original_start,
     );
+}
+
+export function get_default_reminder(): number | null {
+    return settings.default_reminder_minutes;
 }
 
 export function get_time_scale(): number {

@@ -1,0 +1,18 @@
+<div class="popover-menu calendar-menu calendar-form-attendee-options-menu">
+    <ul role="menu" class="popover-menu-list">
+        {{#each options}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitemcheckbox" tabindex="0" class="popover-menu-link calendar-form-attendee-option" data-option="{{name}}" aria-checked="{{#if checked}}true{{else}}false{{/if}}">
+                    <span class="popover-menu-label">{{label}}</span>
+                    <input type="checkbox" class="calendar-switch" tabindex="-1" aria-hidden="true" {{#if checked}}checked{{/if}}/>
+                </a>
+            </li>
+        {{/each}}
+        <li role="separator" class="popover-menu-separator"></li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" tabindex="0" class="popover-menu-link calendar-form-add-optional">
+                <span class="popover-menu-label">{{t "Add optional attendees" }}</span>
+            </a>
+        </li>
+    </ul>
+</div>
