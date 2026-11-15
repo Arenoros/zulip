@@ -8876,3 +8876,15 @@ msgstr "Звонок завершён."
 
 msgid "{full_name} cannot access this channel."
 msgstr "{full_name}: нет доступа к этому каналу."
+
+msgid "Start the call"
+msgstr "Начать звонок"
+
+msgid "The call of this meeting has not started yet."
+msgstr "Звонок этой встречи ещё не начался."
+
+msgid "This event has no Zulip call"
+msgstr "У этого события нет звонка Zulip"
+
+msgid "This event was cancelled"
+msgstr "Это событие отменено"
