@@ -8926,3 +8926,25 @@ msgstr "Неверные рабочие дни"
 
 msgid "Invalid work hours"
 msgstr "Неверные рабочие часы"
+
+msgid "The name must not be empty"
+msgstr "Название не может быть пустым"
+
+msgid "The name is too long"
+msgstr "Слишком длинное название"
+
+msgid "A meeting room with this name already exists"
+msgstr "Переговорная с таким названием уже есть"
+
+msgid "Invalid capacity"
+msgstr "Недопустимая вместимость"
+
+msgid "Invalid email address"
+msgstr "Недопустимый адрес электронной почты"
+
+msgid "Invalid meeting room"
+msgstr "Недопустимая переговорная"
+
+#, python-brace-format
+msgid "{room_name} is booked for another meeting at {time}."
+msgstr "Переговорная {room_name} занята другой встречей {time}."
