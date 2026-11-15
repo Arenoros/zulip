@@ -181,6 +181,7 @@ from zerver.actions.video_calls import (
 )
 from zerver.lib import event_types
 from zerver.lib.calendar.changes import create_calendar_event, respond_to_calendar_event
+from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.drafts import DraftData, do_create_drafts, do_delete_draft, do_edit_draft
 from zerver.lib.event_schema import (
     check_alert_words,
@@ -189,6 +190,7 @@ from zerver.lib.event_schema import (
     check_attachment_update,
     check_calendar,
     check_calendar_free_busy,
+    check_calendar_settings,
     check_call_answer,
     check_call_cancel,
     check_call_missed_seen,
@@ -2217,6 +2219,12 @@ class NormalActionsTest(BaseAction):
             create_calendar_event(othello, required_attendees=[cordelia], **event_fields)
         check_calendar_free_busy("events[0]", events[0])
         self.assertEqual(events[0]["user_ids"], [cordelia.id])
+
+    def test_calendar_settings_events(self) -> None:
+        with self.verify_action(state_change_expected=False) as events:
+            update_calendar_user_settings(self.user_profile, work_days=[1, 2, 3, 4])
+        check_calendar_settings("events[0]", events[0])
+        self.assertEqual(events[0]["settings"]["work_days"], [1, 2, 3, 4])
 
     def test_personal_sections_events(self) -> None:
         with self.verify_action() as events:

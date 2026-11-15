@@ -1854,8 +1854,9 @@ def apply_event(
         pass
     elif event["type"] == "calendar":
         state["calendar_unanswered_invitation_count"] = event["unanswered_invitation_count"]
-    elif event["type"] == "calendar_free_busy":
-        # Clients fetch the free/busy times again when they need them.
+    elif event["type"] in ("calendar_free_busy", "calendar_settings"):
+        # Clients fetch the free/busy times and the calendar settings
+        # when they need them.
         pass
     elif event["type"] == "call":
         # Call ringing events are transient and thus ignored

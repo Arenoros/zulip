@@ -647,6 +647,16 @@ export function redraw_events(): void {
     }
 }
 
+// The settings changed, maybe in another client.
+export function update_settings(new_settings: CalendarSettings): void {
+    settings = new_settings;
+    settings_state = "loaded";
+    if (current_location !== undefined) {
+        redraw_grid();
+        on_settings_loaded?.();
+    }
+}
+
 export function set_time_scale(minutes: number, on_error: (xhr: JQuery.jqXHR) => void): void {
     settings = {...settings, time_scale_minutes: minutes};
     if (current_location !== undefined) {

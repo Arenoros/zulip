@@ -5,9 +5,11 @@ from django.db import transaction
 from django.db.models import Max
 from django.utils.translation import gettext as _
 
+from zerver.lib.event_types import CalendarSettings, CalendarSettingsEvent
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.types import UNSET, Unset
 from zerver.models import CalendarPinnedUser, CalendarUserSettings, UserProfile
+from zerver.tornado.django_api import send_event_on_commit
 
 TIME_SCALE_MINUTES = [15, 30, 60]
 MINUTES_PER_DAY = 24 * 60
@@ -119,3 +121,7 @@ def update_calendar_user_settings(
             raise JsonableError(_("Invalid time scale"))
         user_settings.time_scale_minutes = time_scale_minutes
     user_settings.save()
+    event = CalendarSettingsEvent(
+        settings=CalendarSettings(**calendar_user_settings_to_api_dict(user_settings))
+    )
+    send_event_on_commit(user_profile.realm, event, [user_profile.id])

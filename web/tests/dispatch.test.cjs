@@ -361,6 +361,15 @@ run_test("calendar_free_busy", ({override}) => {
     assert.deepEqual(stub.get_args("user_ids").user_ids, [9, 10]);
 });
 
+run_test("calendar_settings", ({override}) => {
+    const event = event_fixtures.calendar_settings;
+    const stub = make_stub();
+    override(calendar_grid, "update_settings", stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.deepEqual(stub.get_args("settings").settings, event.settings);
+});
+
 run_test("call", ({override}) => {
     const event = event_fixtures.call__ring;
     const stub = make_stub();

@@ -82,6 +82,20 @@ class CalendarFreeBusyEvent(BaseEvent):
     user_ids: list[int]
 
 
+class CalendarSettings(BaseEventModel):
+    work_days: list[int]
+    work_day_start_minutes: int
+    work_day_end_minutes: int
+    default_reminder_minutes: int | None
+    default_view: int
+    time_scale_minutes: int
+
+
+class CalendarSettingsEvent(BaseEvent):
+    type: Literal["calendar_settings"] = "calendar_settings"
+    settings: CalendarSettings
+
+
 class CallConversation(BaseEventModel):
     message_id: int
     stream_id: int | None = None

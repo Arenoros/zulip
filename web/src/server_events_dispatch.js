@@ -144,6 +144,10 @@ export function dispatch_normal_event(event) {
             calendar_grid.refresh_free_busy(event.user_ids);
             break;
 
+        case "calendar_settings":
+            calendar_grid.update_settings(event.settings);
+            break;
+
         case "call":
             call_ringing.dispatch(event);
             break;

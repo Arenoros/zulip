@@ -170,6 +170,18 @@ exports.fixtures = {
         user_ids: [9, 10],
     },
 
+    calendar_settings: {
+        type: "calendar_settings",
+        settings: {
+            work_days: [1, 2, 3, 4],
+            work_day_start_minutes: 540,
+            work_day_end_minutes: 1080,
+            default_reminder_minutes: 15,
+            default_view: 1,
+            time_scale_minutes: 30,
+        },
+    },
+
     call__ring: {
         type: "call",
         op: "ring",
