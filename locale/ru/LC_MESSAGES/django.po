@@ -8888,3 +8888,35 @@ msgstr "У этого события нет звонка Zulip"
 
 msgid "This event was cancelled"
 msgstr "Это событие отменено"
+
+#, python-brace-format
+msgid "Open in calendar"
+msgstr "Открыть в календаре"
+
+#, python-brace-format
+msgid "{user} accepted {title}."
+msgstr "{user} принимает приглашение на встречу {title}."
+
+#, python-brace-format
+msgid "{user} cancelled {title}."
+msgstr "{user} отменяет встречу {title}."
+
+#, python-brace-format
+msgid "{user} declined {title}."
+msgstr "{user} отклоняет приглашение на встречу {title}."
+
+#, python-brace-format
+msgid "{user} invited you to {title} on {time}."
+msgstr "{user} приглашает вас на встречу {title}, {time}."
+
+#, python-brace-format
+msgid "{user} moved {title} to {time}."
+msgstr "{user} переносит встречу {title} на {time}."
+
+#, python-brace-format
+msgid "{user} removed you from {title}."
+msgstr "{user} исключает вас из участников встречи {title}."
+
+#, python-brace-format
+msgid "{user} tentatively accepted {title}."
+msgstr "{user} под вопросом принимает приглашение на встречу {title}."
