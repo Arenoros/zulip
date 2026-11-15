@@ -5,93 +5,27 @@ import * as tippy from "tippy.js";
 import render_calendar_card_choices_popover from "../templates/popovers/calendar/calendar_card_choices_popover.hbs";
 import render_calendar_card_popover from "../templates/popovers/calendar/calendar_card_popover.hbs";
 
+import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
-import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
-import * as confirm_dialog from "./confirm_dialog.ts";
-import {$t, $t_html} from "./i18n.ts";
+import {$t} from "./i18n.ts";
 import * as people from "./people.ts";
 import * as popover_menus from "./popover_menus.ts";
 import {current_user} from "./state_data.ts";
-import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
-import {user_settings} from "./user_settings.ts";
 
 // The card of an event, which opens next to it on the grid.
 
-// The values of CalendarResponse on the server.
-const RESPONSES = new Map([
-    ["none", 1],
-    ["accepted", 2],
-    ["tentative", 3],
-    ["declined", 4],
-    ["following", 5],
-]);
-
-type Scope = "occurrence" | "series";
-
 let card_occurrence: CalendarOccurrence | undefined;
 let choices_instance: tippy.Instance | undefined;
-
-function get_response_name(response: number): string {
-    return [...RESPONSES].find(([, value]) => value === response)?.[0] ?? "none";
-}
-
-function is_personal(occurrence: CalendarOccurrence): boolean {
-    return occurrence.attendees.every((attendee) => attendee.user_id === current_user.user_id);
-}
-
-function format_day(date: Date): string {
-    const time_zone = calendar_grid.get_time_zone();
-    const weekday = new Intl.DateTimeFormat(user_settings.default_language, {
-        weekday: "short",
-        timeZone: time_zone,
-    }).format(date);
-    const day = new Intl.DateTimeFormat(user_settings.default_language, {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        timeZone: time_zone,
-    }).format(date);
-    return `${calendar_util.capitalize(weekday, user_settings.default_language)} ${day}`;
-}
-
-function format_time(date: Date): string {
-    return new Intl.DateTimeFormat(user_settings.default_language, {
-        hour: "numeric",
-        minute: "2-digit",
-        hourCycle: user_settings.twenty_four_hour_time ? "h23" : "h12",
-        timeZone: calendar_grid.get_time_zone(),
-    }).format(date);
-}
-
-// "Mon 11/09/2026 12:00 PM – 1:00 PM", with the day of the end too
-// when it is another day.
-export function get_time_label(occurrence: CalendarOccurrence): string {
-    const start = new Date(occurrence.start * 1000);
-    if (occurrence.is_all_day) {
-        // All-day events end at the midnight after their last day.
-        const last_day = new Date((occurrence.end - 1) * 1000);
-        const first = format_day(start);
-        const last = format_day(last_day);
-        return first === last ? first : `${first} – ${last}`;
-    }
-    const end = new Date(occurrence.end * 1000);
-    const start_day = format_day(start);
-    const end_day = format_day(end);
-    if (start_day === end_day) {
-        return `${start_day} ${format_time(start)} – ${format_time(end)}`;
-    }
-    return `${start_day} ${format_time(start)} – ${end_day} ${format_time(end)}`;
-}
 
 function get_counts_label(occurrence: CalendarOccurrence): string {
     const counts = new Map<string, number>();
     for (const attendee of occurrence.attendees) {
         if (attendee.user_id !== occurrence.organizer_id) {
-            const name = get_response_name(attendee.response);
+            const name = calendar_actions.get_response_name(attendee.response);
             counts.set(name, (counts.get(name) ?? 0) + 1);
         }
     }
@@ -110,7 +44,7 @@ function get_counts_label(occurrence: CalendarOccurrence): string {
 
 function get_card_context(occurrence: CalendarOccurrence): Record<string, unknown> {
     const is_organizer = occurrence.organizer_id === current_user.user_id;
-    const personal = is_organizer && is_personal(occurrence);
+    const personal = is_organizer && calendar_actions.is_personal(occurrence);
     const organizer = people.maybe_get_user_by_id(occurrence.organizer_id, true);
     const title = occurrence.is_cancelled
         ? $t({defaultMessage: "Canceled: {title}"}, {title: occurrence.title})
@@ -134,13 +68,13 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
         is_personal: personal,
         is_invitee: !is_organizer && !occurrence.is_cancelled,
         is_recurring: occurrence.original_start !== null,
-        time_label: get_time_label(occurrence),
+        time_label: calendar_actions.get_time_label(occurrence),
         location,
         organizer_label,
         organizer_avatar_url:
             organizer === undefined ? "" : people.small_avatar_url_for_person(organizer),
         counts_label: get_counts_label(occurrence),
-        response: get_response_name(occurrence.response),
+        response: calendar_actions.get_response_name(occurrence.response),
     };
 }
 
@@ -173,7 +107,7 @@ function hide_choices(): void {
 
 // Asks whether an action is for this occurrence or the whole series,
 // in a menu under its button.
-function choose_scope(button: HTMLElement, on_choose: (scope: Scope) => void): void {
+function choose_scope(button: HTMLElement, on_choose: (scope: calendar_actions.Scope) => void): void {
     assert(card_occurrence !== undefined);
     if (card_occurrence.original_start === null) {
         on_choose("series");
@@ -208,84 +142,32 @@ function choose_scope(button: HTMLElement, on_choose: (scope: Scope) => void): v
     choices_instance.show();
 }
 
-function get_scope_data(occurrence: CalendarOccurrence, scope: Scope): Record<string, string> {
-    if (scope === "occurrence" && occurrence.original_start !== null) {
-        return {occurrence: JSON.stringify(occurrence.original_start)};
-    }
-    return {};
-}
-
-function respond(response: string, scope: Scope): void {
+function respond(response: string, scope: calendar_actions.Scope): void {
     assert(card_occurrence !== undefined);
     const occurrence = card_occurrence;
-    void channel.post({
-        url: `/json/calendar/events/${occurrence.id}/response`,
-        data: {
-            response: JSON.stringify(RESPONSES.get(response)),
-            ...get_scope_data(occurrence, scope),
-        },
-        success() {
+    calendar_actions.respond(
+        occurrence,
+        response,
+        scope,
+        () => {
             if (card_occurrence === occurrence) {
-                card_occurrence = {...occurrence, response: RESPONSES.get(response)!};
+                card_occurrence = {
+                    ...occurrence,
+                    response: calendar_actions.RESPONSES.get(response)!,
+                };
                 render_card();
             }
-            calendar_grid.refresh();
         },
-        error: show_error,
-    });
+        show_error,
+    );
 }
 
-// The card is closed by then, behind the confirmation.
-function remove(occurrence: CalendarOccurrence, scope: Scope): void {
-    void channel.del({
-        url: `/json/calendar/events/${occurrence.id}`,
-        data: get_scope_data(occurrence, scope),
-        success() {
-            calendar_grid.refresh();
-        },
-        error(xhr) {
-            ui_report.error(
-                $t_html({defaultMessage: "Failed to remove the event"}),
-                xhr,
-                $("#home-error"),
-            );
-        },
-    });
-}
-
-function confirm_remove(scope: Scope): void {
+// The card is closed behind the confirmation.
+function confirm_remove(scope: calendar_actions.Scope): void {
     assert(card_occurrence !== undefined);
     const occurrence = card_occurrence;
-    const is_organizer = occurrence.organizer_id === current_user.user_id;
-    const is_meeting = !is_personal(occurrence);
-    let title_html: string;
-    let content: string;
-    if (is_organizer && is_meeting) {
-        title_html =
-            scope === "occurrence"
-                ? $t_html({defaultMessage: "Cancel this occurrence?"})
-                : $t_html({defaultMessage: "Cancel this meeting?"});
-        content = $t({defaultMessage: "Attendees will see it as canceled."});
-    } else {
-        title_html =
-            scope === "occurrence"
-                ? $t_html({defaultMessage: "Delete this occurrence?"})
-                : $t_html({defaultMessage: "Delete this event?"});
-        content = is_meeting
-            ? $t({defaultMessage: "You will decline it, and it will leave your calendar."})
-            : $t({defaultMessage: "This can't be undone."});
-    }
     hide();
-    const $content = $("<p>").text(content);
-    confirm_dialog.launch({
-        modal_title_html: title_html,
-        modal_content_html: $content.prop("outerHTML") as string,
-        is_compact: true,
-        dangerous_action: true,
-        on_click() {
-            remove(occurrence, scope);
-        },
-    });
+    calendar_actions.confirm_remove(occurrence, scope);
 }
 
 function show_more_menu(button: HTMLElement): void {
