@@ -47,7 +47,8 @@ type PopoverName =
     | "send_later_options"
     | "calendar_view_menu"
     | "calendar_date_picker"
-    | "calendar_filter_menu";
+    | "calendar_filter_menu"
+    | "calendar_card";
 
 export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     compose_control_buttons: null,
@@ -82,6 +83,7 @@ export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     calendar_view_menu: null,
     calendar_date_picker: null,
     calendar_filter_menu: null,
+    calendar_card: null,
 };
 
 // Font size in em for popover derived from popover font size being

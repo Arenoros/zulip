@@ -10,6 +10,7 @@ import render_calendar_date_picker_popover from "../templates/popovers/calendar/
 import render_calendar_view_menu_popover from "../templates/popovers/calendar/calendar_view_menu_popover.hbs";
 
 import * as browser_history from "./browser_history.ts";
+import * as calendar_card from "./calendar_card.ts";
 import * as calendar_colleagues from "./calendar_colleagues.ts";
 import * as calendar_filter from "./calendar_filter.ts";
 import * as calendar_grid from "./calendar_grid.ts";
@@ -519,6 +520,7 @@ export function initialize({
     });
 
     calendar_colleagues.initialize({on_colleagues_change});
+    calendar_card.initialize();
     calendar_menus.register_filter_menu(() => {
         calendar_grid.redraw_events();
         $("#calendar-view .calendar-filter-button").toggleClass(

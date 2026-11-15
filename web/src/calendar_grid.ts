@@ -65,15 +65,17 @@ const occurrence_schema = z.object({
     timezone: z.string(),
     is_all_day: z.boolean(),
     title: z.string(),
+    location: z.string(),
     show_as: z.number(),
     is_cancelled: z.boolean(),
     response: z.number(),
     organizer_id: z.number(),
     category: z.string(),
-    attendees: z.array(z.object({user_id: z.number()})),
+    has_zulip_call: z.boolean(),
+    attendees: z.array(z.object({user_id: z.number(), response: z.number()})),
 });
 
-type CalendarOccurrence = z.infer<typeof occurrence_schema>;
+export type CalendarOccurrence = z.infer<typeof occurrence_schema>;
 
 const events_schema = z.object({events: z.array(occurrence_schema)});
 
@@ -135,6 +137,18 @@ export function get_today(): string {
 
 export function get_work_days(): number[] {
     return settings.work_days;
+}
+
+// One of the user's occurrences shown, by the attributes of its
+// element in the grid.
+export function get_occurrence(
+    event_id: number,
+    original_start: number | null,
+): CalendarOccurrence | undefined {
+    return occurrences.find(
+        (occurrence) =>
+            occurrence.id === event_id && occurrence.original_start === original_start,
+    );
 }
 
 export function get_time_scale(): number {
@@ -213,6 +227,9 @@ function get_event_context(occurrence: CalendarOccurrence): Record<string, unkno
             ? undefined
             : get_free_busy_status(occurrence.show_as).label;
     return {
+        has_card: true,
+        event_id: occurrence.id,
+        original_start: occurrence.original_start ?? "",
         title,
         organizer_name: organizer?.full_name,
         class_names: get_event_class_names(occurrence),
@@ -351,6 +368,13 @@ function render_events(): void {
     );
     const load_state = get_load_state();
     $grid.toggleClass("has-all-day-events", has_all_day_events);
+    // Events that come into view, from the keyboard for instance, are
+    // not left under the day headers, which stay at the top.
+    const top = $grid.find(".calendar-grid-top").get(0);
+    $("#calendar-view .calendar-grid-container").css(
+        "scroll-padding-top",
+        `${top?.offsetHeight ?? 0}px`,
+    );
     $grid.toggleClass("loading", load_state === "loading");
     $grid.toggleClass("load-failed", load_state === "error");
     $("#calendar-view .calendar-grid-error-container").html(
