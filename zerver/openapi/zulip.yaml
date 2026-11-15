@@ -9273,6 +9273,38 @@ paths:
                                 description: |
                                   The title of the calendar event, if the current user
                                   may see its details.
+                      working_hours:
+                        type: object
+                        description: |
+                          When each user works, keyed by the user's ID, as they set
+                          it in their [calendar settings](/api/update-calendar-settings).
+                        additionalProperties:
+                          type: object
+                          additionalProperties: false
+                          description: |
+                            `{user_id}`: When the user works.
+                          properties:
+                            timezone:
+                              type: string
+                              description: |
+                                The user's timezone, in which they work, or `""` if
+                                they did not set one.
+                            work_days:
+                              type: array
+                              items:
+                                type: integer
+                              description: |
+                                The ISO weekdays the user works on, Monday being 1.
+                            work_day_start_minutes:
+                              type: integer
+                              description: |
+                                When the user's work day starts, in minutes after
+                                midnight in their timezone.
+                            work_day_end_minutes:
+                              type: integer
+                              description: |
+                                When the user's work day ends, in minutes after
+                                midnight in their timezone.
                     example:
                       {
                         "msg": "",
@@ -9290,6 +9322,23 @@ paths:
                                 },
                               ],
                             "11": [],
+                          },
+                        "working_hours":
+                          {
+                            "9":
+                              {
+                                "timezone": "Europe/Moscow",
+                                "work_days": [1, 2, 3, 4, 5],
+                                "work_day_start_minutes": 540,
+                                "work_day_end_minutes": 1080,
+                              },
+                            "11":
+                              {
+                                "timezone": "",
+                                "work_days": [1, 2, 3, 4, 5],
+                                "work_day_start_minutes": 540,
+                                "work_day_end_minutes": 1080,
+                              },
                           },
                       }
   /calendar/pinned_users:

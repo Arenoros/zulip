@@ -75,6 +75,26 @@ def get_calendar_user_settings(user_profile: UserProfile) -> CalendarUserSetting
         return CalendarUserSettings(user=user_profile)
 
 
+def get_working_hours(users: list[UserProfile]) -> dict[int, dict[str, Any]]:
+    """When the users work, as in Exchange's working hours: their
+    work days and hours in their timezone, which is "" for users who
+    did not set one."""
+    settings_by_user_id = {
+        user_settings.user_id: user_settings
+        for user_settings in CalendarUserSettings.objects.filter(user__in=users)
+    }
+    working_hours = {}
+    for user in users:
+        user_settings = settings_by_user_id.get(user.id, CalendarUserSettings(user=user))
+        working_hours[user.id] = {
+            "timezone": user.timezone,
+            "work_days": user_settings.work_days,
+            "work_day_start_minutes": user_settings.work_day_start_minutes,
+            "work_day_end_minutes": user_settings.work_day_end_minutes,
+        }
+    return working_hours
+
+
 def calendar_user_settings_to_api_dict(user_settings: CalendarUserSettings) -> dict[str, Any]:
     return {
         "work_days": user_settings.work_days,

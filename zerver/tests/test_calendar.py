@@ -9,6 +9,7 @@ from django.utils.timezone import now as timezone_now
 from typing_extensions import override
 
 from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.user_settings import do_change_user_setting
 from zerver.actions.video_calls import do_end_livekit_call
 
 from zerver.lib.calendar.changes import (
@@ -27,6 +28,7 @@ from zerver.lib.calendar.occurrences import (
     get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
+from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.timestamp import datetime_to_global_time
@@ -1422,6 +1424,30 @@ class CalendarAPITest(CalendarTestCase):
                     }
                 ],
                 str(othello.id): [],
+            },
+        )
+
+        # When they work: the defaults, or their own settings.
+        do_change_user_setting(cordelia, "timezone", "Asia/Tokyo", acting_user=None)
+        update_calendar_user_settings(
+            othello, work_days=[1, 2, 3, 4], work_day_start_minutes=480, work_day_end_minutes=960
+        )
+        result = get_free_busy(hamlet, [cordelia.id, othello.id])
+        self.assertEqual(
+            self.assert_json_success(result)["working_hours"],
+            {
+                str(cordelia.id): {
+                    "timezone": "Asia/Tokyo",
+                    "work_days": [1, 2, 3, 4, 5],
+                    "work_day_start_minutes": 540,
+                    "work_day_end_minutes": 1080,
+                },
+                str(othello.id): {
+                    "timezone": othello.timezone,
+                    "work_days": [1, 2, 3, 4],
+                    "work_day_start_minutes": 480,
+                    "work_day_end_minutes": 960,
+                },
             },
         )
 

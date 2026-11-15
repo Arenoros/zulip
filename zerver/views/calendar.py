@@ -39,6 +39,7 @@ from zerver.lib.calendar.user_settings import (
     calendar_user_settings_to_api_dict,
     get_calendar_user_settings,
     get_pinned_users,
+    get_working_hours,
     pin_user,
     unpin_user,
     update_calendar_user_settings,
@@ -121,7 +122,7 @@ def get_calendar_free_busy(
 ) -> HttpResponse:
     if len(user_ids) > MAX_FREE_BUSY_USERS:
         raise JsonableError(_("Too many users"))
-    access_calendar_users(user_profile, user_ids)
+    users = access_calendar_users(user_profile, user_ids)
     free_busy = get_free_busy(
         user_profile, user_ids, timestamp_to_datetime(start), timestamp_to_datetime(end)
     )
@@ -131,7 +132,10 @@ def get_calendar_free_busy(
             "free_busy": {
                 str(user_id): [block.to_api_dict() for block in blocks]
                 for user_id, blocks in free_busy.items()
-            }
+            },
+            "working_hours": {
+                str(user_id): hours for user_id, hours in get_working_hours(users).items()
+            },
         },
     )
 
