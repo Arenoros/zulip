@@ -588,10 +588,25 @@ def create_example_calendar_room(name: str) -> int:
     )
 
 
+@openapi_param_value_generator(["/calendar/events:post"])
+def calendar_event_room_ids() -> dict[str, object]:
+    return {"room_ids": [create_example_calendar_room("Attic")]}
+
+
+@openapi_param_value_generator(["/calendar/free_busy:get"])
+def calendar_free_busy_room_ids() -> dict[str, object]:
+    return {"room_ids": [create_example_calendar_room("Library")]}
+
+
+@openapi_param_value_generator(["/calendar/events/{calendar_event_id}:patch"])
+def iago_calendar_event_id_and_room_ids() -> dict[str, object]:
+    event_id = create_weekly_calendar_event(helpers.example_user("iago"), [])
+    return {"calendar_event_id": event_id, "room_ids": [create_example_calendar_room("Den")]}
+
+
 @openapi_param_value_generator(
     [
         "/calendar/events/{calendar_event_id}:get",
-        "/calendar/events/{calendar_event_id}:patch",
         "/calendar/events/{calendar_event_id}:delete",
         "/calendar/events/{calendar_event_id}/attendees:post",
         "/calendar/events/{calendar_event_id}/chat:post",

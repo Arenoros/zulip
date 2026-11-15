@@ -15,6 +15,7 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarEventRoom,
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
@@ -23,6 +24,10 @@ from zerver.models.calendar import CalendarResponse, CalendarShowAs
 # two months, which also bounds how many occurrences of a series that
 # repeats forever are computed.
 MAX_CALENDAR_RANGE = timedelta(days=62)
+
+# Like the default booking window of a room mailbox in Exchange, a
+# meeting books its rooms for the occurrences in this time from now.
+ROOM_BOOKING_WINDOW = timedelta(days=180)
 
 
 @dataclass
@@ -71,6 +76,7 @@ class CalendarOccurrence:
     date_created: datetime
     # Empty when the organizer hides the attendees from others.
     attendees: list[CalendarAttendeeData]
+    room_ids: list[int]
 
     def to_api_dict(self) -> dict[str, Any]:
         result = asdict(self)
@@ -161,19 +167,33 @@ def _get_event_occurrences(
     return occurrences
 
 
+def _event_in_range(range_start: datetime, range_end: datetime) -> Q:
+    # A series is fetched if it starts before the end of the range;
+    # whether it has occurrences in the range is computed afterwards.
+    return Q(event__rrule="", event__start__lt=range_end, event__end__gt=range_start) | (
+        ~Q(event__rrule="") & Q(event__start__lt=range_end)
+    )
+
+
 def _get_events_in_range(
     attendee_query: Q, range_start: datetime, range_end: datetime
 ) -> list[CalendarAttendee]:
-    # A series is fetched if it starts before the end of the range;
-    # whether it has occurrences in the range is computed afterwards.
     return list(
         CalendarAttendee.objects.filter(attendee_query)
-        .filter(
-            Q(event__rrule="", event__start__lt=range_end, event__end__gt=range_start)
-            | (~Q(event__rrule="") & Q(event__start__lt=range_end))
-        )
+        .filter(_event_in_range(range_start, range_end))
         .select_related("event")
     )
+
+
+def _get_room_ids_by_event_id(event_ids: set[int]) -> dict[int, list[int]]:
+    room_ids_by_event_id: dict[int, list[int]] = defaultdict(list)
+    for event_id, room_id in (
+        CalendarEventRoom.objects.filter(event_id__in=event_ids)
+        .order_by("room__name", "room_id")
+        .values_list("event_id", "room_id")
+    ):
+        room_ids_by_event_id[event_id].append(room_id)
+    return room_ids_by_event_id
 
 
 def _get_exceptions_by_event_id(event_ids: set[int]) -> dict[int, list[CalendarEventException]]:
@@ -221,6 +241,7 @@ def _make_calendar_occurrence(
     response: int,
     occurrence: _Occurrence,
     attendees: list[CalendarAttendeeData],
+    room_ids: list[int],
 ) -> CalendarOccurrence:
     event = attendee.event
     exception = occurrence.exception
@@ -258,6 +279,7 @@ def _make_calendar_occurrence(
         chat_id=event.chat_id,
         date_created=event.date_created,
         attendees=attendees if show_attendees else [],
+        room_ids=room_ids,
     )
 
 
@@ -279,6 +301,7 @@ def get_calendar_occurrences(
     ]
     event_ids = {attendee.event_id for attendee in own_attendees}
     exceptions_by_event_id = _get_exceptions_by_event_id(event_ids)
+    room_ids_by_event_id = _get_room_ids_by_event_id(event_ids)
 
     # The attendees of each event, by the ID of their attendance.
     attendees_by_event_id: dict[int, list[tuple[int, CalendarAttendeeData]]] = defaultdict(list)
@@ -330,7 +353,14 @@ def get_calendar_occurrences(
                 for attendee_id, data in attendees_by_event_id[event.id]
             ]
             calendar_occurrences.append(
-                _make_calendar_occurrence(user_profile, attendee, response, occurrence, attendees)
+                _make_calendar_occurrence(
+                    user_profile,
+                    attendee,
+                    response,
+                    occurrence,
+                    attendees,
+                    room_ids_by_event_id[event.id],
+                )
             )
     calendar_occurrences.sort(key=lambda occurrence: occurrence.start)
     return calendar_occurrences
@@ -356,6 +386,7 @@ def get_calendar_event(user_profile: UserProfile, event_id: int) -> tuple[Calend
         attendee.response,
         _Occurrence(None, event.start, event.end, None),
         attendees,
+        _get_room_ids_by_event_id({event.id})[event.id],
     )
     return calendar_event, CalendarEventException.objects.filter(event=event).exists()
 
@@ -420,6 +451,110 @@ def get_free_busy(
     for blocks in free_busy.values():
         blocks.sort(key=lambda block: block.start)
     return free_busy
+
+
+def _get_room_bookings(
+    room_ids: list[int], range_start: datetime, range_end: datetime
+) -> list[tuple[int, CalendarEvent, _Occurrence]]:
+    """The occurrences of meetings that booked the rooms during the
+    range, with the room each booked."""
+    event_rooms = list(
+        CalendarEventRoom.objects.filter(room_id__in=room_ids, event__is_cancelled=False)
+        .filter(_event_in_range(range_start, range_end))
+        .select_related("event")
+    )
+    exceptions_by_event_id = _get_exceptions_by_event_id(
+        {event_room.event_id for event_room in event_rooms}
+    )
+    return [
+        (event_room.room_id, event_room.event, occurrence)
+        for event_room in event_rooms
+        for occurrence in _get_event_occurrences(
+            event_room.event, exceptions_by_event_id[event_room.event_id], range_start, range_end
+        )
+        if occurrence.exception is None or not occurrence.exception.is_cancelled
+    ]
+
+
+def get_room_free_busy(
+    viewer: UserProfile, room_ids: list[int], range_start: datetime, range_end: datetime
+) -> dict[int, list[FreeBusyBlock]]:
+    """When the rooms are booked during the range; the viewer sees
+    the titles of meetings as in the free/busy times of users."""
+    check_calendar_range(range_start, range_end)
+    bookings = _get_room_bookings(room_ids, range_start, range_end)
+    viewer_event_ids = set(
+        CalendarAttendee.objects.filter(
+            user=viewer, event_id__in={event.id for _, event, _ in bookings}
+        ).values_list("event_id", flat=True)
+    )
+
+    free_busy: dict[int, list[FreeBusyBlock]] = {room_id: [] for room_id in room_ids}
+    for room_id, event, occurrence in bookings:
+        shows_details = event.id in viewer_event_ids and (
+            not event.is_private or event.organizer_id == viewer.id
+        )
+        title = None
+        if shows_details:
+            exception = occurrence.exception
+            title = _override(exception.title if exception is not None else None, event.title)
+        free_busy[room_id].append(
+            FreeBusyBlock(
+                start=occurrence.start,
+                end=occurrence.end,
+                show_as=CalendarShowAs.BUSY,
+                event_id=event.id if shows_details else None,
+                title=title,
+            )
+        )
+    for blocks in free_busy.values():
+        blocks.sort(key=lambda block: block.start)
+    return free_busy
+
+
+def get_first_room_conflict(
+    event: CalendarEvent, room_ids: list[int]
+) -> tuple[int, datetime] | None:
+    """The room and the start of the first occurrence of the event,
+    in its booking window, during which another meeting booked one of
+    the rooms."""
+    exceptions = list(CalendarEventException.objects.filter(event=event))
+    # An occurrence may have been moved before the start of its series.
+    window_start = max(
+        timezone_now(),
+        min([event.start, *(exception.start for exception in exceptions if exception.start)]),
+    )
+    occurrences = [
+        occurrence
+        for occurrence in _get_event_occurrences(
+            event,
+            exceptions,
+            window_start,
+            window_start + ROOM_BOOKING_WINDOW,
+        )
+        if occurrence.end > window_start
+        and (occurrence.exception is None or not occurrence.exception.is_cancelled)
+    ]
+    if not occurrences:
+        return None
+    bookings = _get_room_bookings(
+        room_ids,
+        min(occurrence.start for occurrence in occurrences),
+        max(occurrence.end for occurrence in occurrences),
+    )
+    # ponytail: compares every pair, which is fine for the bookings of
+    # a few rooms; sort and sweep if rooms get thousands of bookings.
+    conflicts = [
+        (occurrence.start, room_id)
+        for room_id, other_event, booking in bookings
+        if other_event.id != event.id
+        for occurrence in occurrences
+        if booking.start < occurrence.end and occurrence.start < booking.end
+    ]
+    if not conflicts:
+        return None
+    start, room_id = min(conflicts)
+    return room_id, start
 
 
 def get_unanswered_invitation_counts(user_ids: set[int]) -> dict[int, int]:

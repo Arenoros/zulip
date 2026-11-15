@@ -4,6 +4,7 @@ from unittest import mock
 from zoneinfo import ZoneInfo
 
 import orjson
+import time_machine
 from django.conf import settings
 from django.utils.timezone import now as timezone_now
 from typing_extensions import override
@@ -28,7 +29,7 @@ from zerver.lib.calendar.occurrences import (
     get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
-from zerver.lib.calendar.rooms import create_calendar_room
+from zerver.lib.calendar.rooms import create_calendar_room, update_calendar_room
 from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
@@ -39,6 +40,7 @@ from zerver.models import (
     CalendarAttendeeOccurrenceResponse,
     CalendarEvent,
     CalendarEventException,
+    CalendarEventRoom,
     CalendarPinnedUser,
     CalendarRoom,
     CalendarUserSettings,
@@ -1224,6 +1226,7 @@ class CalendarAPITest(CalendarTestCase):
                         "added_by": None,
                     },
                 ],
+                "room_ids": [],
             },
         )
         self.assertEqual(second["original_start"], timestamp(MONDAY_10_00 + timedelta(days=1)))
@@ -1653,6 +1656,16 @@ class CalendarRoomsTest(CalendarTestCase):
         result = self.api_get(user, "/api/v1/calendar/rooms")
         return self.assert_json_success(result)["rooms"]
 
+    def book(self, organizer: UserProfile, start: datetime, **kwargs: Any) -> int:
+        return self.create_event(
+            organizer, start=start, end=start + timedelta(minutes=30), **kwargs
+        )
+
+    def create_room(self, name: str) -> int:
+        return create_calendar_room(
+            get_realm("zulip"), name=name, capacity=None, location="", email=""
+        )
+
     def test_manage_rooms(self) -> None:
         iago = self.example_user("iago")
         hamlet = self.example_user("hamlet")
@@ -1729,3 +1742,222 @@ class CalendarRoomsTest(CalendarTestCase):
         result = self.api_patch(iago, f"/api/v1/calendar/rooms/{lear_room_id}", {"name": "Den"})
         self.assert_json_error(result, "Invalid meeting room")
 
+    @time_machine.travel(utc(2026, 11, 1), tick=False)
+    def test_book_rooms(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        blue_id = self.create_room("Blue room")
+        attic_id = self.create_room("Attic")
+
+        event_id = self.create_event(hamlet, room_ids=[blue_id, attic_id])
+        self.assertEqual(
+            set(
+                CalendarEventRoom.objects.filter(event_id=event_id).values_list(
+                    "room_id", flat=True
+                )
+            ),
+            {blue_id, attic_id},
+        )
+        (occurrence,) = self.get_occurrences(hamlet)
+        self.assertEqual(occurrence.room_ids, [attic_id, blue_id])
+        result = self.api_get(hamlet, f"/api/v1/calendar/events/{event_id}")
+        self.assertEqual(self.assert_json_success(result)["event"]["room_ids"], [attic_id, blue_id])
+
+        # A room booked at that time declines, and nothing is saved.
+        events = CalendarEvent.objects.count()
+        with self.assertRaisesRegex(
+            JsonableError, r"^Blue room is booked for another meeting at 2026-11-16 10:15\.$"
+        ):
+            self.book(cordelia, MONDAY_10_00 + timedelta(minutes=15), room_ids=[blue_id])
+        self.assertEqual(CalendarEvent.objects.count(), events)
+        # Right after, it is free.
+        booked_id = self.book(cordelia, MONDAY_10_00 + timedelta(minutes=30), room_ids=[blue_id])
+
+        # A series declines at its first occurrence that overlaps.
+        with self.assertRaisesRegex(
+            JsonableError, r"^Attic is booked for another meeting at 2026-11-16 10:00\.$"
+        ):
+            self.book(
+                cordelia,
+                MONDAY_10_00 - timedelta(days=3),
+                rrule="FREQ=DAILY",
+                room_ids=[attic_id],
+            )
+        # Occurrences after the booking window are not checked, as in
+        # Exchange.
+        far_start = MONDAY_10_00 + timedelta(days=200)
+        self.create_event(
+            hamlet, start=far_start, end=far_start + timedelta(hours=1), room_ids=[attic_id]
+        )
+        series_id = self.book(
+            cordelia,
+            MONDAY_10_00 + timedelta(days=1),
+            rrule="FREQ=DAILY",
+            room_ids=[attic_id],
+        )
+
+        # Moving an occurrence or the series onto a booked time.
+        with self.assertRaisesRegex(JsonableError, "^Attic is booked"):
+            update_calendar_event(
+                cordelia,
+                series_id,
+                original_start=MONDAY_10_00 + timedelta(days=1),
+                start=MONDAY_10_00,
+            )
+        with self.assertRaisesRegex(JsonableError, "^Attic is booked"):
+            update_calendar_event(cordelia, series_id, start=MONDAY_10_00)
+        update_calendar_event(
+            cordelia,
+            series_id,
+            original_start=MONDAY_10_00 + timedelta(days=1),
+            start=MONDAY_10_00 + timedelta(days=1, hours=2),
+        )
+        with self.assertRaisesRegex(
+            JsonableError,
+            "Only the time, title, location and description of an occurrence can be changed",
+        ):
+            update_calendar_event(
+                cordelia, series_id, original_start=MONDAY_10_00 + timedelta(days=2), room_ids=[]
+            )
+
+        # Bookings in the past are not checked.
+        past_start = utc(2026, 10, 20, 7)
+        self.book(hamlet, past_start, room_ids=[attic_id])
+        self.book(cordelia, past_start, room_ids=[attic_id])
+
+        # A cancelled meeting frees its rooms.
+        cancel_calendar_event(hamlet, event_id)
+        self.create_event(cordelia, room_ids=[attic_id])
+
+        # Changing the rooms asks the attendees to respond again, as a
+        # change of the location does.
+        sequence = CalendarEvent.objects.get(id=series_id).sequence
+        update_calendar_event(cordelia, series_id, room_ids=[attic_id])
+        self.assertEqual(CalendarEvent.objects.get(id=series_id).sequence, sequence)
+        update_calendar_event(cordelia, series_id, room_ids=[])
+        self.assertEqual(CalendarEvent.objects.get(id=series_id).sequence, sequence + 1)
+        self.assertFalse(CalendarEventRoom.objects.filter(event_id=series_id).exists())
+
+        # An archived room keeps its bookings, but takes no new ones.
+        update_calendar_room(CalendarRoom.objects.get(id=blue_id), is_archived=True)
+        update_calendar_event(cordelia, booked_id, title="Review", room_ids=[blue_id])
+        for room_ids in [[blue_id, attic_id, attic_id + 1000], [blue_id + 1000]]:
+            with self.assertRaisesRegex(JsonableError, "^Invalid meeting room$"):
+                self.create_event(hamlet, room_ids=room_ids)
+        with self.assertRaisesRegex(JsonableError, "^Invalid meeting room$"):
+            self.book(hamlet, MONDAY_10_00 + timedelta(days=3), room_ids=[blue_id])
+        lear_room_id = create_calendar_room(
+            get_realm("lear"), name="Throne room", capacity=None, location="", email=""
+        )
+        with self.assertRaisesRegex(JsonableError, "^Invalid meeting room$"):
+            self.create_event(hamlet, room_ids=[lear_room_id])
+
+    @time_machine.travel(utc(2026, 11, 1), tick=False)
+    def test_room_free_busy(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        blue_id = self.create_room("Blue room")
+        attic_id = self.create_room("Attic")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia], room_ids=[blue_id])
+        private_id = self.create_event(
+            hamlet,
+            required_attendees=[cordelia],
+            start=MONDAY_10_00 + timedelta(hours=1),
+            end=MONDAY_10_00 + timedelta(hours=1, minutes=30),
+            is_private=True,
+            room_ids=[blue_id],
+        )
+        series_id = self.book(
+            hamlet,
+            MONDAY_10_00 + timedelta(days=1),
+            rrule="FREQ=DAILY",
+            room_ids=[attic_id],
+        )
+        cancel_calendar_event(hamlet, series_id, MONDAY_10_00 + timedelta(days=2))
+
+        def get_room_free_busy(viewer: UserProfile, room_ids: list[int]) -> Any:
+            return self.api_get(
+                viewer,
+                "/api/v1/calendar/free_busy",
+                {
+                    "user_ids": "[]",
+                    "room_ids": orjson.dumps(room_ids).decode(),
+                    "start": timestamp(WEEK_START),
+                    "end": timestamp(WEEK_END),
+                },
+            )
+
+        def block(start: datetime, event_id: int | None, title: str | None) -> dict[str, Any]:
+            return {
+                "start": timestamp(start),
+                "end": timestamp(start + timedelta(minutes=30)),
+                "show_as": CalendarShowAs.BUSY,
+                "event_id": event_id,
+                "title": title,
+            }
+
+        result = get_room_free_busy(cordelia, [blue_id, attic_id])
+        self.assertEqual(
+            self.assert_json_success(result)["room_free_busy"],
+            {
+                str(blue_id): [
+                    block(MONDAY_10_00, event_id, "Planning"),
+                    block(MONDAY_10_00 + timedelta(hours=1), None, None),
+                ],
+                str(attic_id): [
+                    block(MONDAY_10_00 + timedelta(days=days), None, None)
+                    for days in [1, 3, 4, 5, 6]
+                ],
+            },
+        )
+        result = get_room_free_busy(hamlet, [blue_id])
+        self.assertEqual(
+            self.assert_json_success(result)["room_free_busy"][str(blue_id)][1],
+            block(MONDAY_10_00 + timedelta(hours=1), private_id, "Planning"),
+        )
+        result = get_room_free_busy(othello, [blue_id])
+        self.assertEqual(
+            self.assert_json_success(result)["room_free_busy"][str(blue_id)][0],
+            block(MONDAY_10_00, None, None),
+        )
+
+        lear_room_id = create_calendar_room(
+            get_realm("lear"), name="Throne room", capacity=None, location="", email=""
+        )
+        result = get_room_free_busy(othello, [lear_room_id])
+        self.assert_json_error(result, "Invalid meeting room")
+        result = get_room_free_busy(othello, list(range(1, MAX_FREE_BUSY_USERS + 2)))
+        self.assert_json_error(result, "Too many users")
+
+    def test_book_rooms_api(self) -> None:
+        hamlet = self.example_user("hamlet")
+        blue_id = self.create_room("Blue room")
+        attic_id = self.create_room("Attic")
+        with time_machine.travel(utc(2026, 11, 1), tick=False):
+            result = self.api_post(
+                hamlet,
+                "/api/v1/calendar/events",
+                {
+                    "title": "Planning",
+                    "start": timestamp(MONDAY_10_00),
+                    "end": timestamp(MONDAY_10_00 + timedelta(minutes=30)),
+                    "timezone": "Europe/Moscow",
+                    "room_ids": orjson.dumps([blue_id]).decode(),
+                },
+            )
+            event_id = self.assert_json_success(result)["id"]
+            result = self.api_patch(
+                hamlet,
+                f"/api/v1/calendar/events/{event_id}",
+                {"room_ids": orjson.dumps([attic_id]).decode()},
+            )
+            self.assert_json_success(result)
+        self.assertEqual(
+            list(
+                CalendarEventRoom.objects.filter(event_id=event_id).values_list(
+                    "room_id", flat=True
+                )
+            ),
+            [attic_id],
+        )

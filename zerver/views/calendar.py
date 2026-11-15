@@ -34,6 +34,7 @@ from zerver.lib.calendar.occurrences import (
     get_calendar_event,
     get_calendar_occurrences,
     get_free_busy,
+    get_room_free_busy,
 )
 from zerver.lib.calendar.rooms import (
     access_calendar_room,
@@ -127,14 +128,21 @@ def get_calendar_free_busy(
     user_profile: UserProfile,
     *,
     user_ids: Json[list[int]],
+    room_ids: Json[list[int]] | None = None,
     start: Json[int],
     end: Json[int],
 ) -> HttpResponse:
-    if len(user_ids) > MAX_FREE_BUSY_USERS:
+    room_ids = room_ids or []
+    if len(user_ids) + len(room_ids) > MAX_FREE_BUSY_USERS:
         raise JsonableError(_("Too many users"))
     users = access_calendar_users(user_profile, user_ids)
+    for room_id in room_ids:
+        access_calendar_room(user_profile.realm, room_id)
     free_busy = get_free_busy(
         user_profile, user_ids, timestamp_to_datetime(start), timestamp_to_datetime(end)
+    )
+    room_free_busy = get_room_free_busy(
+        user_profile, room_ids, timestamp_to_datetime(start), timestamp_to_datetime(end)
     )
     return json_success(
         request,
@@ -145,6 +153,10 @@ def get_calendar_free_busy(
             },
             "working_hours": {
                 str(user_id): hours for user_id, hours in get_working_hours(users).items()
+            },
+            "room_free_busy": {
+                str(room_id): [block.to_api_dict() for block in blocks]
+                for room_id, blocks in room_free_busy.items()
             },
         },
     )
@@ -171,6 +183,7 @@ def create_calendar_event_backend(
     has_zulip_call: Json[bool] = False,
     required_attendees: Json[list[int]] | None = None,
     optional_attendees: Json[list[int]] | None = None,
+    room_ids: Json[list[int]] | None = None,
 ) -> HttpResponse:
     event_id = create_calendar_event(
         user_profile,
@@ -190,6 +203,7 @@ def create_calendar_event_backend(
         has_zulip_call=has_zulip_call,
         required_attendees=access_calendar_users(user_profile, required_attendees or []),
         optional_attendees=access_calendar_users(user_profile, optional_attendees or []),
+        room_ids=room_ids,
     )
     return json_success(request, data={"id": event_id})
 
@@ -217,6 +231,7 @@ def update_calendar_event_backend(
     has_zulip_call: Json[bool] | None = None,
     required_attendees: Json[list[int]] | None = None,
     optional_attendees: Json[list[int]] | None = None,
+    room_ids: Json[list[int]] | None = None,
 ) -> HttpResponse:
     update_calendar_event(
         user_profile,
@@ -242,6 +257,7 @@ def update_calendar_event_backend(
         optional_attendees=None
         if optional_attendees is None
         else access_calendar_users(user_profile, optional_attendees),
+        room_ids=room_ids,
     )
     return json_success(request)
 

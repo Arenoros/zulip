@@ -8506,6 +8506,7 @@ paths:
                                     "added_by": null,
                                   },
                                 ],
+                              "room_ids": [3],
                             },
                           ],
                       }
@@ -8633,6 +8634,16 @@ paths:
                   items:
                     type: integer
                   example: [11]
+                room_ids:
+                  description: |
+                    The IDs of the [meeting rooms](/api/get-calendar-rooms) the
+                    event books. A room accepts the booking only if no other
+                    meeting booked it during the occurrences of the event in the
+                    next 180 days; otherwise, the event is not created.
+                  type: array
+                  items:
+                    type: integer
+                  example: [3]
               required:
                 - title
                 - start
@@ -8660,6 +8671,8 @@ paths:
               required_attendees:
                 contentType: application/json
               optional_attendees:
+                contentType: application/json
+              room_ids:
                 contentType: application/json
       responses:
         "200":
@@ -8755,6 +8768,7 @@ paths:
                                   "added_by": null,
                                 },
                               ],
+                            "room_ids": [],
                           },
                         "has_changed_occurrences": false,
                       }
@@ -8880,6 +8894,18 @@ paths:
                   items:
                     type: integer
                   example: [11]
+                room_ids:
+                  description: |
+                    The IDs of all the [meeting rooms](/api/get-calendar-rooms)
+                    the event books, replacing the current ones. Archived rooms
+                    the event already booked can be kept. As when creating an
+                    event, the change fails if a room is booked by another
+                    meeting during the event, which is also checked when its
+                    time changes.
+                  type: array
+                  items:
+                    type: integer
+                  example: [3]
             encoding:
               occurrence:
                 contentType: application/json
@@ -8904,6 +8930,8 @@ paths:
               required_attendees:
                 contentType: application/json
               optional_attendees:
+                contentType: application/json
+              room_ids:
                 contentType: application/json
       responses:
         "200":
@@ -9224,6 +9252,18 @@ paths:
                   type: integer
                 example: [9, 11]
           required: true
+        - name: room_ids
+          in: query
+          description: |
+            The IDs of [meeting rooms](/api/get-calendar-rooms), at most 100
+            together with the users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                example: [3]
         - $ref: "#/components/parameters/CalendarRangeStart"
         - $ref: "#/components/parameters/CalendarRangeEnd"
       responses:
@@ -9305,6 +9345,43 @@ paths:
                               description: |
                                 When the user's work day ends, in minutes after
                                 midnight in their timezone.
+                      room_free_busy:
+                        type: object
+                        description: |
+                          The times each meeting room is booked, keyed by the
+                          room's ID, like the busy times of users; they show as
+                          busy.
+                        additionalProperties:
+                          type: array
+                          description: |
+                            `{room_id}`: The times the room is booked, by their
+                            start.
+                          items:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              start:
+                                type: integer
+                                description: |
+                                  When the booking starts, as a UNIX timestamp.
+                              end:
+                                type: integer
+                                description: |
+                                  When the booking ends, as a UNIX timestamp.
+                              show_as:
+                                $ref: "#/components/schemas/CalendarShowAs"
+                              event_id:
+                                type: integer
+                                nullable: true
+                                description: |
+                                  The ID of the calendar event, if the current user
+                                  may see its details.
+                              title:
+                                type: string
+                                nullable: true
+                                description: |
+                                  The title of the calendar event, if the current user
+                                  may see its details.
                     example:
                       {
                         "msg": "",
@@ -9339,6 +9416,19 @@ paths:
                                 "work_day_start_minutes": 540,
                                 "work_day_end_minutes": 1080,
                               },
+                          },
+                        "room_free_busy":
+                          {
+                            "3":
+                              [
+                                {
+                                  "start": 1763276400,
+                                  "end": 1763278200,
+                                  "show_as": 3,
+                                  "event_id": null,
+                                  "title": null,
+                                },
+                              ],
                           },
                       }
   /calendar/pinned_users:
@@ -30927,6 +31017,13 @@ components:
                   The ID of the attendee who forwarded the event to
                   this attendee, or `null` if the organizer invited
                   them.
+        room_ids:
+          type: array
+          items:
+            type: integer
+          description: |
+            The IDs of the [meeting rooms](/api/get-calendar-rooms) the
+            event booked, by their names.
     CalendarOccurrenceParameter:
       type: integer
       description: |

@@ -22,6 +22,11 @@ from zerver.lib.calendar.occurrences import (
     get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import is_occurrence_start, validate_rrule
+from zerver.lib.calendar.rooms import (
+    check_calendar_event_rooms,
+    check_calendar_event_rooms_free,
+    set_calendar_event_rooms,
+)
 from zerver.lib.event_types import CalendarChangeEvent, CalendarFreeBusyEvent
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.streams import can_access_stream_metadata_user_ids, create_stream_if_needed
@@ -216,15 +221,19 @@ def create_calendar_event(
     has_zulip_call: bool = False,
     required_attendees: list[UserProfile],
     optional_attendees: list[UserProfile],
+    room_ids: list[int] | None = None,
 ) -> int:
-    """Creates the event in the organizer's calendar, and invites the
-    attendees, if any. Returns the event's ID."""
+    """Creates the event in the organizer's calendar, invites the
+    attendees, if any, and books the rooms, if they are free. Returns
+    the event's ID."""
     title = check_calendar_title(title)
     event_timezone = check_calendar_event_time(start, end, event_timezone, is_all_day)
     check_show_as(show_as)
     if rrule:
         validate_rrule(rrule)
     is_required_by_user_id = check_attendees(organizer, required_attendees, optional_attendees)
+    room_ids = room_ids or []
+    check_calendar_event_rooms(organizer.realm, room_ids)
 
     event = CalendarEvent.objects.create(
         realm_id=organizer.realm_id,
@@ -255,6 +264,8 @@ def create_calendar_event(
         reminder_minutes=get_default_reminder_minutes({organizer.id})[organizer.id],
     )
     create_new_attendees(event, is_required_by_user_id)
+    set_calendar_event_rooms(event, room_ids)
+    check_calendar_event_rooms_free(event)
     notify_invited(organizer, event, set(is_required_by_user_id))
     send_calendar_change_events(organizer.realm, event, get_attendee_user_ids(event))
     return event.id
@@ -334,6 +345,7 @@ def update_calendar_occurrence(
     exception.save()
 
     if time_changed:
+        check_calendar_event_rooms_free(event)
         ask_attendees_to_respond_again(event, original_start)
     if time_changed or location is not None:
         event.sequence += 1
@@ -406,6 +418,7 @@ def update_calendar_event(
     has_zulip_call: bool | None = None,
     required_attendees: list[UserProfile] | None = None,
     optional_attendees: list[UserProfile] | None = None,
+    room_ids: list[int] | None = None,
 ) -> None:
     """Changes the series, or with original_start, one occurrence of it.
 
@@ -428,6 +441,7 @@ def update_calendar_event(
             has_zulip_call,
             required_attendees,
             optional_attendees,
+            room_ids,
         ]
         if any(value is not None for value in series_fields):
             raise JsonableError(
@@ -493,7 +507,10 @@ def update_calendar_event(
     if time_changed:
         CalendarEventException.objects.filter(event=event).delete()
         ask_attendees_to_respond_again(event, None)
-    if time_changed or (location is not None and location != event.location):
+    rooms_changed = room_ids is not None and check_calendar_event_rooms(
+        user_profile.realm, room_ids, event
+    )
+    if time_changed or rooms_changed or (location is not None and location != event.location):
         event.sequence += 1
     if location is not None:
         event.location = location
@@ -511,6 +528,11 @@ def update_calendar_event(
 
     if required_attendees is not None or optional_attendees is not None:
         update_attendees(event, required_attendees, optional_attendees)
+    if rooms_changed:
+        assert room_ids is not None
+        set_calendar_event_rooms(event, room_ids)
+    if time_changed or rooms_changed:
+        check_calendar_event_rooms_free(event)
     new_user_ids = get_attendee_user_ids(event)
     if time_changed:
         notify_moved(user_profile, event, old_user_ids & new_user_ids)
