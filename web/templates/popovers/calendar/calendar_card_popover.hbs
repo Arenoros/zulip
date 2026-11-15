@@ -8,6 +8,14 @@
             <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
         </button>
     </div>
+    {{#unless is_personal}}
+        <div class="calendar-card-join">
+            <button type="button" class="calendar-card-button calendar-card-chat">
+                <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
+                {{t "Discussion" }}
+            </button>
+        </div>
+    {{/unless}}
     <div class="calendar-card-section">
         <div class="calendar-card-row">
             <i class="zulip-icon zulip-icon-clock calendar-card-row-icon" aria-hidden="true"></i>

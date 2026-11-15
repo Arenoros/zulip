@@ -914,6 +914,14 @@ body.calendar-view-visible {
     overflow-wrap: break-word;
 }
 
+.calendar-card-join {
+    display: flex;
+    flex-wrap: wrap;
+    /* 8px and 12px at 14px/1em */
+    gap: 0.5714em;
+    margin-top: 0.8571em;
+}
+
 .calendar-card-section {
     display: flex;
     flex-direction: column;
@@ -922,7 +930,8 @@ body.calendar-view-visible {
     padding: 0.8571em 0;
     border-top: 1px solid var(--color-calendar-border);
 
-    .calendar-card-header + & {
+    .calendar-card-header + &,
+    .calendar-card-join + & {
         margin-top: 0.8571em; /* 12px at 14px/1em */
     }
 }

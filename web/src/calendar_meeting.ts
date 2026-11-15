@@ -9,6 +9,7 @@ import render_calendar_card_choices_popover from "../templates/popovers/calendar
 import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_recurrence from "./calendar_recurrence.ts";
 import * as calendar_responses from "./calendar_responses.ts";
@@ -431,6 +432,13 @@ export function initialize(opts: {on_close: () => void}): void {
     const selector = (child: string): string => `.calendar-meeting ${child}`;
     $view.on("click", selector(".calendar-meeting-close"), () => {
         close();
+    });
+    $view.on("click", selector(".calendar-meeting-chat"), () => {
+        assert(meeting !== undefined);
+        calendar_meeting_chat.open(
+            meeting.occurrence.id,
+            $("#calendar-view .calendar-meeting-error"),
+        );
     });
     $view.on("keydown", ".calendar-meeting", (e) => {
         if (e.key === "Escape" && !popovers.any_active()) {

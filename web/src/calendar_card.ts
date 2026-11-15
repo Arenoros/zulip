@@ -9,6 +9,7 @@ import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as calendar_meeting from "./calendar_meeting.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
@@ -292,6 +293,10 @@ function open(element: HTMLElement): void {
                 }
                 hide();
                 calendar_meeting.open(expanded);
+            });
+            $popper.on("click", ".calendar-card-chat", () => {
+                assert(card_occurrence !== undefined);
+                calendar_meeting_chat.open(card_occurrence.id, $popper.find(".calendar-card-error"));
             });
             $popper.on("click", ".calendar-card-cancel", function (this: HTMLElement) {
                 choose_scope(this, confirm_remove);

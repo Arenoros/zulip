@@ -1,15 +1,19 @@
 import {$} from "jquery";
 import assert from "minimalistic-assert";
+import * as z from "zod/mini";
 
 import render_left_sidebar_meeting_chat_popover from "../templates/popovers/left_sidebar/left_sidebar_meeting_chat_popover.hbs";
 
+import * as browser_history from "./browser_history.ts";
 import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_grid from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
+import * as hash_util from "./hash_util.ts";
 import {$t_html} from "./i18n.ts";
 import * as people from "./people.ts";
 import * as popover_menus from "./popover_menus.ts";
+import * as stream_data from "./stream_data.ts";
 import * as sub_store from "./sub_store.ts";
 import type {StreamSubscription} from "./sub_store.ts";
 import * as subscriber_api from "./subscriber_api.ts";
@@ -24,10 +28,42 @@ import * as ui_util from "./ui_util.ts";
 // occurrence; the longest range the server allows.
 const NEXT_OCCURRENCE_DAYS = 62;
 
+// The chat the user opened, until the client learns they are
+// subscribed to it.
+let pending_chat_id: number | undefined;
+
 // The time of the next occurrence of the meeting of each chat, or ""
 // if it has none soon, once fetched.
 const next_time_labels = new Map<number, string>();
 const fetching_chat_ids = new Set<number>();
+
+function go_to_chat(stream_id: number): void {
+    browser_history.go_to_location(hash_util.by_stream_topic_url(stream_id, ""));
+}
+
+export function open(event_id: number, $error: JQuery): void {
+    void channel.post({
+        url: `/json/calendar/events/${event_id}/chat`,
+        success(data) {
+            const {stream_id} = z.object({stream_id: z.number()}).parse(data);
+            if (stream_data.is_subscribed(stream_id)) {
+                go_to_chat(stream_id);
+            } else {
+                pending_chat_id = stream_id;
+            }
+        },
+        error(xhr) {
+            ui_report.error($t_html({defaultMessage: "Failed to open the chat"}), xhr, $error);
+        },
+    });
+}
+
+export function on_subscribed(sub: StreamSubscription): void {
+    if (sub.stream_id === pending_chat_id) {
+        pending_chat_id = undefined;
+        go_to_chat(sub.stream_id);
+    }
+}
 
 // The time of the meeting's next occurrence, for the header of its
 // chat: undefined until it is fetched, when on_fetched is called.
