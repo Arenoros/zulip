@@ -8704,6 +8704,12 @@ paths:
         Attendees get a [`calendar`](/api/get-events#calendar) event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      x-curl-examples-parameters:
+        oneOf:
+          - type: exclude
+            parameters:
+              enum:
+                - occurrence
       parameters:
         - $ref: "#/components/parameters/CalendarEventId"
       requestBody:
@@ -8756,6 +8762,7 @@ paths:
                     How the event shows the attendees in their free/busy times, as in `show_as` in [`GET /calendar/events`](/api/get-calendar-events).
                   allOf:
                     - $ref: "#/components/schemas/CalendarShowAs"
+                    - example: 3
                 is_private:
                   description: |
                     Whether only the organizer sees the title of the event in the free/busy times of the attendees.
