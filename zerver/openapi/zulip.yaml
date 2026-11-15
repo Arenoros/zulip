@@ -8948,6 +8948,48 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/SimpleSuccess"
+  /calendar/events/{calendar_event_id}/chat:
+    post:
+      operationId: get-calendar-event-chat
+      tags: ["calendar"]
+      summary: Get the chat of a meeting
+      description: |
+        Get the chat of a meeting, creating it the first time someone opens it.
+
+        A meeting's chat is a private channel without topics, with
+        `is_meeting_chat` set, whose history is available to its subscribers.
+        It is named after the meeting, with a number added if another channel
+        already has that name, and renamed with it. All of the meeting's
+        attendees are subscribed to it when it is created, and those invited
+        later when they are invited; attendees removed from the meeting stay
+        in it. Getting the chat subscribes the current user if they left it.
+        A series has one chat for all of its occurrences.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - stream_id
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      stream_id:
+                        type: integer
+                        description: |
+                          The ID of the meeting's chat.
+                    example: {"msg": "", "result": "success", "stream_id": 15}
   /calendar/events/{calendar_event_id}/personal_settings:
     patch:
       operationId: update-calendar-personal-settings

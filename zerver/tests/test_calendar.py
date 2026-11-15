@@ -22,6 +22,7 @@ from zerver.lib.calendar.occurrences import (
 from zerver.lib.calendar.recurrence import get_occurrence_starts, validate_rrule
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
+from zerver.lib.test_helpers import get_subscription
 from zerver.models import (
     CalendarAttendee,
     CalendarAttendeeOccurrenceResponse,
@@ -29,9 +30,11 @@ from zerver.models import (
     CalendarEventException,
     CalendarPinnedUser,
     CalendarUserSettings,
+    Stream,
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
+from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.views.calendar import MAX_FREE_BUSY_USERS
 
 
@@ -695,6 +698,93 @@ class RespondToCalendarEventTest(CalendarTestCase):
 
 def timestamp(value: datetime) -> int:
     return int(value.timestamp())
+
+
+class MeetingChatTest(CalendarTestCase):
+    def get_chat(self, user: UserProfile, event_id: int) -> Stream:
+        result = self.api_post(user, f"/api/v1/calendar/events/{event_id}/chat")
+        return Stream.objects.get(id=self.assert_json_success(result)["stream_id"])
+
+    def test_create_chat(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        event_id = self.create_event(
+            hamlet,
+            rrule="FREQ=DAILY",
+            required_attendees=[cordelia],
+            optional_attendees=[othello],
+        )
+        self.assertIsNone(CalendarEvent.objects.get(id=event_id).chat)
+
+        chat = self.get_chat(cordelia, event_id)
+        self.assertEqual(chat.name, "Planning")
+        self.assertTrue(chat.is_meeting_chat)
+        self.assertTrue(chat.invite_only)
+        self.assertTrue(chat.history_public_to_subscribers)
+        self.assertEqual(chat.topics_policy, StreamTopicsPolicyEnum.empty_topic_only.value)
+        self.assertEqual(chat.creator, hamlet)
+        self.assertEqual(
+            set(self.users_subscribed_to_stream(chat.name, hamlet.realm)),
+            {hamlet, cordelia, othello},
+        )
+        # Meeting chats notify like group direct messages.
+        subscription = get_subscription(chat.name, cordelia)
+        self.assertEqual(
+            (
+                subscription.desktop_notifications,
+                subscription.audible_notifications,
+                subscription.push_notifications,
+                subscription.email_notifications,
+            ),
+            (True, True, True, True),
+        )
+
+        # Everyone, and every occurrence of the series, has the same chat.
+        self.assertEqual(self.get_chat(hamlet, event_id), chat)
+        result = self.api_post(self.example_user("iago"), f"/api/v1/calendar/events/{event_id}/chat")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+    def test_chat_names_are_unique(self) -> None:
+        hamlet = self.example_user("hamlet")
+        self.make_stream("Planning")
+        first_id = self.create_event(hamlet)
+        second_id = self.create_event(hamlet, title="planning")
+        self.assertEqual(self.get_chat(hamlet, first_id).name, "Planning (2)")
+        self.assertEqual(self.get_chat(hamlet, second_id).name, "planning (3)")
+
+        long_id = self.create_event(hamlet, title="A" * 100)
+        self.assertEqual(self.get_chat(hamlet, long_id).name, "A" * Stream.MAX_NAME_LENGTH)
+
+        # Renaming the meeting renames its chat, which keeps a name of
+        # its own.
+        update_calendar_event(hamlet, first_id, title="Retro")
+        self.assertEqual(CalendarEvent.objects.get(id=first_id).chat.name, "Retro")
+        update_calendar_event(hamlet, second_id, title="Retro")
+        self.assertEqual(CalendarEvent.objects.get(id=second_id).chat.name, "Retro (2)")
+        update_calendar_event(hamlet, first_id, title="Retro")
+        self.assertEqual(CalendarEvent.objects.get(id=first_id).chat.name, "Retro")
+
+    def test_chat_follows_attendees(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+        iago = self.example_user("iago")
+        event_id = self.create_event(hamlet, required_attendees=[cordelia])
+        chat = self.get_chat(hamlet, event_id)
+
+        # Those invited later join the chat; those removed stay in it.
+        update_calendar_event(hamlet, event_id, required_attendees=[othello])
+        add_calendar_attendees(othello, event_id, [iago], is_required=False)
+        self.assertEqual(
+            set(self.users_subscribed_to_stream(chat.name, hamlet.realm)),
+            {hamlet, cordelia, othello, iago},
+        )
+
+        # An attendee who left the chat returns to it on opening it.
+        self.unsubscribe(othello, chat.name)
+        self.assertEqual(self.get_chat(othello, event_id), chat)
+        self.assertTrue(get_subscription(chat.name, othello).active)
 
 
 class CalendarAPITest(CalendarTestCase):

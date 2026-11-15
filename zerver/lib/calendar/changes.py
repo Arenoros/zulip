@@ -1,3 +1,4 @@
+import itertools
 import secrets
 import uuid
 import zoneinfo
@@ -8,6 +9,7 @@ from django.db import transaction
 from django.utils.timezone import now as timezone_now
 from django.utils.translation import gettext as _
 
+from zerver.actions.streams import bulk_add_subscriptions, rename_stream_without_notice
 from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
     get_unanswered_invitation_counts,
@@ -15,8 +17,10 @@ from zerver.lib.calendar.occurrences import (
 from zerver.lib.calendar.recurrence import is_occurrence_start, validate_rrule
 from zerver.lib.event_types import CalendarChangeEvent, CalendarFreeBusyEvent
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.streams import can_access_stream_metadata_user_ids, create_stream_if_needed
 from zerver.lib.timezone import canonicalize_timezone
 from zerver.lib.types import UNSET, Unset
+from zerver.lib.user_groups import get_role_based_system_groups_dict
 from zerver.models import (
     CalendarAttendee,
     CalendarAttendeeOccurrenceResponse,
@@ -25,9 +29,12 @@ from zerver.models import (
     CalendarPinnedUser,
     CalendarUserSettings,
     Realm,
+    Stream,
     UserProfile,
 )
 from zerver.models.calendar import DEFAULT_REMINDER_MINUTES, CalendarResponse, CalendarShowAs
+from zerver.models.groups import SystemGroups
+from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.tornado.django_api import send_event_on_commit
 
 # Outlook's default color categories, by the names Exchange stores.
@@ -159,6 +166,27 @@ def create_new_attendees(
         )
         for user_id, is_required in is_required_by_user_id.items()
     )
+    if event.chat is not None:
+        bulk_add_subscriptions(
+            event.chat.realm,
+            [event.chat],
+            UserProfile.objects.filter(id__in=is_required_by_user_id, is_active=True),
+            acting_user=added_by,
+        )
+
+
+def get_meeting_chat_name(event: CalendarEvent) -> str:
+    """The meeting's title, with a number added if another channel
+    already has that name, since channel names are unique."""
+    for number in itertools.count(1):
+        suffix = "" if number == 1 else f" ({number})"
+        name = event.title[: Stream.MAX_NAME_LENGTH - len(suffix)].strip() + suffix
+        channels = Stream.objects.filter(realm_id=event.realm_id, name__iexact=name)
+        if event.chat_id is not None:
+            channels = channels.exclude(id=event.chat_id)
+        if not channels.exists():
+            return name
+    raise AssertionError("unreachable")  # nocoverage
 
 
 @transaction.atomic(durable=True)
@@ -459,6 +487,15 @@ def update_calendar_event(
         event.location = location
     event.last_modified = timezone_now()
     event.save()
+    if title is not None and event.chat is not None:
+        chat_name = get_meeting_chat_name(event)
+        if chat_name != event.chat.name:
+            rename_stream_without_notice(
+                event.chat,
+                chat_name,
+                acting_user=user_profile,
+                notify_user_ids=can_access_stream_metadata_user_ids(event.chat),
+            )
 
     if required_attendees is not None or optional_attendees is not None:
         update_attendees(event, required_attendees, optional_attendees)
@@ -572,3 +609,43 @@ def update_calendar_attendee_settings(
         attendee.show_as = show_as
     attendee.save(update_fields=["reminder_minutes", "category", "show_as"])
     send_calendar_change_events(user_profile.realm, event, {user_profile.id})
+
+
+@transaction.atomic(durable=True)
+def get_or_create_calendar_event_chat(user_profile: UserProfile, event_id: int) -> Stream:
+    """The meeting's chat, a private channel without topics with all
+    of its attendees, created when someone first opens it. Opening it
+    subscribes an attendee who left it."""
+    access_calendar_event_by_id(user_profile, event_id)
+    # Locked, so that attendees opening the chat at once get the same one.
+    event = CalendarEvent.objects.select_for_update().get(id=event_id)
+    if event.chat is not None:
+        bulk_add_subscriptions(event.chat.realm, [event.chat], [user_profile], acting_user=None)
+        return event.chat
+
+    realm = user_profile.realm
+    nobody = get_role_based_system_groups_dict(realm)[SystemGroups.NOBODY]
+    created = False
+    while not created:
+        # Another channel may take the name before this one is created.
+        chat, created = create_stream_if_needed(
+            realm,
+            get_meeting_chat_name(event),
+            is_meeting_chat=True,
+            invite_only=True,
+            history_public_to_subscribers=True,
+            topics_policy=StreamTopicsPolicyEnum.empty_topic_only.value,
+            # Who is in the chat follows who is invited to the meeting.
+            can_administer_channel_group=nobody.usergroup_ptr,
+            can_remove_subscribers_group=nobody.usergroup_ptr,
+            acting_user=event.organizer,
+        )
+    event.chat = chat
+    event.save(update_fields=["chat"])
+    bulk_add_subscriptions(
+        realm,
+        [chat],
+        UserProfile.objects.filter(calendarattendee__event=event, is_active=True),
+        acting_user=None,
+    )
+    return chat

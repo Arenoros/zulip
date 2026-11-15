@@ -8,6 +8,7 @@ from pydantic import Json, StringConstraints
 from pydantic_partials.sentinels import Missing, MissingType
 
 from zerver.lib.calendar.changes import (
+    get_or_create_calendar_event_chat,
     add_calendar_attendees,
     cancel_calendar_event,
     create_calendar_event,
@@ -264,6 +265,17 @@ def add_calendar_attendees_backend(
         is_required,
     )
     return json_success(request)
+
+
+@typed_endpoint
+def get_or_create_calendar_event_chat_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    calendar_event_id: PathOnly[int],
+) -> HttpResponse:
+    chat = get_or_create_calendar_event_chat(user_profile, calendar_event_id)
+    return json_success(request, data={"stream_id": chat.id})
 
 
 @typed_endpoint

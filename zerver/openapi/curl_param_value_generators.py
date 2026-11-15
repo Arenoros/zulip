@@ -587,6 +587,7 @@ def create_weekly_calendar_event(organizer: UserProfile, attendees: list[UserPro
         "/calendar/events/{calendar_event_id}:patch",
         "/calendar/events/{calendar_event_id}:delete",
         "/calendar/events/{calendar_event_id}/attendees:post",
+        "/calendar/events/{calendar_event_id}/chat:post",
         "/calendar/events/{calendar_event_id}/personal_settings:patch",
     ]
 )

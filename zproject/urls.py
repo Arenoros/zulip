@@ -47,6 +47,7 @@ from zerver.views.calendar import (
     get_calendar_free_busy,
     get_calendar_pinned_users,
     get_calendar_settings,
+    get_or_create_calendar_event_chat_backend,
     pin_calendar_user,
     respond_to_calendar_event_backend,
     unpin_calendar_user,
@@ -439,6 +440,10 @@ v1_api_and_json_patterns = [
     ),
     rest_path(
         "calendar/events/<int:calendar_event_id>/attendees", POST=add_calendar_attendees_backend
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/chat",
+        POST=get_or_create_calendar_event_chat_backend,
     ),
     rest_path(
         "calendar/events/<int:calendar_event_id>/personal_settings",

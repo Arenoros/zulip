@@ -872,6 +872,12 @@ def bulk_add_subscriptions(
             # on their existing subscription.
             if stream.default_push_notifications:
                 sub.push_notifications = True
+            # A meeting's chat notifies like a group direct message.
+            if stream.is_meeting_chat:
+                sub.desktop_notifications = user_profile.enable_desktop_notifications
+                sub.audible_notifications = user_profile.enable_sounds
+                sub.push_notifications = user_profile.enable_offline_push_notifications
+                sub.email_notifications = user_profile.enable_offline_email_notifications
             sub_info = SubInfo(user_profile, sub, stream)
             subs_to_add.append(sub_info)
 
