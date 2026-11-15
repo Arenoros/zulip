@@ -342,6 +342,23 @@ class FreeBusyTest(CalendarTestCase):
             required_attendees=[hamlet],
         )
         respond_to_calendar_event(hamlet, followed, CalendarResponse.FOLLOWING)
+        maybe = self.create_event(
+            othello,
+            title="Maybe",
+            start=MONDAY_10_00 + timedelta(hours=6),
+            end=MONDAY_10_00 + timedelta(hours=7),
+            required_attendees=[hamlet],
+        )
+        respond_to_calendar_event(hamlet, maybe, CalendarResponse.TENTATIVE)
+        maybe_free = self.create_event(
+            othello,
+            title="Maybe, but free",
+            start=MONDAY_10_00 + timedelta(hours=8),
+            end=MONDAY_10_00 + timedelta(hours=9),
+            show_as=CalendarShowAs.FREE,
+            required_attendees=[hamlet],
+        )
+        respond_to_calendar_event(hamlet, maybe_free, CalendarResponse.TENTATIVE)
         declined = self.create_event(othello, title="Declined", required_attendees=[hamlet])
         respond_to_calendar_event(hamlet, declined, CalendarResponse.DECLINED)
         cancelled = self.create_event(hamlet, title="Cancelled")
@@ -371,7 +388,9 @@ class FreeBusyTest(CalendarTestCase):
                 (timedelta(hours=1), CalendarShowAs.TENTATIVE, None, None),
                 (timedelta(hours=3), CalendarShowAs.BUSY, None, None),
                 (timedelta(hours=5), CalendarShowAs.FREE, None, None),
+                (timedelta(hours=6), CalendarShowAs.TENTATIVE, None, None),
                 (timedelta(hours=7), CalendarShowAs.BUSY, None, None),
+                (timedelta(hours=8), CalendarShowAs.FREE, None, None),
             ],
         )
         # The organizer of a private event sees its title.
@@ -567,6 +586,8 @@ class RespondToCalendarEventTest(CalendarTestCase):
         attendee = self.get_attendee(event_id, cordelia)
         self.assertEqual(attendee.response, CalendarResponse.TENTATIVE)
         self.assertIsNotNone(attendee.response_date)
+        # The meeting shows as tentative in the attendee's calendar.
+        self.assertEqual(self.get_occurrences(cordelia)[0].show_as, CalendarShowAs.TENTATIVE)
 
         respond_to_calendar_event(
             cordelia, event_id, CalendarResponse.ACCEPTED, original_start=MONDAY_10_00

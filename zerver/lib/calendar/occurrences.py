@@ -201,6 +201,13 @@ def _get_show_as(attendee: CalendarAttendee, response: int) -> int:
         return CalendarShowAs.FREE
     if attendee.show_as is not None:
         return attendee.show_as
+    # Like Exchange, a meeting accepted tentatively shows as tentative,
+    # unless it does not block time at all.
+    if (
+        response == CalendarResponse.TENTATIVE
+        and attendee.event.show_as != CalendarShowAs.FREE
+    ):
+        return CalendarShowAs.TENTATIVE
     return attendee.event.show_as
 
 
