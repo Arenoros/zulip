@@ -86,10 +86,13 @@ export function get_scope_data(
     return {};
 }
 
+// The organizer is told of the response, with the message, unless
+// notify_organizer is false.
 export function respond(
     occurrence: CalendarOccurrence,
     response: string,
     scope: Scope,
+    notification: {notify_organizer: boolean; message: string},
     on_success: () => void,
     on_error: (xhr: JQuery.jqXHR) => void,
 ): void {
@@ -97,6 +100,8 @@ export function respond(
         url: `/json/calendar/events/${occurrence.id}/response`,
         data: {
             response: JSON.stringify(RESPONSES.get(response)),
+            notify_organizer: JSON.stringify(notification.notify_organizer),
+            message: notification.message,
             ...get_scope_data(occurrence, scope),
         },
         success() {

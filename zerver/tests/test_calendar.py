@@ -926,6 +926,62 @@ class CalendarNotificationTest(CalendarTestCase):
         self.assert_length(self.get_notifications(othello), 2)
         self.assert_length(self.get_notifications(hamlet), 0)
 
+    def test_responses(self) -> None:
+        hamlet = self.example_user("hamlet")
+        cordelia = self.example_user("cordelia")
+        event_id = self.create_event(hamlet, rrule="FREQ=DAILY", required_attendees=[cordelia])
+
+        respond_to_calendar_event(
+            cordelia,
+            event_id,
+            CalendarResponse.ACCEPTED,
+            message="I will join from the train.\nMaybe late.",
+        )
+        self.assertEqual(
+            self.get_notifications(hamlet),
+            [
+                f"{self.mention(cordelia)} accepted **Planning**.\n\n"
+                "> I will join from the train.\n> Maybe late.\n\n"
+            ],
+        )
+
+        tuesday = MONDAY_10_00 + timedelta(days=1)
+        respond_to_calendar_event(cordelia, event_id, CalendarResponse.TENTATIVE, tuesday)
+        self.assertEqual(
+            self.get_notifications(hamlet)[-1],
+            f"{self.mention(cordelia)} tentatively accepted **Planning** "
+            f"({datetime_to_global_time(tuesday)}).",
+        )
+        result = self.api_post(
+            cordelia,
+            f"/api/v1/calendar/events/{event_id}/response",
+            {"response": orjson.dumps(CalendarResponse.DECLINED).decode()},
+        )
+        self.assert_json_success(result)
+        self.assertEqual(
+            self.get_notifications(hamlet)[-1], f"{self.mention(cordelia)} declined **Planning**."
+        )
+
+        # Not asked to, following, without requested responses, or for
+        # a cancelled meeting, the organizer is not told.
+        result = self.api_post(
+            cordelia,
+            f"/api/v1/calendar/events/{event_id}/response",
+            {
+                "response": orjson.dumps(CalendarResponse.ACCEPTED).decode(),
+                "notify_organizer": "false",
+            },
+        )
+        self.assert_json_success(result)
+        respond_to_calendar_event(cordelia, event_id, CalendarResponse.FOLLOWING)
+        cancel_calendar_event(hamlet, event_id, tuesday)
+        respond_to_calendar_event(cordelia, event_id, CalendarResponse.DECLINED, tuesday)
+        update_calendar_event(hamlet, event_id, response_requested=False)
+        respond_to_calendar_event(cordelia, event_id, CalendarResponse.ACCEPTED)
+        cancel_calendar_event(hamlet, event_id)
+        self.api_delete(cordelia, f"/api/v1/calendar/events/{event_id}")
+        self.assert_length(self.get_notifications(hamlet), 3)
+
 
 class MeetingCallTest(CalendarTestCase):
     @override

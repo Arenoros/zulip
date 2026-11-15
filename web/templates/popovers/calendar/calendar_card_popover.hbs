@@ -50,15 +50,15 @@
             </div>
         </div>
     {{/unless}}
-    {{#if is_invitee}}
+    {{#if can_notify_organizer}}
         <div class="calendar-card-section calendar-card-notify">
             <i class="zulip-icon zulip-icon-calendar calendar-card-row-icon" aria-hidden="true"></i>
             <div class="calendar-card-notify-fields">
                 <label class="calendar-card-notify-label">
-                    <input type="checkbox" class="calendar-list-checkbox" checked disabled/>
+                    <input type="checkbox" class="calendar-list-checkbox calendar-card-notify-checkbox" checked/>
                     {{t "Notify the organizer" }}
                 </label>
-                <input type="text" class="calendar-card-message" placeholder="{{t 'Message (optional)' }}" disabled/>
+                <input type="text" class="calendar-card-message" placeholder="{{t 'Message (optional)' }}" aria-label="{{t 'Message for the organizer' }}"/>
             </div>
         </div>
     {{/if}}

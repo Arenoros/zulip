@@ -8877,6 +8877,9 @@ paths:
         to one occurrence of a repeating event. A cancelled event can only
         be declined.
 
+        If the organizer asked for responses, they get a direct message from
+        Notification Bot with any response other than following the event.
+
         Attendees get a [`calendar`](/api/get-events#calendar) event.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
@@ -8898,12 +8901,27 @@ paths:
                   example: 2
                 occurrence:
                   $ref: "#/components/schemas/CalendarOccurrenceParameter"
+                notify_organizer:
+                  description: |
+                    Whether to tell the organizer of the response, if they asked
+                    for responses.
+                  type: boolean
+                  default: true
+                  example: true
+                message:
+                  description: |
+                    A message for the organizer, sent with the response.
+                  type: string
+                  default: ""
+                  example: "I will join from the train."
               required:
                 - response
             encoding:
               response:
                 contentType: application/json
               occurrence:
+                contentType: application/json
+              notify_organizer:
                 contentType: application/json
       responses:
         "200":

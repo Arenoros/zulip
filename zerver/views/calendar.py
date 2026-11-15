@@ -260,8 +260,17 @@ def respond_to_calendar_event_backend(
     calendar_event_id: PathOnly[int],
     response: Json[int],
     occurrence: Json[int] | None = None,
+    notify_organizer: Json[bool] = True,
+    message: CalendarDescription = "",
 ) -> HttpResponse:
-    respond_to_calendar_event(user_profile, calendar_event_id, response, to_datetime(occurrence))
+    respond_to_calendar_event(
+        user_profile,
+        calendar_event_id,
+        response,
+        to_datetime(occurrence),
+        notify_organizer=notify_organizer,
+        message=message,
+    )
     return json_success(request)
 
 

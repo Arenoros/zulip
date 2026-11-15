@@ -9,9 +9,10 @@ from zerver.actions.message_send import do_send_messages, internal_prep_private_
 from zerver.lib.mention import silent_mention_syntax_for_user
 from zerver.lib.timestamp import datetime_to_global_time
 from zerver.models import CalendarEvent, CalendarEventException, UserProfile
+from zerver.models.calendar import CalendarResponse
 from zerver.models.users import get_system_bot
 
-# Invitations, changes of time and cancellations reach
+# Invitations, changes of time, cancellations and responses reach
 # people as direct messages from Notification Bot, which mobile apps
 # notify of too.
 
@@ -127,3 +128,30 @@ def notify_cancelled(
         ),
     )
 
+
+def notify_response(
+    attendee: UserProfile,
+    event: CalendarEvent,
+    response: int,
+    original_start: datetime | None,
+    message: str,
+) -> None:
+    start = original_start or event.start
+
+    def get_text() -> str:
+        if response == CalendarResponse.ACCEPTED:
+            text = _("{user} accepted {title}.")
+        elif response == CalendarResponse.TENTATIVE:
+            text = _("{user} tentatively accepted {title}.")
+        else:
+            text = _("{user} declined {title}.")
+        text = text.format(
+            user=silent_mention_syntax_for_user(attendee),
+            title=format_title(event.title, original_start),
+        )
+        if message:
+            quoted = "\n".join(f"> {line}" for line in message.splitlines())
+            text += f"\n\n{quoted}\n\n"
+        return text
+
+    send_calendar_notifications(attendee, event, {event.organizer_id}, start, get_text)

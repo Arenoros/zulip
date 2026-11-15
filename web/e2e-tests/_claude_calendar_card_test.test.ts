@@ -174,7 +174,7 @@ async function calendar_card_test(page: Page): Promise<void> {
             facts["location"] === "Room 4" &&
             facts["organizer"] === "Othello, the Moor of Venice invited you" &&
             facts["counts"] === "Accepted: 1 · Not answered: 1" &&
-            facts["notify_disabled"] === true,
+            facts["notify_disabled"] === false,
         JSON.stringify(facts),
     );
     await shot(page, "dark-invitation");

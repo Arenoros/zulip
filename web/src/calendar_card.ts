@@ -71,6 +71,8 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
         is_personal: personal,
         can_join_call: calendar_call.can_join(occurrence),
         is_invitee: !is_organizer && !occurrence.is_cancelled,
+        can_notify_organizer:
+            !is_organizer && !occurrence.is_cancelled && occurrence.response_requested,
         is_recurring: occurrence.original_start !== null,
         time_label: calendar_actions.get_time_label(occurrence),
         location,
@@ -162,10 +164,20 @@ function choose_scope(button: HTMLElement, on_choose: (scope: calendar_actions.S
 function respond(response: string, scope: calendar_actions.Scope): void {
     assert(card_occurrence !== undefined);
     const occurrence = card_occurrence;
+    const instance = get_card_instance();
+    assert(instance !== null);
+    const $popper = $(instance.popper);
     calendar_actions.respond(
         occurrence,
         response,
         scope,
+        {
+            // The card offers to tell the organizer only if they asked
+            // for responses.
+            notify_organizer:
+                $popper.find(".calendar-card-notify-checkbox").prop("checked") === true,
+            message: $popper.find<HTMLInputElement>(".calendar-card-message").val()?.trim() ?? "",
+        },
         () => {
             if (card_occurrence === occurrence) {
                 card_occurrence = {
@@ -255,6 +267,11 @@ function open(element: HTMLElement): void {
         },
         onMount(instance) {
             const $popper = $(instance.popper);
+            $popper.on("change", ".calendar-card-notify-checkbox", function (this: HTMLElement) {
+                $popper
+                    .find(".calendar-card-message")
+                    .prop("disabled", !$(this).prop("checked"));
+            });
             $popper.on("click", ".calendar-card-respond", function (this: HTMLElement) {
                 const response = this.dataset["response"]!;
                 if (response === "tentative") {

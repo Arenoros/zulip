@@ -15,6 +15,7 @@ from zerver.lib.calendar.notifications import (
     notify_invited,
     notify_moved,
     notify_removed,
+    notify_response,
 )
 from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
@@ -541,16 +542,31 @@ def cancel_calendar_event(
     send_calendar_change_events(user_profile.realm, event, user_ids)
 
 
+def is_cancelled_occurrence(event: CalendarEvent, original_start: datetime | None) -> bool:
+    return event.is_cancelled or (
+        original_start is not None
+        and CalendarEventException.objects.filter(
+            event=event, original_start=original_start, is_cancelled=True
+        ).exists()
+    )
+
+
 @transaction.atomic(durable=True)
 def respond_to_calendar_event(
     user_profile: UserProfile,
     event_id: int,
     response: int,
     original_start: datetime | None = None,
+    *,
+    notify_organizer: bool = True,
+    message: str = "",
 ) -> None:
     """Responds to the event, or with original_start, to one
     occurrence of it. Declining is also how an attendee removes an
-    event from their calendar."""
+    event from their calendar.
+
+    The organizer is told of the response, with the message, if they
+    asked for responses."""
     event = access_calendar_event_by_id(user_profile, event_id)
     if event.organizer_id == user_profile.id:
         raise JsonableError(_("The organizer cannot respond to their own event"))
@@ -569,6 +585,15 @@ def respond_to_calendar_event(
         CalendarAttendeeOccurrenceResponse.objects.update_or_create(
             attendee=attendee, original_start=original_start, defaults={"response": response}
         )
+    # Following a meeting is not an answer to the invitation, and
+    # removing a cancelled meeting from one's calendar tells nothing.
+    if (
+        notify_organizer
+        and event.response_requested
+        and response != CalendarResponse.FOLLOWING
+        and not is_cancelled_occurrence(event, original_start)
+    ):
+        notify_response(user_profile, event, response, original_start, message)
     send_calendar_change_events(user_profile.realm, event, get_attendee_user_ids(event))
 
 

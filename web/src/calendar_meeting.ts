@@ -481,7 +481,14 @@ export function initialize(opts: {on_close: () => void}): void {
         const response = this.dataset["response"]!;
         choose_scope(this, (scope) => {
             assert(meeting !== undefined);
-            calendar_actions.respond(meeting.occurrence, response, scope, reload, show_error);
+            calendar_actions.respond(
+                meeting.occurrence,
+                response,
+                scope,
+                {notify_organizer: true, message: ""},
+                reload,
+                show_error,
+            );
         });
     });
     $view.on("click", selector(".calendar-meeting-delete"), function (this: HTMLElement) {
