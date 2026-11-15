@@ -67,6 +67,8 @@ class CalendarOccurrence:
     has_zulip_call: bool
     meet_code: str
     chat_id: int | None
+    # When the organizer created the event and sent its invitations.
+    date_created: datetime
     # Empty when the organizer hides the attendees from others.
     attendees: list[CalendarAttendeeData]
 
@@ -78,6 +80,7 @@ class CalendarOccurrence:
         )
         result["start"] = datetime_to_timestamp(self.start)
         result["end"] = datetime_to_timestamp(self.end)
+        result["date_created"] = datetime_to_timestamp(self.date_created)
         for attendee in result["attendees"]:
             attendee["added_by"] = attendee.pop("added_by_id")
         return result
@@ -253,6 +256,7 @@ def _make_calendar_occurrence(
         has_zulip_call=event.has_zulip_call,
         meet_code=event.meet_code,
         chat_id=event.chat_id,
+        date_created=event.date_created,
         attendees=attendees if show_attendees else [],
     )
 

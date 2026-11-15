@@ -757,6 +757,7 @@ class CalendarAPITest(CalendarTestCase):
                 "has_zulip_call": False,
                 "meet_code": event.meet_code,
                 "chat_id": None,
+                "date_created": timestamp(event.date_created),
                 "attendees": [
                     {
                         "user_id": hamlet.id,

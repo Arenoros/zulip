@@ -8422,6 +8422,7 @@ paths:
                               "has_zulip_call": false,
                               "meet_code": "Xc3oQ9pL2mKd",
                               "chat_id": null,
+                              "date_created": 1763190000,
                               "attendees":
                                 [
                                   {
@@ -8675,6 +8676,7 @@ paths:
                             "has_zulip_call": false,
                             "meet_code": "Xc3oQ9pL2mKd",
                             "chat_id": null,
+                            "date_created": 1763190000,
                             "attendees":
                               [
                                 {
@@ -30428,6 +30430,11 @@ components:
           nullable: true
           description: |
             The ID of the channel for the chat of the event, if any.
+        date_created:
+          type: integer
+          description: |
+            When the organizer created the event and sent its
+            invitations, as a UNIX timestamp.
         attendees:
           type: array
           description: |
