@@ -71,6 +71,7 @@ export const occurrence_schema = z.object({
     show_as: z.number(),
     is_private: z.boolean(),
     is_cancelled: z.boolean(),
+    rrule: z.string(),
     response: z.number(),
     organizer_id: z.number(),
     reminder_minutes: z.nullable(z.number()),
@@ -93,6 +94,7 @@ const free_busy_block_schema = z.object({
     end: z.number(),
     show_as: z.number(),
     // Only for events the user is invited to and may see.
+    event_id: z.nullable(z.number()),
     title: z.nullable(z.string()),
 });
 
@@ -101,7 +103,7 @@ type FreeBusyBlock = z.infer<typeof free_busy_block_schema> & {
     timezone: string;
 };
 
-const free_busy_schema = z.object({
+export const free_busy_schema = z.object({
     free_busy: z.record(z.string(), z.array(free_busy_block_schema)),
 });
 
@@ -159,6 +161,11 @@ export function get_occurrence(
         (occurrence) =>
             occurrence.id === event_id && occurrence.original_start === original_start,
     );
+}
+
+// The start and end of the user's work day, in minutes after midnight.
+export function get_work_hours(): {start: number; end: number} {
+    return {start: settings.work_day_start_minutes, end: settings.work_day_end_minutes};
 }
 
 export function get_default_reminder(): number | null {

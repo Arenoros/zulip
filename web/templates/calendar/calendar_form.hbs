@@ -73,24 +73,72 @@
                         </div>
                     </div>
                 </div>
-                <div class="calendar-form-row">
+                <div class="calendar-form-row calendar-form-time-row">
                     <i class="zulip-icon zulip-icon-clock calendar-form-row-icon" aria-hidden="true"></i>
                     <div class="calendar-form-field calendar-form-time">
-                        <button type="button" class="calendar-text-button calendar-form-date" aria-haspopup="true"></button>
-                        <span class="calendar-form-time-range">
-                            <select class="calendar-form-start" aria-label="{{t 'Start' }}"></select>
-                            <span aria-hidden="true">–</span>
-                            <select class="calendar-form-end" aria-label="{{t 'End' }}"></select>
-                        </span>
-                        <label class="calendar-form-all-day">
-                            <input type="checkbox" class="calendar-list-checkbox calendar-form-all-day-checkbox" {{#if is_occurrence}}disabled{{/if}}/>
-                            {{t "All day" }}
-                        </label>
-                        <span class="calendar-toolbar-spacer"></span>
-                        <button type="button" class="calendar-toolbar-button calendar-form-scheduler">
-                            <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
-                            {{t "Scheduler" }}
-                        </button>
+                        <div class="calendar-form-time-header">
+                            <button type="button" class="calendar-text-button calendar-form-time-summary" aria-expanded="false" aria-controls="calendar-form-time-panel"></button>
+                            <button type="button" class="calendar-toolbar-button calendar-form-scheduler">
+                                <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+                                {{t "Scheduler" }}
+                            </button>
+                        </div>
+                        <div class="calendar-form-time-panel hide" id="calendar-form-time-panel">
+                            <div class="calendar-form-time-fields">
+                                <div class="calendar-form-time-field">
+                                    <span class="calendar-form-label" aria-hidden="true">{{#if is_occurrence}}{{t "Date" }}{{else}}{{t "Start date" }}{{/if}}</span>
+                                    {{!-- The button's label, with the date, is set when the date changes. --}}
+                                    <button type="button" class="calendar-form-input-button calendar-form-date" aria-haspopup="true"></button>
+                                </div>
+                                <label class="calendar-form-time-field calendar-form-time-of-day">
+                                    <span class="calendar-form-label">{{t "Start time" }}</span>
+                                    <select class="calendar-form-select calendar-form-start"></select>
+                                </label>
+                                <label class="calendar-form-time-field calendar-form-time-of-day">
+                                    <span class="calendar-form-label">{{t "End time" }}</span>
+                                    <select class="calendar-form-select calendar-form-end"></select>
+                                </label>
+                                <button type="button" class="calendar-icon-button calendar-form-timezone" {{#if is_occurrence}}disabled{{/if}}>
+                                    <i class="zulip-icon zulip-icon-globe" aria-hidden="true"></i>
+                                    <span class="dropdown_widget_value calendar-form-timezone-name"></span>
+                                </button>
+                            </div>
+                            <div class="calendar-form-time-options">
+                                <label class="calendar-form-all-day">
+                                    <input type="checkbox" class="calendar-list-checkbox calendar-form-all-day-checkbox" {{#if is_occurrence}}disabled{{/if}}/>
+                                    {{t "All day" }}
+                                </label>
+                                <button type="button" class="calendar-toolbar-button calendar-form-repeats" aria-pressed="false" {{#if is_occurrence}}disabled{{/if}}>
+                                    <i class="zulip-icon zulip-icon-refresh-cw" aria-hidden="true"></i>
+                                    {{t "Repeats" }}
+                                </button>
+                            </div>
+                            <div class="calendar-form-recurrence hide">
+                                <div class="calendar-form-recurrence-row">
+                                    <label class="calendar-form-label" for="calendar-form-interval">{{t "Repeat every" }}</label>
+                                    <select class="calendar-form-select calendar-form-interval" id="calendar-form-interval"></select>
+                                    <select class="calendar-form-select calendar-form-frequency" aria-label="{{t 'Repeat' }}"></select>
+                                </div>
+                                <div class="calendar-form-recurrence-row">
+                                    <div class="calendar-form-weekdays" role="group" aria-label="{{t 'Days of the week' }}"></div>
+                                    <span class="calendar-form-until-group">
+                                        <span class="calendar-form-label">{{t "until" }}</span>
+                                        <button type="button" class="calendar-form-input-button calendar-form-until" aria-haspopup="true"></button>
+                                        <button type="button" class="calendar-icon-button calendar-form-until-remove tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Repeat forever' }}" aria-label="{{t 'Repeat forever' }}">
+                                            <i class="zulip-icon zulip-icon-trash" aria-hidden="true"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="calendar-form-suggestions hide">
+                                <div class="calendar-form-suggestions-heading">
+                                    <i class="zulip-icon zulip-icon-calendar-clock" aria-hidden="true"></i>
+                                    {{t "Suggested times" }}
+                                    <i class="zulip-icon zulip-icon-info tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Times of the same length in your work hours, by how many attendees are free.' }}" aria-label="{{t 'Times of the same length in your work hours, by how many attendees are free.' }}" role="img"></i>
+                                </div>
+                                <div class="calendar-form-suggestion-list"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="calendar-form-row">

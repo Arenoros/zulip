@@ -236,6 +236,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form-optional-row:not(.hide)", {visible: true});
     await add_attendee(page, ".calendar-form-optional-attendees", "Cordelia, Lear's daughter");
 
+    // The time row unfolds into its fields.
+    await page.click(".calendar-form-time-summary");
+    await page.waitForSelector(".calendar-form-time-panel", {visible: true});
     await page.click(".calendar-form-date");
     await page.waitForSelector(".calendar-date-picker-popover", {visible: true});
     await page.click(`.calendar-date-picker-popover .calendar-mini-month-day[data-date="${wednesday}"]`);
@@ -512,10 +515,12 @@ async function calendar_form_test(page: Page): Promise<void> {
     await page.setViewport({width: 1440, height: 900});
 
     // An all-day event has no time.
+    await page.click(".calendar-form-time-summary");
     await page.click(".calendar-form-all-day-checkbox");
     check(
         "an all-day event has no time",
-        (await page.$(".calendar-form-time-range.hide")) !== null &&
+        !(await is_shown(page, ".calendar-form-start")) &&
+            !(await is_shown(page, ".calendar-form-end")) &&
             (await page.$(".calendar-form-day-block")) === null,
     );
     await request(page, "PATCH", "/json/settings", "color_scheme=2&default_language=en");

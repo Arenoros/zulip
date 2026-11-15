@@ -8,17 +8,22 @@ import * as z from "zod/mini";
 import render_calendar_day_events from "../templates/calendar/calendar_day_events.hbs";
 import render_calendar_form from "../templates/calendar/calendar_form.hbs";
 import render_calendar_form_day from "../templates/calendar/calendar_form_day.hbs";
+import render_calendar_form_suggestions from "../templates/calendar/calendar_form_suggestions.hbs";
 import render_calendar_date_picker_popover from "../templates/popovers/calendar/calendar_date_picker_popover.hbs";
 import render_calendar_form_attendee_options_popover from "../templates/popovers/calendar/calendar_form_attendee_options_popover.hbs";
 import render_calendar_submenu_popover from "../templates/popovers/calendar/calendar_submenu_popover.hbs";
+import timezones from "../generated/timezones.json";
 
 import * as calendar_grid from "./calendar_grid.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_layout from "./calendar_layout.ts";
+import * as calendar_recurrence from "./calendar_recurrence.ts";
+import type {Recurrence} from "./calendar_recurrence.ts";
 import * as calendar_util from "./calendar_util.ts";
 import * as channel from "./channel.ts";
 import * as compose_ui from "./compose_ui.ts";
 import * as confirm_dialog from "./confirm_dialog.ts";
+import * as dropdown_widget from "./dropdown_widget.ts";
 import {$t, $t_html} from "./i18n.ts";
 import type {InputPillContainer} from "./input_pill.ts";
 import * as people from "./people.ts";
@@ -27,6 +32,7 @@ import * as popover_menus from "./popover_menus.ts";
 import * as popovers from "./popovers.ts";
 import * as rendered_markdown from "./rendered_markdown.ts";
 import {current_user} from "./state_data.ts";
+import * as timerender from "./timerender.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
 import * as user_pill from "./user_pill.ts";
@@ -42,6 +48,13 @@ const MINUTES_PER_DAY = 24 * 60;
 const TIME_STEP_MINUTES = 30;
 // The step of moving and resizing the event on the day grid.
 const DRAG_STEP_MINUTES = 15;
+const MAX_SUGGESTIONS = 5;
+// The occurrences of a series checked for suggested times, within the
+// longest range of free/busy times the server gives.
+const MAX_CHECKED_OCCURRENCES = 8;
+const MAX_CHECKED_DAYS = 60;
+// Free and working elsewhere.
+const FREE_SHOW_AS = new Set([1, 5]);
 const REMINDERS: (number | null)[] = [null, 0, 5, 15, 30, 60, 120, 720, 1440, 10_080];
 // Outlook's default color categories, by the names Exchange stores.
 const CATEGORIES = [
@@ -57,12 +70,15 @@ type FormState = {
     title: string;
     required_attendee_ids: number[];
     optional_attendee_ids: number[];
-    // The start's date and minute after midnight, in the user's
+    // The start's date and minute after midnight, in the event's
     // timezone, and the duration, which may end on the next day.
     date: string;
     start_minute: number;
     duration_minutes: number;
+    time_zone: string;
     is_all_day: boolean;
+    // Undefined for an event that does not repeat.
+    recurrence: Recurrence | undefined;
     location: string;
     has_zulip_call: boolean;
     description: string;
@@ -84,6 +100,10 @@ type Editing = {
 let state: FormState | undefined;
 let initial_state: string | undefined;
 let editing: Editing | undefined;
+// Whether changing when the series takes place drops changes made to
+// some of its occurrences.
+let has_changed_occurrences = false;
+let is_time_expanded = false;
 let is_saving = false;
 let required_pills: InputPillContainer<UserPill> | undefined;
 let optional_pills: InputPillContainer<UserPill> | undefined;
@@ -91,6 +111,7 @@ let menu_instance: tippy.Instance | undefined;
 let on_close: (() => void) | undefined;
 let get_mini_month_context: ((month: Date) => Record<string, unknown>) | undefined;
 let day_request_id = 0;
+let suggestions_request_id = 0;
 
 const day_events_schema = z.object({
     events: z.array(
@@ -109,10 +130,6 @@ export function is_open(): boolean {
     return state !== undefined;
 }
 
-function get_time_zone(): string {
-    return calendar_grid.get_time_zone();
-}
-
 function format_minutes(minutes: number): string {
     return new Intl.DateTimeFormat(user_settings.default_language, {
         hour: "numeric",
@@ -125,14 +142,20 @@ function format_minutes(minutes: number): string {
 function get_start_seconds(form: FormState): number {
     const [year, month, day] = form.date.split("-").map(Number);
     return (
-        new TZDate(year!, month! - 1, day!, 0, form.is_all_day ? 0 : form.start_minute, get_time_zone()).getTime() /
-        1000
+        new TZDate(
+            year!,
+            month! - 1,
+            day!,
+            0,
+            form.is_all_day ? 0 : form.start_minute,
+            form.time_zone,
+        ).getTime() / 1000
     );
 }
 
 function get_end_seconds(form: FormState): number {
     if (form.is_all_day) {
-        return calendar_layout.get_day_start(form.date, get_time_zone(), 1);
+        return calendar_layout.get_day_start(form.date, form.time_zone, 1);
     }
     const [year, month, day] = form.date.split("-").map(Number);
     return (
@@ -142,7 +165,7 @@ function get_end_seconds(form: FormState): number {
             day!,
             0,
             form.start_minute + form.duration_minutes,
-            get_time_zone(),
+            form.time_zone,
         ).getTime() / 1000
     );
 }
@@ -255,7 +278,21 @@ function update_time_fields(): void {
     assert(state !== undefined);
     const form = state;
     const $form = $("#calendar-view .calendar-form");
-    $form.find(".calendar-form-date").text(get_date_label(form.date));
+    $form
+        .find(".calendar-form-time-summary")
+        .text(get_time_summary(form))
+        .attr("aria-expanded", String(is_time_expanded))
+        .toggleClass("expanded", is_time_expanded);
+    $form.find(".calendar-form-time-panel").toggleClass("hide", !is_time_expanded);
+    $form
+        .find(".calendar-form-date")
+        .text(get_date_label(form.date))
+        .attr(
+            "aria-label",
+            editing?.is_occurrence
+                ? $t({defaultMessage: "Date: {date}"}, {date: get_date_label(form.date)})
+                : $t({defaultMessage: "Start date: {date}"}, {date: get_date_label(form.date)}),
+        );
     const start_options = Array.from(
         {length: MINUTES_PER_DAY / TIME_STEP_MINUTES},
         (_, index) => index * TIME_STEP_MINUTES,
@@ -299,11 +336,243 @@ function update_time_fields(): void {
                 .prop("selected", duration === form.duration_minutes),
         );
     }
-    $form.find(".calendar-form-time-range").toggleClass("hide", form.is_all_day);
+    $form.find(".calendar-form-time-of-day").toggleClass("hide", form.is_all_day);
     $form.find(".calendar-form-all-day-checkbox").prop("checked", form.is_all_day);
+    $form.find(".calendar-form-timezone-name").text(form.time_zone);
+    $form
+        .find(".calendar-form-timezone")
+        .attr("aria-label", $t({defaultMessage: "Time zone: {time_zone}"}, {time_zone: form.time_zone}));
+    update_recurrence_fields();
+    update_suggestions();
     render_day();
     // The event stays in view on the day grid when its time changes.
     $form.find(".calendar-form-day-block").get(0)?.scrollIntoView({block: "nearest"});
+}
+
+function get_time_summary(form: FormState): string {
+    const time_range = form.is_all_day
+        ? undefined
+        : {
+              start: format_minutes(form.start_minute),
+              end: format_minutes(form.start_minute + form.duration_minutes),
+          };
+    let summary;
+    if (form.recurrence !== undefined) {
+        summary = calendar_recurrence.describe(form.recurrence, form.date, time_range);
+    } else if (time_range === undefined) {
+        summary = $t({defaultMessage: "{date}, all day"}, {date: get_date_label(form.date)});
+    } else {
+        summary = `${get_date_label(form.date)} ${time_range.start} – ${time_range.end}`;
+    }
+    if (form.time_zone !== calendar_grid.get_time_zone()) {
+        summary += ` (${form.time_zone})`;
+    }
+    return summary;
+}
+
+function get_frequency_label(frequency: calendar_recurrence.Frequency, count: number): string {
+    switch (frequency) {
+        case "DAILY":
+            return $t({defaultMessage: "{count, plural, one {day} other {days}}"}, {count});
+        case "WEEKLY":
+            return $t({defaultMessage: "{count, plural, one {week} other {weeks}}"}, {count});
+        case "MONTHLY":
+            return $t({defaultMessage: "{count, plural, one {month} other {months}}"}, {count});
+        case "YEARLY":
+            return $t({defaultMessage: "{count, plural, one {year} other {years}}"}, {count});
+    }
+}
+
+function update_recurrence_fields(): void {
+    assert(state !== undefined);
+    const recurrence = state.recurrence;
+    const $form = $("#calendar-view .calendar-form");
+    const is_recurring = recurrence !== undefined;
+    $form
+        .find(".calendar-form-repeats, .calendar-form-series-button")
+        .attr("aria-pressed", String(is_recurring))
+        .toggleClass("selected", is_recurring);
+    $form
+        .find(".calendar-form-event-button")
+        .attr("aria-pressed", String(!is_recurring))
+        .toggleClass("selected", !is_recurring);
+    $form.find(".calendar-form-recurrence").toggleClass("hide", !is_recurring);
+    if (recurrence === undefined) {
+        return;
+    }
+    const $interval = $form.find(".calendar-form-interval").empty();
+    for (let count = 1; count <= calendar_recurrence.MAX_INTERVAL; count += 1) {
+        $interval.append(
+            $("<option>")
+                .val(count)
+                .text(count)
+                .prop("selected", count === recurrence.interval),
+        );
+    }
+    const $frequency = $form.find(".calendar-form-frequency").empty();
+    for (const frequency of calendar_recurrence.FREQUENCIES) {
+        $frequency.append(
+            $("<option>")
+                .val(frequency)
+                .text(get_frequency_label(frequency, recurrence.interval))
+                .prop("selected", frequency === recurrence.frequency),
+        );
+    }
+    const $weekdays = $form
+        .find(".calendar-form-weekdays")
+        .toggleClass("hide", recurrence.frequency !== "WEEKLY")
+        .empty();
+    for (const weekday of calendar_recurrence.WEEKDAYS) {
+        const is_pressed = recurrence.weekdays.includes(weekday);
+        $weekdays.append(
+            $("<button>")
+                .attr({
+                    type: "button",
+                    "data-weekday": weekday,
+                    "aria-pressed": String(is_pressed),
+                    "aria-label": calendar_recurrence.get_weekday_name(weekday, "long"),
+                })
+                .addClass("calendar-form-weekday")
+                .toggleClass("selected", is_pressed)
+                .text(
+                    calendar_util.capitalize(
+                        calendar_recurrence.get_weekday_name(weekday, "short"),
+                        user_settings.default_language,
+                    ),
+                ),
+        );
+    }
+    const until_label =
+        recurrence.until === undefined
+            ? $t({defaultMessage: "No end date"})
+            : new Intl.DateTimeFormat(user_settings.default_language, {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+              }).format(calendar_util.parse_date(recurrence.until)!);
+    $form
+        .find(".calendar-form-until")
+        .text(until_label)
+        .attr("aria-label", $t({defaultMessage: "Until: {date}"}, {date: until_label}));
+    $form.find(".calendar-form-until-remove").toggleClass("hide", recurrence.until === undefined);
+}
+
+// Shows, for a meeting, the times of the same length in the user's
+// work hours when the most attendees are free, at all of a series'
+// first occurrences.
+function update_suggestions(): void {
+    assert(state !== undefined);
+    const form = state;
+    const $suggestions = $("#calendar-view .calendar-form-suggestions");
+    const attendee_ids = [...form.required_attendee_ids, ...form.optional_attendee_ids];
+    const dates =
+        form.recurrence === undefined
+            ? [form.date]
+            : calendar_recurrence.get_occurrence_dates(
+                  form.recurrence,
+                  form.date,
+                  MAX_CHECKED_OCCURRENCES,
+                  MAX_CHECKED_DAYS,
+              );
+    if (!is_time_expanded || form.is_all_day || attendee_ids.length === 0 || dates.length === 0) {
+        $suggestions.addClass("hide");
+        return;
+    }
+    const user_ids = [current_user.user_id, ...attendee_ids];
+    suggestions_request_id += 1;
+    const request_id = suggestions_request_id;
+    void channel.get({
+        url: "/json/calendar/free_busy",
+        data: {
+            user_ids: JSON.stringify(user_ids),
+            start: calendar_layout.get_day_start(dates[0]!, form.time_zone),
+            // An event may end on the next day.
+            end: calendar_layout.get_day_start(dates.at(-1)!, form.time_zone, 2),
+        },
+        success(raw_data) {
+            if (request_id !== suggestions_request_id || state !== form) {
+                return;
+            }
+            const {free_busy} = calendar_grid.free_busy_schema.parse(raw_data);
+            render_suggestions(form, dates, user_ids, free_busy);
+        },
+    });
+}
+
+function render_suggestions(
+    form: FormState,
+    dates: string[],
+    user_ids: number[],
+    free_busy: Record<
+        string,
+        {start: number; end: number; show_as: number; event_id: number | null}[]
+    >,
+): void {
+    const is_free = (user_id: number, minute: number): boolean =>
+        dates.every((date) => {
+            const start = get_start_seconds({...form, date, start_minute: minute});
+            const end = start + form.duration_minutes * 60;
+            return (free_busy[String(user_id)] ?? []).every(
+                (block) =>
+                    FREE_SHOW_AS.has(block.show_as) ||
+                    block.end <= start ||
+                    block.start >= end ||
+                    (editing !== undefined && block.event_id === editing.occurrence.id),
+            );
+        });
+    // ponytail: the user's work hours are taken in the event's
+    // timezone, which is the user's own for most events; convert them
+    // if meetings across timezones need it.
+    const work_hours = calendar_grid.get_work_hours();
+    const candidates = [];
+    for (
+        let minute = work_hours.start;
+        minute + form.duration_minutes <= work_hours.end;
+        minute += TIME_STEP_MINUTES
+    ) {
+        const free_count = user_ids.filter((user_id) => is_free(user_id, minute)).length;
+        candidates.push({minute, free_ratio: free_count / user_ids.length});
+    }
+    // The freest times, then those nearest the chosen one, in the
+    // order of the day.
+    const chosen = candidates
+        .sort(
+            (a, b) =>
+                b.free_ratio - a.free_ratio ||
+                Math.abs(a.minute - form.start_minute) - Math.abs(b.minute - form.start_minute),
+        )
+        .slice(0, MAX_SUGGESTIONS)
+        .sort((a, b) => a.minute - b.minute);
+    const percent = new Intl.NumberFormat(user_settings.default_language, {style: "percent"});
+    const minutes = new Intl.NumberFormat(user_settings.default_language, {
+        style: "unit",
+        unit: "minute",
+        unitDisplay: "short",
+    });
+    const $suggestions = $("#calendar-view .calendar-form-suggestions");
+    $suggestions.toggleClass("hide", chosen.length === 0);
+    $suggestions.find(".calendar-form-suggestion-list").html(
+        render_calendar_form_suggestions({
+            is_recurring: form.recurrence !== undefined,
+            day_label:
+                form.recurrence === undefined
+                    ? get_date_label(form.date)
+                    : calendar_util.capitalize(
+                          calendar_recurrence.describe_pattern(form.recurrence, dates[0]!),
+                          user_settings.default_language,
+                      ),
+            suggestions: chosen.map(({minute, free_ratio}) => ({
+                minute,
+                is_selected: minute === form.start_minute,
+                time_label: `${format_minutes(minute)} – ${format_minutes(minute + form.duration_minutes)} (${minutes.format(form.duration_minutes)})`,
+                is_everyone_free: free_ratio === 1,
+                free_label: $t(
+                    {defaultMessage: "{percent} free"},
+                    {percent: percent.format(free_ratio)},
+                ),
+            })),
+        }),
+    );
 }
 
 function update_menu_buttons(): void {
@@ -376,7 +645,7 @@ function render_day(): void {
 function fetch_day_events(): void {
     assert(state !== undefined);
     const date = state.date;
-    const time_zone = get_time_zone();
+    const time_zone = state.time_zone;
     day_request_id += 1;
     const request_id = day_request_id;
     void channel.get({
@@ -657,9 +926,12 @@ function show_attendee_options(button: HTMLElement): void {
     });
 }
 
-function show_date_picker(button: HTMLElement): void {
-    assert(state !== undefined && get_mini_month_context !== undefined);
-    const form = state;
+function show_date_picker(
+    button: HTMLElement,
+    date: string,
+    on_pick: (date: string) => void,
+): void {
+    assert(get_mini_month_context !== undefined);
     const get_context = get_mini_month_context;
     const render = (instance: tippy.Instance, month: Date): void => {
         instance.setContent(
@@ -671,7 +943,7 @@ function show_date_picker(button: HTMLElement): void {
         placement: "bottom-start",
         onShow(instance) {
             menu_instance = instance;
-            render(instance, calendar_util.parse_date(form.date)!);
+            render(instance, calendar_util.parse_date(date)!);
             popover_menus.on_show_prep(instance);
         },
         onMount(instance) {
@@ -687,9 +959,8 @@ function show_date_picker(button: HTMLElement): void {
                 render(instance, addMonths(get_month(this), 1));
             });
             $popper.on("click", ".calendar-mini-month-day", function (this: HTMLElement) {
-                form.date = this.dataset["date"]!;
                 popover_menus.hide_current_popover_if_visible(instance);
-                update_time_fields();
+                on_pick(this.dataset["date"]!);
             });
         },
         onHidden(instance) {
@@ -751,12 +1022,23 @@ function validate(): boolean {
 }
 
 function get_event_data(form: FormState): Record<string, string> {
+    const time = {
+        ...form,
+        date:
+            form.recurrence === undefined
+                ? form.date
+                : calendar_recurrence.get_first_date(form.recurrence, form.date),
+    };
     return {
         title: form.title.trim(),
-        start: JSON.stringify(get_start_seconds(form)),
-        end: JSON.stringify(get_end_seconds(form)),
-        timezone: get_time_zone(),
+        start: JSON.stringify(get_start_seconds(time)),
+        end: JSON.stringify(get_end_seconds(time)),
+        timezone: form.time_zone,
         is_all_day: JSON.stringify(form.is_all_day),
+        rrule:
+            form.recurrence === undefined
+                ? ""
+                : calendar_recurrence.format_rrule(form.recurrence, form.time_zone),
         description: form.description,
         location: form.location,
         show_as: JSON.stringify(form.show_as),
@@ -781,7 +1063,12 @@ function get_changed_data(form: FormState): Record<string, string> {
         Object.entries(data).filter(([key, value]) => value !== initial_data[key]),
     );
     // The time is sent whole, with the timezone it is in.
-    if ("start" in changed || "end" in changed || "is_all_day" in changed) {
+    if (
+        "start" in changed ||
+        "end" in changed ||
+        "timezone" in changed ||
+        "is_all_day" in changed
+    ) {
         changed["start"] = data["start"]!;
         changed["end"] = data["end"]!;
         changed["timezone"] = data["timezone"]!;
@@ -831,6 +1118,34 @@ function save(): void {
     if (!validate()) {
         return;
     }
+    const time_fields = ["start", "end", "timezone", "is_all_day", "rrule"];
+    if (
+        editing !== undefined &&
+        !editing.is_occurrence &&
+        has_changed_occurrences &&
+        Object.keys(get_changed_data(state)).some((key) => time_fields.includes(key))
+    ) {
+        confirm_dialog.launch({
+            modal_title_html: $t_html({defaultMessage: "Change the whole series?"}),
+            modal_content_html: $("<p>")
+                .text(
+                    $t({
+                        defaultMessage:
+                            "Some occurrences of this series were changed or canceled on their own. Changing when the series takes place undoes those changes.",
+                    }),
+                )
+                .prop("outerHTML") as string,
+            is_compact: true,
+            modal_submit_button_text: $t({defaultMessage: "Change the series"}),
+            on_click: send,
+        });
+        return;
+    }
+    send();
+}
+
+function send(): void {
+    assert(state !== undefined);
     const form = state;
     is_saving = true;
     $("#calendar-view .calendar-form-save").prop("disabled", true);
@@ -921,6 +1236,37 @@ function create_pills(selector: string, user_ids: number[], is_disabled: boolean
     return pills;
 }
 
+function on_attendees_change(): void {
+    read_fields();
+    update_suggestions();
+}
+
+function set_up_timezone_widget(): void {
+    const now = new Date();
+    new dropdown_widget.DropdownWidget({
+        widget_name: "calendar_form_timezone",
+        widget_selector: "#calendar-view .calendar-form-timezone",
+        get_options: () =>
+            timezones.timezones.map((time_zone) => ({
+                name: `${time_zone} (${timerender.get_utc_offset_string(time_zone, now)})`,
+                unique_id: time_zone,
+            })),
+        item_click_callback(event, dropdown, widget) {
+            dropdown.hide();
+            event.preventDefault();
+            event.stopPropagation();
+            assert(state !== undefined);
+            // The event keeps its time of day in the new timezone.
+            state.time_zone = String(widget.value());
+            update_time_fields();
+        },
+        $events_container: $("#calendar-view .calendar-form"),
+        default_id: state?.time_zone,
+        unique_id_type: "string",
+        search_placeholder_text: $t({defaultMessage: "Time zone of the event"}),
+    }).setup();
+}
+
 function render_form(): void {
     assert(state !== undefined);
     const form = state;
@@ -970,6 +1316,11 @@ function render_form(): void {
         form.optional_attendee_ids,
         is_occurrence,
     );
+    for (const pills of [required_pills, optional_pills]) {
+        pills.onPillCreate(on_attendees_change);
+        pills.onPillRemove(on_attendees_change);
+    }
+    set_up_timezone_widget();
     update_menu_buttons();
     update_time_fields();
     scroll_day_to_event();
@@ -979,6 +1330,7 @@ function render_form(): void {
 function open(form: FormState, form_editing: Editing | undefined): void {
     state = form;
     editing = form_editing;
+    is_time_expanded = false;
     render_form();
     read_fields();
     initial_state = JSON.stringify(state);
@@ -1014,7 +1366,9 @@ export function open_new(date: string, start_minute: number): void {
             date,
             start_minute,
             duration_minutes: TIME_STEP_MINUTES,
+            time_zone: calendar_grid.get_time_zone(),
             is_all_day: false,
+            recurrence: undefined,
             location: "",
             has_zulip_call: false,
             description: "",
@@ -1031,7 +1385,7 @@ export function open_new(date: string, start_minute: number): void {
 }
 
 export function open_now(): void {
-    const now = new TZDate(Date.now(), get_time_zone());
+    const now = new TZDate(Date.now(), calendar_grid.get_time_zone());
     const minute = now.getHours() * 60 + now.getMinutes();
     const next = Math.ceil(minute / TIME_STEP_MINUTES) * TIME_STEP_MINUTES;
     const date = format(now, "yyyy-MM-dd");
@@ -1042,16 +1396,17 @@ export function open_now(): void {
     }
 }
 
-function open_event(occurrence: CalendarOccurrence, is_occurrence: boolean): void {
-    const time_zone = get_time_zone();
-    // The time of an all-day event is that of its own timezone.
-    const start = new TZDate(
-        occurrence.start * 1000,
-        occurrence.is_all_day ? occurrence.timezone : time_zone,
-    );
+function open_event(
+    occurrence: CalendarOccurrence,
+    is_occurrence: boolean,
+    event_has_changed_occurrences: boolean,
+): void {
+    // The time is that of the event's timezone.
+    const start = new TZDate(occurrence.start * 1000, occurrence.timezone);
     const attendees = occurrence.attendees.filter(
         (attendee) => attendee.user_id !== occurrence.organizer_id,
     );
+    has_changed_occurrences = event_has_changed_occurrences;
     open(
         {
             title: occurrence.title,
@@ -1066,7 +1421,12 @@ function open_event(occurrence: CalendarOccurrence, is_occurrence: boolean): voi
             duration_minutes: occurrence.is_all_day
                 ? MINUTES_PER_DAY
                 : Math.round((occurrence.end - occurrence.start) / 60),
+            time_zone: occurrence.timezone,
             is_all_day: occurrence.is_all_day,
+            // An occurrence is changed on its own date.
+            recurrence: is_occurrence
+                ? undefined
+                : calendar_recurrence.parse_rrule(occurrence.rrule, occurrence.timezone),
             location: occurrence.location,
             has_zulip_call: occurrence.has_zulip_call,
             description: occurrence.description,
@@ -1084,7 +1444,7 @@ function open_event(occurrence: CalendarOccurrence, is_occurrence: boolean): voi
 
 export function open_edit(occurrence: CalendarOccurrence, is_occurrence: boolean): void {
     if (is_occurrence || occurrence.original_start === null) {
-        open_event(occurrence, is_occurrence);
+        open_event(occurrence, is_occurrence, false);
         return;
     }
     // A series is changed from its start, with its own fields rather
@@ -1092,8 +1452,13 @@ export function open_edit(occurrence: CalendarOccurrence, is_occurrence: boolean
     void channel.get({
         url: `/json/calendar/events/${occurrence.id}`,
         success(raw_data) {
-            const data = z.object({event: calendar_grid.occurrence_schema}).parse(raw_data);
-            open_event(data.event, false);
+            const data = z
+                .object({
+                    event: calendar_grid.occurrence_schema,
+                    has_changed_occurrences: z.boolean(),
+                })
+                .parse(raw_data);
+            open_event(data.event, false, data.has_changed_occurrences);
         },
         error(xhr) {
             ui_report.error(
@@ -1134,7 +1499,94 @@ export function initialize(opts: {
         show_attendee_options(this);
     });
     $view.on("click", ".calendar-form-date", function (this: HTMLElement) {
-        show_date_picker(this);
+        assert(state !== undefined);
+        const form = state;
+        show_date_picker(this, form.date, (date) => {
+            const recurrence = form.recurrence;
+            // A weekly series on the start's weekday moves with it.
+            if (
+                recurrence?.frequency === "WEEKLY" &&
+                recurrence.weekdays.length === 1 &&
+                recurrence.weekdays[0] === calendar_recurrence.get_weekday(form.date)
+            ) {
+                recurrence.weekdays = [calendar_recurrence.get_weekday(date)];
+            }
+            form.date = date;
+            update_time_fields();
+        });
+    });
+    $view.on("click", ".calendar-form-until", function (this: HTMLElement) {
+        assert(state?.recurrence !== undefined);
+        const recurrence = state.recurrence;
+        show_date_picker(this, recurrence.until ?? state.date, (date) => {
+            recurrence.until = date;
+            update_time_fields();
+        });
+    });
+    $view.on("click", ".calendar-form-until-remove", () => {
+        assert(state?.recurrence !== undefined);
+        state.recurrence.until = undefined;
+        update_time_fields();
+        $("#calendar-view .calendar-form-until").trigger("focus");
+    });
+    $view.on("click", ".calendar-form-time-summary", () => {
+        is_time_expanded = !is_time_expanded;
+        update_time_fields();
+    });
+    $view.on("click", ".calendar-form-event-button", () => {
+        assert(state !== undefined);
+        state.recurrence = undefined;
+        update_time_fields();
+    });
+    $view.on("click", ".calendar-form-series-button", () => {
+        assert(state !== undefined);
+        state.recurrence ??= calendar_recurrence.get_default_recurrence(state.date);
+        is_time_expanded = true;
+        update_time_fields();
+    });
+    $view.on("click", ".calendar-form-repeats", () => {
+        assert(state !== undefined);
+        state.recurrence =
+            state.recurrence === undefined
+                ? calendar_recurrence.get_default_recurrence(state.date)
+                : undefined;
+        update_time_fields();
+    });
+    $view.on("change", ".calendar-form-interval", function (this: HTMLSelectElement) {
+        assert(state?.recurrence !== undefined);
+        state.recurrence.interval = Number(this.value);
+        update_time_fields();
+    });
+    $view.on("change", ".calendar-form-frequency", function (this: HTMLSelectElement) {
+        assert(state?.recurrence !== undefined);
+        const frequency = calendar_recurrence.FREQUENCIES.find((value) => value === this.value)!;
+        state.recurrence.frequency = frequency;
+        if (frequency === "WEEKLY" && state.recurrence.weekdays.length === 0) {
+            state.recurrence.weekdays = [calendar_recurrence.get_weekday(state.date)];
+        }
+        update_time_fields();
+    });
+    $view.on("click", ".calendar-form-weekday", function (this: HTMLElement) {
+        assert(state?.recurrence !== undefined);
+        const recurrence = state.recurrence;
+        const weekday = calendar_recurrence.WEEKDAYS.find(
+            (value) => value === this.dataset["weekday"],
+        )!;
+        if (!recurrence.weekdays.includes(weekday)) {
+            recurrence.weekdays = calendar_recurrence.WEEKDAYS.filter(
+                (value) => value === weekday || recurrence.weekdays.includes(value),
+            );
+        } else if (recurrence.weekdays.length > 1) {
+            // A weekly series repeats on at least one day.
+            recurrence.weekdays = recurrence.weekdays.filter((value) => value !== weekday);
+        }
+        update_time_fields();
+        $(`#calendar-view .calendar-form-weekday[data-weekday="${weekday}"]`).trigger("focus");
+    });
+    $view.on("click", ".calendar-form-suggestion", function (this: HTMLElement) {
+        assert(state !== undefined);
+        state.start_minute = Number(this.dataset["minute"]);
+        update_time_fields();
     });
     $view.on("change", ".calendar-form-start", function (this: HTMLSelectElement) {
         assert(state !== undefined);
