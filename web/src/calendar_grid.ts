@@ -11,6 +11,7 @@ import render_calendar_grid_error from "../templates/calendar/calendar_grid_erro
 
 import * as calendar_colleagues from "./calendar_colleagues.ts";
 import type {Colleague} from "./calendar_colleagues.ts";
+import * as calendar_filter from "./calendar_filter.ts";
 import * as calendar_layout from "./calendar_layout.ts";
 import type {AllDayEventPlacement, TimedEventPlacement} from "./calendar_layout.ts";
 import * as calendar_util from "./calendar_util.ts";
@@ -66,6 +67,7 @@ const occurrence_schema = z.object({
     title: z.string(),
     show_as: z.number(),
     is_cancelled: z.boolean(),
+    response: z.number(),
     organizer_id: z.number(),
     category: z.string(),
     attendees: z.array(z.object({user_id: z.number()})),
@@ -133,6 +135,10 @@ export function get_today(): string {
 
 export function get_work_days(): number[] {
     return settings.work_days;
+}
+
+export function get_time_scale(): number {
+    return settings.time_scale_minutes;
 }
 
 function format_time(seconds: number): string {
@@ -305,7 +311,7 @@ function get_calendar_items(): CalendarItem[][] {
         return [[], ...colleagues.map(() => [])];
     }
     return [
-        occurrences,
+        calendar_filter.filter_events(occurrences, current_user.user_id),
         ...colleagues.map((colleague) => free_busy.get(colleague.user_id) ?? []),
     ];
 }
@@ -578,6 +584,25 @@ export function go_to_location(location: CalendarLocation): void {
     current_location = location;
     fetch_week();
     redraw_grid();
+}
+
+// Draws the events again, after the filter changed.
+export function redraw_events(): void {
+    if (current_location !== undefined) {
+        render_events();
+    }
+}
+
+export function set_time_scale(minutes: number, on_error: (xhr: JQuery.jqXHR) => void): void {
+    settings = {...settings, time_scale_minutes: minutes};
+    if (current_location !== undefined) {
+        redraw_grid();
+    }
+    void channel.patch({
+        url: "/json/calendar/settings",
+        data: {time_scale_minutes: JSON.stringify(minutes)},
+        error: on_error,
+    });
 }
 
 export function set_colleagues(shown_colleagues: Colleague[]): void {

@@ -123,3 +123,21 @@ test("pin and unpin", ({override}) => {
     assert.deepEqual(calendar_colleagues.get_shown_colleagues(), []);
     assert.equal(changes, 3);
 });
+
+test("side by side", ({override}) => {
+    load([{user_id: othello.user_id, color: "#2f6fc4"}], override);
+    calendar_colleagues.set_shown(othello.user_id, true);
+    assert.ok(calendar_colleagues.is_side_by_side_enabled());
+    assert.equal(calendar_colleagues.get_shown_colleagues().length, 1);
+
+    // Turning side by side off hides the checked colleagues, who stay
+    // checked.
+    calendar_colleagues.set_side_by_side_enabled(false);
+    assert.ok(!calendar_colleagues.is_side_by_side_enabled());
+    assert.deepEqual(calendar_colleagues.get_shown_colleagues(), []);
+    assert.ok(calendar_colleagues.get_colleagues()[0].is_shown);
+
+    calendar_colleagues.set_side_by_side_enabled(true);
+    assert.equal(calendar_colleagues.get_shown_colleagues().length, 1);
+    assert.equal(changes, 4);
+});

@@ -64,11 +64,13 @@
                 <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
             </button>
         </div>
-        <button type="button" class="calendar-toolbar-button calendar-filter-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Filter' }}" aria-label="{{t 'Filter' }}" aria-haspopup="true">
-            <i class="zulip-icon zulip-icon-filter" aria-hidden="true"></i>
-            <span class="calendar-toolbar-label">{{t "Filter" }}</span>
-            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
-        </button>
+        <div class="calendar-filter-menu-trigger">
+            <button type="button" class="calendar-toolbar-button calendar-filter-button tippy-zulip-delayed-tooltip {{#if is_filtering}}active{{/if}}" data-tippy-content="{{t 'Filter' }}" aria-label="{{t 'Filter' }}" aria-haspopup="true">
+                <i class="zulip-icon zulip-icon-filter" aria-hidden="true"></i>
+                <span class="calendar-toolbar-label">{{t "Filter" }}</span>
+                <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            </button>
+        </div>
         <span class="calendar-toolbar-separator" aria-hidden="true"></span>
         <button type="button" class="calendar-toolbar-button calendar-meet-now-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Meet now' }}" aria-label="{{t 'Meet now' }}">
             <i class="zulip-icon zulip-icon-video-call" aria-hidden="true"></i>

@@ -11,7 +11,9 @@ import render_calendar_view_menu_popover from "../templates/popovers/calendar/ca
 
 import * as browser_history from "./browser_history.ts";
 import * as calendar_colleagues from "./calendar_colleagues.ts";
+import * as calendar_filter from "./calendar_filter.ts";
 import * as calendar_grid from "./calendar_grid.ts";
+import * as calendar_menus from "./calendar_menus.ts";
 import * as calendar_util from "./calendar_util.ts";
 import type {CalendarLocation, CalendarView} from "./calendar_util.ts";
 import * as dropdown_widget from "./dropdown_widget.ts";
@@ -44,6 +46,12 @@ function today(): Date {
 
 function format_date(date: Date, options: Intl.DateTimeFormatOptions): string {
     return new Intl.DateTimeFormat(user_settings.default_language, options).format(date);
+}
+
+const TIME_SCALES = [15, 30, 60];
+
+function get_time_scale_label(minutes: number): string {
+    return $t({defaultMessage: "{minutes} minutes"}, {minutes});
 }
 
 function get_view_label(view: CalendarView): string {
@@ -152,6 +160,7 @@ function render_view(): void {
             is_left_panel_collapsed: is_left_panel_collapsed(),
             mini_month: get_mini_month_context(left_panel_month!),
             colleague_list: get_colleague_list_context(),
+            is_filtering: calendar_filter.is_filtering(),
             legend: calendar_grid.get_legend(),
             range_label: get_range_label(current_location, "long"),
             short_range_label: get_range_label(current_location, "short"),
@@ -359,6 +368,8 @@ function register_view_menu_popover(): void {
                             label: get_view_label(view),
                             is_current: view === current_view,
                         })),
+                        is_side_by_side: calendar_colleagues.is_side_by_side_enabled(),
+                        time_scale_label: get_time_scale_label(calendar_grid.get_time_scale()),
                     }),
                 ),
             );
@@ -366,14 +377,40 @@ function register_view_menu_popover(): void {
             popover_menus.on_show_prep(instance);
         },
         onMount(instance) {
-            $(instance.popper).on("click", ".calendar-view-option", function (this: HTMLElement) {
+            const $popper = $(instance.popper);
+            $popper.on("click", ".calendar-view-option", function (this: HTMLElement) {
                 assert(current_location !== undefined);
                 const view = this.dataset["calendarView"] === "week" ? "week" : "workweek";
                 go_to_location({...current_location, view});
                 popover_menus.hide_current_popover_if_visible(instance);
             });
+            $popper.on("click", ".calendar-side-by-side-option", () => {
+                calendar_colleagues.set_side_by_side_enabled(
+                    !calendar_colleagues.is_side_by_side_enabled(),
+                );
+                popover_menus.hide_current_popover_if_visible(instance);
+            });
+            calendar_menus.setup_submenus(instance, () => ({
+                is_radio: true,
+                get_options: () =>
+                    TIME_SCALES.map((minutes) => ({
+                        value: String(minutes),
+                        label: get_time_scale_label(minutes),
+                        checked: String(minutes === calendar_grid.get_time_scale()),
+                    })),
+                on_click(value) {
+                    calendar_grid.set_time_scale(
+                        Number(value),
+                        report_error($t({defaultMessage: "Failed to save the time scale"})),
+                    );
+                    $popper
+                        .find(".calendar-menu-value")
+                        .text(get_time_scale_label(Number(value)));
+                },
+            }));
         },
         onHidden(instance) {
+            calendar_menus.hide_submenu();
             instance.destroy();
             popover_menus.popover_instances.calendar_view_menu = null;
         },
@@ -482,6 +519,13 @@ export function initialize({
     });
 
     calendar_colleagues.initialize({on_colleagues_change});
+    calendar_menus.register_filter_menu(() => {
+        calendar_grid.redraw_events();
+        $("#calendar-view .calendar-filter-button").toggleClass(
+            "active",
+            calendar_filter.is_filtering(),
+        );
+    });
     calendar_grid.initialize({
         // The work days in the user's settings change the work week.
         on_settings_change() {

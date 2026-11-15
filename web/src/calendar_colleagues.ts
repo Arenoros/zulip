@@ -23,6 +23,7 @@ const PALETTE = [
 export const COLLAPSED_LIST_LENGTH = 5;
 
 const SHOWN_KEY = "calendar-shown-colleagues";
+const SIDE_BY_SIDE_KEY = "calendar-side-by-side";
 
 const pinned_users_schema = z.object({
     pinned_users: z.array(z.object({user_id: z.number(), color: z.string()})),
@@ -80,7 +81,21 @@ export function get_colleagues(): Colleague[] {
     });
 }
 
+// Whether the calendars of the checked colleagues are shown; the view
+// menu hides them all without unchecking them.
+export function is_side_by_side_enabled(): boolean {
+    return localstorage().get(SIDE_BY_SIDE_KEY) !== false;
+}
+
+export function set_side_by_side_enabled(is_enabled: boolean): void {
+    localstorage().set(SIDE_BY_SIDE_KEY, is_enabled);
+    on_change?.();
+}
+
 export function get_shown_colleagues(): Colleague[] {
+    if (!is_side_by_side_enabled()) {
+        return [];
+    }
     return get_colleagues().filter((colleague) => colleague.is_shown);
 }
 

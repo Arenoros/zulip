@@ -1,0 +1,16 @@
+<div class="popover-menu calendar-menu calendar-submenu" data-submenu="{{id}}">
+    <ul role="menu" class="popover-menu-list">
+        {{#each options}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="{{#if ../is_radio}}menuitemradio{{else}}menuitemcheckbox{{/if}}" tabindex="0" class="popover-menu-link calendar-submenu-option" data-value="{{value}}" aria-checked="{{checked}}">
+                    {{#if ../is_radio}}
+                        <i class="popover-menu-icon zulip-icon {{#if (eq checked "true")}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                    {{else}}
+                        {{> calendar_menu_checkbox .}}
+                    {{/if}}
+                    <span class="popover-menu-label">{{label}}</span>
+                </a>
+            </li>
+        {{/each}}
+    </ul>
+</div>
