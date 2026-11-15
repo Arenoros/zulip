@@ -7,6 +7,9 @@ import * as people from "./people.ts";
 import type {User} from "./people.ts";
 import * as personal_sections from "./personal_sections.ts";
 import * as pm_conversations from "./pm_conversations.ts";
+import * as stream_data from "./stream_data.ts";
+import * as stream_topic_history from "./stream_topic_history.ts";
+import type {StreamSubscription} from "./sub_store.ts";
 import * as unread from "./unread.ts";
 import * as user_status from "./user_status.ts";
 import type {UserStatusEmojiInfo} from "./user_status.ts";
@@ -41,11 +44,15 @@ export function get_active_user_ids_string(): string | undefined {
 
 export type PMListConversation = {
     user_ids_string: string;
+    meeting_chat_stream_id?: number | undefined;
 };
 
 export type DisplayObject = {
     recipients: string;
     user_ids_string: string;
+    // Set for the chat of a calendar meeting, which is a channel.
+    is_meeting_chat?: boolean;
+    meeting_chat_stream_id?: number | undefined;
     is_current_user: boolean;
     unread: number;
     is_zero: boolean;
@@ -110,9 +117,34 @@ function get_display_object(
     return display_object;
 }
 
+function get_meeting_chat_display_object(sub: StreamSubscription): DisplayObject {
+    const num_unread = unread.unread_count_info_for_stream(sub.stream_id).unmuted_count;
+    const filter = narrow_state.filter();
+    return {
+        recipients: sub.name,
+        user_ids_string: "",
+        is_meeting_chat: true,
+        meeting_chat_stream_id: sub.stream_id,
+        unread: num_unread,
+        is_zero: num_unread === 0,
+        is_active:
+            filter !== undefined &&
+            filter.is_conversation_view() &&
+            narrow_state.stream_id(filter) === sub.stream_id,
+        url: hash_util.by_stream_topic_url(sub.stream_id, ""),
+        status_emoji_info: undefined,
+        user_circle_class: undefined,
+        is_group: true,
+        is_bot: false,
+        has_unread_mention: unread.stream_has_any_unmuted_mentions(sub.stream_id),
+        includes_deactivated_user: false,
+        is_current_user: false,
+    };
+}
+
 export function get_conversations(search_string = ""): DisplayObject[] {
     const conversations = pm_conversations.recent.get();
-    const display_objects: DisplayObject[] = [];
+    const display_objects: (DisplayObject & {max_message_id: number})[] = [];
 
     // The user_ids_string for the current view, if any.
     const active_user_ids_string = get_active_user_ids_string();
@@ -123,9 +155,11 @@ export function get_conversations(search_string = ""): DisplayObject[] {
             .map((conversation) => conversation.user_ids_string)
             .includes(active_user_ids_string)
     ) {
+        // The current conversation, which has no messages yet, comes
+        // first.
         conversations.unshift({
             user_ids_string: active_user_ids_string,
-            max_message_id: -1,
+            max_message_id: Infinity,
             local_message_count: 0,
         });
     }
@@ -141,10 +175,26 @@ export function get_conversations(search_string = ""): DisplayObject[] {
             continue;
         }
 
-        display_objects.push(get_display_object(user_ids_string, active_user_ids_string));
+        display_objects.push({
+            ...get_display_object(user_ids_string, active_user_ids_string),
+            max_message_id: conversation.max_message_id,
+        });
     }
 
-    return display_objects;
+    // Meeting chats are among the conversations, by their latest
+    // message.
+    for (const sub of stream_data.get_meeting_chats()) {
+        if (util.prefix_match({value: sub.name, search_term: search_string})) {
+            display_objects.push({
+                ...get_meeting_chat_display_object(sub),
+                max_message_id: stream_topic_history.get_max_message_id(sub.stream_id),
+            });
+        }
+    }
+
+    return display_objects
+        .toSorted((a, b) => b.max_message_id - a.max_message_id)
+        .map(({max_message_id: _max_message_id, ...display_object}) => display_object);
 }
 
 export type SectionDisplayObject = {

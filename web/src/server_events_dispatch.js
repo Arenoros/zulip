@@ -10,6 +10,7 @@ import * as bot_data from "./bot_data.ts";
 import * as browser_history from "./browser_history.ts";
 import {buddy_list} from "./buddy_list.ts";
 import * as calendar_grid from "./calendar_grid.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel_folders from "./channel_folders.ts";
@@ -41,6 +42,7 @@ import * as message_store from "./message_store.ts";
 import * as message_view from "./message_view.ts";
 import * as message_view_header from "./message_view_header.ts";
 import * as muted_users_ui from "./muted_users_ui.ts";
+import * as narrow_state from "./narrow_state.ts";
 import * as narrow_title from "./narrow_title.ts";
 import * as navbar_alerts from "./navbar_alerts.ts";
 import * as navigation_views from "./navigation_views.ts";
@@ -130,6 +132,10 @@ export function dispatch_normal_event(event) {
         case "calendar":
             calendar_ui.update_unanswered_invitation_count(event.unanswered_invitation_count);
             calendar_grid.refresh();
+            calendar_meeting_chat.clear_next_time_labels();
+            if (stream_data.is_meeting_chat(narrow_state.stream_id())) {
+                message_view_header.render_title_area();
+            }
             break;
 
         case "calendar_free_busy":

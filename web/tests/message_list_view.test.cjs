@@ -42,6 +42,7 @@ const people = mock_esm("../src/people", {
     is_direct_message_conversation_with_self: () => false,
 });
 
+const bubble_layout = zrequire("bubble_layout");
 const {Filter} = zrequire("../src/filter");
 const {MessageListView} = zrequire("../src/message_list_view");
 const message_list = zrequire("message_list");
@@ -1328,6 +1329,18 @@ test("message series in the bubble layout", ({override}) => {
     view.merge_message_groups(view.build_message_groups([dm_at(18)]), "bottom");
     view.merge_message_groups(view.build_message_groups([dm_at(24)]), "bottom");
     assert.deepEqual(senders_shown(view), [true, false, false, true, false, true]);
+
+    // The chat of a calendar meeting is a channel without topics
+    // shown as a group chat.
+    stream_data.add_sub_for_tests(
+        make_stream({stream_id: 102, name: "Planning", is_meeting_chat: true}),
+    );
+    const meeting_chat = [
+        {operator: "channel", operand: "102"},
+        {operator: "topic", operand: ""},
+    ];
+    assert.ok(make_view(meeting_chat).is_bubble_layout());
+    assert.ok(!bubble_layout.is_meeting_chat(new Filter(conversation)));
 
     override(user_settings, "web_direct_message_bubbles", false);
     view = make_view(conversation);

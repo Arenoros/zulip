@@ -229,6 +229,20 @@ run_test("compute_placeholder_text", ({override, override_rewire}) => {
         $t({defaultMessage: "Message #all > Test"}),
     );
 
+    // The chat of a calendar meeting is named like a group chat.
+    const meeting_chat = make_stream({
+        subscribed: true,
+        name: "Weekly sync",
+        stream_id: 4,
+        topics_policy: "empty_topic_only",
+        is_meeting_chat: true,
+    });
+    stream_data.add_sub_for_tests(meeting_chat);
+    assert.equal(
+        compose_ui.compute_placeholder_text({...opts, stream_id: 4, topic: ""}),
+        $t({defaultMessage: "Message {recipient_names}"}, {recipient_names: "Weekly sync"}),
+    );
+
     // When empty topic is allowed and user can create new topics,
     // the placeholder should include the "general chat" display name.
     const stream_open = make_stream({

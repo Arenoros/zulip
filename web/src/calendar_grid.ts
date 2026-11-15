@@ -81,6 +81,7 @@ export const occurrence_schema = z.object({
     allow_forwarding: z.boolean(),
     hide_attendees: z.boolean(),
     has_zulip_call: z.boolean(),
+    chat_id: z.nullable(z.number()),
     date_created: z.number(),
     attendees: z.array(
         z.object({
@@ -94,7 +95,7 @@ export const occurrence_schema = z.object({
 
 export type CalendarOccurrence = z.infer<typeof occurrence_schema>;
 
-const events_schema = z.object({events: z.array(occurrence_schema)});
+export const events_schema = z.object({events: z.array(occurrence_schema)});
 
 const free_busy_block_schema = z.object({
     start: z.number(),

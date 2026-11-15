@@ -21,6 +21,7 @@ import * as narrow_state from "./narrow_state.ts";
 import * as overlays from "./overlays.ts";
 import * as peer_data from "./peer_data.ts";
 import * as people from "./people.ts";
+import * as pm_list from "./pm_list.ts";
 import * as recent_view_ui from "./recent_view_ui.ts";
 import * as settings_notifications from "./settings_notifications.ts";
 import * as settings_streams from "./settings_streams.ts";
@@ -174,6 +175,9 @@ export function update_property<P extends keyof UpdatableStreamProperties>(
         name(value) {
             stream_settings_ui.update_stream_name(sub, value);
             compose_recipient.possibly_update_stream_name_in_compose(sub.stream_id);
+            if (sub.is_meeting_chat) {
+                pm_list.update_private_messages();
+            }
         },
         description(value) {
             assert(other_values !== undefined);

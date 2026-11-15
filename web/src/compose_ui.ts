@@ -453,6 +453,14 @@ export function compute_placeholder_text(opts: ComposePlaceholderOptions): strin
         let stream_name = "";
         if (opts.stream_id !== undefined) {
             const stream = stream_data.get_sub_by_id(opts.stream_id);
+            if (stream?.is_meeting_chat) {
+                // The chat of a calendar meeting is named like a
+                // group chat.
+                return $t(
+                    {defaultMessage: "Message {recipient_names}"},
+                    {recipient_names: stream.name},
+                );
+            }
             if (stream !== undefined) {
                 stream_name = stream.name;
             }

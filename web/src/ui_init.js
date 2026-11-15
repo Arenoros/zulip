@@ -19,6 +19,7 @@ import * as banners from "./banners.ts";
 import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import {is_browser_unsupported_old_version} from "./browser_support.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel from "./channel.ts";
@@ -807,6 +808,7 @@ export async function initialize_everything(state_data) {
     personal_menu_popover.initialize();
     pm_list.initialize();
     personal_sections_ui.initialize();
+    calendar_meeting_chat.initialize();
     topic_list.initialize({
         on_topic_click(stream_id, topic) {
             const sub = sub_store.get(stream_id);

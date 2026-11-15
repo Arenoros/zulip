@@ -79,10 +79,6 @@ class BinaryDict<T> {
         return this.trues.values();
     }
 
-    num_true_items(): number {
-        return this.trues.size;
-    }
-
     false_values(): IteratorObject<T, BuiltinIteratorReturn> {
         return this.falses.values();
     }
@@ -373,27 +369,49 @@ export function get_default_stream_options(): {
         .toArray();
 }
 
+// Meeting chats are shown among direct message conversations, so the
+// lists of channels leave them out.
 export function get_unsorted_subs(): StreamSubscription[] {
-    return stream_info.values().toArray();
+    return stream_info
+        .values()
+        .filter((sub) => !sub.is_meeting_chat)
+        .toArray();
 }
 
 export function get_unsorted_subs_with_content_access(): StreamSubscription[] {
     return stream_info
         .values()
-        .filter((sub) => has_content_access(sub))
+        .filter((sub) => !sub.is_meeting_chat && has_content_access(sub))
         .toArray();
 }
 
 export function num_subscribed_subs(): number {
-    return stream_info.num_true_items();
+    return subscribed_subs().length;
 }
 
 export function subscribed_subs(): StreamSubscription[] {
-    return [...stream_info.true_values()];
+    return stream_info
+        .true_values()
+        .filter((sub) => !sub.is_meeting_chat)
+        .toArray();
 }
 
 export function unsubscribed_subs(): StreamSubscription[] {
-    return [...stream_info.false_values()];
+    return stream_info
+        .false_values()
+        .filter((sub) => !sub.is_meeting_chat)
+        .toArray();
+}
+
+export function get_meeting_chats(): StreamSubscription[] {
+    return stream_info
+        .true_values()
+        .filter((sub) => sub.is_meeting_chat && !sub.is_archived)
+        .toArray();
+}
+
+export function is_meeting_chat(stream_id: number | undefined): boolean {
+    return stream_id !== undefined && sub_store.get(stream_id)?.is_meeting_chat === true;
 }
 
 export function subscribed_stream_names(): string[] {

@@ -136,6 +136,7 @@ export type MessageGroup = {
           channel_color: string;
           stream_url: string;
           is_archived: boolean;
+          is_meeting_chat: boolean;
           subscribed?: boolean;
           topic: string;
           topic_display_name: string;
@@ -507,6 +508,7 @@ export function populate_group_from_message(
             match_topic_html: util.get_match_topic(message),
             stream_url: hash_util.channel_url_by_user_setting(stream_id),
             is_archived: sub.is_archived,
+            is_meeting_chat: sub.is_meeting_chat,
             topic_url: internal_url.by_stream_topic_url(
                 stream_id,
                 topic,

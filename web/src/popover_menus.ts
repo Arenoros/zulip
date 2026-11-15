@@ -44,6 +44,7 @@ type PopoverName =
     | "folder_actions"
     | "dm_actions"
     | "dm_section_actions"
+    | "meeting_chat_actions"
     | "send_later_options"
     | "calendar_view_menu"
     | "calendar_date_picker"
@@ -79,6 +80,7 @@ export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     folder_actions: null,
     dm_actions: null,
     dm_section_actions: null,
+    meeting_chat_actions: null,
     send_later_options: null,
     calendar_view_menu: null,
     calendar_date_picker: null,

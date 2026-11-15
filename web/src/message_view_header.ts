@@ -7,6 +7,7 @@ import render_message_view_header_call_buttons from "../templates/message_view_h
 
 import * as bubble_layout from "./bubble_layout.ts";
 import * as buddy_data from "./buddy_data.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as compose_call from "./compose_call.ts";
 import type {Filter} from "./filter.ts";
@@ -98,11 +99,43 @@ type MessageViewHeaderContext = {
       }
 );
 
+// The header of a meeting's chat names the meeting, with the time of
+// its next occurrence, where a group chat shows its participants.
+function get_meeting_chat_header_context(filter: Filter): ConversationHeaderContext {
+    const sub = narrow_state.stream_sub(filter);
+    assert(sub !== undefined);
+    const subtitle_parts = [
+        $t({defaultMessage: "Group chat"}),
+        $t(
+            {defaultMessage: "{N, plural, one {# participant} other {# participants}}"},
+            {N: peer_data.get_subscriber_count(sub.stream_id)},
+        ),
+    ];
+    const time_label = calendar_meeting_chat.get_next_time_label(sub.stream_id, () => {
+        maybe_rerender_title_area_for_stream(sub.stream_id);
+    });
+    if (time_label) {
+        subtitle_parts.push(time_label);
+    }
+    return {
+        title: sub.name,
+        avatar_urls: [],
+        is_group: true,
+        user_circle_class: undefined,
+        channel_color: sub.color,
+        channel_icon: "calendar",
+        subtitle: subtitle_parts.join(" · "),
+    };
+}
+
 // In the bubble layout, the header of a direct message conversation
 // shows who it is with, as avatars, and their status.
 function get_conversation_header_context(filter: Filter): ConversationHeaderContext | undefined {
     if (!bubble_layout.is_bubble_layout(filter)) {
         return undefined;
+    }
+    if (bubble_layout.is_meeting_chat(filter)) {
+        return get_meeting_chat_header_context(filter);
     }
     const user_ids = filter.terms_with_operator("dm")[0]!.operand;
     const users: User[] = [];

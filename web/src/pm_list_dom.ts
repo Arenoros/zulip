@@ -36,7 +36,10 @@ export function keyed_pm_li(conversation: PMListConversation): vdom.Node<PMNode>
     const eq = (other: PMNode): boolean =>
         other.type === "conversation" && _.isEqual(conversation, other.conversation);
 
-    const key = conversation.user_ids_string;
+    const key =
+        conversation.meeting_chat_stream_id === undefined
+            ? conversation.user_ids_string
+            : `meeting_chat_${conversation.meeting_chat_stream_id}`;
 
     return {
         key,

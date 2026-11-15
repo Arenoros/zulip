@@ -27,6 +27,8 @@ export type RecipientLabel = {
     stream?: StreamSubscription;
     topic_display_name?: string;
     is_dm_with_self?: boolean;
+    // The chat of a calendar meeting is named like a group chat.
+    is_meeting_chat?: boolean;
     user_ids?: number[];
 };
 
@@ -36,6 +38,9 @@ export function get_channel_recipient_label(
 ): RecipientLabel | undefined {
     const stream = stream_data.get_sub_by_id(stream_id);
     const topic_display_name = util.get_final_topic_display_name(topic);
+    if (stream?.is_meeting_chat) {
+        return {label_text: stream.name, is_meeting_chat: true, stream};
+    }
     if (stream) {
         const recipient_label: RecipientLabel = {
             label_text: `#${stream.name} > ${topic_display_name}`,
@@ -240,6 +245,7 @@ export function update_reply_button_with_recipient_context(
             stream: recipient_label.stream,
             topic_display_name: recipient_label.topic_display_name,
             is_dm_with_self: recipient_label.is_dm_with_self,
+            is_meeting_chat: recipient_label.is_meeting_chat,
             empty_string_topic_display_name,
             label_text: recipient_label.label_text,
         });

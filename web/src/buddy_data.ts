@@ -495,7 +495,10 @@ export function get_conversation_participants_callback(): () => Set<number> {
         if (
             !narrow_state.stream_id() ||
             narrow_state.topic() === undefined ||
-            !message_lists.current
+            !message_lists.current ||
+            // Like a group chat, the chat of a calendar meeting
+            // lists everyone in it as one section.
+            stream_data.is_meeting_chat(narrow_state.stream_id())
         ) {
             return new Set<number>();
         }
