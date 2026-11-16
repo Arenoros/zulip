@@ -51,10 +51,13 @@ run_test("cards from the messages of the list", () => {
     const cards = topic_cards.get_topic_cards(msg_list, messages);
     // Topics are compared case-insensitively, the least recently
     // active first, and each card shows the three latest replies.
-    assert.deepEqual(cards.map(card_ids), [
-        [2, 5],
-        [1, 7, 8, 9],
-    ]);
+    assert.deepEqual(
+        cards.map((card) => card_ids(card)),
+        [
+            [2, 5],
+            [1, 7, 8, 9],
+        ],
+    );
     assert.equal(cards[0].hidden_replies, undefined);
     // Without what the server told us, the hidden replies are the
     // loaded ones, their authors most recent first.
@@ -99,7 +102,10 @@ run_test("cards with what the server told us", () => {
         message(21, "lunch", dave),
     ];
     let cards = topic_cards.get_topic_cards(msg_list, messages);
-    assert.deepEqual(cards.map(card_ids), [[15], [10, 19, 20, 21]]);
+    assert.deepEqual(
+        cards.map((card) => card_ids(card)),
+        [[15], [10, 19, 20, 21]],
+    );
     assert.deepEqual(cards[1].hidden_replies, {
         count: 6,
         sender_names: ["Bob", "Carol"],
@@ -109,7 +115,10 @@ run_test("cards with what the server told us", () => {
     // A topic whose first message was moved away starts with its
     // first loaded message.
     cards = topic_cards.get_topic_cards(msg_list, messages.slice(2));
-    assert.deepEqual(cards.map(card_ids), [[18, 19, 20, 21]]);
+    assert.deepEqual(
+        cards.map((card) => card_ids(card)),
+        [[18, 19, 20, 21]],
+    );
 
     topic_cards.forget_message_list(msg_list.id);
     assert.equal(topic_cards.get_anchor(msg_list), undefined);

@@ -42,7 +42,8 @@ export function terms_for_kind(filter: Filter, kind: SearchFilterKind): NarrowCa
             return terms;
         case "direct":
             return [...terms, {operator: "is", operand: "dm", negated: false}];
-        case "channels":
+        default:
+            kind satisfies "channels";
             return [...terms, {operator: "is", operand: "dm", negated: true}];
     }
 }
@@ -80,7 +81,8 @@ function kind_label(kind: SearchFilterKind): string {
             return $t({defaultMessage: "All"});
         case "direct":
             return $t({defaultMessage: "Direct and group messages"});
-        case "channels":
+        default:
+            kind satisfies "channels";
             return $t({defaultMessage: "Channels"});
     }
 }
@@ -91,23 +93,26 @@ export function update_counts(): void {
         return;
     }
     latest_counts_request += 1;
-    const counts_request = latest_counts_request;
     for (const kind of SEARCH_FILTER_KINDS) {
-        const kind_filter = new Filter(terms_for_kind(filter, kind));
-        void channel.get({
-            url: "/json/messages/count",
-            data: {narrow: message_fetch.get_narrow_for_message_fetch(kind_filter)},
-            success(raw_data) {
-                if (counts_request !== latest_counts_request) {
-                    return;
-                }
-                const data = message_count_response_schema.parse(raw_data);
-                $(`.search-filter[data-search-filter="${kind}"] .search-filter-count`).text(
-                    count_label(data.count, data.count_is_limited),
-                );
-            },
-        });
+        update_count(filter, kind, latest_counts_request);
     }
+}
+
+function update_count(filter: Filter, kind: SearchFilterKind, counts_request: number): void {
+    const kind_filter = new Filter(terms_for_kind(filter, kind));
+    void channel.get({
+        url: "/json/messages/count",
+        data: {narrow: message_fetch.get_narrow_for_message_fetch(kind_filter)},
+        success(raw_data) {
+            if (counts_request !== latest_counts_request) {
+                return;
+            }
+            const data = message_count_response_schema.parse(raw_data);
+            $(`.search-filter[data-search-filter="${kind}"] .search-filter-count`).text(
+                count_label(data.count, data.count_is_limited),
+            );
+        },
+    });
 }
 
 export function handle_narrow_activated(filter: Filter): void {

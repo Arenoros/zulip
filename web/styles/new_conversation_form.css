@@ -55,7 +55,7 @@ body:has(.focused-message-list.conversations-view) #legacy-closed-compose-box {
         background-color: var(--color-background-new-conversation-form);
         border: 1px solid var(--color-border-new-conversation-form);
         border-radius: 8px;
-        box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+        box-shadow: 0 8px 24px hsl(0deg 0% 0% / 25%);
     }
 
     #compose_top {

@@ -330,6 +330,20 @@
 
             .compose_control_button_container:has(.markdown_preview) {
                 order: 11;
+                position: relative;
+                /* 8px at 15px/1em */
+                margin-left: 0.5333em;
+
+                &::after {
+                    content: "";
+                    position: absolute;
+                    /* A 1px by 18px divider, centered in the 8px gap. */
+                    left: -0.3em;
+                    top: 0.4667em;
+                    width: 1px;
+                    height: 1.2em;
+                    background-color: var(--color-border-compose-field);
+                }
             }
 
             .compose_control_button_container:has(.undo_markdown_preview) {
@@ -354,23 +368,6 @@
                     top: 0.3889em;
                     width: 1px;
                     height: 1em;
-                    background-color: var(--color-border-compose-field);
-                }
-            }
-
-            .compose_control_button_container:has(.markdown_preview) {
-                position: relative;
-                /* 8px at 15px/1em */
-                margin-left: 0.5333em;
-
-                &::after {
-                    content: "";
-                    position: absolute;
-                    /* A 1px by 18px divider, centered in the 8px gap. */
-                    left: -0.3em;
-                    top: 0.4667em;
-                    width: 1px;
-                    height: 1.2em;
                     background-color: var(--color-border-compose-field);
                 }
             }

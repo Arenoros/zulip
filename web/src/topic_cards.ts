@@ -51,7 +51,10 @@ function get_topic_card_info(msg_list: MessageList): Map<string, TopicCardInfo> 
 export function get_anchor(msg_list: MessageList): number | undefined {
     // Each page holds the topics last active before the oldest
     // topic we already have.
-    const max_ids = [...get_topic_card_info(msg_list).values()].map((card) => card.max_id);
+    const max_ids = get_topic_card_info(msg_list)
+        .values()
+        .map((card) => card.max_id)
+        .toArray();
     return max_ids.length > 0 ? Math.min(...max_ids) : undefined;
 }
 

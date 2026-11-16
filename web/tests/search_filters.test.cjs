@@ -8,7 +8,7 @@ const {$} = require("./lib/zjquery.cjs");
 const {page_params} = require("./lib/zpage_params.cjs");
 
 const channel = mock_esm("../src/channel");
-const message_fetch = mock_esm("../src/message_fetch", {
+mock_esm("../src/message_fetch", {
     get_narrow_for_message_fetch: (filter) => JSON.stringify(filter.terms()),
 });
 

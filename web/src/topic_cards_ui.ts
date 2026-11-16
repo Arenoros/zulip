@@ -37,7 +37,7 @@ function open_hidden_replies(elem: HTMLElement): void {
         return;
     }
     const {msg_list, $card, first_message} = card;
-    const oldest_shown_reply = $card.find(".message_row").eq(1);
+    const $oldest_shown_reply = $card.find(".message_row").eq(1);
     // Keep the card's first message where it is while the replies
     // appear below it.
     msg_list.select_id(first_message.id, {then_scroll: false});
@@ -45,7 +45,7 @@ function open_hidden_replies(elem: HTMLElement): void {
         msg_list,
         stream_id: first_message.stream_id,
         topic: first_message.topic,
-        anchor: rows.id(oldest_shown_reply),
+        anchor: rows.id($oldest_shown_reply),
     });
 }
 

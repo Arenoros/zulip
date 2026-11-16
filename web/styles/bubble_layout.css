@@ -22,14 +22,14 @@
         /* 3px at 15px/1em */
         padding-top: 0.2em;
         /* The status row holds the notice of a failed send. */
-        grid-template-areas:
+        grid-template:
             ".      sender    sender sender   sender sender"
             "avatar message   edited controls time   .     "
             ".      status    status status   status .     "
             ".      more      .      .        .      .     "
             ".      reactions .      .        .      .     "
-            ".      reminders .      .        .      .     ";
-        grid-template-columns:
+            ".      reminders .      .        .      .     "
+            /
             var(--bubble-avatar-column-width)
             fit-content(
                 calc(
@@ -38,7 +38,6 @@
                 )
             )
             max-content max-content max-content minmax(0, 1fr);
-        grid-template-rows: repeat(6, auto);
         /* For the floating message controls. */
         position: relative;
 
@@ -82,6 +81,7 @@
             /* Content wider than the column, such as a long formula,
                scrolls inside the bubble. */
             max-width: 100%;
+
             --color-markdown-link: var(--color-link-message-bubble);
             --color-markdown-link-hover: var(--color-link-message-bubble);
             --color-markdown-link-decoration: color-mix(
@@ -101,8 +101,7 @@
         }
 
         .message-time {
-            justify-self: start;
-            align-self: center;
+            place-self: center start;
             /* 8px at 12px/1em */
             padding: 0 0.6667em;
             font-size: 0.8em;
@@ -120,42 +119,7 @@
         &:hover .message-time {
             visibility: visible;
         }
-    }
 
-    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
-        /* 16px at 15px/1em */
-        padding-top: 1.0667em;
-
-        .message-sender-and-time {
-            grid-area: sender;
-            justify-self: start;
-            display: flex;
-            align-items: baseline;
-            /* 8px at 15px/1em */
-            gap: 0.5333em;
-            min-width: 0;
-            /* 4px at 15px/1em */
-            padding-bottom: 0.2667em;
-        }
-
-        .message_sender {
-            font-size: 0.8em;
-            line-height: var(--base-line-height-unitless);
-
-            .sender_name {
-                font-weight: 600;
-            }
-        }
-
-        .message-time {
-            padding: 0;
-            visibility: visible;
-        }
-    }
-
-    /* Message states */
-
-    .messagebox-content:not(.is-me-message) {
         .message_edit_notice {
             align-self: center;
             /* 11px at 15px/1em */
@@ -195,7 +159,108 @@
         .actions_hover {
             order: 1;
         }
+
+        .message_length_controller:not(:empty) {
+            /* 4px at 15px/1em */
+            margin-top: 0.2667em;
+        }
+
+        .message_length_toggle {
+            width: auto;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+            color: var(--color-link-message-bubble);
+            font-variant: normal;
+            font-weight: 600;
+
+            &:hover,
+            &:active {
+                background-color: transparent;
+                text-decoration: underline;
+                scale: none;
+            }
+        }
+
+        .message_content.condensed ~ .message_length_controller {
+            grid-area: message;
+            place-self: end start;
+            /* Above the faded text. */
+            position: relative;
+            /* The padding of the bubble, 7px 12px at 15px/1em */
+            margin: 0 0.8em 0.4667em;
+        }
+
+        /* A collapsed message is replaced by a dashed frame with the
+           button to show it. */
+        .message_content.collapsed ~ .message_length_controller {
+            justify-self: start;
+            display: flex;
+            align-items: center;
+            /* 36px at 15px/1em */
+            min-height: 2.4em;
+            margin: 0;
+            /* 12px at 15px/1em */
+            padding: 0 0.8em;
+            border: 1px dashed var(--color-border-rendered-markdown-table);
+            border-radius: 8px;
+
+            .message_length_toggle {
+                margin: 0;
+            }
+        }
     }
+
+    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
+        /* 16px at 15px/1em */
+        padding-top: 1.0667em;
+
+        .message-sender-and-time {
+            grid-area: sender;
+            justify-self: start;
+            display: flex;
+            align-items: baseline;
+            /* 8px at 15px/1em */
+            gap: 0.5333em;
+            min-width: 0;
+            /* 4px at 15px/1em */
+            padding-bottom: 0.2667em;
+        }
+
+        .message_sender {
+            font-size: 0.8em;
+            line-height: var(--base-line-height-unitless);
+
+            .sender_name {
+                font-weight: 600;
+            }
+        }
+
+        .message-time {
+            padding: 0;
+            visibility: visible;
+        }
+
+        .zulip-icon-bot {
+            display: none;
+        }
+
+        .message-sender-bot-label {
+            display: inline-block;
+            /* 4px at 12px/1em */
+            margin-inline-start: 0.3333em;
+            /* 0 4px at 11px/1em */
+            padding: 0 0.3636em;
+            border: 1px solid var(--color-border-rendered-markdown-table);
+            border-radius: 4px;
+            /* 11px at 12px/1em */
+            font-size: 0.9167em;
+            color: var(--color-text-message-bubble-caption);
+        }
+    }
+
+    /* Message states */
 
     .messagebox:hover,
     .has_actions_popover .messagebox {
@@ -273,8 +338,7 @@
 
         .message-sending-notice {
             grid-area: time;
-            justify-self: start;
-            align-self: center;
+            place-self: center start;
             display: flex;
             align-items: center;
             gap: 0.25em;
@@ -435,79 +499,6 @@
         }
     }
 
-    .messagebox-content:not(.is-me-message) {
-        .message_length_controller:not(:empty) {
-            /* 4px at 15px/1em */
-            margin-top: 0.2667em;
-        }
-
-        .message_length_toggle {
-            width: auto;
-            height: auto;
-            margin: 0;
-            padding: 0;
-            background-color: transparent;
-            color: var(--color-link-message-bubble);
-            font-variant: normal;
-            font-weight: 600;
-
-            &:hover,
-            &:active {
-                background-color: transparent;
-                text-decoration: underline;
-                scale: none;
-            }
-        }
-
-        .message_content.condensed ~ .message_length_controller {
-            grid-area: message;
-            align-self: end;
-            justify-self: start;
-            /* Above the faded text. */
-            position: relative;
-            /* The padding of the bubble, 7px 12px at 15px/1em */
-            margin: 0 0.8em 0.4667em;
-        }
-
-        /* A collapsed message is replaced by a dashed frame with the
-           button to show it. */
-        .message_content.collapsed ~ .message_length_controller {
-            justify-self: start;
-            display: flex;
-            align-items: center;
-            /* 36px at 15px/1em */
-            min-height: 2.4em;
-            margin: 0;
-            /* 12px at 15px/1em */
-            padding: 0 0.8em;
-            border: 1px dashed var(--color-border-rendered-markdown-table);
-            border-radius: 8px;
-
-            .message_length_toggle {
-                margin: 0;
-            }
-        }
-    }
-
-    .messagebox-includes-sender .messagebox-content:not(.is-me-message) {
-        .zulip-icon-bot {
-            display: none;
-        }
-
-        .message-sender-bot-label {
-            display: inline-block;
-            /* 4px at 12px/1em */
-            margin-inline-start: 0.3333em;
-            /* 0 4px at 11px/1em */
-            padding: 0 0.3636em;
-            border: 1px solid var(--color-border-rendered-markdown-table);
-            border-radius: 4px;
-            /* 11px at 12px/1em */
-            font-size: 0.9167em;
-            color: var(--color-text-message-bubble-caption);
-        }
-    }
-
     /* /me messages have a small avatar and no bubble. */
     .messagebox-includes-sender .messagebox-content.is-me-message {
         /* 20px at 15px/1em */
@@ -517,12 +508,12 @@
         --bubble-avatar-column-width: 1.8667em;
         /* 16px at 15px/1em */
         padding-top: 1.0667em;
-        grid-template-areas:
+        grid-template:
             "avatar sender    time controls ."
             ".      more      .    .        ."
             ".      reactions .    .        ."
-            ".      reminders .    .        .";
-        grid-template-columns:
+            ".      reminders .    .        ."
+            /
             var(--bubble-avatar-column-width)
             fit-content(
                 calc(
@@ -531,7 +522,6 @@
                 )
             )
             max-content max-content minmax(0, 1fr);
-        grid-template-rows: repeat(4, auto);
 
         .status-message {
             font-style: italic;
@@ -602,6 +592,7 @@
                 border-color: var(--color-background-own-message-bubble);
                 background-color: var(--color-background-own-message-bubble);
                 color: var(--color-text-own-message-bubble);
+
                 --color-markdown-link: var(--color-link-own-message-bubble);
                 --color-markdown-link-hover: var(
                     --color-link-own-message-bubble
