@@ -132,6 +132,11 @@ function get_filter_options(): FilterOption[][] {
                     ),
                 })),
             },
+            {
+                id: "channel_meetings",
+                label: $t({defaultMessage: "Meetings in channels"}),
+                keys: [calendar_filter.CHANNEL_MEETINGS_KEY],
+            },
         ],
         [
             {

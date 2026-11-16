@@ -20,7 +20,12 @@ export type FilteredEvent = {
     response: number;
     category: string;
     attendees: {user_id: number}[];
+    is_invited: boolean;
 };
+
+// Meetings in the user's channels that they are not invited to; those
+// they are invited to are among their meetings.
+export const CHANNEL_MEETINGS_KEY = "channel_meetings";
 
 export const MEETING_KEYS = [
     "meetings:organizer",
@@ -91,8 +96,16 @@ function get_meeting_key(event: FilteredEvent, my_user_id: number): string {
 // The keys of the kinds an event is of; the filter hides it if it
 // hides any of them.
 export function get_event_keys(event: FilteredEvent, my_user_id: number): string[] {
+    let kind_key: string;
+    if (!event.is_invited) {
+        kind_key = CHANNEL_MEETINGS_KEY;
+    } else if (is_personal(event, my_user_id)) {
+        kind_key = "personal";
+    } else {
+        kind_key = get_meeting_key(event, my_user_id);
+    }
     return [
-        is_personal(event, my_user_id) ? "personal" : get_meeting_key(event, my_user_id),
+        kind_key,
         get_category_key(event.category),
         `show_as:${event.show_as}`,
         ...(event.original_start === null ? [] : ["recurring"]),

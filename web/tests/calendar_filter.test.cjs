@@ -19,6 +19,7 @@ function event(title, fields = {}) {
         response: 2,
         category: "",
         attendees: [{user_id: 1}, {user_id: 2}],
+        is_invited: true,
         ...fields,
     };
 }
@@ -32,6 +33,7 @@ const events = [
     event("followed", {response: 5, show_as: 1}),
     event("red", {category: "Red category"}),
     event("series", {original_start: 1_800_000_000}),
+    event("channel", {response: 1, attendees: [{user_id: 2}], is_invited: false}),
 ];
 
 function shown() {
@@ -62,6 +64,13 @@ test("event keys", () => {
         "show_as:3",
         "recurring",
     ]);
+    // Meetings in my channels that I am not invited to are not my
+    // meetings.
+    assert.deepEqual(calendar_filter.get_event_keys(events[8], ME), [
+        "channel_meetings",
+        "category:",
+        "show_as:3",
+    ]);
     assert.equal(calendar_filter.get_category_key("Red category"), "category:Red category");
     assert.equal(calendar_filter.MEETING_KEYS.length, 5);
     assert.deepEqual(calendar_filter.SHOW_AS_KEYS, [
@@ -79,21 +88,30 @@ test("filtering", () => {
 
     calendar_filter.set_hidden(["personal", "meetings:organizer"], true);
     assert.ok(calendar_filter.is_filtering());
-    assert.deepEqual(shown(), ["accepted", "tentative", "unanswered", "followed", "red", "series"]);
+    assert.deepEqual(shown(), [
+        "accepted",
+        "tentative",
+        "unanswered",
+        "followed",
+        "red",
+        "series",
+        "channel",
+    ]);
 
     calendar_filter.set_hidden(["meetings:organizer"], false);
     calendar_filter.set_hidden(
         ["meetings:none", "meetings:following", "category:Red category", "recurring"],
         true,
     );
-    assert.deepEqual(shown(), ["organized", "accepted", "tentative"]);
+    assert.deepEqual(shown(), ["organized", "accepted", "tentative", "channel"]);
 
-    calendar_filter.set_hidden(["show_as:2"], true);
+    calendar_filter.set_hidden(["show_as:2", "channel_meetings"], true);
     assert.deepEqual(shown(), ["organized", "accepted"]);
     assert.deepEqual(
         [...calendar_filter.get_hidden_keys()],
         [
             "category:Red category",
+            "channel_meetings",
             "meetings:following",
             "meetings:none",
             "personal",

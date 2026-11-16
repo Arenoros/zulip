@@ -260,12 +260,13 @@ async function calendar_menus_test(page: Page): Promise<void> {
         items.map((item) => item.textContent.trim()),
     );
     check(
-        "the filter menu leaves out channel meetings",
+        "the filter menu has the kinds of events",
         JSON.stringify(filter_labels) ===
             JSON.stringify([
                 "Reset filters",
                 "Personal events",
                 "Meetings",
+                "Meetings in channels",
                 "Categories",
                 "Show as",
                 "Recurring events",
