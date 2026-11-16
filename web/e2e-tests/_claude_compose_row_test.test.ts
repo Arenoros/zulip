@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -115,7 +116,7 @@ async function row_facts(page: Page): Promise<RowFacts> {
             };
         };
         const shown = (element: Element | null): boolean =>
-            element !== null && (element as HTMLElement).offsetParent !== null;
+            element instanceof HTMLElement && element.offsetParent !== null;
         const field = document.querySelector("#compose .messagebox")!;
         const textarea = document.querySelector("textarea#compose-textarea")!;
         const buttons = [
@@ -166,7 +167,7 @@ async function toolbar_labels(page: Page): Promise<string[]> {
             ...document.querySelectorAll(
                 "#message-formatting-controls-container .compose_control_button, #message-formatting-controls-container .compose-toolbar-end .compose-row-button",
             ),
-        ].filter((element) => (element as HTMLElement).offsetParent !== null);
+        ].filter((element) => element instanceof HTMLElement && element.offsetParent !== null);
         return (
             items
                 .map((element) => ({
@@ -174,7 +175,7 @@ async function toolbar_labels(page: Page): Promise<string[]> {
                     rect: element.getBoundingClientRect(),
                 }))
                 // By rows of the wrapped toolbar, then from left to right.
-                .sort(
+                .toSorted(
                     (a, b) =>
                         Math.round(a.rect.top / 16) - Math.round(b.rect.top / 16) ||
                         a.rect.left - b.rect.left,
@@ -193,10 +194,9 @@ function near(a: number, b: number, tolerance = 1): boolean {
 }
 
 async function compose_row_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {
-        othello: number;
-        hamlet: number;
-    };
+    const seeded = z
+        .object({othello: z.number(), hamlet: z.number()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     await common.log_in(page);
     await page.waitForSelector("#message_view_header", {visible: true});
     await page.setViewport({width: 1280, height: 1000});
@@ -370,7 +370,7 @@ async function compose_row_test(page: Page): Promise<void> {
     await page.waitForSelector("#compose.compose-fullscreen");
     const collapse_shown = await page.$eval(
         ".compose-toolbar-end .collapse-composebox-button",
-        (button) => (button as HTMLElement).offsetParent !== null,
+        (button) => button instanceof HTMLElement && button.offsetParent !== null,
     );
     check("Maximize fills the view and offers Collapse", collapse_shown);
     await page.click(".compose-toolbar-end .collapse-composebox-button");
@@ -399,7 +399,9 @@ async function compose_row_test(page: Page): Promise<void> {
     await page.click(".compose-delete-draft-button");
     await new Promise((resolve) => setTimeout(resolve, 300));
     const draft_kept = await page.evaluate(() =>
-        Object.values(localStorage).some((value) => value.includes("**bold** text")),
+        Object.values(localStorage).some(
+            (value: unknown) => typeof value === "string" && value.includes("**bold** text"),
+        ),
     );
     check(
         "Delete draft empties the field and deletes its draft",

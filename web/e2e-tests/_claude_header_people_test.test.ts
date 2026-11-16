@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -62,14 +63,14 @@ print(
 )
 `;
 
-type Seeded = {
-    desdemona: number;
-    othello: number;
-    hamlet: number;
-    cordelia: number;
-    prospero: number;
-    denmark: number;
-};
+const seeded_schema = z.object({
+    desdemona: z.number(),
+    othello: z.number(),
+    hamlet: z.number(),
+    cordelia: z.number(),
+    prospero: z.number(),
+    denmark: z.number(),
+});
 
 async function patch(page: Page, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -145,7 +146,9 @@ async function header_facts(page: Page): Promise<HeaderFacts> {
         const header_rect = header.getBoundingClientRect();
         const middle = (header_rect.top + header_rect.bottom) / 2;
         const buttons = [
-            ...header.querySelectorAll<HTMLElement>(".message-view-header-buttons .icon-button"),
+            ...header.querySelectorAll<HTMLElement>(
+                ":scope .message-view-header-buttons .icon-button",
+            ),
         ];
         const title_right =
             header.querySelector(".message-header-navbar-title")?.getBoundingClientRect().right ??
@@ -230,7 +233,7 @@ function dm_hash(user_ids: number[]): string {
 }
 
 async function header_people_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await common.log_in(page);
@@ -335,7 +338,12 @@ async function header_people_test(page: Page): Promise<void> {
     );
     const disabled_before = await page.$eval(
         "#start-group-chat-modal .dialog_submit_button",
-        (button) => (button as HTMLButtonElement).disabled,
+        (button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                throw new TypeError("Expected <button>");
+            }
+            return button.disabled;
+        },
     );
     check("the dialog focuses the input and starts with nobody to add", disabled_before);
     const excluded: string[] = [];
@@ -343,7 +351,7 @@ async function header_people_test(page: Page): Promise<void> {
         await page.keyboard.type(query);
         await new Promise((resolve) => setTimeout(resolve, 500));
         excluded.push(...(await typeahead_names(page)));
-        for (const _ of query) {
+        for (let remaining = query.length; remaining > 0; remaining -= 1) {
             await page.keyboard.press("Backspace");
         }
     }
@@ -364,7 +372,12 @@ async function header_people_test(page: Page): Promise<void> {
     await page.waitForSelector("#start-group-chat-modal .pill", {visible: true});
     const disabled_after = await page.$eval(
         "#start-group-chat-modal .dialog_submit_button",
-        (button) => (button as HTMLButtonElement).disabled,
+        (button) => {
+            if (!(button instanceof HTMLButtonElement)) {
+                throw new TypeError("Expected <button>");
+            }
+            return button.disabled;
+        },
     );
     check("adding someone enables the Start button", !disabled_after);
     await shot(page, "light-modal", "#start-group-chat-modal");
@@ -375,7 +388,7 @@ async function header_people_test(page: Page): Promise<void> {
     await page.waitForFunction(
         (hash: string) => window.location.hash === hash,
         {polling: 100},
-        `#narrow/dm/${[seeded.hamlet, seeded.othello].sort((a, b) => a - b).join(",")}-group`,
+        `#narrow/dm/${[seeded.hamlet, seeded.othello].toSorted((a, b) => a - b).join(",")}-group`,
     );
     await page.waitForFunction(
         () =>

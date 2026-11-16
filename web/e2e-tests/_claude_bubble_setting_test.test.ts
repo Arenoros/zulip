@@ -35,7 +35,12 @@ async function shot(page: Page, selector: string, name: string, pad = 8): Promis
 }
 
 async function is_checked(page: Page, selector: string): Promise<boolean> {
-    return await page.$eval(selector, (input) => (input as HTMLInputElement).checked);
+    return await page.$eval(selector, (input) => {
+        if (!(input instanceof HTMLInputElement)) {
+            throw new TypeError("Expected <input>");
+        }
+        return input.checked;
+    });
 }
 
 async function wait_checked(page: Page, selector: string, value: boolean): Promise<void> {
@@ -109,7 +114,7 @@ async function visual_test(page: Page): Promise<void> {
     check("the organization default is on", await is_checked(page, realm_checkbox));
     await shot(page, "#realm-user-default-settings .information-settings", "realm-information");
     const reset_buttons = await page.$$eval(
-        `${realm_checkbox}`,
+        realm_checkbox,
         (inputs) =>
             inputs[0]!.closest(".input-group")!.querySelectorAll(".reset-user-setting-to-default")
                 .length,

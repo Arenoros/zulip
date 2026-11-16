@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -25,7 +26,8 @@ async function api(page: Page, method: string, url: string, body?: string): Prom
                 },
                 body: body ?? null,
             });
-            return await response.json();
+            const data: unknown = await response.json();
+            return data;
         },
         method,
         url,
@@ -92,9 +94,13 @@ async function visual_test(page: Page): Promise<void> {
     await page.click("#create_channel_folder .dialog_submit_button");
     await common.wait_for_micromodal_to_close(page);
 
-    const folders = (await api(page, "GET", "/json/channel_folders")) as {
-        channel_folders: {id: number; name: string; can_access_group: unknown}[];
-    };
+    const folders = z
+        .object({
+            channel_folders: z.array(
+                z.object({id: z.number(), name: z.string(), can_access_group: z.unknown()}),
+            ),
+        })
+        .parse(await api(page, "GET", "/json/channel_folders"));
     const folder = folders.channel_folders.find((folder) => folder.name === "Secret")!;
     check(
         "the folder is created private",
@@ -104,12 +110,16 @@ async function visual_test(page: Page): Promise<void> {
     );
     await page.click("#stream_creation_form .create_stream_cancel");
 
-    const created = (await api(
-        page,
-        "POST",
-        "/json/channels/create",
-        `name=plans&folder_id=${folder.id}&subscribers=${encodeURIComponent(JSON.stringify([]))}`,
-    )) as {id: number};
+    const created = z
+        .object({id: z.number()})
+        .parse(
+            await api(
+                page,
+                "POST",
+                "/json/channels/create",
+                `name=plans&folder_id=${folder.id}&subscribers=${encodeURIComponent(JSON.stringify([]))}`,
+            ),
+        );
     await api(
         page,
         "POST",
@@ -126,12 +136,12 @@ async function visual_test(page: Page): Promise<void> {
         "the private folder is hidden from those who cannot see it",
         (await hamlet_page.$(section_selector(folder.id))) === null,
     );
-    const hamlet_folders = (await api(hamlet_page, "GET", "/json/channel_folders")) as {
-        channel_folders: {id: number}[];
-    };
+    const hamlet_folders = z
+        .object({channel_folders: z.array(z.object({id: z.number()}))})
+        .parse(await api(hamlet_page, "GET", "/json/channel_folders"));
     check(
         "the API does not list the folder",
-        !hamlet_folders.channel_folders.some((f) => f.id === folder.id),
+        hamlet_folders.channel_folders.every((f) => f.id !== folder.id),
     );
 
     // The owner lets Hamlet see the folder from the folder dialog.
@@ -177,8 +187,20 @@ async function visual_test(page: Page): Promise<void> {
     await hamlet_page.waitForFunction(
         async (folder_id) => {
             const response = await fetch("/json/channel_folders");
-            const data = (await response.json()) as {channel_folders: {id: number}[]};
-            return data.channel_folders.some((folder) => folder.id === folder_id);
+            const data: unknown = await response.json();
+            return (
+                typeof data === "object" &&
+                data !== null &&
+                "channel_folders" in data &&
+                Array.isArray(data.channel_folders) &&
+                data.channel_folders.some(
+                    (folder: unknown) =>
+                        typeof folder === "object" &&
+                        folder !== null &&
+                        "id" in folder &&
+                        folder.id === folder_id,
+                )
+            );
         },
         {},
         folder.id,
@@ -211,14 +233,18 @@ async function visual_test(page: Page): Promise<void> {
     await sidebar_clip(hamlet_page, "pf-04-hamlet-in-channel");
 
     // Taking access away while Hamlet looks at the channel.
-    const updated = (await api(
-        page,
-        "PATCH",
-        `/json/channel_folders/${folder.id}`,
-        `can_access_group=${encodeURIComponent(
-            JSON.stringify({new: {direct_members: [cordelia], direct_subgroups: []}}),
-        )}`,
-    )) as {result: string; msg: string};
+    const updated = z
+        .object({result: z.string(), msg: z.string()})
+        .parse(
+            await api(
+                page,
+                "PATCH",
+                `/json/channel_folders/${folder.id}`,
+                `can_access_group=${encodeURIComponent(
+                    JSON.stringify({new: {direct_members: [cordelia], direct_subgroups: []}}),
+                )}`,
+            ),
+        );
     check("access is taken away", updated.result === "success", updated.msg);
     await hamlet_page.waitForSelector(section_selector(folder.id), {hidden: true});
     check("the folder disappears for Hamlet", true);
@@ -227,20 +253,24 @@ async function visual_test(page: Page): Promise<void> {
             !document.querySelector("#stream_filters .stream-name")?.textContent.includes("plans"),
     );
     await sidebar_clip(hamlet_page, "pf-05-hamlet-after-revocation");
-    const hamlet_subs = (await api(hamlet_page, "GET", "/json/users/me/subscriptions")) as {
-        subscriptions: {stream_id: number}[];
-    };
+    const hamlet_subs = z
+        .object({subscriptions: z.array(z.object({stream_id: z.number()}))})
+        .parse(await api(hamlet_page, "GET", "/json/users/me/subscriptions"));
     check(
         "Hamlet is unsubscribed",
-        !hamlet_subs.subscriptions.some((sub) => sub.stream_id === created.id),
+        hamlet_subs.subscriptions.every((sub) => sub.stream_id !== created.id),
     );
-    const hamlet_messages = (await api(
-        hamlet_page,
-        "GET",
-        `/json/messages?anchor=newest&num_before=10&num_after=0&narrow=${encodeURIComponent(
-            JSON.stringify([{operator: "channel", operand: created.id}]),
-        )}`,
-    )) as {messages: unknown[]};
+    const hamlet_messages = z
+        .object({messages: z.array(z.unknown())})
+        .parse(
+            await api(
+                hamlet_page,
+                "GET",
+                `/json/messages?anchor=newest&num_before=10&num_after=0&narrow=${encodeURIComponent(
+                    JSON.stringify([{operator: "channel", operand: created.id}]),
+                )}`,
+            ),
+        );
     check("Hamlet cannot read the channel any more", hamlet_messages.messages.length === 0);
 
     const blueslip_errors = await hamlet_page.evaluate(

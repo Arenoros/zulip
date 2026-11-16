@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -87,10 +88,7 @@ event(othello, "Live meeting", at(4, 16), at(4, 17), [desdemona])
 print("CREATED")
 `;
 
-type Seeded = {
-    monday: string;
-    today: string;
-};
+const seeded_schema = z.object({monday: z.string(), today: z.string()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -170,7 +168,7 @@ function add_days(date: string, days: number): string {
 }
 
 async function calendar_grid_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
@@ -242,7 +240,7 @@ async function calendar_grid_test(page: Page): Promise<void> {
             const bar = document.querySelector(".calendar-all-day-event")!;
             const bar_rect = bar.getBoundingClientRect();
             const column = document
-                .querySelector(`.calendar-day-column[data-date="${thursday}"]`)!
+                .querySelector(`.calendar-day-column[data-date="${CSS.escape(thursday)}"]`)!
                 .getBoundingClientRect();
             return {
                 title: bar.textContent.trim(),

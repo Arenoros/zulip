@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -66,7 +67,7 @@ event_id = create_calendar_event(
 print("SEEDED " + json.dumps({"monday": monday.isoformat(), "event_id": event_id}))
 `;
 
-type Seeded = {monday: string; event_id: number};
+const seeded_schema = z.object({monday: z.string(), event_id: z.number()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<unknown> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -83,7 +84,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -145,7 +147,9 @@ async function wait_for_chat(page: Page, title: string): Promise<void> {
 }
 
 async function calendar_chat_test(page: Page): Promise<void> {
-    const {monday, event_id} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const {monday, event_id} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     const wednesday = add_days(monday, 2);
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
@@ -230,7 +234,7 @@ check_send_stream_message(othello, get_client("test"), chat.name, "", "Room chan
         (stream_id) =>
             document
                 .querySelector(
-                    `.meeting-chat-list-item[data-stream-id="${stream_id}"] .unread_count`,
+                    `.meeting-chat-list-item[data-stream-id="${CSS.escape(String(stream_id))}"] .unread_count`,
                 )
                 ?.textContent.trim() === "1",
         {},
@@ -257,7 +261,7 @@ update_calendar_event(othello, ${event_id}, title="Weekly retro", required_atten
         (stream_id) =>
             document
                 .querySelector(
-                    `.meeting-chat-list-item[data-stream-id="${stream_id}"] .conversation-partners-list`,
+                    `.meeting-chat-list-item[data-stream-id="${CSS.escape(String(stream_id))}"] .conversation-partners-list`,
                 )
                 ?.textContent.trim() === "Weekly retro",
         {},
@@ -273,7 +277,7 @@ print("SUBSCRIBERS " + json.dumps(sorted(
     for s in Subscription.objects.filter(recipient=chat.recipient, active=True)
 )))
 `,
-    ).split("SUBSCRIBERS ")[1]!;
+    ).split("SUBSCRIBERS ", 2)[1]!;
     check(
         "Iago joined, Hamlet stayed",
         JSON.stringify(JSON.parse(subscribers)) ===

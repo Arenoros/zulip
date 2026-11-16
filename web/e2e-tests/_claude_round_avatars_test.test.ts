@@ -52,7 +52,7 @@ async function step(name: string, body: () => Promise<void>): Promise<void> {
     try {
         await body();
     } catch (error) {
-        console.log(`SKIP ${name}: ${String(error).split("\n")[0]}`);
+        console.log(`SKIP ${name}: ${String(error).split("\n", 1)[0]}`);
     }
 }
 

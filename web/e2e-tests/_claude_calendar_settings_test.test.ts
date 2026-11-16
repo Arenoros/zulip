@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -32,12 +33,16 @@ desdemona = get_user_by_delivery_email("desdemona@zulip.com", get_realm("zulip")
 `;
 
 function get_settings(): Record<string, unknown> {
-    return JSON.parse(
-        run_python(
-            python_prelude +
-                `print("SETTINGS " + json.dumps(calendar_user_settings_to_api_dict(get_calendar_user_settings(desdemona))))`,
-        ).split("SETTINGS ")[1]!,
-    ) as Record<string, unknown>;
+    return z
+        .record(z.string(), z.unknown())
+        .parse(
+            JSON.parse(
+                run_python(
+                    python_prelude +
+                        `print("SETTINGS " + json.dumps(calendar_user_settings_to_api_dict(get_calendar_user_settings(desdemona))))`,
+                ).split("SETTINGS ", 2)[1]!,
+            ),
+        );
 }
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
@@ -78,9 +83,12 @@ async function text(page: Page, selector: string): Promise<string> {
 }
 
 async function selected_label(page: Page, id: string): Promise<string> {
-    return await page.$eval(`#${id}`, (element) =>
-        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
-    );
+    return await page.$eval(`#${id}`, (element) => {
+        if (!(element instanceof HTMLSelectElement)) {
+            throw new TypeError("Expected <select>");
+        }
+        return element.selectedOptions[0]!.textContent.trim();
+    });
 }
 
 async function wait_for_status(page: Page, subsection: string, status: string): Promise<void> {
@@ -105,7 +113,12 @@ async function calendar_settings_test(page: Page): Promise<void> {
     await page.goto(`${base_url}#settings/calendar`);
     await page.waitForSelector("#calendar_work_day_start_minutes", {visible: true});
     const work_days = await page.$$eval(".calendar-settings-work-day-checkbox", (checkboxes) =>
-        checkboxes.map((checkbox) => (checkbox as HTMLInputElement).checked),
+        checkboxes.map((checkbox) => {
+            if (!(checkbox instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return checkbox.checked;
+        }),
     );
     const defaults = [
         await selected_label(page, "calendar_work_day_start_minutes"),

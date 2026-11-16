@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Browser, HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -65,14 +66,14 @@ print(
 )
 `;
 
-type Seeded = {
-    desdemona: number;
-    othello: number;
-    hamlet: number;
-    prospero: number;
-    welcome_bot: number;
-    denmark: number;
-};
+const seeded_schema = z.object({
+    desdemona: z.number(),
+    othello: z.number(),
+    hamlet: z.number(),
+    prospero: z.number(),
+    welcome_bot: z.number(),
+    denmark: z.number(),
+});
 
 async function patch(page: Page, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -135,7 +136,7 @@ async function call_button_facts(page: Page): Promise<CallButtonFacts> {
         const header = document.querySelector("#message_view_header")!;
         const title = header.querySelector(".message-header-navbar-title")!;
         const buttons = [
-            ...header.querySelectorAll(".message-view-header-call-buttons .icon-button"),
+            ...header.querySelectorAll(":scope .message-view-header-call-buttons .icon-button"),
         ];
         const header_rect = header.getBoundingClientRect();
         return {
@@ -175,7 +176,7 @@ function dm_hash(user_ids: number[]): string {
 }
 
 async function header_calls_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await common.log_in(page);
@@ -242,7 +243,7 @@ async function header_calls_test(page: Page): Promise<void> {
         "the video call button opens a call with the conversation",
         video_url.includes("/calls/livekit/join?call_id=") &&
             video_url.includes(
-                `&dm=${[seeded.othello, seeded.desdemona].sort((a, b) => a - b).join(",")}`,
+                `&dm=${[seeded.othello, seeded.desdemona].toSorted((a, b) => a - b).join(",")}`,
             ) &&
             !video_url.includes("voice_only"),
         video_url,

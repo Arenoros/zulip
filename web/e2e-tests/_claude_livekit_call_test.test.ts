@@ -1,6 +1,7 @@
 import process from "node:process";
 
-import puppeteer, {type Browser, type Page} from "puppeteer";
+import type {Browser, Page} from "puppeteer";
+import * as puppeteer from "puppeteer";
 
 import * as common from "./lib/common.ts";
 
@@ -32,6 +33,7 @@ async function launch_media_browser(): Promise<Browser> {
 // Headless Chrome has no screen to capture, so share a canvas instead.
 async function fake_screen_share(page: Page): Promise<void> {
     await page.evaluateOnNewDocument(() => {
+        // eslint-disable-next-line @typescript-eslint/require-await
         navigator.mediaDevices.getDisplayMedia = async () => {
             const canvas = document.createElement("canvas");
             canvas.width = 1280;
@@ -217,10 +219,12 @@ async function livekit_call_test(page: Page): Promise<void> {
         check("leaving updates both sides", true);
         check(
             "controls are disabled after leaving",
-            await page_b.$eval(
-                "#livekit-call-leave",
-                (element) => (element as HTMLButtonElement).disabled,
-            ),
+            await page_b.$eval("#livekit-call-leave", (element) => {
+                if (!(element instanceof HTMLButtonElement)) {
+                    throw new TypeError("Expected <button>");
+                }
+                return element.disabled;
+            }),
         );
         await common.screenshot(page_b, "livekit-7-left");
 
@@ -238,13 +242,15 @@ async function livekit_call_test(page: Page): Promise<void> {
 
         // Share from a desktop app that supports remote control.
         await page_b.evaluateOnNewDocument(() => {
-            window.electron_bridge = {
-                send_event: () => true,
-                on_event() {
-                    /* Not used by the call page. */
+            Object.assign(window, {
+                electron_bridge: {
+                    send_event: () => true,
+                    on_event() {
+                        /* Not used by the call page. */
+                    },
+                    get_remote_control_supported: () => true,
                 },
-                get_remote_control_supported: () => true,
-            };
+            });
         });
         await page_b.goto(call_url);
         await page_b.waitForFunction(
@@ -265,19 +271,26 @@ async function livekit_call_test(page: Page): Promise<void> {
         check(
             "viewers can request control",
             (await page_a.$eval(".livekit-call-screen-share-button", (element) =>
-                (element as HTMLButtonElement).hidden ? null : element.textContent,
+                element instanceof HTMLElement && element.hidden ? null : element.textContent,
             )) === "Request control",
         );
         check(
             "the presenter cannot request control",
             await page_b.$eval(
                 ".livekit-call-screen-share-button",
-                (element) => (element as HTMLButtonElement).hidden === true,
+                (element) => element instanceof HTMLElement && element.hidden === true,
             ),
         );
-        async function controls_layout(controls_page: Page) {
+        async function controls_layout(controls_page: Page): Promise<{
+            gap_em: number;
+            left: number;
+            controls_bottom: number;
+            button_inside: boolean;
+            label_truncated: boolean;
+            video_height: number;
+        }> {
             return controls_page.evaluate(() => {
-                const rect = (selector: string) =>
+                const rect = (selector: string): DOMRect =>
                     document.querySelector(selector)!.getBoundingClientRect();
                 const share = rect(".livekit-call-screen-share");
                 const video = rect(".livekit-call-screen-share .livekit-call-video");

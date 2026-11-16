@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -259,7 +260,9 @@ async function shot_compose(page: Page, name: string): Promise<void> {
 
 async function new_conversation_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const {stream_id} = JSON.parse(output.split("SEEDED ")[1]!) as {stream_id: number};
+    const {stream_id} = z
+        .object({stream_id: z.number()})
+        .parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -529,7 +532,9 @@ async function new_conversation_test(page: Page): Promise<void> {
     await page.waitForSelector("#compose.compose-for-view");
     form = await form_state(page);
     const saved_as_draft = await page.evaluate(() =>
-        Object.values(localStorage).some((value) => value.includes("Lunch menu ideas.")),
+        Object.values(localStorage).some(
+            (value: unknown) => typeof value === "string" && value.includes("Lunch menu ideas."),
+        ),
     );
     check(
         "leaving the view saves what was typed as a draft, and the topic gets its own compose box",

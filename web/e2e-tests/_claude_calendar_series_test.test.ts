@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -71,15 +72,16 @@ print(
 )
 `;
 
-type Seeded = {monday: string; daily_id: number};
+const seeded_schema = z.object({monday: z.string(), daily_id: z.number()});
 
-type CalendarEvent = {
-    id: number;
-    title: string;
-    start: number;
-    timezone: string;
-    rrule: string;
-};
+const calendar_event_schema = z.object({
+    id: z.number(),
+    title: z.string(),
+    start: z.number(),
+    timezone: z.string(),
+    rrule: z.string(),
+});
+type CalendarEvent = z.infer<typeof calendar_event_schema>;
 
 async function request(page: Page, method: string, url: string, body: string): Promise<unknown> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -96,7 +98,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -110,7 +113,7 @@ async function request(page: Page, method: string, url: string, body: string): P
 
 function moscow_seconds(date: string, hour: number, minute = 0): number {
     const [year, month, day] = date.split("-").map(Number);
-    return Date.UTC(year!, month! - 1, day!, hour - 3, minute) / 1000;
+    return Date.UTC(year!, month! - 1, day, hour - 3, minute) / 1000;
 }
 
 function add_days(date: string, days: number): string {
@@ -120,7 +123,7 @@ function add_days(date: string, days: number): string {
 
 // As in "Thu 11/12/2026".
 function date_label(date: string): string {
-    const [year, month, day] = date.split("-");
+    const [year, month, day] = date.split("-", 3);
     const weekday = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", {
         weekday: "short",
         timeZone: "UTC",
@@ -129,12 +132,16 @@ function date_label(date: string): string {
 }
 
 async function week_events(page: Page, monday: string): Promise<CalendarEvent[]> {
-    const data = (await request(
-        page,
-        "GET",
-        "/json/calendar/events",
-        `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
-    )) as {events: CalendarEvent[]};
+    const data = z
+        .object({events: z.array(calendar_event_schema)})
+        .parse(
+            await request(
+                page,
+                "GET",
+                "/json/calendar/events",
+                `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
+            ),
+        );
     return data.events;
 }
 
@@ -167,14 +174,14 @@ async function summary(page: Page): Promise<string> {
 }
 
 async function wait_for_summary(page: Page, text: string): Promise<void> {
-    await page
-        .waitForFunction(
+    await common.succeeds(
+        page.waitForFunction(
             (text) =>
                 document.querySelector(".calendar-form-time-summary")?.textContent.trim() === text,
             {polling: 100, timeout: 5000},
             text,
-        )
-        .catch(() => undefined);
+        ),
+    );
 }
 
 async function suggestions(page: Page): Promise<{time: string; free: string; selected: boolean}[]> {
@@ -193,7 +200,9 @@ async function click_empty_time(page: Page, date: string, hour: number): Promise
     await page.evaluate(
         (date, hour) => {
             const container = document.querySelector(".calendar-grid-container")!;
-            const column = document.querySelector(`.calendar-day-column[data-date="${date}"]`)!;
+            const column = document.querySelector(
+                `.calendar-day-column[data-date="${CSS.escape(date)}"]`,
+            )!;
             container.scrollTop = (column.getBoundingClientRect().height / 24) * (hour - 1);
         },
         date,
@@ -205,8 +214,9 @@ async function click_empty_time(page: Page, date: string, hour: number): Promise
 }
 
 async function calendar_series_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
-    const {monday} = seeded;
+    const {monday} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     const thursday = add_days(monday, 3);
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
@@ -243,7 +253,7 @@ async function calendar_series_test(page: Page): Promise<void> {
     );
 
     // Othello is busy on Thursdays from 9:00 to 10:00.
-    let times = await suggestions(page);
+    const times = await suggestions(page);
     check(
         "suggested times are those when everyone is free, near the chosen one",
         JSON.stringify(times.map((time) => time.time)) ===
@@ -288,7 +298,7 @@ async function calendar_series_test(page: Page): Promise<void> {
     );
 
     // Picking a suggested time.
-    times = await suggestions(page);
+    await suggestions(page);
     await page.evaluate(() => {
         const buttons = [...document.querySelectorAll<HTMLElement>(".calendar-form-suggestion")];
         buttons.find((button) => button.textContent.includes("11:00 AM – 11:30 AM"))!.click();
@@ -310,11 +320,10 @@ async function calendar_series_test(page: Page): Promise<void> {
     const saved =
         review === undefined
             ? undefined
-            : (
-                  (await request(page, "GET", `/json/calendar/events/${review.id}`, "")) as {
-                      event: CalendarEvent;
-                  }
-              ).event;
+            : z
+                  .object({event: calendar_event_schema})
+                  .parse(await request(page, "GET", `/json/calendar/events/${review.id}`, ""))
+                  .event;
     check(
         "the series is saved with its rule",
         saved !== undefined &&
@@ -339,8 +348,12 @@ async function calendar_series_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form", {visible: true});
     check(
         "the whole series opens with the series' title and start",
-        (await page.$eval(".calendar-form-title", (input) => (input as HTMLInputElement).value)) ===
-            "Daily sync" &&
+        (await page.$eval(".calendar-form-title", (input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return input.value;
+        })) === "Daily sync" &&
             (await summary(page)) ===
                 `Repeats every day, from 4:00 PM to 5:00 PM, starting ${date_label(monday)}`,
         await summary(page),
@@ -377,7 +390,12 @@ async function calendar_series_test(page: Page): Promise<void> {
     await page.type(".calendar-form-title", "Tokyo call");
     await page.click(".calendar-form-time-summary");
     const start_minute = Number(
-        await page.$eval(".calendar-form-start", (select) => (select as HTMLSelectElement).value),
+        await page.$eval(".calendar-form-start", (select) => {
+            if (!(select instanceof HTMLSelectElement)) {
+                throw new TypeError("Expected <select>");
+            }
+            return select.value;
+        }),
     );
     await page.click(".calendar-form-timezone");
     await page.waitForSelector(".dropdown-list-search-input", {visible: true});
@@ -403,14 +421,16 @@ async function calendar_series_test(page: Page): Promise<void> {
     );
     await page.click(".calendar-form-save");
     await wait_for_grid(page);
-    const data = (await request(
-        page,
-        "GET",
-        "/json/calendar/events",
-        // From the day before, where the event falls in Moscow if it
-        // was created soon after midnight there.
-        `start=${moscow_seconds(add_days(monday, -1), 0)}&end=${moscow_seconds(add_days(monday, 60), 0)}`,
-    )) as {events: CalendarEvent[]};
+    const data = z.object({events: z.array(calendar_event_schema)}).parse(
+        await request(
+            page,
+            "GET",
+            "/json/calendar/events",
+            // From the day before, where the event falls in Moscow if it
+            // was created soon after midnight there.
+            `start=${moscow_seconds(add_days(monday, -1), 0)}&end=${moscow_seconds(add_days(monday, 60), 0)}`,
+        ),
+    );
     const call = data.events.find((event) => event.title === "Tokyo call");
     const tokyo_time =
         call === undefined

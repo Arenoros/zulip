@@ -116,6 +116,16 @@ export async function page_url_with_fragment(page: Page): Promise<string> {
 
 // This function will clear the existing value of the element and
 // replace it with the text.
+// Whether a wait, like page.waitForSelector, ends before its timeout.
+export async function succeeds(wait: Promise<unknown>): Promise<boolean> {
+    try {
+        await wait;
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export async function clear_and_type(page: Page, selector: string, text: string): Promise<void> {
     // Select all text currently in the element.
     await page.click(selector, {count: 3});

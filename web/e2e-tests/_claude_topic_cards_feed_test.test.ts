@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -89,7 +90,10 @@ UserMessage.objects.filter(user_profile=desdemona, message_id__in=unread_ids).up
 print("SEEDED " + json.dumps({"ids": ids, "stream_id": stream.id}))
 `;
 
-type Seeded = {ids: Record<string, number[]>; stream_id: number};
+const seeded_schema = z.object({
+    ids: z.record(z.string(), z.array(z.number())),
+    stream_id: z.number(),
+});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -177,7 +181,7 @@ async function shot(page: Page, name: string): Promise<void> {
 
 async function topic_cards_feed_test(page: Page): Promise<void> {
     const output = run_python(seed_script);
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     const {ids} = seeded;
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
@@ -335,10 +339,12 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
         card.querySelector<HTMLElement>(".topic-card-reply-button")!.click();
     });
     await page.waitForSelector("#compose-textarea", {visible: true});
-    const topic_in_compose = await page.$eval(
-        "#stream_message_recipient_topic",
-        (input) => (input as HTMLInputElement).value,
-    );
+    const topic_in_compose = await page.$eval("#stream_message_recipient_topic", (input) => {
+        if (!(input instanceof HTMLInputElement)) {
+            throw new TypeError("Expected <input>");
+        }
+        return input.value;
+    });
     check(
         "Reply in topic opens the compose box for that topic",
         topic_in_compose === "filler 05",
@@ -358,7 +364,7 @@ async function topic_cards_feed_test(page: Page): Promise<void> {
             last_card?.querySelector(".topic-card-title-text")?.textContent.trim() ===
                 "filler 05" &&
             last_row?.textContent.includes("A reply from the card.") === true &&
-            Number.isInteger(Number(last_row.dataset["messageId"]))
+            Number.isSafeInteger(Number(last_row.dataset["messageId"]))
         );
     });
     await wait_for_scroll_to_settle(page);
@@ -432,11 +438,12 @@ internal_send_stream_message(hamlet, stream, "filler 02", "A late reply.")
             String.raw`
 from zerver.actions.message_edit import check_update_message
 from zerver.actions.user_topics import do_set_user_topic_visibility_policy
+from zerver.lib.topic import messages_for_topic
 from zerver.models import UserTopic
 
 stream = get_stream("roadmap", realm)
 check_update_message(desdemona, ${own_reply_id}, content="A reply from the card. Edited.")
-first = Message.objects.filter(recipient=stream.recipient, subject="filler 01").first()
+first = messages_for_topic(realm.id, stream.recipient_id, "filler 01").first()
 check_update_message(iago, first.id, topic_name="✔ filler 01", propagate_mode="change_all")
 do_set_user_topic_visibility_policy(
     desdemona, stream, "filler 03", visibility_policy=UserTopic.VisibilityPolicy.MUTED
@@ -456,11 +463,10 @@ do_set_user_topic_visibility_policy(
                 card.querySelector(".topic-card-resolved-label") !== null,
         ),
     );
-    await page.waitForFunction(
-        () =>
-            ![...document.querySelectorAll(".focused-message-list .topic-card-title-text")].some(
-                (title) => title.textContent.trim() === "filler 03",
-            ),
+    await page.waitForFunction(() =>
+        [...document.querySelectorAll(".focused-message-list .topic-card-title-text")].every(
+            (title) => title.textContent.trim() !== "filler 03",
+        ),
     );
     const titles = await card_titles(page);
     check(

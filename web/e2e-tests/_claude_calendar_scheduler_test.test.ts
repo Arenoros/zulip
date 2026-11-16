@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -74,7 +75,7 @@ do_mark_all_as_read(desdemona)
 print("SEEDED " + json.dumps({"event_id": event_id, "start": int(start.timestamp()), "wednesday": wednesday.isoformat()}))
 `;
 
-type Seeded = {event_id: number; start: number; wednesday: string};
+const seeded_schema = z.object({event_id: z.number(), start: z.number(), wednesday: z.string()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -114,9 +115,12 @@ async function texts(page: Page, selector: string): Promise<string[]> {
 }
 
 async function selected_time(page: Page): Promise<string> {
-    return await page.$eval(".calendar-scheduler-start", (element) =>
-        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
-    );
+    return await page.$eval(".calendar-scheduler-start", (element) => {
+        if (!(element instanceof HTMLSelectElement)) {
+            throw new TypeError("Expected <select>");
+        }
+        return element.selectedOptions[0]!.textContent.trim();
+    });
 }
 
 async function wait_for_loaded(page: Page): Promise<void> {
@@ -130,9 +134,9 @@ function add_days(date: string, days: number): string {
 }
 
 async function calendar_scheduler_test(page: Page): Promise<void> {
-    const {event_id, start, wednesday} = JSON.parse(
-        run_python(seed_script).split("SEEDED ")[1]!,
-    ) as Seeded;
+    const {event_id, start, wednesday} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/settings", "color_scheme=2&web_font_size_px=14");
@@ -156,7 +160,7 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
         "Othello's row shows his local time, outside of his work hours",
         people[1]!.includes("7:00 PM") &&
             (await page.$$(".calendar-scheduler-person-track")).length === 3,
-        people[1]!,
+        people[1],
     );
     check(
         "Hamlet's busy time shows in his row",
@@ -208,7 +212,7 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
     await page.waitForFunction(
         () =>
             document
-                .querySelectorAll(".calendar-scheduler-day")[0]
+                .querySelector(".calendar-scheduler-day")
                 ?.querySelectorAll(".calendar-scheduler-hour").length === 24,
     );
     check("the whole day can be shown", true);
@@ -222,9 +226,12 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
     await page.click(".calendar-scheduler-back");
     await page.waitForSelector(".calendar-form-save", {visible: true});
     await page.click(".calendar-form-time-summary");
-    const form_start = await page.$eval(".calendar-form-start", (element) =>
-        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
-    );
+    const form_start = await page.$eval(".calendar-form-start", (element) => {
+        if (!(element instanceof HTMLSelectElement)) {
+            throw new TypeError("Expected <select>");
+        }
+        return element.selectedOptions[0]!.textContent.trim();
+    });
     check("the form has the time chosen in the scheduler", form_start === "11:00 AM", form_start);
     await page.click(".calendar-form-scheduler");
     await wait_for_loaded(page);
@@ -237,7 +244,7 @@ event = CalendarEvent.objects.get(id=${event_id})
 print("SAVED " + event.start.astimezone(MOSCOW).isoformat())
 `,
     )
-        .split("SAVED ")[1]!
+        .split("SAVED ", 2)[1]!
         .trim();
     check(
         "saving from the scheduler saves the meeting",

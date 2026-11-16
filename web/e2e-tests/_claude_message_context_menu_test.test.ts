@@ -208,7 +208,7 @@ async function visual_test(page: Page): Promise<void> {
             row.querySelector(".message_content")?.textContent.includes("first plain message"),
         )!;
         const range = document.createRange();
-        range.selectNodeContents(row.querySelector(".message_content p")!);
+        range.selectNodeContents(row.querySelector(":scope .message_content p")!);
         const selection = document.getSelection()!;
         selection.removeAllRanges();
         selection.addRange(range);
@@ -263,7 +263,7 @@ async function visual_test(page: Page): Promise<void> {
     // Near the right edge the menu stays inside the window.
     const edge = await page.evaluate((row_id) => {
         const row = document.querySelector(`#${CSS.escape(row_id)}`)!;
-        const rect = row.querySelector(".message_content p")!.getBoundingClientRect();
+        const rect = row.querySelector(":scope .message_content p")!.getBoundingClientRect();
         return {x: rect.right - 6, y: rect.top + rect.height / 2, row_id};
     }, first.row_id);
     await page.mouse.click(edge.x, edge.y, {button: "right"});

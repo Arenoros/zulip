@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -62,13 +63,13 @@ print(
 )
 `;
 
-type Seeded = {
-    desdemona: number;
-    othello: number;
-    hamlet: number;
-    prospero: number;
-    denmark: number;
-};
+const seeded_schema = z.object({
+    desdemona: z.number(),
+    othello: z.number(),
+    hamlet: z.number(),
+    prospero: z.number(),
+    denmark: z.number(),
+});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -158,7 +159,7 @@ function dm_hash(user_ids: number[]): string {
 }
 
 async function compose_for_view_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await common.log_in(page);

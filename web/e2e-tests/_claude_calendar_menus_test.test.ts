@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -92,7 +93,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -167,10 +169,9 @@ async function checked_state(page: Page, option: string): Promise<string | null>
 }
 
 async function calendar_menus_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {
-        monday: string;
-        othello: number;
-    };
+    const seeded = z
+        .object({monday: z.string(), othello: z.number()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/settings", "color_scheme=2&web_font_size_px=14");
@@ -214,9 +215,9 @@ async function calendar_menus_test(page: Page): Promise<void> {
             ) < 1,
         {polling: 100},
     );
-    const settings = (await request(page, "GET", "/json/calendar/settings", "")) as {
-        settings: {time_scale_minutes: number};
-    };
+    const settings = z
+        .object({settings: z.object({time_scale_minutes: z.number()})})
+        .parse(await request(page, "GET", "/json/calendar/settings", ""));
     check(
         "the time scale changes the grid and is saved",
         settings.settings.time_scale_minutes === 60 &&
@@ -242,10 +243,7 @@ async function calendar_menus_test(page: Page): Promise<void> {
     );
     check(
         "turning side by side off hides the colleagues, who stay checked",
-        await page.$eval(
-            ".calendar-colleague input",
-            (input) => (input as HTMLInputElement).checked,
-        ),
+        await page.$eval(".calendar-colleague input", (input) => input.checked),
     );
     await open_menu(page, ".calendar-view-menu-trigger", "#calendar-view-menu");
     await page.click(".calendar-side-by-side-option");

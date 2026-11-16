@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -89,15 +90,16 @@ add_calendar_attendees(hamlet, planning_id, [cordelia], False)
 print("SEEDED " + json.dumps({"monday": monday.isoformat()}))
 `;
 
-type Seeded = {monday: string};
+const seeded_schema = z.object({monday: z.string()});
 
-type CalendarEvent = {
-    id: number;
-    title: string;
-    start: number;
-    show_as: number;
-    reminder_minutes: number | null;
-};
+const calendar_event_schema = z.object({
+    id: z.number(),
+    title: z.string(),
+    start: z.number(),
+    show_as: z.number(),
+    reminder_minutes: z.nullable(z.number()),
+});
+type CalendarEvent = z.infer<typeof calendar_event_schema>;
 
 async function request(page: Page, method: string, url: string, body: string): Promise<unknown> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -114,7 +116,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -128,7 +131,7 @@ async function request(page: Page, method: string, url: string, body: string): P
 
 function moscow_seconds(date: string, hour: number): number {
     const [year, month, day] = date.split("-").map(Number);
-    return Date.UTC(year!, month! - 1, day!, hour - 3) / 1000;
+    return Date.UTC(year!, month! - 1, day, hour - 3) / 1000;
 }
 
 function add_days(date: string, days: number): string {
@@ -137,12 +140,16 @@ function add_days(date: string, days: number): string {
 }
 
 async function week_events(page: Page, monday: string): Promise<CalendarEvent[]> {
-    const data = (await request(
-        page,
-        "GET",
-        "/json/calendar/events",
-        `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
-    )) as {events: CalendarEvent[]};
+    const data = z
+        .object({events: z.array(calendar_event_schema)})
+        .parse(
+            await request(
+                page,
+                "GET",
+                "/json/calendar/events",
+                `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
+            ),
+        );
     return data.events;
 }
 
@@ -202,7 +209,9 @@ async function open_meeting(page: Page, date: string, title: string): Promise<vo
 }
 
 async function calendar_meeting_test(page: Page): Promise<void> {
-    const {monday} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const {monday} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     const tuesday = add_days(monday, 1);
     const wednesday = add_days(monday, 2);
     await common.log_in(page);
@@ -359,8 +368,12 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form", {visible: true});
     check(
         "copying opens a new event with the fields but no attendees",
-        (await page.$eval(".calendar-form-title", (input) => (input as HTMLInputElement).value)) ===
-            "Weekly sync" &&
+        (await page.$eval(".calendar-form-title", (input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return input.value;
+        })) === "Weekly sync" &&
             (await page.$$(".calendar-form-required-attendees .pill")).length === 0 &&
             (await text(page, ".calendar-form-time-summary")).startsWith(
                 "Repeats every Wednesday",
@@ -389,7 +402,7 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.waitForNetworkIdle({idleTime: 300, concurrency: 1});
     check(
         "deleting this occurrence closes the meeting and removes it",
-        !(await week_events(page, monday)).some((event) => event.title === "Weekly sync"),
+        (await week_events(page, monday)).every((event) => event.title !== "Weekly sync"),
     );
 
     // The organizer changes their meeting, next to the responses.

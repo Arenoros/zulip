@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -25,7 +26,8 @@ async function api(page: Page, method: string, url: string, body?: string): Prom
                 },
                 body: body ?? null,
             });
-            return await response.json();
+            const data: unknown = await response.json();
+            return data;
         },
         method,
         url,
@@ -55,10 +57,16 @@ async function section_channel_names(
     page: Page,
     section_id: number | string,
 ): Promise<{shown: string[]; full: string[]}> {
-    return await page.$$eval(`${section_selector(section_id)} .stream-name`, (elements) => ({
-        shown: elements.map((element) => (element as HTMLElement).innerText.trim()),
-        full: elements.map((element) => element.textContent.trim()),
-    }));
+    const selector = `${section_selector(section_id)} .stream-name`;
+    const elements = await page.$$(selector);
+    return {
+        shown: await Promise.all(
+            elements.map(async (element) => (await common.get_element_text(element)).trim()),
+        ),
+        full: await page.$$eval(selector, (elements) =>
+            elements.map((element) => element.textContent.trim()),
+        ),
+    };
 }
 
 async function wait_for_channel_in_section(
@@ -87,18 +95,14 @@ async function visual_test(page: Page): Promise<void> {
     await common.log_in(page);
     await page.waitForSelector("#subscribe-to-more-streams", {visible: true});
 
-    const design = (await api(
-        page,
-        "POST",
-        "/json/channel_folders/create",
-        "name=Design&description=",
-    )) as {channel_folder_id: number};
-    const support = (await api(
-        page,
-        "POST",
-        "/json/channel_folders/create",
-        "name=Support&description=",
-    )) as {channel_folder_id: number};
+    const design = z
+        .object({channel_folder_id: z.number()})
+        .parse(await api(page, "POST", "/json/channel_folders/create", "name=Design&description="));
+    const support = z
+        .object({channel_folder_id: z.number()})
+        .parse(
+            await api(page, "POST", "/json/channel_folders/create", "name=Support&description="),
+        );
     await page.waitForSelector(section_selector(design.channel_folder_id), {visible: true});
 
     // Create a channel from the header of a folder.
@@ -129,18 +133,22 @@ async function visual_test(page: Page): Promise<void> {
         ["general", support.channel_folder_id],
         ["general", undefined],
     ] as const) {
-        const result = (await api(
-            page,
-            "POST",
-            "/json/channels/create",
-            `name=${name}&subscribers=${encodeURIComponent(JSON.stringify([]))}` +
-                (folder_id === undefined ? "" : `&folder_id=${folder_id}`),
-        )) as {result: string; msg: string};
+        const result = z
+            .object({result: z.string(), msg: z.string()})
+            .parse(
+                await api(
+                    page,
+                    "POST",
+                    "/json/channels/create",
+                    `name=${name}&subscribers=${encodeURIComponent(JSON.stringify([]))}` +
+                        (folder_id === undefined ? "" : `&folder_id=${folder_id}`),
+                ),
+            );
         check(`another channel named ${name} is created`, result.result === "success", result.msg);
     }
-    const streams = (await api(page, "GET", "/json/streams")) as {
-        streams: {name: string; stream_id: number}[];
-    };
+    const streams = z
+        .object({streams: z.array(z.object({name: z.string(), stream_id: z.number()}))})
+        .parse(await api(page, "GET", "/json/streams"));
     await api(
         page,
         "POST",
@@ -226,8 +234,12 @@ async function visual_test(page: Page): Promise<void> {
     await common.wait_for_micromodal_to_open(page);
     check(
         "the dialog to rename a channel has its short name",
-        (await page.$eval("#change_stream_name", (e) => (e as HTMLInputElement).value)) ===
-            "general",
+        (await page.$eval("#change_stream_name", (e) => {
+            if (!(e instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return e.value;
+        })) === "general",
     );
     await common.screenshot(page, "cn-05-rename-dialog");
     await page.click("#change_stream_name", {count: 3});
@@ -310,12 +322,16 @@ async function visual_test(page: Page): Promise<void> {
 
     // Moving to a folder that has a channel of that name is refused.
     const plain_general_id = streams.streams.find((stream) => stream.name === "general")!.stream_id;
-    const refused = (await api(
-        page,
-        "PATCH",
-        `/json/streams/${plain_general_id}`,
-        `folder_id=${support.channel_folder_id}`,
-    )) as {result: string; msg: string};
+    const refused = z
+        .object({result: z.string(), msg: z.string()})
+        .parse(
+            await api(
+                page,
+                "PATCH",
+                `/json/streams/${plain_general_id}`,
+                `folder_id=${support.channel_folder_id}`,
+            ),
+        );
     check("moving onto a taken name is refused", refused.result === "error", refused.msg);
 
     const failures = results.filter((r) => r.startsWith("FAIL"));

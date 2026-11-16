@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -48,14 +49,14 @@ print(
 )
 `;
 
-type Seeded = {
-    desdemona: number;
-    iago: number;
-    stream_id: number;
-    from_iago: number;
-    bubble: number;
-    card: number;
-};
+const seeded_schema = z.object({
+    desdemona: z.number(),
+    iago: z.number(),
+    stream_id: z.number(),
+    from_iago: z.number(),
+    bubble: z.number(),
+    card: z.number(),
+});
 
 async function api(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -161,10 +162,12 @@ async function edit_facts(page: Page, id: number): Promise<EditFacts> {
             "compose-plus-menu-button",
         ];
         const row_buttons = [
-            ...row.querySelectorAll<HTMLElement>(".message-edit-row-buttons .compose-row-button"),
+            ...row.querySelectorAll<HTMLElement>(
+                ":scope .message-edit-row-buttons .compose-row-button",
+            ),
         ].filter((button) => shown(button));
         const controls = [
-            ...row.querySelectorAll<HTMLElement>(".message-edit-buttons-and-timer button"),
+            ...row.querySelectorAll<HTMLElement>(":scope .message-edit-buttons-and-timer button"),
         ].filter((button) => shown(button));
         const centers = [...row_buttons, ...controls].map((element) => {
             const rect = element.getBoundingClientRect();
@@ -181,9 +184,12 @@ async function edit_facts(page: Page, id: number): Promise<EditFacts> {
                 (button) => names.find((name) => button.classList.contains(name)) ?? "",
             ),
             controls: controls.map((button) => button.textContent.trim()),
-            one_row:
-                centers.every((center) => Math.abs(center - centers[0]!) < 1) &&
-                centers.every((center) => center > textarea.top && center < textarea.bottom),
+            one_row: centers.every(
+                (center) =>
+                    Math.abs(center - centers[0]!) < 1 &&
+                    center > textarea.top &&
+                    center < textarea.bottom,
+            ),
             buttons_below_message: row_buttons.every(
                 (button) => button.getBoundingClientRect().top >= textarea.bottom - 0.5,
             ),
@@ -197,10 +203,12 @@ async function edit_facts(page: Page, id: number): Promise<EditFacts> {
             message_height: textarea.height,
             timer: shown(timer) ? timer.textContent.trim() : "",
             timer_above_buttons: timer_rect !== undefined && timer_rect.bottom <= control_top + 0.5,
-            overflowing: [...row.querySelectorAll(".message-edit-field *")].filter((child) => {
-                const rect = child.getBoundingClientRect();
-                return rect.width > 0 && rect.right > field.right + 0.5;
-            }).length,
+            overflowing: [...row.querySelectorAll(":scope .message-edit-field *")].filter(
+                (child) => {
+                    const rect = child.getBoundingClientRect();
+                    return rect.width > 0 && rect.right > field.right + 0.5;
+                },
+            ).length,
             compose_formatting: document
                 .querySelector("#compose")!
                 .classList.contains("formatting-mode"),
@@ -235,7 +243,7 @@ async function message_text(page: Page, id: number): Promise<string> {
 
 async function edit_form_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -254,7 +262,7 @@ async function edit_form_test(page: Page): Promise<void> {
     );
     await page.reload();
     const dm = `#narrow/dm/${seeded.iago}-Iago`;
-    await go_to(page, dm, `${row(seeded.bubble)}`);
+    await go_to(page, dm, row(seeded.bubble));
 
     // Whatever is typed in the compose box stays there.
     await page.click("#compose-textarea");
@@ -302,7 +310,12 @@ async function edit_form_test(page: Page): Promise<void> {
     await page.keyboard.type("A second line.");
     const still_open = await page.$eval(
         `${row(seeded.bubble)} .message_edit_content`,
-        (textarea) => (textarea as HTMLTextAreaElement).value,
+        (textarea) => {
+            if (!(textarea instanceof HTMLTextAreaElement)) {
+                throw new TypeError("Expected <textarea>");
+            }
+            return textarea.value;
+        },
     );
     check(
         "in formatting mode, Enter starts a new line",
@@ -368,10 +381,12 @@ async function edit_form_test(page: Page): Promise<void> {
     await page.keyboard.press("Escape");
     await wait_for_edit_closed(page, seeded.bubble);
     const after_escape = await message_text(page, seeded.bubble);
-    const compose_after = await page.$eval(
-        "#compose-textarea",
-        (textarea) => (textarea as HTMLTextAreaElement).value,
-    );
+    const compose_after = await page.$eval("#compose-textarea", (textarea) => {
+        if (!(textarea instanceof HTMLTextAreaElement)) {
+            throw new TypeError("Expected <textarea>");
+        }
+        return textarea.value;
+    });
     check(
         "Esc cancels the edit, and the compose box keeps its text",
         !after_escape.includes("Hello from a snippet.") &&

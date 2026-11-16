@@ -1,6 +1,8 @@
 import {execSync} from "node:child_process";
 
-import puppeteer, {type Page} from "puppeteer";
+import type {Page} from "puppeteer";
+import * as puppeteer from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -75,17 +77,17 @@ do_update_message_flags(desdemona, "add", "starred", [ids["starred"]])
 print("SEEDED " + json.dumps({"ids": ids, "stream_id": stream.id}))
 `;
 
-type Seeded = {
-    ids: {
-        series: number[];
-        starred: number;
-        bot: number;
-        mention: number;
-        own: number;
-        unread: number;
-    };
-    stream_id: number;
-};
+const seeded_schema = z.object({
+    ids: z.object({
+        series: z.array(z.number()),
+        starred: z.number(),
+        bot: z.number(),
+        mention: z.number(),
+        own: z.number(),
+        unread: z.number(),
+    }),
+    stream_id: z.number(),
+});
 
 async function api(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -162,11 +164,11 @@ async function line_of(page: Page, id: number): Promise<Line> {
     return await page.$eval(row(id), (row) => {
         const box = (element: Element | null): DOMRect =>
             element?.getBoundingClientRect() ?? new DOMRect();
-        const avatar = row.querySelector(".message-avatar .inline_profile_picture");
+        const avatar = row.querySelector(":scope .message-avatar .inline_profile_picture");
         const name = row.querySelector(".sender_name");
         const time = row.querySelector(".message-time")!;
         const star = row.querySelector(".message-starred-indicator");
-        const control_star = row.querySelector(".message_controls .star_container");
+        const control_star = row.querySelector(":scope .message_controls .star_container");
         return {
             avatar: Math.round(box(avatar).width),
             name_right: Math.round(box(name).right),
@@ -196,7 +198,7 @@ async function hover(page: Page, id: number): Promise<void> {
 
 async function mixed_view_rows_test(page: Page): Promise<void> {
     const output = run_python(seed_script);
-    const {ids, stream_id} = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const {ids, stream_id} = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -306,16 +308,15 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
         row(ids.starred),
     );
     await page.click(`${row(ids.starred)} .star_container .star`);
-    const restarred = await page
-        .waitForFunction(
+    const restarred = await common.succeeds(
+        page.waitForFunction(
             (selector: string) =>
                 getComputedStyle(document.querySelector(`${selector} .message-starred-indicator`)!)
                     .display !== "none",
             {timeout: 5000},
             row(ids.starred),
-        )
-        .then(() => true)
-        .catch(() => false);
+        ),
+    );
     check("unstarring and starring updates the star next to the time", restarred);
     const plain = await line_of(page, ids.series[0]!);
     check("a message that is not starred has no star", !plain.star_shown);
@@ -325,7 +326,7 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
     // Bots, mentions, own messages, unread messages.
     const bot = await page.$eval(row(ids.bot), (row) => {
         const label = row.querySelector(".message-sender-bot-label")!;
-        const icon = row.querySelector(".message_sender .zulip-icon-bot");
+        const icon = row.querySelector(":scope .message_sender .zulip-icon-bot");
         return {
             label: getComputedStyle(label).display !== "none" ? label.textContent.trim() : "",
             icon: icon !== null && getComputedStyle(icon).display !== "none",
@@ -384,10 +385,9 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
         return {x: box.left + 10, y: box.top + box.height / 2};
     });
     await page.mouse.click(point.x, point.y, {button: "right"});
-    const menu = await page
-        .waitForSelector("#message-actions-menu-dropdown", {visible: true, timeout: 5000})
-        .then(() => true)
-        .catch(() => false);
+    const menu = await common.succeeds(
+        page.waitForSelector("#message-actions-menu-dropdown", {visible: true, timeout: 5000}),
+    );
     check("right-clicking a message opens its actions menu", menu);
     await page.keyboard.press("Escape");
     await page.mouse.click(point.x, point.y);
@@ -395,15 +395,14 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
     await page.click(`${row(ids.mention)} .message_content`);
     await page.keyboard.press("Escape");
     await page.keyboard.press("KeyR");
-    const reply = await page
-        .waitForFunction(
+    const reply = await common.succeeds(
+        page.waitForFunction(
             () =>
                 document.querySelector<HTMLInputElement>("input#stream_message_recipient_topic")
                     ?.value === "mentions",
             {timeout: 5000},
-        )
-        .then(() => true)
-        .catch(() => false);
+        ),
+    );
     const recipient_row_shown = await page.evaluate(
         () => getComputedStyle(document.querySelector("#compose-recipient")!).display !== "none",
     );

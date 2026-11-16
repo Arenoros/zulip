@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -135,7 +136,9 @@ async function shot(page: Page, name: string): Promise<void> {
 
 async function reply_in_conversations_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const {stream_id} = JSON.parse(output.split("SEEDED ")[1]!) as {stream_id: number};
+    const {stream_id} = z
+        .object({stream_id: z.number()})
+        .parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -181,7 +184,9 @@ async function reply_in_conversations_test(page: Page): Promise<void> {
         JSON.stringify(facts),
     );
     const saved = await page.evaluate(() =>
-        Object.values(localStorage).some((value) => value.includes("Fresh beans arrived.")),
+        Object.values(localStorage).some(
+            (value: unknown) => typeof value === "string" && value.includes("Fresh beans arrived."),
+        ),
     );
     check("the previous reply is kept as a draft", saved);
 
@@ -191,7 +196,9 @@ async function reply_in_conversations_test(page: Page): Promise<void> {
     await wait_for_compose_closed(page);
     facts = await reply_facts(page);
     const kept = await page.evaluate(() =>
-        Object.values(localStorage).some((value) => value.includes("The fridge is full.")),
+        Object.values(localStorage).some(
+            (value: unknown) => typeof value === "string" && value.includes("The fridge is full."),
+        ),
     );
     check(
         "× closes the reply, keeps the draft and shows New conversation again",

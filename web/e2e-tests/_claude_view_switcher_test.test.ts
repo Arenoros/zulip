@@ -85,17 +85,16 @@ async function open(page: Page, hash: string): Promise<void> {
 }
 
 async function wait_for_active(page: Page, label: string): Promise<boolean> {
-    return await page
-        .waitForFunction(
+    return await common.succeeds(
+        page.waitForFunction(
             (label: string) =>
                 document
                     .querySelector("#message_view_header .view-switcher-segment.active")
                     ?.textContent.trim() === label,
             {timeout: 10000},
             label,
-        )
-        .then(() => true)
-        .catch(() => false);
+        ),
+    );
 }
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -164,7 +163,7 @@ async function view_switcher_test(page: Page): Promise<void> {
 
     // Switching without reloading the web app.
     await page.evaluate(() => {
-        (window as unknown as {switcher_marker: boolean}).switcher_marker = true;
+        document.documentElement.dataset["switcherMarker"] = "true";
     });
     await page.click("#message_view_header .view-switcher-segment:nth-child(2)");
     const mentions = await wait_for_active(page, "Mentions");
@@ -173,7 +172,7 @@ async function view_switcher_test(page: Page): Promise<void> {
     const starred = await wait_for_active(page, "Starred");
     const starred_state = await switcher(page);
     const kept = await page.evaluate(
-        () => (window as unknown as {switcher_marker?: boolean}).switcher_marker === true,
+        () => document.documentElement.dataset["switcherMarker"] === "true",
     );
     check(
         "the segments open mentions and starred messages without reloading",
@@ -228,26 +227,24 @@ async function view_switcher_test(page: Page): Promise<void> {
     await page.keyboard.press("Escape");
     await page.keyboard.press("Slash");
     // The search bar expands over the header, which is marked hidden.
-    const hidden_while_searching = await page
-        .waitForFunction(
+    const hidden_while_searching = await common.succeeds(
+        page.waitForFunction(
             () =>
                 document.querySelector(".navbar-search")!.classList.contains("expanded") &&
                 document.querySelector("#message_view_header")!.classList.contains("hidden"),
             {timeout: 5000},
-        )
-        .then(() => true)
-        .catch(() => false);
+        ),
+    );
     await page.keyboard.press("Escape");
-    const shown_again = await page
-        .waitForFunction(
+    const shown_again = await common.succeeds(
+        page.waitForFunction(
             () =>
                 !document.querySelector("#message_view_header")!.classList.contains("hidden") &&
                 document.querySelector("#message_view_header .view-switcher")?.checkVisibility() ===
                     true,
             {timeout: 5000},
-        )
-        .then(() => true)
-        .catch(() => false);
+        ),
+    );
     const back = await switcher(page);
     check(
         "search opens in place of the segments and closes back to them",

@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -81,7 +82,7 @@ respond_to_calendar_event(othello, planning_id, CalendarResponse.ACCEPTED, messa
 print("SEEDED " + json.dumps({"standup_id": standup_id, "bot_id": bot.id, "start": int(start.timestamp())}))
 `;
 
-type Seeded = {standup_id: number; bot_id: number; start: number};
+const seeded_schema = z.object({standup_id: z.number(), bot_id: z.number(), start: z.number()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -152,7 +153,9 @@ async function click_calendar_link(page: Page, containing: string): Promise<void
 }
 
 async function calendar_notifications_test(page: Page): Promise<void> {
-    const {standup_id, bot_id} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const {standup_id, bot_id} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/realm", "video_chat_provider=10");
@@ -197,11 +200,11 @@ async function calendar_notifications_test(page: Page): Promise<void> {
     await page.waitForSelector('.calendar-card-respond[data-response="accepted"].selected');
     const response = run_python(
         python_prelude + `print("LAST " + json.dumps(last_notification(othello)))`,
-    ).split("LAST ")[1]!;
+    ).split("LAST ", 2)[1]!;
     check(
         "the organizer learns the response and its message",
-        JSON.parse(response).includes("accepted **Standup**.") &&
-            JSON.parse(response).includes("> Running late"),
+        z.string().parse(JSON.parse(response)).includes("accepted **Standup**.") &&
+            z.string().parse(JSON.parse(response)).includes("> Running late"),
         response.trim(),
     );
     await page.keyboard.press("Escape");
@@ -218,10 +221,12 @@ async function calendar_notifications_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form .calendar-responses:not(.hide)", {visible: true});
     check(
         "the organizer's link opens the meeting with the responses",
-        (await page.$eval(
-            ".calendar-form-title",
-            (element) => (element as HTMLInputElement).value,
-        )) === "Planning",
+        (await page.$eval(".calendar-form-title", (element) => {
+            if (!(element instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return element.value;
+        })) === "Planning",
     );
 
     // A closed reminder stays closed.

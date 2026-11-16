@@ -128,6 +128,8 @@ js_rules = RuleList(
                 "web/src/server_message.ts",
                 "web/src/state_data.ts",
                 "web/tests/",
+                # Serves search results in the server's format.
+                "web/e2e-tests/_claude_search_results_test.test.ts",
             },
             "exclude_pattern": "emails",
             "description": "avoid subject in JS code",
@@ -215,6 +217,8 @@ js_rules = RuleList(
                 "web/tests/compose_paste.test.cjs",
                 "web/tests/postprocess_content.test.cjs",
                 "web/tests/lib/zjquery_element.cjs",
+                # Seeds a message embed rendered as the server renders it.
+                "web/e2e-tests/_claude_bubble_content_test.test.ts",
             },
             "good_lines": ["#my-style {color: blue;}", "const style =", 'some_style = "test"'],
             "bad_lines": ['<p style="color: blue;">Foo</p>', 'style = "color: blue;"'],

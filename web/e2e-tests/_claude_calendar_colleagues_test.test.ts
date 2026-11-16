@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -99,7 +100,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -125,7 +127,7 @@ async function wait_for_week(page: Page): Promise<void> {
 async function add_colleague(page: Page, name: string): Promise<void> {
     await page.click("#calendar-add-colleague_widget");
     await page.waitForSelector(".calendar-add-colleague-dropdown-list-container", {visible: true});
-    await page.type(".dropdown-list-search-input", name.split(",")[0]!);
+    await page.type(".dropdown-list-search-input", name.split(",", 1)[0]!);
     await page.waitForFunction(
         (name) =>
             [...document.querySelectorAll(".dropdown-list-item-common-styles")].some(
@@ -184,7 +186,9 @@ async function busy_blocks(page: Page): Promise<string[]> {
 }
 
 async function calendar_colleagues_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {monday: string};
+    const seeded = z
+        .object({monday: z.string()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/settings", "color_scheme=2&web_font_size_px=14");
@@ -336,26 +340,32 @@ async function calendar_colleagues_test(page: Page): Promise<void> {
         () => document.querySelectorAll(".calendar-colleague").length === 2,
         {polling: 100},
     );
-    const pinned = (await request(page, "GET", "/json/calendar/pinned_users", "")) as {
-        pinned_users: {user_id: number}[];
-    };
+    const pinned = z
+        .object({pinned_users: z.array(z.object({user_id: z.number()}))})
+        .parse(await request(page, "GET", "/json/calendar/pinned_users", ""));
     check(
         "the × of a row removes the colleague",
         pinned.pinned_users.length === 2 &&
-            !(await list_state(page)).some((row) => row.startsWith("Othello")),
+            (await list_state(page)).every((row) => !row.startsWith("Othello")),
         JSON.stringify(await list_state(page)),
     );
 
     // Long lists show their first colleagues.
-    const user_ids = (await page.evaluate(() =>
-        [...document.querySelectorAll(".calendar-colleague input")].map((input) =>
-            Number((input as HTMLElement).dataset["userId"]),
+    const user_ids = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>(".calendar-colleague input")].map((input) =>
+            Number(input.dataset["userId"]),
         ),
-    )) as number[];
-    const me = (await request(page, "GET", "/json/users/me", "")) as {user_id: number};
-    const others = (await request(page, "GET", "/json/users", "")) as {
-        members: {user_id: number; is_bot: boolean; is_active: boolean}[];
-    };
+    );
+    const me = z
+        .object({user_id: z.number()})
+        .parse(await request(page, "GET", "/json/users/me", ""));
+    const others = z
+        .object({
+            members: z.array(
+                z.object({user_id: z.number(), is_bot: z.boolean(), is_active: z.boolean()}),
+            ),
+        })
+        .parse(await request(page, "GET", "/json/users", ""));
     const more = others.members
         .filter(
             (user) =>

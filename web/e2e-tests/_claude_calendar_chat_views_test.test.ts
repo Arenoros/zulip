@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -126,9 +127,9 @@ async function wait_for_reply_label(page: Page, label: string): Promise<void> {
 }
 
 async function calendar_chat_views_test(page: Page): Promise<void> {
-    const {stream_id} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {
-        stream_id: number;
-    };
+    const {stream_id} = z
+        .object({stream_id: z.number()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     const inbox_row = `#inbox-direct-messages-container .inbox-row[data-meeting-chat-stream-id="${stream_id}"]`;
     const recent_row = `#recent-view-content-tbody tr[data-meeting-chat-stream-id="${stream_id}"]`;
 

@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -129,7 +130,9 @@ async function near_plus_button(page: Page, selector: string): Promise<boolean> 
 }
 
 async function compose_menus_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {othello: number};
+    const seeded = z
+        .object({othello: z.number()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     await common.log_in(page);
     await page.waitForSelector("#message_view_header", {visible: true});
     await page.setViewport({width: 1280, height: 1000});
@@ -234,8 +237,8 @@ async function compose_menus_test(page: Page): Promise<void> {
     );
     await page.click(".compose-plus-menu-poll");
     await new Promise((resolve) => setTimeout(resolve, 300));
-    const poll_dialog_shown = await page.evaluate(
-        () => document.querySelector<HTMLElement>("#add-poll-modal")?.offsetParent != null,
+    const poll_dialog_shown = await page.evaluate(() =>
+        Boolean(document.querySelector<HTMLElement>("#add-poll-modal")?.offsetParent),
     );
     check(
         "with text, Poll and To-do list are inactive and say why",
@@ -287,15 +290,16 @@ async function compose_menus_test(page: Page): Promise<void> {
         "#message-formatting-controls-container .compose_control_button",
         (buttons) =>
             buttons
-                .filter((button) => (button as HTMLElement).offsetParent !== null)
+                .filter((button) => button instanceof HTMLElement && button.offsetParent !== null)
                 .map((button) => button.getAttribute("aria-label")),
     );
     check(
         "the formatting toolbar no longer has poll, to-do list, global time or saved snippets",
-        !toolbar.some((label) =>
-            ["Add poll", "Add to-do list", "Add global time", "Add saved snippet"].includes(
-                label ?? "",
-            ),
+        toolbar.every(
+            (label) =>
+                !["Add poll", "Add to-do list", "Add global time", "Add saved snippet"].includes(
+                    label ?? "",
+                ),
         ),
         JSON.stringify(toolbar),
     );

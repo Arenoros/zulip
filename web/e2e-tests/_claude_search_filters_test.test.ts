@@ -1,4 +1,5 @@
 import type {HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -28,14 +29,15 @@ async function api(page: Page, method: string, url: string, body?: string): Prom
                 },
                 ...(body !== undefined && {body}),
             });
-            return [response.status, (await response.json()) as unknown];
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
         body,
     );
     if (status !== 200) {
-        throw new Error(`${method} ${url} ${body}: ${status}`);
+        throw new Error(`${method} ${url} ${body ?? ""}: ${status}`);
     }
     return data;
 }
@@ -59,10 +61,12 @@ async function bar(page: Page): Promise<Bar | undefined> {
             [...filter.children].map((part) => part.textContent).join("|");
         return {
             labels: filters.map((filter) => label(filter)),
-            active: filters.filter((filter) => filter.classList.contains("active")).map(label),
+            active: filters
+                .filter((filter) => filter.classList.contains("active"))
+                .map((filter) => label(filter)),
             current: filters
                 .filter((filter) => filter.getAttribute("aria-current") === "page")
-                .map(label),
+                .map((filter) => label(filter)),
             nav_label: nav.getAttribute("aria-label"),
             hash: window.location.hash,
         };
@@ -71,8 +75,8 @@ async function bar(page: Page): Promise<Bar | undefined> {
 
 // Waits until the filters show these labels, and returns them.
 async function wait_for_labels(page: Page, labels: string[]): Promise<Bar | undefined> {
-    await page
-        .waitForFunction(
+    await common.succeeds(
+        page.waitForFunction(
             (labels: string[]) => {
                 const filters = [...document.querySelectorAll(".search-filters .search-filter")];
                 return (
@@ -85,8 +89,8 @@ async function wait_for_labels(page: Page, labels: string[]): Promise<Bar | unde
             },
             {timeout: 15000},
             labels,
-        )
-        .catch(() => undefined);
+        ),
+    );
     return await bar(page);
 }
 
@@ -94,10 +98,11 @@ async function wait_for_labels(page: Page, labels: string[]): Promise<Bar | unde
 // searches here find nothing; the filters work without results.
 // Waits until the filter for this kind of messages is the active one.
 async function wait_for_active(page: Page, kind: string): Promise<boolean> {
-    return await page
-        .waitForSelector(`.search-filter.active[data-search-filter="${kind}"]`, {timeout: 10000})
-        .then(() => true)
-        .catch(() => false);
+    return await common.succeeds(
+        page.waitForSelector(`.search-filter.active[data-search-filter="${kind}"]`, {
+            timeout: 10000,
+        }),
+    );
 }
 
 async function open(page: Page, hash: string, wait_for = ".search-filters"): Promise<void> {
@@ -114,18 +119,27 @@ async function open(page: Page, hash: string, wait_for = ".search-filters"): Pro
 }
 
 async function wait_for_hash(page: Page, hash: string): Promise<boolean> {
-    return await page
-        .waitForFunction((hash: string) => window.location.hash === hash, {timeout: 10000}, hash)
-        .then(() => true)
-        .catch(() => false);
+    return await common.succeeds(
+        page.waitForFunction(
+            (hash: string) => window.location.hash === hash,
+            {timeout: 10000},
+            hash,
+        ),
+    );
 }
 
 type CountResponse = {status: number; body: object};
 
+const narrow_schema = z.array(
+    z.object({operator: z.string(), operand: z.string(), negated: z.optional(z.boolean())}),
+);
+
 // Answers the count requests of the filters.
 async function respond_to_counts(
     page: Page,
-    respond: (narrow: {operator: string; operand: string; negated?: boolean}[]) => CountResponse,
+    respond: (
+        narrow: {operator: string; operand: string; negated?: boolean | undefined}[],
+    ) => CountResponse,
 ): Promise<void> {
     page.removeAllListeners("request");
     await page.setRequestInterception(true);
@@ -138,7 +152,7 @@ async function respond_to_counts(
             void request.continue();
             return;
         }
-        const response = respond(JSON.parse(url.searchParams.get("narrow")!));
+        const response = respond(narrow_schema.parse(JSON.parse(url.searchParams.get("narrow")!)));
         void request.respond({
             status: response.status,
             contentType: "application/json",

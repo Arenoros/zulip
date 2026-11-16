@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -70,24 +71,25 @@ print(
 )
 `;
 
-type Seeded = {monday: string; othello: number; desdemona: number};
+const seeded_schema = z.object({monday: z.string(), othello: z.number(), desdemona: z.number()});
 
-type Occurrence = {
-    id: number;
-    title: string;
-    start: number;
-    end: number;
-    location: string;
-    has_zulip_call: boolean;
-    show_as: number;
-    is_private: boolean;
-    allow_forwarding: boolean;
-    reminder_minutes: number | null;
-    category: string;
-    description: string;
-    original_start: number | null;
-    attendees: {user_id: number; is_required: boolean}[];
-};
+const occurrence_schema = z.object({
+    id: z.number(),
+    title: z.string(),
+    start: z.number(),
+    end: z.number(),
+    location: z.string(),
+    has_zulip_call: z.boolean(),
+    show_as: z.number(),
+    is_private: z.boolean(),
+    allow_forwarding: z.boolean(),
+    reminder_minutes: z.nullable(z.number()),
+    category: z.string(),
+    description: z.string(),
+    original_start: z.nullable(z.number()),
+    attendees: z.array(z.object({user_id: z.number(), is_required: z.boolean()})),
+});
+type Occurrence = z.infer<typeof occurrence_schema>;
 
 async function request(page: Page, method: string, url: string, body: string): Promise<unknown> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -104,7 +106,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -118,7 +121,7 @@ async function request(page: Page, method: string, url: string, body: string): P
 
 function moscow_seconds(date: string, hour: number, minute = 0): number {
     const [year, month, day] = date.split("-").map(Number);
-    return Date.UTC(year!, month! - 1, day!, hour - 3, minute) / 1000;
+    return Date.UTC(year!, month! - 1, day, hour - 3, minute) / 1000;
 }
 
 function add_days(date: string, days: number): string {
@@ -127,12 +130,16 @@ function add_days(date: string, days: number): string {
 }
 
 async function week_events(page: Page, monday: string): Promise<Occurrence[]> {
-    const data = (await request(
-        page,
-        "GET",
-        "/json/calendar/events",
-        `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
-    )) as {events: Occurrence[]};
+    const data = z
+        .object({events: z.array(occurrence_schema)})
+        .parse(
+            await request(
+                page,
+                "GET",
+                "/json/calendar/events",
+                `start=${moscow_seconds(monday, 0)}&end=${moscow_seconds(add_days(monday, 7), 0)}`,
+            ),
+        );
     return data.events;
 }
 
@@ -166,7 +173,7 @@ async function wait_for_grid(page: Page): Promise<void> {
 
 async function add_attendee(page: Page, selector: string, name: string): Promise<void> {
     await page.click(`${selector} .input`);
-    await page.keyboard.type(name.split(",")[0]!);
+    await page.keyboard.type(name.split(",", 1)[0]!);
     await page.waitForSelector(".typeahead.dropdown-menu .active", {visible: true});
     await page.keyboard.press("Enter");
     await page.waitForFunction(
@@ -205,7 +212,7 @@ async function form_times(page: Page): Promise<{date: string; start: string; end
 }
 
 async function calendar_form_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     const {monday} = seeded;
     const wednesday = add_days(monday, 2);
     await common.log_in(page);
@@ -265,10 +272,12 @@ async function calendar_form_test(page: Page): Promise<void> {
     await page.click('.calendar-form-format[data-format-type="bold"]');
     check(
         "formatting buttons format the description",
-        (await page.$eval(
-            ".calendar-form-description-input",
-            (element) => (element as HTMLTextAreaElement).value,
-        )) === "**Agenda**",
+        (await page.$eval(".calendar-form-description-input", (element) => {
+            if (!(element instanceof HTMLTextAreaElement)) {
+                throw new TypeError("Expected <textarea>");
+            }
+            return element.value;
+        })) === "**Agenda**",
     );
     await page.click(".calendar-form-preview");
     await page.waitForFunction(
@@ -292,10 +301,12 @@ async function calendar_form_test(page: Page): Promise<void> {
     check(
         "the emoji picker inserts into the description",
         (
-            await page.$eval(
-                ".calendar-form-description-input",
-                (element) => (element as HTMLTextAreaElement).value,
-            )
+            await page.$eval(".calendar-form-description-input", (element) => {
+                if (!(element instanceof HTMLTextAreaElement)) {
+                    throw new TypeError("Expected <textarea>");
+                }
+                return element.value;
+            })
         ).includes(":+1:"),
     );
 
@@ -371,13 +382,20 @@ async function calendar_form_test(page: Page): Promise<void> {
     await wait_for_form(page);
     check(
         "the form for a change has the meeting's data",
-        (await page.$eval(".calendar-form-title", (input) => (input as HTMLInputElement).value)) ===
-            "Design review" &&
+        (await page.$eval(".calendar-form-title", (input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return input.value;
+        })) === "Design review" &&
             (await page.$$(".calendar-form-required-attendees .pill")).length === 1 &&
             (await page.$$(".calendar-form-optional-attendees .pill")).length === 1,
     );
     await page.$eval(".calendar-form-title", (input) => {
-        (input as HTMLInputElement).value = "";
+        if (!(input instanceof HTMLInputElement)) {
+            throw new TypeError("Expected <input>");
+        }
+        input.value = "";
     });
     await page.type(".calendar-form-title", "Design review, moved");
     await page.click(".calendar-form-save");
@@ -404,13 +422,18 @@ async function calendar_form_test(page: Page): Promise<void> {
     check(
         "an occurrence keeps the settings of its series",
         (await page.$(".calendar-form-occurrence-note")) !== null &&
-            (await page.$eval(
-                ".calendar-form-call-checkbox",
-                (input) => (input as HTMLInputElement).disabled,
-            )),
+            (await page.$eval(".calendar-form-call-checkbox", (input) => {
+                if (!(input instanceof HTMLInputElement)) {
+                    throw new TypeError("Expected <input>");
+                }
+                return input.disabled;
+            })),
     );
     await page.$eval(".calendar-form-title", (input) => {
-        (input as HTMLInputElement).value = "";
+        if (!(input instanceof HTMLInputElement)) {
+            throw new TypeError("Expected <input>");
+        }
+        input.value = "";
     });
     await page.type(".calendar-form-title", "Daily sync (Tuesday)");
     await page.click(".calendar-form-save");
@@ -431,7 +454,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     const column_box = (await thursday_column.boundingBox())!;
     await page.evaluate((thursday) => {
         const container = document.querySelector(".calendar-grid-container")!;
-        const column = document.querySelector(`.calendar-day-column[data-date="${thursday}"]`)!;
+        const column = document.querySelector(
+            `.calendar-day-column[data-date="${CSS.escape(thursday)}"]`,
+        )!;
         container.scrollTop = (column.getBoundingClientRect().height / 24) * 13;
     }, thursday);
     const column_rect = await page.$eval(
@@ -464,8 +489,12 @@ async function calendar_form_test(page: Page): Promise<void> {
     await wait_for_form(page);
     check(
         "a draft stays when leaving the calendar",
-        (await page.$eval(".calendar-form-title", (input) => (input as HTMLInputElement).value)) ===
-            "Draft",
+        (await page.$eval(".calendar-form-title", (input) => {
+            if (!(input instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return input.value;
+        })) === "Draft",
     );
 
     // Canceling with changes asks first.

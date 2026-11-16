@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -118,22 +119,22 @@ print(
 )
 `;
 
-type Seeded = {
-    ids: {
-        plans: number[];
-        dm: number;
-        night: number[];
-        group: number;
-        self: number;
-        long_topic: number;
-        long: number[];
-    };
-    stream_id: number;
-    othello_id: number;
-    hamlet_id: number;
-    iago_id: number;
-    long_topic: string;
-};
+const seeded_schema = z.object({
+    ids: z.object({
+        plans: z.array(z.number()),
+        dm: z.number(),
+        night: z.array(z.number()),
+        group: z.number(),
+        self: z.number(),
+        long_topic: z.number(),
+        long: z.array(z.number()),
+    }),
+    stream_id: z.number(),
+    othello_id: z.number(),
+    hamlet_id: z.number(),
+    iago_id: z.number(),
+    long_topic: z.string(),
+});
 
 async function api(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -198,7 +199,7 @@ async function header_of(page: Page, message_id: number): Promise<Header> {
         const header = group.querySelector(".message_header")!;
         const open = header.querySelector<HTMLAnchorElement>(".conversation-fragment-open");
         const date = header.querySelector(".recipient_row_date");
-        const icon = header.querySelector(".stream_label .zulip-icon");
+        const icon = header.querySelector(":scope .stream_label .zulip-icon");
         return {
             fragment: header.classList.contains("conversation-fragment-header"),
             label: header
@@ -229,8 +230,9 @@ async function is_mixed_view(page: Page): Promise<{mixed: boolean; fragments: nu
 
 async function conversation_fragments_test(page: Page): Promise<void> {
     const output = run_python(seed_script);
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
-    const {ids, stream_id, othello_id, hamlet_id, iago_id} = seeded;
+    const {ids, stream_id, othello_id, hamlet_id, iago_id} = seeded_schema.parse(
+        JSON.parse(output.split("SEEDED ", 2)[1]!),
+    );
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -390,7 +392,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         "the topic actions show on hover, next to the link",
         hidden_opacity === "0" &&
             shown_opacity === "1" &&
-            order.link_left - order.controls_right >= 0 &&
+            order.link_left >= order.controls_right &&
             order.link_left - order.controls_right <= 4,
         JSON.stringify({hidden_opacity, shown_opacity, ...order}),
     );
@@ -398,13 +400,15 @@ async function conversation_fragments_test(page: Page): Promise<void> {
 
     // Topic editing in the header.
     await page.click(`${group_of(ids.plans[2]!)} .on_hover_topic_edit`);
-    const editing = await page
-        .waitForSelector(".focused-message-list .conversation-fragment-header .topic_edit_form", {
-            visible: true,
-            timeout: 5000,
-        })
-        .then(() => true)
-        .catch(() => false);
+    const editing = await common.succeeds(
+        page.waitForSelector(
+            ".focused-message-list .conversation-fragment-header .topic_edit_form",
+            {
+                visible: true,
+                timeout: 5000,
+            },
+        ),
+    );
     await page.keyboard.press("Escape");
     await new Promise((resolve) => setTimeout(resolve, 500));
     check("the topic can be edited in the fragment header", editing);
@@ -438,13 +442,12 @@ async function conversation_fragments_test(page: Page): Promise<void> {
     await page.click(
         `${group_of(ids.night[0]!)} > .conversation-fragment-date-divider .scroll-to-time`,
     );
-    const scroll_popover = await page
-        .waitForSelector("#scroll-to-time-popover", {
+    const scroll_popover = await common.succeeds(
+        page.waitForSelector("#scroll-to-time-popover", {
             visible: true,
             timeout: 5000,
-        })
-        .then(() => true)
-        .catch(() => false);
+        }),
+    );
     check("the date divider between cards opens Scroll to date", scroll_popover);
     await page.keyboard.press("Escape");
 
@@ -453,13 +456,12 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         row.scrollIntoView({block: "center"});
     });
     await page.click(`${group_of(ids.plans[0]!)} .conversation-fragment-open`);
-    const opened_topic = await page
-        .waitForSelector(".focused-message-list.open-conversation .message_row", {
+    const opened_topic = await common.succeeds(
+        page.waitForSelector(".focused-message-list.open-conversation .message_row", {
             visible: true,
             timeout: 10000,
-        })
-        .then(() => true)
-        .catch(() => false);
+        }),
+    );
     check(
         "Open conversation opens the topic",
         opened_topic && page.url().includes("/topic/plans"),
@@ -597,7 +599,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         "copied messages name their conversations without the links",
         copied[0]?.startsWith("Direct messages > Othello, the Moor of Venice |") === true &&
             copied.some((line) => line.startsWith("fragments > plans |")) &&
-            !copied.some((line) => line.includes("Open")),
+            copied.every((line) => !line.includes("Open")),
         JSON.stringify(copied),
     );
 
@@ -634,7 +636,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
             (header) => {
                 const contents = header.querySelector(".message-header-contents")!;
                 const link = header.querySelector(".conversation-fragment-open")!;
-                const topic = header.querySelector(".stream_topic a");
+                const topic = header.querySelector(":scope .stream_topic a");
                 return {
                     overflows: contents.scrollWidth > contents.clientWidth + 1,
                     link_inside:

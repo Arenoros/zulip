@@ -1,4 +1,5 @@
 import type {HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -13,12 +14,14 @@ const base_url = "http://zulip.zulipdev.com:9981/";
 const shot_prefix = process.env["SHOT_PREFIX"] ?? "search-results";
 const keyword = "zebraresult";
 
-type RawMessage = {
-    id: number;
-    type: string;
-    content: string;
-    subject: string;
-};
+// The messages are served back to the web app, with all their fields.
+const raw_message_schema = z.looseObject({
+    id: z.number(),
+    type: z.string(),
+    content: z.string(),
+    subject: z.string(),
+});
+type RawMessage = z.infer<typeof raw_message_schema>;
 
 async function api(page: Page, method: string, url: string, body?: string): Promise<unknown> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -35,25 +38,23 @@ async function api(page: Page, method: string, url: string, body?: string): Prom
                 },
                 ...(body !== undefined && {body}),
             });
-            return [response.status, (await response.json()) as unknown];
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
         body,
     );
     if (status !== 200) {
-        throw new Error(`${method} ${url} ${body}: ${status}`);
+        throw new Error(`${method} ${url} ${body ?? ""}: ${status}`);
     }
     return data;
 }
 
 async function send(page: Page, body: Record<string, string>): Promise<number> {
-    const data = (await api(
-        page,
-        "POST",
-        "/json/messages",
-        new URLSearchParams(body).toString(),
-    )) as {id: number};
+    const data = z
+        .object({id: z.number()})
+        .parse(await api(page, "POST", "/json/messages", new URLSearchParams(body).toString()));
     return data.id;
 }
 
@@ -62,7 +63,7 @@ async function send(page: Page, body: Record<string, string>): Promise<number> {
 // the server marks up matches.
 async function serve_search_results(page: Page, messages: RawMessage[]): Promise<void> {
     const highlight = (text: string): string =>
-        text.replaceAll(keyword, `<span class="highlight">${keyword}</span>`);
+        text.replaceAll(keyword, () => `<span class="highlight">${keyword}</span>`);
     page.removeAllListeners("request");
     await page.setRequestInterception(true);
     page.on("request", (request: HTTPRequest) => {
@@ -75,7 +76,9 @@ async function serve_search_results(page: Page, messages: RawMessage[]): Promise
             void request.continue();
             return;
         }
-        const terms = JSON.parse(narrow) as {operator: string; operand: string}[];
+        const terms = z
+            .array(z.object({operator: z.string(), operand: z.string()}))
+            .parse(JSON.parse(narrow));
         const search = terms.find((term) => term.operator === "search")!.operand;
         const only_direct = terms.some((term) => term.operator === "is" && term.operand === "dm");
         const found = (search === keyword ? messages : [])
@@ -219,11 +222,9 @@ async function search_results_test(page: Page): Promise<void> {
         client_gravatar: "true",
         apply_markdown: "true",
     }).toString();
-    const all_messages = (
-        (await api(page, "GET", `/json/messages?${query}`)) as {
-            messages: RawMessage[];
-        }
-    ).messages;
+    const all_messages = z
+        .object({messages: z.array(raw_message_schema)})
+        .parse(await api(page, "GET", `/json/messages?${query}`)).messages;
     const sent = all_messages.filter((message) =>
         [channel_id, direct_id, group_id].includes(message.id),
     );

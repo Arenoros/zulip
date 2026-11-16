@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Browser, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -75,7 +76,7 @@ print("SEEDED " + json.dumps({
 }))
 `;
 
-type Seeded = {monday: string; event_id: number; meet_code: string};
+const seeded_schema = z.object({monday: z.string(), event_id: z.number(), meet_code: z.string()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -165,18 +166,20 @@ async function join_call(
 }
 
 function get_calls(event_id: number): {urls: string[]; chat_id: number} {
-    return JSON.parse(
-        run_python(
-            python_prelude +
-                String.raw`
+    return z.object({urls: z.array(z.string()), chat_id: z.number()}).parse(
+        JSON.parse(
+            run_python(
+                python_prelude +
+                    String.raw`
 chat = CalendarEvent.objects.get(id=${event_id}).chat
 print("CALLS " + json.dumps({
     "urls": [call.url for call in LiveKitCall.objects.filter(message__recipient=chat.recipient).order_by("id")],
     "chat_id": chat.id,
 }))
 `,
-        ).split("CALLS ")[1]!,
-    ) as {urls: string[]; chat_id: number};
+            ).split("CALLS ", 2)[1]!,
+        ),
+    );
 }
 
 function end_calls(): void {
@@ -190,9 +193,9 @@ for call in LiveKitCall.objects.filter(date_ended=None):
 }
 
 async function calendar_call_test(page: Page): Promise<void> {
-    const {monday, event_id, meet_code} = JSON.parse(
-        run_python(seed_script).split("SEEDED ")[1]!,
-    ) as Seeded;
+    const {monday, event_id, meet_code} = seeded_schema.parse(
+        JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!),
+    );
     const wednesday = add_days(monday, 2);
     const thursday = add_days(monday, 3);
     const browser = page.browser();
@@ -299,10 +302,12 @@ async function calendar_call_test(page: Page): Promise<void> {
     await page.waitForSelector("#calendar-meet-now-modal", {visible: true});
     check(
         "meet now is titled by default",
-        (await page.$eval(
-            "#calendar-meet-now-title",
-            (element) => (element as HTMLInputElement).value,
-        )) === "Meet now",
+        (await page.$eval("#calendar-meet-now-title", (element) => {
+            if (!(element instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return element.value;
+        })) === "Meet now",
     );
     await page.type("#calendar-meet-now-modal .calendar-meet-now-attendees .input", "Othello");
     await page.waitForSelector(".typeahead .active", {visible: true});
@@ -314,10 +319,18 @@ async function calendar_call_test(page: Page): Promise<void> {
         page,
         "#calendar-meet-now-modal .dialog_submit_button",
     );
-    const meet_now_event = JSON.parse(
-        run_python(
-            python_prelude +
-                String.raw`
+    const meet_now_event = z
+        .object({
+            minutes: z.number(),
+            has_zulip_call: z.boolean(),
+            attendees: z.array(z.string()),
+            chat_id: z.number(),
+        })
+        .parse(
+            JSON.parse(
+                run_python(
+                    python_prelude +
+                        String.raw`
 event = CalendarEvent.objects.filter(title="Meet now").latest("id")
 print("MEETNOW " + json.dumps({
     "minutes": int((event.end - event.start).total_seconds() // 60),
@@ -326,8 +339,9 @@ print("MEETNOW " + json.dumps({
     "chat_id": event.chat_id,
 }))
 `,
-        ).split("MEETNOW ")[1]!,
-    ) as {minutes: number; has_zulip_call: boolean; attendees: string[]; chat_id: number};
+                ).split("MEETNOW ", 2)[1]!,
+            ),
+        );
     check(
         "meet now makes a 30 minute meeting with a Zulip call and joins it",
         meet_now_event.minutes === 30 &&

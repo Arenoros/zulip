@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -84,7 +85,8 @@ async function request(page: Page, method: string, url: string, body: string): P
                 },
                 body: method === "GET" ? null : body,
             });
-            return [response.status, (await response.json()) as unknown] as const;
+            const data: unknown = await response.json();
+            return [response.status, data] as const;
         },
         method,
         url,
@@ -125,9 +127,11 @@ async function card_facts(page: Page): Promise<Record<string, unknown>> {
         time: card.querySelector(".calendar-card-time")!.textContent.trim(),
         series: card.querySelector(".calendar-card-series") !== null,
         location: card.querySelector(".calendar-card-location")?.textContent.trim(),
-        organizer: card.querySelector(".calendar-card-organizer-text span")?.textContent.trim(),
+        organizer: card
+            .querySelector(":scope .calendar-card-organizer-text span")
+            ?.textContent.trim(),
         counts: card.querySelector(".calendar-card-counts")?.textContent.trim(),
-        buttons: [...card.querySelectorAll(".calendar-card-actions button")].map((button) =>
+        buttons: [...card.querySelectorAll(":scope .calendar-card-actions button")].map((button) =>
             button.textContent.trim(),
         ),
         notify_disabled:
@@ -154,9 +158,9 @@ function add_days(date: string, days: number): string {
 }
 
 async function calendar_card_test(page: Page): Promise<void> {
-    const {monday} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as {
-        monday: string;
-    };
+    const {monday} = z
+        .object({monday: z.string()})
+        .parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/settings", "color_scheme=2&web_font_size_px=14");
@@ -202,17 +206,14 @@ async function calendar_card_test(page: Page): Promise<void> {
     await page.keyboard.press("Enter");
     await page.waitForSelector(".calendar-card", {visible: true});
     await close_card(page);
-    const focused = await page
-        .waitForFunction(
+    const focused = await common.succeeds(
+        page.waitForFunction(
             () =>
                 document.activeElement?.classList.contains("calendar-event") === true &&
                 document.activeElement.getAttribute("aria-label")!.startsWith("Review,"),
             {polling: 100, timeout: 2000},
-        )
-        .then(
-            () => true,
-            () => false,
-        );
+        ),
+    );
     check("closing the card returns to the event", focused);
 
     // Tentative for the whole series, from another day.

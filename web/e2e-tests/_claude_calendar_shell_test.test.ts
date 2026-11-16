@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -52,10 +53,7 @@ print(
 )
 `;
 
-type Seeded = {
-    event_id: number;
-    denmark: number;
-};
+const seeded_schema = z.object({event_id: z.number(), denmark: z.number()});
 
 async function request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -124,7 +122,7 @@ function monday_of_this_week(): string {
 }
 
 async function calendar_shell_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
@@ -205,7 +203,12 @@ async function calendar_shell_test(page: Page): Promise<void> {
     await page.click(".calendar-date-picker-popover .calendar-mini-month-next");
     const picked_day = await page.$eval(
         ".calendar-date-picker-popover .calendar-mini-month-week:nth-child(5) .calendar-mini-month-day:nth-child(3)",
-        (element) => (element as HTMLElement).dataset["date"]!,
+        (element) => {
+            if (!(element instanceof HTMLElement)) {
+                throw new TypeError("Expected an HTML element");
+            }
+            return element.dataset["date"]!;
+        },
     );
     await page.click(
         ".calendar-date-picker-popover .calendar-mini-month-week:nth-child(5) .calendar-mini-month-day:nth-child(3)",
@@ -214,9 +217,9 @@ async function calendar_shell_test(page: Page): Promise<void> {
     const picked_hash = await current_hash(page);
     check(
         "a day in the date picker shows its week",
-        new Date(`${picked_hash.split("/")[2]}T00:00`).getDay() === 1 &&
+        new Date(`${picked_hash.split("/", 3)[2]}T00:00`).getDay() === 1 &&
             (new Date(`${picked_day}T00:00`).getTime() -
-                new Date(`${picked_hash.split("/")[2]}T00:00`).getTime()) /
+                new Date(`${picked_hash.split("/", 3)[2]}T00:00`).getTime()) /
                 86_400_000 ===
                 2,
         `${picked_day} ${picked_hash}`,

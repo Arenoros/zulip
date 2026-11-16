@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -222,12 +223,14 @@ async function visual_test(page: Page): Promise<void> {
     // Seed before logging in, so that the web app fetches the messages
     // with their backdated timestamps instead of receiving them as events.
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as {
-        ids: number[];
-        yesterday: number;
-        iago: number;
-        desdemona: number;
-    };
+    const seeded = z
+        .object({
+            ids: z.array(z.number()),
+            yesterday: z.number(),
+            iago: z.number(),
+            desdemona: z.number(),
+        })
+        .parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.setViewport({width: 1280, height: 1000});
     await common.log_in(page);
@@ -245,7 +248,7 @@ async function visual_test(page: Page): Promise<void> {
             function bubble(id: number): DOMRect {
                 return document
                     .querySelector(
-                        `.focused-message-list .message_row[data-message-id="${id}"] .message_content`,
+                        `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"] .message_content`,
                     )!
                     .getBoundingClientRect();
             }
@@ -348,7 +351,9 @@ async function visual_test(page: Page): Promise<void> {
     await page.waitForFunction(
         (id: number) =>
             !document
-                .querySelector(`.focused-message-list .message_row[data-message-id="${id}"]`)!
+                .querySelector(
+                    `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"]`,
+                )!
                 .classList.contains("unread"),
         {polling: 200},
         first_unread_id,
@@ -424,7 +429,7 @@ async function visual_test(page: Page): Promise<void> {
         function rect(id: number, selector: string): DOMRect {
             return document
                 .querySelector(
-                    `.focused-message-list .message_row[data-message-id="${id}"] ${selector}`,
+                    `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"] ${selector}`,
                 )!
                 .getBoundingClientRect();
         }
@@ -540,7 +545,7 @@ async function visual_test(page: Page): Promise<void> {
     await api(page, "POST", `/json/messages/${seeded.ids[1]}/reactions`, "emoji_name=thumbs_up");
     await api(page, "POST", `/json/messages/${seeded.ids[3]}/reactions`, "emoji_name=heart");
     // Seeded messages are too old to edit, so send and edit a new one.
-    const sent_id = await page.evaluate(async (iago) => {
+    const sent = await page.evaluate(async (iago) => {
         const csrf_token =
             document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
             "";
@@ -552,8 +557,10 @@ async function visual_test(page: Page): Promise<void> {
             },
             body: `type=direct&to=${JSON.stringify([iago])}&content=A message to edit`,
         });
-        return ((await response.json()) as {id: number}).id;
+        const data: unknown = await response.json();
+        return data;
     }, seeded.iago);
+    const sent_id = z.object({id: z.number()}).parse(sent).id;
     await page.waitForSelector(`.focused-message-list .message_row[data-message-id="${sent_id}"]`);
     await api(page, "PATCH", `/json/messages/${sent_id}`, "content=An edited message");
     await page.waitForSelector(
@@ -572,7 +579,7 @@ async function visual_test(page: Page): Promise<void> {
     });
 
     // An uploaded image, from someone else and from oneself.
-    const image_message_id = await page.evaluate(async (iago) => {
+    const image_message = await page.evaluate(async (iago) => {
         const csrf_token =
             document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
             "";
@@ -596,7 +603,16 @@ async function visual_test(page: Page): Promise<void> {
             headers: {"X-CSRFToken": csrf_token},
             body: form,
         });
-        const {url} = (await upload.json()) as {url: string};
+        const upload_data: unknown = await upload.json();
+        if (
+            typeof upload_data !== "object" ||
+            upload_data === null ||
+            !("url" in upload_data) ||
+            typeof upload_data.url !== "string"
+        ) {
+            throw new TypeError("Expected the URL of the upload");
+        }
+        const {url} = upload_data;
         const response = await fetch("/json/messages", {
             method: "POST",
             headers: {
@@ -605,8 +621,10 @@ async function visual_test(page: Page): Promise<void> {
             },
             body: `type=direct&to=${JSON.stringify([iago])}&content=${encodeURIComponent(`[screenshot.png](${url})`)}`,
         });
-        return ((await response.json()) as {id: number}).id;
+        const data: unknown = await response.json();
+        return data;
     }, seeded.iago);
+    const image_message_id = z.object({id: z.number()}).parse(image_message).id;
     await page.waitForSelector(
         `.focused-message-list .message_row[data-message-id="${image_message_id}"] .message_content img`,
     );
