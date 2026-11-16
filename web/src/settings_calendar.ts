@@ -67,7 +67,7 @@ function get_context(): Record<string, unknown> {
             selected: minutes === settings.time_scale_minutes,
         })),
         reminder_options: calendar_form.REMINDERS.map((minutes) => ({
-            value: minutes === null ? "" : minutes,
+            value: minutes ?? "",
             label: calendar_form.get_reminder_label(minutes),
             selected: minutes === settings.default_reminder_minutes,
         })),
@@ -107,7 +107,7 @@ function get_change_data(element: HTMLElement): Record<string, string> {
     if (element.classList.contains("calendar-settings-work-day-checkbox")) {
         const work_days = $section
             .find<HTMLInputElement>(".calendar-settings-work-day-checkbox:checked")
-            .toArray()
+            .get()
             .map((checkbox) => Number(checkbox.value));
         return {work_days: JSON.stringify(work_days)};
     }

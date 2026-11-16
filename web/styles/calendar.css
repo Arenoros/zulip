@@ -504,6 +504,12 @@ body.calendar-view-visible {
     &.side-by-side {
         /* Days stay wide enough to read. 84px at 14px/1em */
         --calendar-min-column-width: 6em;
+
+        /* The first day of each calendar shown side by side. */
+        .calendar-day-header.first-of-calendar,
+        .calendar-day-column.first-of-calendar {
+            border-left-width: 2px;
+        }
     }
 }
 
@@ -641,14 +647,6 @@ body.calendar-view-visible {
     font-size: 0.8571em; /* 12px at 14px/1em */
     color: var(--color-calendar-text-secondary);
     white-space: nowrap;
-}
-
-/* The first day of each calendar shown side by side. */
-.calendar-grid.side-by-side {
-    .calendar-day-header.first-of-calendar,
-    .calendar-day-column.first-of-calendar {
-        border-left-width: 2px;
-    }
 }
 
 .calendar-day-column {
@@ -1094,12 +1092,12 @@ body.calendar-view-visible {
 }
 
 .calendar-card-accept-icon {
-    color: light-dark(#13a10e, #54b054);
+    color: light-dark(hsl(118deg 84% 34.3%), hsl(120deg 36.8% 51%));
 }
 
 .calendar-card-decline-icon,
 .calendar-card-cancel .zulip-icon-trash {
-    color: light-dark(#c4314b, #f1707b);
+    color: light-dark(hsl(349.4deg 60% 48%), hsl(354.9deg 82.2% 69.2%));
 }
 
 /* The form of an event takes the place of the calendar's panels. */
@@ -1195,7 +1193,7 @@ body.calendar-view-visible {
 
 .calendar-form-field-error {
     width: 100%;
-    color: light-dark(#c4314b, #f1707b);
+    color: light-dark(hsl(349.4deg 60% 48%), hsl(354.9deg 82.2% 69.2%));
     font-size: 0.8571em; /* 12px at 14px/1em */
 }
 
@@ -1287,8 +1285,7 @@ body.calendar-view-visible {
 }
 
 .calendar-form-time {
-    flex-direction: column;
-    flex-wrap: nowrap;
+    flex-flow: column nowrap;
     align-items: stretch;
 }
 
@@ -1545,7 +1542,7 @@ body.calendar-view-visible {
         height: 1em;
         border-radius: 50%;
         background-color: var(--color-calendar-text-secondary);
-        transition: left 0.15s;
+        transition: transform 0.15s;
     }
 
     &:checked {
@@ -1553,7 +1550,7 @@ body.calendar-view-visible {
         background-color: var(--color-calendar-accent);
 
         &::before {
-            left: 1.2857em;
+            transform: translateX(1.1428em);
             background-color: var(--color-calendar-text-on-accent);
         }
     }
@@ -1595,27 +1592,27 @@ body.calendar-view-visible {
     }
 
     &.red {
-        background-color: #d13438;
+        background-color: hsl(358.5deg 63.1% 51.2%);
     }
 
     &.orange {
-        background-color: #ca5010;
+        background-color: hsl(20.6deg 85.3% 42.7%);
     }
 
     &.yellow {
-        background-color: #c19c00;
+        background-color: hsl(48.5deg 100% 37.8%);
     }
 
     &.green {
-        background-color: #13a10e;
+        background-color: hsl(118deg 84% 34.3%);
     }
 
     &.blue {
-        background-color: #0078d4;
+        background-color: hsl(206deg 100% 41.6%);
     }
 
     &.purple {
-        background-color: #8764b8;
+        background-color: hsl(265deg 37.2% 55.7%);
     }
 }
 
@@ -1631,8 +1628,7 @@ body.calendar-view-visible {
 }
 
 .calendar-form-editor {
-    flex-direction: column;
-    flex-wrap: nowrap;
+    flex-flow: column nowrap;
     align-items: stretch;
     gap: 0;
     border: 1px solid var(--color-calendar-border);
@@ -1749,8 +1745,11 @@ body.calendar-view-visible {
     /* 4px and 8px at 12px/1em */
     padding: 0.3333em 0.6667em;
     border-radius: 4px;
-    background-color: light-dark(#1e8a45, #3fbf6b);
-    color: light-dark(#fff, #0b2414);
+    background-color: light-dark(
+        hsl(141.7deg 64.3% 32.9%),
+        hsl(140.6deg 50.4% 49.8%)
+    );
+    color: light-dark(hsl(0deg 0% 100%), hsl(141.6deg 53.2% 9.2%));
     font-size: 0.8571em; /* 12px at 14px/1em */
     font-weight: 600;
     cursor: move;
@@ -2288,7 +2287,7 @@ body.calendar-view-visible {
 }
 
 .calendar-scheduler-unavailable {
-    color: light-dark(#c4314b, #f1707b);
+    color: light-dark(hsl(349.4deg 60% 48%), hsl(354.9deg 82.2% 69.2%));
     font-size: 0.8571em; /* 12px at 14px/1em */
 }
 

@@ -10,8 +10,8 @@ import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_call from "./calendar_call.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
-import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import type {CalendarOccurrence} from "./calendar_grid.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as calendar_recurrence from "./calendar_recurrence.ts";
 import * as calendar_responses from "./calendar_responses.ts";
 import * as calendar_rooms from "./calendar_rooms.ts";
@@ -547,10 +547,12 @@ export function initialize(opts: {on_close: () => void}): void {
     $view.on("click", selector(".calendar-meeting-occurrences"), function (this: HTMLElement) {
         show_occurrences(this);
     });
-    for (const button of [".calendar-meeting-responses-button", ".calendar-responses-hide"]) {
-        $view.on("click", selector(button), () => {
+    $view.on(
+        "click",
+        `${selector(".calendar-meeting-responses-button")}, ${selector(".calendar-responses-hide")}`,
+        () => {
             is_responses_shown = !is_responses_shown;
             update_responses_panel();
-        });
-    }
+        },
+    );
 }

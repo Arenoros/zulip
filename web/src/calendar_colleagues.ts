@@ -70,14 +70,12 @@ export function get_colleagues(): Colleague[] {
         if (user === undefined || !people.is_active_user(user.user_id)) {
             return [];
         }
-        return [
-            {
-                user_id: user.user_id,
-                full_name: user.full_name,
-                color: get_theme_color(pinned_user.color),
-                is_shown: shown_ids.has(user.user_id),
-            },
-        ];
+        return {
+            user_id: user.user_id,
+            full_name: user.full_name,
+            color: get_theme_color(pinned_user.color),
+            is_shown: shown_ids.has(user.user_id),
+        };
     });
 }
 

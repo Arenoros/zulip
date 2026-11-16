@@ -5,6 +5,7 @@ import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
 import * as z from "zod/mini";
 
+import timezones from "../generated/timezones.json";
 import render_calendar_day_events from "../templates/calendar/calendar_day_events.hbs";
 import render_calendar_form from "../templates/calendar/calendar_form.hbs";
 import render_calendar_form_day from "../templates/calendar/calendar_form_day.hbs";
@@ -12,7 +13,6 @@ import render_calendar_form_suggestions from "../templates/calendar/calendar_for
 import render_calendar_date_picker_popover from "../templates/popovers/calendar/calendar_date_picker_popover.hbs";
 import render_calendar_form_attendee_options_popover from "../templates/popovers/calendar/calendar_form_attendee_options_popover.hbs";
 import render_calendar_submenu_popover from "../templates/popovers/calendar/calendar_submenu_popover.hbs";
-import timezones from "../generated/timezones.json";
 
 import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_grid from "./calendar_grid.ts";
@@ -40,9 +40,9 @@ import * as timerender from "./timerender.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
 import * as user_pill from "./user_pill.ts";
-import * as util from "./util.ts";
 import type {UserPill} from "./user_pill.ts";
 import {user_settings} from "./user_settings.ts";
+import * as util from "./util.ts";
 
 // The form for a new event, and for changing one, which takes the
 // place of the calendar's grid until it is saved or canceled.
@@ -104,7 +104,7 @@ type Editing = {
 };
 
 let state: FormState | undefined;
-let initial_state: string | undefined;
+let initial_state: FormState | undefined;
 let editing: Editing | undefined;
 // Whether changing when the series takes place drops changes made to
 // some of its occurrences.
@@ -272,9 +272,7 @@ function read_fields(): void {
     }
     state.description =
         $form.find<HTMLTextAreaElement>(".calendar-form-description-input").val() ?? "";
-    state.has_zulip_call = $form
-        .find<HTMLInputElement>(".calendar-form-call-checkbox")
-        .prop("checked") as boolean;
+    state.has_zulip_call = $form.find(".calendar-form-call-checkbox").is(":checked");
     state.required_attendee_ids = get_attendee_ids(required_pills);
     state.optional_attendee_ids = get_attendee_ids(optional_pills);
 }
@@ -284,7 +282,7 @@ function is_dirty(): boolean {
         return false;
     }
     read_fields();
-    return JSON.stringify(state) !== initial_state;
+    return JSON.stringify(state) !== JSON.stringify(initial_state);
 }
 
 // Fills the selects of the start and the end of an event, whose end
@@ -407,7 +405,8 @@ function get_frequency_label(frequency: calendar_recurrence.Frequency, count: nu
             return $t({defaultMessage: "{count, plural, one {week} other {weeks}}"}, {count});
         case "MONTHLY":
             return $t({defaultMessage: "{count, plural, one {month} other {months}}"}, {count});
-        case "YEARLY":
+        default:
+            frequency satisfies "YEARLY";
             return $t({defaultMessage: "{count, plural, one {year} other {years}}"}, {count});
     }
 }
@@ -478,7 +477,7 @@ function update_recurrence_fields(): void {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
-              }).format(calendar_util.parse_date(recurrence.until)!);
+              }).format(calendar_util.parse_date(recurrence.until));
     $form
         .find(".calendar-form-until")
         .text(until_label)
@@ -565,13 +564,13 @@ function render_suggestions(
     // The freest times, then those nearest the chosen one, in the
     // order of the day.
     const chosen = candidates
-        .sort(
+        .toSorted(
             (a, b) =>
                 b.free_ratio - a.free_ratio ||
                 Math.abs(a.minute - form.start_minute) - Math.abs(b.minute - form.start_minute),
         )
         .slice(0, MAX_SUGGESTIONS)
-        .sort((a, b) => a.minute - b.minute);
+        .toSorted((a, b) => a.minute - b.minute);
     const percent = new Intl.NumberFormat(user_settings.default_language, {style: "percent"});
     const minutes = new Intl.NumberFormat(user_settings.default_language, {
         style: "unit",
@@ -736,10 +735,9 @@ function scroll_day_to_event(): void {
 function start_drag(e: JQuery.TriggeredEvent, is_resize: boolean): void {
     assert(state !== undefined);
     const form = state;
-    const pointer = e.originalEvent as PointerEvent;
-    const block = (e.currentTarget as HTMLElement).closest<HTMLElement>(
-        ".calendar-form-day-block",
-    )!;
+    const pointer = e.originalEvent;
+    assert(pointer instanceof PointerEvent && e.currentTarget instanceof HTMLElement);
+    const block = e.currentTarget.closest<HTMLElement>(".calendar-form-day-block")!;
     const column = block.closest<HTMLElement>(".calendar-form-day-column")!;
     const start_y = pointer.clientY;
     const start_minute = form.start_minute;
@@ -778,7 +776,7 @@ function start_drag(e: JQuery.TriggeredEvent, is_resize: boolean): void {
 
 function move_by_keyboard(key: string, is_resize: boolean): boolean {
     assert(state !== undefined);
-    let delta = 0;
+    let delta: number;
     if (key === "ArrowUp") {
         delta = -DRAG_STEP_MINUTES;
     } else if (key === "ArrowDown") {
@@ -901,7 +899,8 @@ export function get_personal_menu_options(
                 label: get_reminder_label(minutes),
                 checked: minutes === values.reminder_minutes,
             }));
-        case "category":
+        default:
+            menu satisfies "category";
             return [
                 {value: "", label: get_category_label("none"), checked: values.category === ""},
                 ...CATEGORIES.map(([name, color]) => ({
@@ -1068,8 +1067,8 @@ function toggle_preview(): void {
         url: "/json/messages/render",
         data: {content},
         success(raw_data) {
-            const {rendered} = z.object({rendered: z.string()}).parse(raw_data);
-            $preview.html(rendered);
+            const rendered_description = z.object({rendered: z.string()}).parse(raw_data).rendered;
+            $preview.html(rendered_description);
             rendered_markdown.update_elements($preview);
         },
     });
@@ -1127,9 +1126,8 @@ function get_event_data(form: FormState): Record<string, string> {
 // change sends.
 function get_changed_data(form: FormState): Record<string, string> {
     assert(initial_state !== undefined && editing !== undefined);
-    const initial = JSON.parse(initial_state) as FormState;
     const data = get_event_data(form);
-    const initial_data = get_event_data(initial);
+    const initial_data = get_event_data(initial_state);
     const changed = Object.fromEntries(
         Object.entries(data).filter(([key, value]) => value !== initial_data[key]),
     );
@@ -1146,10 +1144,10 @@ function get_changed_data(form: FormState): Record<string, string> {
     }
     if (editing.is_occurrence) {
         // An occurrence keeps the settings of its series.
-        const occurrence_fields = ["title", "description", "location", "start", "end"];
+        const occurrence_fields = new Set(["title", "description", "location", "start", "end"]);
         return {
             ...Object.fromEntries(
-                Object.entries(changed).filter(([key]) => occurrence_fields.includes(key)),
+                Object.entries(changed).filter(([key]) => occurrence_fields.has(key)),
             ),
             occurrence: JSON.stringify(editing.occurrence.original_start),
         };
@@ -1158,13 +1156,11 @@ function get_changed_data(form: FormState): Record<string, string> {
 }
 
 function save_personal_settings(event_id: number, form: FormState, on_done: () => void): void {
-    const initial =
-        initial_state === undefined ? undefined : (JSON.parse(initial_state) as FormState);
     const data: Record<string, string> = {};
-    if (initial?.reminder_minutes !== form.reminder_minutes) {
+    if (initial_state?.reminder_minutes !== form.reminder_minutes) {
         data["reminder_minutes"] = JSON.stringify(form.reminder_minutes);
     }
-    if (initial?.category !== form.category) {
+    if (initial_state?.category !== form.category) {
         data["category"] = form.category;
     }
     if (Object.keys(data).length === 0) {
@@ -1192,23 +1188,23 @@ export function save(): void {
     if (!validate()) {
         return;
     }
-    const time_fields = ["start", "end", "timezone", "is_all_day", "rrule"];
+    const time_fields = new Set(["start", "end", "timezone", "is_all_day", "rrule"]);
     if (
         editing !== undefined &&
         !editing.is_occurrence &&
         has_changed_occurrences &&
-        Object.keys(get_changed_data(state)).some((key) => time_fields.includes(key))
+        Object.keys(get_changed_data(state)).some((key) => time_fields.has(key))
     ) {
         confirm_dialog.launch({
             modal_title_html: $t_html({defaultMessage: "Change the whole series?"}),
-            modal_content_html: $("<p>")
-                .text(
+            modal_content_html: util.the(
+                $("<p>").text(
                     $t({
                         defaultMessage:
                             "Some occurrences of this series were changed or canceled on their own. Changing when the series takes place undoes those changes.",
                     }),
-                )
-                .prop("outerHTML") as string,
+                ),
+            ).outerHTML,
             is_compact: true,
             modal_submit_button_text: $t({defaultMessage: "Change the series"}),
             on_click: send,
@@ -1363,9 +1359,9 @@ export function cancel(): void {
     }
     confirm_dialog.launch({
         modal_title_html: $t_html({defaultMessage: "Discard your changes?"}),
-        modal_content_html: $("<p>")
-            .text($t({defaultMessage: "The event will not be saved."}))
-            .prop("outerHTML") as string,
+        modal_content_html: util.the(
+            $("<p>").text($t({defaultMessage: "The event will not be saved."})),
+        ).outerHTML,
         is_compact: true,
         modal_submit_button_text: $t({defaultMessage: "Discard"}),
         on_click: close,
@@ -1526,7 +1522,7 @@ function open(form: FormState, form_editing: Editing | undefined): void {
         if (state === form) {
             render_form();
             read_fields();
-            initial_state = JSON.stringify(state);
+            initial_state = structuredClone(form);
         }
     });
 }
@@ -1762,20 +1758,30 @@ export function initialize(opts: {
                 : undefined;
         update_time_fields();
     });
-    $view.on("change", ".calendar-form-interval", function (this: HTMLSelectElement) {
-        assert(state?.recurrence !== undefined);
-        state.recurrence.interval = Number(this.value);
-        update_time_fields();
-    });
-    $view.on("change", ".calendar-form-frequency", function (this: HTMLSelectElement) {
-        assert(state?.recurrence !== undefined);
-        const frequency = calendar_recurrence.FREQUENCIES.find((value) => value === this.value)!;
-        state.recurrence.frequency = frequency;
-        if (frequency === "WEEKLY" && state.recurrence.weekdays.length === 0) {
-            state.recurrence.weekdays = [calendar_recurrence.get_weekday(state.date)];
-        }
-        update_time_fields();
-    });
+    $view.on(
+        "change",
+        ".calendar-form-interval",
+        function (this: HTMLSelectElement, _e: JQuery.Event) {
+            assert(state?.recurrence !== undefined);
+            state.recurrence.interval = Number(this.value);
+            update_time_fields();
+        },
+    );
+    $view.on(
+        "change",
+        ".calendar-form-frequency",
+        function (this: HTMLSelectElement, _e: JQuery.Event) {
+            assert(state?.recurrence !== undefined);
+            const frequency = calendar_recurrence.FREQUENCIES.find(
+                (value) => value === this.value,
+            )!;
+            state.recurrence.frequency = frequency;
+            if (frequency === "WEEKLY" && state.recurrence.weekdays.length === 0) {
+                state.recurrence.weekdays = [calendar_recurrence.get_weekday(state.date)];
+            }
+            update_time_fields();
+        },
+    );
     $view.on("click", ".calendar-form-weekday", function (this: HTMLElement) {
         assert(state?.recurrence !== undefined);
         const recurrence = state.recurrence;
@@ -1798,22 +1804,30 @@ export function initialize(opts: {
         state.start_minute = Number(this.dataset["minute"]);
         update_time_fields();
     });
-    $view.on("change", ".calendar-form-start", function (this: HTMLSelectElement) {
-        assert(state !== undefined);
-        // The end moves with the start.
-        state.start_minute = Number(this.value);
-        update_time_fields();
-    });
-    $view.on("change", ".calendar-form-end", function (this: HTMLSelectElement) {
+    $view.on(
+        "change",
+        ".calendar-form-start",
+        function (this: HTMLSelectElement, _e: JQuery.Event) {
+            assert(state !== undefined);
+            // The end moves with the start.
+            state.start_minute = Number(this.value);
+            update_time_fields();
+        },
+    );
+    $view.on("change", ".calendar-form-end", function (this: HTMLSelectElement, _e: JQuery.Event) {
         assert(state !== undefined);
         state.duration_minutes = Number(this.value);
         update_time_fields();
     });
-    $view.on("change", ".calendar-form-all-day-checkbox", function (this: HTMLInputElement) {
-        assert(state !== undefined);
-        state.is_all_day = this.checked;
-        update_time_fields();
-    });
+    $view.on(
+        "change",
+        ".calendar-form-all-day-checkbox",
+        function (this: HTMLInputElement, _e: JQuery.Event) {
+            assert(state !== undefined);
+            state.is_all_day = this.checked;
+            update_time_fields();
+        },
+    );
     $view.on("click", ".calendar-form-previous-day", () => {
         move_day(-1);
     });
@@ -1825,15 +1839,14 @@ export function initialize(opts: {
         compose_ui.format_text($textarea, this.dataset["formatType"]!);
         $textarea.trigger("focus");
     });
-    for (const button of [
-        ".calendar-form-responses-button",
-        ".calendar-form .calendar-responses-hide",
-    ]) {
-        $view.on("click", button, () => {
+    $view.on(
+        "click",
+        ".calendar-form-responses-button, .calendar-form .calendar-responses-hide",
+        () => {
             is_responses_shown = !is_responses_shown;
             update_side_panel();
-        });
-    }
+        },
+    );
     $view.on("click", ".calendar-form-preview", () => {
         toggle_preview();
     });

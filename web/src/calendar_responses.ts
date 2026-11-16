@@ -112,18 +112,16 @@ export function render($container: JQuery, occurrence: CalendarOccurrence): void
                               )
                             : undefined,
                 }))
-                .sort((a, b) => a.name.localeCompare(b.name));
+                .toSorted((a, b) => a.name.localeCompare(b.name));
             if (group.length === 0) {
                 return [];
             }
-            return [
-                {
-                    response,
-                    label: get_group_label(response, group.length),
-                    is_collapsed: group.length > MAX_EXPANDED_GROUP_SIZE,
-                    people: group,
-                },
-            ];
+            return {
+                response,
+                label: get_group_label(response, group.length),
+                is_collapsed: group.length > MAX_EXPANDED_GROUP_SIZE,
+                people: group,
+            };
         },
     );
     $container.html(

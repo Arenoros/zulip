@@ -128,7 +128,7 @@ function get_filter_options(): FilterOption[][] {
                             defaultMessage:
                                 "{role, select, organizer {I'm the organizer} accepted {Accepted} tentative {Tentative} none {Not answered} other {Following}}",
                         },
-                        {role: key.split(":")[1]!},
+                        {role: key.split(":", 2)[1]!},
                     ),
                 })),
             },
@@ -155,7 +155,7 @@ function get_filter_options(): FilterOption[][] {
                 keys: calendar_filter.SHOW_AS_KEYS,
                 submenu: calendar_filter.SHOW_AS_KEYS.map((key) => ({
                     key,
-                    label: calendar_grid.get_free_busy_status(Number(key.split(":")[1])).label,
+                    label: calendar_grid.get_free_busy_status(Number(key.split(":", 2)[1])).label,
                 })),
             },
             {

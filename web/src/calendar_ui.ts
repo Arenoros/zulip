@@ -579,9 +579,13 @@ export function initialize({
 
     register_view_menu_popover();
     register_date_picker_popover();
-    $view.on("change", ".calendar-colleague-checkbox", function (this: HTMLInputElement) {
-        calendar_colleagues.set_shown(Number(this.dataset["userId"]), this.checked);
-    });
+    $view.on(
+        "change",
+        ".calendar-colleague-checkbox",
+        function (this: HTMLInputElement, _e: JQuery.Event) {
+            calendar_colleagues.set_shown(Number(this.dataset["userId"]), this.checked);
+        },
+    );
     $view.on("click", ".calendar-colleague-remove", function (this: HTMLElement) {
         calendar_colleagues.unpin(
             Number(this.dataset["userId"]),

@@ -41,7 +41,7 @@ function get_dismissed(): string[] {
 function dismiss(occurrence: CalendarOccurrence): void {
     const now = Date.now() / 1000;
     // Reminders of meetings that are over cannot show again.
-    const dismissed = get_dismissed().filter((key) => Number(key.split(":")[2]) > now);
+    const dismissed = get_dismissed().filter((key) => Number(key.split(":", 3)[2]) > now);
     localstorage().set(DISMISSED_KEY, [...dismissed, get_key(occurrence)]);
     remove_banner(get_key(occurrence));
 }

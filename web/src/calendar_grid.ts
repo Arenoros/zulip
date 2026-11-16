@@ -311,7 +311,9 @@ export function get_free_busy_status(show_as: number): {class_name: string; labe
 }
 
 export function get_legend(): {class_name: string; label: string}[] {
-    return [...SHOW_AS_CLASS_NAMES.keys()].map((show_as) => get_free_busy_status(show_as));
+    return SHOW_AS_CLASS_NAMES.keys()
+        .map((show_as) => get_free_busy_status(show_as))
+        .toArray();
 }
 
 function get_free_busy_context(block: FreeBusyBlock): Record<string, unknown> {

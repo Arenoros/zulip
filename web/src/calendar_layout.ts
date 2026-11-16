@@ -99,7 +99,7 @@ function place_in_columns<T>(
     const placements: TimedEventPlacement<T>[] = [];
     let group: TimedEventPlacement<T>[] = [];
     let column_ends: number[] = [];
-    let group_end = Number.NEGATIVE_INFINITY;
+    let group_end = -Infinity;
 
     const close_group = (): void => {
         for (const placement of group) {

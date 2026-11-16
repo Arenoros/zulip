@@ -43,12 +43,15 @@ run_test("overlapping events share the width of their day", () => {
         MOSCOW,
         0,
     );
-    assert.deepEqual(layout.days[0].map(summary), [
-        ["standup", 600, 660, 0, 2],
-        ["review", 630, 690, 1, 2],
-        ["sync", 660, 720, 0, 2],
-        ["lunch", 780, 840, 0, 1],
-    ]);
+    assert.deepEqual(
+        layout.days[0].map((placement) => summary(placement)),
+        [
+            ["standup", 600, 660, 0, 2],
+            ["review", 630, 690, 1, 2],
+            ["sync", 660, 720, 0, 2],
+            ["lunch", 780, 840, 0, 1],
+        ],
+    );
     assert.deepEqual(layout.days.slice(1), [[], [], [], []]);
     assert.deepEqual(layout.all_day, []);
     assert.equal(layout.all_day_lane_count, 0);
@@ -60,15 +63,21 @@ run_test("short events overlap what they are drawn over", () => {
         timed("next", moscow(10, 9, 10), moscow(10, 9, 30)),
     ];
     const layout = calendar_layout.get_week_layout(events, WORK_WEEK, MOSCOW, 15);
-    assert.deepEqual(layout.days[1].map(summary), [
-        ["call", 540, 545, 0, 2],
-        ["next", 550, 570, 1, 2],
-    ]);
+    assert.deepEqual(
+        layout.days[1].map((placement) => summary(placement)),
+        [
+            ["call", 540, 545, 0, 2],
+            ["next", 550, 570, 1, 2],
+        ],
+    );
     const unpadded = calendar_layout.get_week_layout(events, WORK_WEEK, MOSCOW, 0);
-    assert.deepEqual(unpadded.days[1].map(summary), [
-        ["call", 540, 545, 0, 1],
-        ["next", 550, 570, 0, 1],
-    ]);
+    assert.deepEqual(
+        unpadded.days[1].map((placement) => summary(placement)),
+        [
+            ["call", 540, 545, 0, 1],
+            ["next", 550, 570, 0, 1],
+        ],
+    );
 });
 
 run_test("events over midnight show on both days", () => {
@@ -89,12 +98,21 @@ run_test("events over midnight show on both days", () => {
         placement.continues_before,
         placement.continues_after,
     ];
-    assert.deepEqual(layout.days[2].map(ends), [["release", 1320, 1440, false, true]]);
-    assert.deepEqual(layout.days[3].map(ends), [
-        ["release", 0, 120, true, false],
-        ["reminder", 540, 540, false, false],
-    ]);
-    assert.deepEqual(layout.days[4].map(ends), [["until midnight", 1380, 1440, false, false]]);
+    assert.deepEqual(
+        layout.days[2].map((placement) => ends(placement)),
+        [["release", 1320, 1440, false, true]],
+    );
+    assert.deepEqual(
+        layout.days[3].map((placement) => ends(placement)),
+        [
+            ["release", 0, 120, true, false],
+            ["reminder", 540, 540, false, false],
+        ],
+    );
+    assert.deepEqual(
+        layout.days[4].map((placement) => ends(placement)),
+        [["until midnight", 1380, 1440, false, false]],
+    );
 });
 
 run_test("all-day events cover their dates everywhere", () => {
@@ -169,5 +187,8 @@ run_test("the hours stay put when daylight saving time ends", () => {
         timezone: "Europe/Berlin",
     };
     const layout = calendar_layout.get_week_layout([meeting], berlin_sunday, "Europe/Berlin", 0);
-    assert.deepEqual(layout.days[0].map(summary), [["meeting", 600, 660, 0, 1]]);
+    assert.deepEqual(
+        layout.days[0].map((placement) => summary(placement)),
+        [["meeting", 600, 660, 0, 1]],
+    );
 });

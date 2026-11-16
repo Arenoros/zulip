@@ -52,7 +52,7 @@ export function get_default_recurrence(date: string): Recurrence {
 export function parse_rrule(rrule: string, time_zone: string): Recurrence | undefined {
     const parts = new Map<string, string>();
     for (const part of rrule.split(";")) {
-        const [key, value] = part.split("=");
+        const [key, value] = part.split("=", 2);
         if (key === undefined || value === undefined) {
             return undefined;
         }
@@ -63,11 +63,11 @@ export function parse_rrule(rrule: string, time_zone: string): Recurrence | unde
         return undefined;
     }
     const interval = Number(parts.get("INTERVAL") ?? "1");
-    if (!Number.isInteger(interval) || interval < 1 || interval > MAX_INTERVAL) {
+    if (!Number.isSafeInteger(interval) || interval < 1 || interval > MAX_INTERVAL) {
         return undefined;
     }
     const weekdays = parts.get("BYDAY")?.split(",") ?? [];
-    if (!weekdays.every((weekday) => is_weekday(weekday))) {
+    if (weekdays.some((weekday) => !is_weekday(weekday))) {
         return undefined;
     }
     let until: string | undefined;
@@ -79,7 +79,7 @@ export function parse_rrule(rrule: string, time_zone: string): Recurrence | unde
         }
         const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
         until = calendar_util.format_date(
-            new TZDate(Date.UTC(year!, month! - 1, day!, hour, minute, second), time_zone),
+            new TZDate(Date.UTC(year!, month! - 1, day, hour, minute, second), time_zone),
         );
     }
     return {
@@ -91,7 +91,7 @@ export function parse_rrule(rrule: string, time_zone: string): Recurrence | unde
 }
 
 function format_utc(date: Date): string {
-    return new Date(date.getTime())
+    return new Date(date)
         .toISOString()
         .replaceAll(/[-:]/g, "")
         .replace(/\.\d{3}Z$/, "Z");
@@ -150,7 +150,8 @@ function get_step_dates(recurrence: Recurrence, first: Date, step: number): Date
             const day = addMonths(first, count);
             return day.getDate() === first.getDate() ? [day] : [];
         }
-        case "YEARLY": {
+        default: {
+            recurrence.frequency satisfies "YEARLY";
             const day = addYears(first, count);
             return day.getDate() === first.getDate() ? [day] : [];
         }
@@ -234,7 +235,8 @@ export function describe_pattern(recurrence: Recurrence, date: string): string {
                 },
                 {count, day: calendar_util.parse_date(date)!.getDate()},
             );
-        case "YEARLY":
+        default:
+            recurrence.frequency satisfies "YEARLY";
             return $t(
                 {
                     defaultMessage:
@@ -245,7 +247,7 @@ export function describe_pattern(recurrence: Recurrence, date: string): string {
                     date: new Intl.DateTimeFormat(user_settings.default_language, {
                         day: "numeric",
                         month: "long",
-                    }).format(calendar_util.parse_date(date)!),
+                    }).format(calendar_util.parse_date(date)),
                 },
             );
     }

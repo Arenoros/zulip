@@ -9,6 +9,7 @@ import {$t, $t_html} from "./i18n.ts";
 import {current_user} from "./state_data.ts";
 import * as ui_report from "./ui_report.ts";
 import {user_settings} from "./user_settings.ts";
+import * as util from "./util.ts";
 
 // What the user can do with an event in their calendar, from its card
 // or from the meeting opened on the whole window.
@@ -159,7 +160,7 @@ export function confirm_remove(
     const $content = $("<p>").text(content);
     confirm_dialog.launch({
         modal_title_html: title_html,
-        modal_content_html: $content.prop("outerHTML") as string,
+        modal_content_html: util.the($content).outerHTML,
         is_compact: true,
         dangerous_action: true,
         on_click() {

@@ -1,6 +1,7 @@
 import {TZDate} from "@date-fns/tz";
 import {addDays, getISODay} from "date-fns";
 import {$} from "jquery";
+import assert from "minimalistic-assert";
 import * as z from "zod/mini";
 
 import render_calendar_scheduler from "../templates/calendar/calendar_scheduler.hbs";
@@ -243,7 +244,8 @@ function get_person_row(
     const name = user?.full_name ?? $t({defaultMessage: "Unknown user"});
     const selection = get_selection(state);
     const hours = working_hours.get(user_id);
-    const time_zone = hours?.timezone || state.time_zone;
+    const time_zone =
+        hours === undefined || hours.timezone === "" ? state.time_zone : hours.timezone;
     const local_start = new TZDate(selection.start * 1000, time_zone);
     const work_intervals = get_work_intervals(user_id, state.time_zone);
     const dates = get_dates();
@@ -824,38 +826,33 @@ export function initialize(): void {
     });
     // Clicking a time moves the event there; dragging the selection
     // moves it along.
-    $view.on("pointerdown", selector(".calendar-scheduler-track"), function (this: HTMLElement, e) {
-        const event = e.originalEvent as PointerEvent;
-        const left = this.getBoundingClientRect().left;
+    $view.on("pointerdown", selector(".calendar-scheduler-track"), (e) => {
+        const event = e.originalEvent;
+        assert(event instanceof PointerEvent && e.currentTarget instanceof HTMLElement);
+        const left = e.currentTarget.getBoundingClientRect().left;
         move_selection_to((event.clientX - left) / get_minute_width());
     });
-    $view.on(
-        "pointerdown",
-        selector(".calendar-scheduler-selection"),
-        function (this: HTMLElement, e) {
-            const event = e.originalEvent as PointerEvent;
-            event.preventDefault();
-            const start_x = event.clientX;
-            const start_offset = get_selection_offset();
-            const minute_width = get_minute_width();
-            const selection = this;
-            selection.setPointerCapture(event.pointerId);
-            const on_move = (move: PointerEvent): void => {
-                const offset = start_offset + (move.clientX - start_x) / minute_width;
-                selection.style.setProperty(
-                    "--calendar-scheduler-start",
-                    String(Math.max(0, offset)),
-                );
-            };
-            const on_up = (up: PointerEvent): void => {
-                selection.removeEventListener("pointermove", on_move);
-                selection.removeEventListener("pointerup", on_up);
-                move_selection_to(start_offset + (up.clientX - start_x) / minute_width);
-            };
-            selection.addEventListener("pointermove", on_move);
-            selection.addEventListener("pointerup", on_up);
-        },
-    );
+    $view.on("pointerdown", selector(".calendar-scheduler-selection"), (e) => {
+        const event = e.originalEvent;
+        assert(event instanceof PointerEvent && e.currentTarget instanceof HTMLElement);
+        const selection = e.currentTarget;
+        event.preventDefault();
+        const start_x = event.clientX;
+        const start_offset = get_selection_offset();
+        const minute_width = get_minute_width();
+        selection.setPointerCapture(event.pointerId);
+        const on_move = (move: PointerEvent): void => {
+            const offset = start_offset + (move.clientX - start_x) / minute_width;
+            selection.style.setProperty("--calendar-scheduler-start", String(Math.max(0, offset)));
+        };
+        const on_up = (up: PointerEvent): void => {
+            selection.removeEventListener("pointermove", on_move);
+            selection.removeEventListener("pointerup", on_up);
+            move_selection_to(start_offset + (up.clientX - start_x) / minute_width);
+        };
+        selection.addEventListener("pointermove", on_move);
+        selection.addEventListener("pointerup", on_up);
+    });
     $view.on("keydown", selector(".calendar-scheduler-selection"), (e) => {
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
             return;

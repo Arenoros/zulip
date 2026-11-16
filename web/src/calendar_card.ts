@@ -9,10 +9,10 @@ import * as calendar_actions from "./calendar_actions.ts";
 import * as calendar_call from "./calendar_call.ts";
 import * as calendar_form from "./calendar_form.ts";
 import * as calendar_grid from "./calendar_grid.ts";
+import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as calendar_meeting from "./calendar_meeting.ts";
 import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as calendar_rooms from "./calendar_rooms.ts";
-import type {CalendarOccurrence} from "./calendar_grid.ts";
 import * as channel from "./channel.ts";
 import {$t} from "./i18n.ts";
 import * as people from "./people.ts";
@@ -239,7 +239,7 @@ export function hide(): void {
 
 function find_event_element(occurrence: CalendarOccurrence): HTMLElement | undefined {
     return $("#calendar-view .calendar-event[data-event-id]")
-        .toArray()
+        .get()
         .find(
             (element) =>
                 element.dataset["eventId"] === String(occurrence.id) &&

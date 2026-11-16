@@ -134,7 +134,8 @@ run_test("get_month_weeks", () => {
         "2027-03-01",
         "2027-03-08",
     ]);
-    for (const week of calendar_util.get_month_weeks(new Date(2026, 10, 1))) {
+    const month_weeks = calendar_util.get_month_weeks(new Date(2026, 10, 1));
+    for (const week of month_weeks) {
         assert.equal(week.length, 7);
     }
 });
