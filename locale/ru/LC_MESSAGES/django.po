@@ -8948,3 +8948,13 @@ msgstr "Недопустимая переговорная"
 #, python-brace-format
 msgid "{room_name} is booked for another meeting at {time}."
 msgstr "Переговорная {room_name} занята другой встречей {time}."
+
+msgid "A meeting in a channel cannot be private"
+msgstr "Встреча в канале не может быть частной"
+
+#, python-brace-format
+msgid "{user} scheduled {title} on {time}."
+msgstr "{user} назначает встречу {title} на {time}."
+
+msgid "The call has not started yet. Someone in the channel will start it."
+msgstr "Звонок ещё не начался. Его начнёт кто-нибудь из канала."
