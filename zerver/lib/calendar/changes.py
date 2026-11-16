@@ -116,17 +116,16 @@ def check_attendees(
     optional_ids = {user.id for user in optional_attendees} - {organizer.id}
     if required_ids & optional_ids:
         raise JsonableError(_("An attendee cannot be both required and optional"))
-    return {user_id: True for user_id in required_ids} | {
-        user_id: False for user_id in optional_ids
-    }
+    return dict.fromkeys(required_ids, True) | dict.fromkeys(optional_ids, False)
 
 
 def get_default_reminder_minutes(user_ids: set[int]) -> dict[int, int | None]:
     reminder_minutes: dict[int, int | None] = dict.fromkeys(user_ids, DEFAULT_REMINDER_MINUTES)
-    for user_id, minutes in CalendarUserSettings.objects.filter(user_id__in=user_ids).values_list(
-        "user_id", "default_reminder_minutes"
-    ):
-        reminder_minutes[user_id] = minutes
+    reminder_minutes.update(
+        CalendarUserSettings.objects.filter(user_id__in=user_ids).values_list(
+            "user_id", "default_reminder_minutes"
+        )
+    )
     return reminder_minutes
 
 
@@ -655,9 +654,9 @@ def update_calendar_attendee_settings(
     user_profile: UserProfile,
     event_id: int,
     *,
-    reminder_minutes: int | None | Unset = UNSET,
+    reminder_minutes: int | Unset | None = UNSET,
     category: str | None = None,
-    show_as: int | None | Unset = UNSET,
+    show_as: int | Unset | None = UNSET,
 ) -> None:
     """Changes the user's own reminder, category and how the event
     shows them, as in their copy of a meeting in Outlook. A show_as of
@@ -687,7 +686,7 @@ def get_or_create_calendar_event_chat(user_profile: UserProfile, event_id: int) 
     subscribes an attendee who left it."""
     access_calendar_event_by_id(user_profile, event_id)
     # Locked, so that attendees opening the chat at once get the same one.
-    event = CalendarEvent.objects.select_for_update().get(id=event_id)
+    event = CalendarEvent.objects.select_for_update(no_key=True).get(id=event_id)
     if event.chat is not None:
         bulk_add_subscriptions(event.chat.realm, [event.chat], [user_profile], acting_user=None)
         return event.chat

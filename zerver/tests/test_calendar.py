@@ -12,7 +12,6 @@ from typing_extensions import override
 from zerver.actions.realm_settings import do_set_realm_property
 from zerver.actions.user_settings import do_change_user_setting
 from zerver.actions.video_calls import do_end_livekit_call
-
 from zerver.lib.calendar.changes import (
     add_calendar_attendees,
     cancel_calendar_event,
@@ -33,8 +32,8 @@ from zerver.lib.calendar.rooms import create_calendar_room, update_calendar_room
 from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
-from zerver.lib.timestamp import datetime_to_global_time
 from zerver.lib.test_helpers import get_subscription
+from zerver.lib.timestamp import datetime_to_global_time
 from zerver.models import (
     CalendarAttendee,
     CalendarAttendeeOccurrenceResponse,
@@ -52,13 +51,13 @@ from zerver.models import (
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
 from zerver.models.realms import get_realm
-from zerver.models.users import get_system_bot
 from zerver.models.streams import StreamTopicsPolicyEnum
+from zerver.models.users import get_system_bot
 from zerver.views.calendar import MAX_FREE_BUSY_USERS
 
 
-def utc(*args: int) -> datetime:
-    return datetime(*args, tzinfo=timezone.utc)
+def utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
+    return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
 
 
 # Monday, November 16, 2026, 10:00 in Moscow.
@@ -177,7 +176,7 @@ class CreateCalendarEventTest(CalendarTestCase):
         event = CalendarEvent.objects.get(id=event_id)
         self.assertEqual(event.organizer, hamlet)
         self.assertEqual(event.rendered_description, "<p><strong>Agenda</strong></p>")
-        self.assertEqual(len(event.uid), 36)
+        self.assert_length(event.uid, 36)
         self.assertNotEqual(event.meet_code, "")
 
         organizer = self.get_attendee(event_id, hamlet)
@@ -195,7 +194,7 @@ class CreateCalendarEventTest(CalendarTestCase):
     def test_create_with_invalid_fields(self) -> None:
         hamlet = self.example_user("hamlet")
         cordelia = self.example_user("cordelia")
-        for kwargs, error in [
+        invalid_events: list[tuple[dict[str, object], str]] = [
             (dict(title="  "), "The title must not be empty"),
             (dict(title="x" * 256), "The title is too long"),
             (dict(event_timezone="Mars/Olympus"), "Invalid timezone"),
@@ -209,7 +208,8 @@ class CreateCalendarEventTest(CalendarTestCase):
                 dict(required_attendees=[cordelia], optional_attendees=[cordelia]),
                 "An attendee cannot be both required and optional",
             ),
-        ]:
+        ]
+        for kwargs, error in invalid_events:
             with self.assertRaisesRegex(JsonableError, error):
                 self.create_event(hamlet, **kwargs)
         self.assertFalse(CalendarEvent.objects.exists())
@@ -801,11 +801,18 @@ class MeetingChatTest(CalendarTestCase):
         # Renaming the meeting renames its chat, which keeps a name of
         # its own.
         update_calendar_event(hamlet, first_id, title="Retro")
-        self.assertEqual(CalendarEvent.objects.get(id=first_id).chat.name, "Retro")
+        self.assertEqual(
+            CalendarEvent.objects.values_list("chat__name", flat=True).get(id=first_id), "Retro"
+        )
         update_calendar_event(hamlet, second_id, title="Retro")
-        self.assertEqual(CalendarEvent.objects.get(id=second_id).chat.name, "Retro (2)")
+        self.assertEqual(
+            CalendarEvent.objects.values_list("chat__name", flat=True).get(id=second_id),
+            "Retro (2)",
+        )
         update_calendar_event(hamlet, first_id, title="Retro")
-        self.assertEqual(CalendarEvent.objects.get(id=first_id).chat.name, "Retro")
+        self.assertEqual(
+            CalendarEvent.objects.values_list("chat__name", flat=True).get(id=first_id), "Retro"
+        )
 
     def test_chat_follows_attendees(self) -> None:
         hamlet = self.example_user("hamlet")
@@ -837,7 +844,7 @@ class CalendarNotificationTest(CalendarTestCase):
         return [
             message.content.split(" [Open in calendar](")[0]
             for message in Message.objects.filter(
-                sender=bot, usermessage__user_profile=user
+                realm_id=user.realm_id, sender=bot, usermessage__user_profile=user
             ).order_by("id")
         ]
 
@@ -861,7 +868,9 @@ class CalendarNotificationTest(CalendarTestCase):
 
         # The link opens the occurrence in the calendar.
         bot = get_system_bot(settings.NOTIFICATION_BOT, hamlet.realm_id)
-        message = Message.objects.filter(sender=bot, usermessage__user_profile=cordelia).last()
+        message = Message.objects.filter(
+            realm_id=cordelia.realm_id, sender=bot, usermessage__user_profile=cordelia
+        ).last()
         assert message is not None
         self.assertTrue(
             message.content.endswith(
@@ -876,8 +885,10 @@ class CalendarNotificationTest(CalendarTestCase):
         self.assertEqual(
             self.get_notifications(iago),
             [
-                f"{self.mention(cordelia)} invited you to **Planning** on "
-                f"{datetime_to_global_time(MONDAY_10_00)}."
+                (
+                    f"{self.mention(cordelia)} invited you to **Planning** on "
+                    f"{datetime_to_global_time(MONDAY_10_00)}."
+                )
             ],
         )
 
@@ -889,7 +900,9 @@ class CalendarNotificationTest(CalendarTestCase):
             end=moscow_start + timedelta(hours=1),
             required_attendees=[iago],
         )
-        message = Message.objects.filter(sender=bot, usermessage__user_profile=iago).last()
+        message = Message.objects.filter(
+            realm_id=iago.realm_id, sender=bot, usermessage__user_profile=iago
+        ).last()
         assert message is not None
         self.assertTrue(
             message.content.endswith(f"#calendar/event/{moscow_id}/{timestamp(MONDAY_10_00)})")
@@ -972,8 +985,10 @@ class CalendarNotificationTest(CalendarTestCase):
         self.assertEqual(
             self.get_notifications(hamlet),
             [
-                f"{self.mention(cordelia)} accepted **Planning**.\n\n"
-                "> I will join from the train.\n> Maybe late.\n\n"
+                (
+                    f"{self.mention(cordelia)} accepted **Planning**.\n\n"
+                    "> I will join from the train.\n> Maybe late.\n\n"
+                )
             ],
         )
 
@@ -1676,7 +1691,7 @@ class CalendarUserSettingsTest(CalendarTestCase):
         self.assert_json_success(result)
         self.assertEqual(self.get_settings(hamlet), {**changed, "default_reminder_minutes": 30})
 
-        for params, error in [
+        invalid_settings: list[tuple[dict[str, object], str]] = [
             ({"work_days": "[]"}, "Invalid work days"),
             ({"work_days": "[0, 1]"}, "Invalid work days"),
             ({"work_day_start_minutes": 1080}, "Invalid work hours"),
@@ -1684,7 +1699,8 @@ class CalendarUserSettingsTest(CalendarTestCase):
             ({"default_reminder_minutes": -1}, "Invalid reminder"),
             ({"default_view": 3}, "Invalid view"),
             ({"time_scale_minutes": 10}, "Invalid time scale"),
-        ]:
+        ]
+        for params, error in invalid_settings:
             result = self.api_patch(hamlet, "/api/v1/calendar/settings", params)
             self.assert_json_error(result, error)
 

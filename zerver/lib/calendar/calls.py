@@ -79,7 +79,11 @@ def get_or_start_calendar_event_call(
     user_profile: UserProfile, client: Client, event_id: int, chat: Stream
 ) -> LiveKitCall:
     # Locked, so that people joining at once join the same call.
-    event = CalendarEvent.objects.select_for_update().select_related("realm").get(id=event_id)
+    event = (
+        CalendarEvent.objects.select_for_update(no_key=True)
+        .select_related("realm")
+        .get(id=event_id)
+    )
     check_calendar_event_call(event)
     call = get_calendar_event_call(chat)
     if call is not None:

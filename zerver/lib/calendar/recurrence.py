@@ -38,7 +38,7 @@ def validate_rrule(rrule: str) -> None:
             raise JsonableError(_("Unsupported repetition rule"))
     if "UNTIL" in parts:
         try:
-            datetime.strptime(parts["UNTIL"], "%Y%m%dT%H%M%SZ")
+            datetime.strptime(parts["UNTIL"], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
         except ValueError:
             raise JsonableError(_("Invalid repetition rule"))
 

@@ -36,7 +36,9 @@ def pin_user(user_profile: UserProfile, pinned_user: UserProfile, color: str) ->
     check_color(color)
     if pinned_user.id == user_profile.id:
         raise JsonableError(_("You cannot pin your own calendar"))
-    pinned_users = CalendarPinnedUser.objects.select_for_update().filter(user=user_profile)
+    pinned_users = CalendarPinnedUser.objects.select_for_update(no_key=True).filter(
+        user=user_profile
+    )
     if pinned_users.filter(pinned_user=pinned_user).exists():
         raise JsonableError(_("This calendar is already pinned"))
     last_order = pinned_users.aggregate(Max("order"))["order__max"]
@@ -113,7 +115,7 @@ def update_calendar_user_settings(
     work_days: list[int] | None = None,
     work_day_start_minutes: int | None = None,
     work_day_end_minutes: int | None = None,
-    default_reminder_minutes: int | None | Unset = UNSET,
+    default_reminder_minutes: int | Unset | None = UNSET,
     default_view: int | None = None,
     time_scale_minutes: int | None = None,
 ) -> None:

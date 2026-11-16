@@ -2,9 +2,10 @@
 
 import django.db.models.deletion
 import django.utils.timezone
-import zerver.models.calendar
 from django.conf import settings
 from django.db import migrations, models
+
+from zerver.models.calendar import default_work_days
 
 
 class Migration(migrations.Migration):
@@ -177,7 +178,7 @@ class Migration(migrations.Migration):
                         auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
                     ),
                 ),
-                ("work_days", models.JSONField(default=zerver.models.calendar.default_work_days)),
+                ("work_days", models.JSONField(default=default_work_days)),
                 ("work_day_start_minutes", models.PositiveSmallIntegerField(default=540)),
                 ("work_day_end_minutes", models.PositiveSmallIntegerField(default=1080)),
                 ("default_reminder_minutes", models.PositiveIntegerField(default=15, null=True)),

@@ -21,10 +21,10 @@ from zerver.lib.calendar.calls import (
     join_calendar_event_call,
 )
 from zerver.lib.calendar.changes import (
-    get_or_create_calendar_event_chat,
     add_calendar_attendees,
     cancel_calendar_event,
     create_calendar_event,
+    get_or_create_calendar_event_chat,
     respond_to_calendar_event,
     update_calendar_attendee_settings,
     update_calendar_event,
