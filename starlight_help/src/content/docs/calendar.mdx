@@ -1,0 +1,545 @@
+---
+title: Calendar
+---
+
+import {TabItem, Tabs} from "@astrojs/starlight/components";
+
+import FlattenedSteps from "../../components/FlattenedSteps.astro";
+import NavigationSteps from "../../components/NavigationSteps.astro";
+import ZulipTip from "../../components/ZulipTip.astro";
+import GoToCalendar from "../include/_GoToCalendar.mdx";
+
+import CalendarDaysIcon from "~icons/zulip-icon/calendar-days";
+import CalendarPlusIcon from "~icons/zulip-icon/calendar-plus";
+import ChevronLeftIcon from "~icons/zulip-icon/chevron-left";
+import ChevronRightIcon from "~icons/zulip-icon/chevron-right";
+import CloseIcon from "~icons/zulip-icon/close";
+import CopyIcon from "~icons/zulip-icon/copy";
+import ForwardMessageIcon from "~icons/zulip-icon/forward-message";
+import MaximizeDiagonalIcon from "~icons/zulip-icon/maximize-diagonal";
+import MoreVerticalIcon from "~icons/zulip-icon/more-vertical";
+import PanelLeftIcon from "~icons/zulip-icon/panel-left";
+import UserPlusIcon from "~icons/zulip-icon/user-plus";
+import VideoCallIcon from "~icons/zulip-icon/video-call";
+
+Zulip's calendar shows your meetings and events a week at a time. It
+opens in place of your conversations, and you can go back to the
+conversation you were reading without losing your place.
+
+The **calendar** (<CalendarDaysIcon />) icon in the upper right shows
+how many meeting invitations you haven't answered yet.
+
+The calendar shows times in the [time zone](/help/change-your-timezone)
+of your Zulip profile, even when your computer is set to another one.
+Events that last all day, or for a day or more, are shown above the
+hours of the day.
+
+## Open the calendar
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+    </FlattenedSteps>
+
+    <ZulipTip>
+      To go back to your conversations, click the **calendar**
+      (<CalendarDaysIcon />) icon again, or use your browser's back
+      button.
+    </ZulipTip>
+  </TabItem>
+</Tabs>
+
+## Choose the week to show
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Today** to show the current week, or the
+         **previous week** (<ChevronLeftIcon />) and **next week**
+         (<ChevronRightIcon />) icons next to it. You can also click
+         the dates of the week shown to pick a day, or click a day in
+         the small calendar on the left.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Show the whole week or the work week
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the name of the current view in the upper right of the
+         calendar, and select a view.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+The same menu sets the **Time scale**, the length of each row of the
+calendar, which is the same on all your devices. Turn off
+**Colleagues' calendars side by side** there to hide your colleagues'
+calendars without unchecking them.
+
+The work week shows your work days, and the calendar opens at the
+start of your work day. The time outside of your [work
+hours](#change-your-calendar-settings) is shaded.
+
+## Create an event or a meeting
+
+An event becomes a meeting when you invite colleagues to it.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Create** in the upper right of the calendar, or click
+         an empty time in the calendar.
+
+      1. Add a title and the colleagues to invite. Click the date and
+         time to change them. You can also drag the event in the day on
+         the right to move it, or drag its bottom edge to change how
+         long it lasts.
+
+      1. Click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  Click the **attendee options** (<UserPlusIcon />) icon to invite
+  optional attendees, or to hide the list of attendees from the people
+  you invite. The menus at the top of the form set how the time shows
+  in your calendar, your reminder, a category, and whether the event
+  is private.
+</ZulipTip>
+
+## Schedule a meeting in a channel
+
+A meeting in a channel is discussed in a topic of the channel named
+after the meeting, and everyone subscribed to the channel sees it in
+their calendar and can join its call, even without an invitation. The
+people you invite get an invitation as for any other meeting.
+Notification Bot announces the meeting in its topic, as well as when it
+is moved or canceled.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the arrow next to **Create** in the upper right of the
+         calendar, and select **Meeting in a channel**.
+
+      1. Choose a channel, and add a title and the colleagues to
+         invite.
+
+      1. Click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+The meeting's channel can't be changed, and its topic keeps its name
+when the meeting is renamed, so that links to the topic keep working.
+In a channel without topics, the meeting is discussed in the channel's
+general chat. A meeting in a channel can't be private.
+
+## Find a time for a meeting
+
+The scheduler shows, for a week from the date of the meeting, when
+you and the people you invite are busy or outside of their work hours,
+which they set in their [calendar settings](#change-your-calendar-settings).
+Next to each person are their local day and time at the start of the
+meeting, and **Unavailable** if they cannot make it.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Create or change a meeting, and click **Scheduler** next to
+         its time.
+
+      1. Drag the selected time, or click another time, to move the
+         meeting. You can also add or remove attendees.
+
+      1. Click **Save** to save the meeting, or **Back** to go back to
+         its form.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  Click **Find a time** to move the meeting to the next time in your
+  work hours when everyone required is free and at work. **Display
+  options** shows the whole day instead of your work hours, and changes
+  the scale.
+</ZulipTip>
+
+## Book a meeting room
+
+A meeting books a room by inviting it. The room accepts the meeting
+only if no other meeting booked it at that time; otherwise, the meeting
+isn't saved, and you can choose another room or time. Your organization's
+administrators [set up the rooms](/help/meeting-rooms).
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Create or change a meeting, and start typing the room's name in
+         **Add a place or a room**.
+
+      1. Choose the room. You can add several rooms, and type a place
+         after them.
+
+      1. Click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  The **Rooms** section of the [scheduler](#find-a-time-for-a-meeting)
+  shows when rooms are booked, and **Find a time** looks for a time when
+  they are free.
+</ZulipTip>
+
+## Repeat an event or a meeting
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Create** in the upper right of the calendar, or edit
+         the event or meeting.
+
+      1. Click **Series** at the top of the form.
+
+      1. Choose how often it repeats: every few days, weeks on some
+         days of the week, months, or years. It repeats forever,
+         unless you choose the day it repeats **until**.
+
+      1. Click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  When you invite colleagues, **Suggested times** lists the times of
+  the same length in your work hours when the most of them are free,
+  at the first occurrences of a series. Click one to choose it.
+</ZulipTip>
+
+An event's times are those of your [time
+zone](/help/change-your-timezone). To set them in another time zone,
+click the time zone next to the time.
+
+## Change a meeting or event
+
+You can change the meetings you organize, and your personal events.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting or event in the calendar.
+
+      1. Click **Edit**. For a meeting or event that repeats, choose
+         whether to change this occurrence or the whole series.
+
+      1. Make your changes, and click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+When you change one occurrence of a series, you can change its title,
+time, place, and description. Its attendees and other settings are
+those of the whole series. Changing when the whole series takes place
+undoes the changes made to its occurrences, after you confirm.
+
+## Answer an invitation
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click **Accept**, **Decline**, or **Tentative**. For a
+         meeting that repeats, choose whether to answer for this
+         occurrence or for the whole series.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+If the organizer asked for responses, they get a direct message with
+your answer. To add a message for them, type it in the **Message
+(optional)** field before you answer; to answer without telling them,
+uncheck **Notify the organizer**.
+
+<ZulipTip>
+  To keep a meeting in your calendar without blocking your time, click
+  the **more actions** (<MoreVerticalIcon />) icon, and select **Follow
+  meeting**. Select **Delete from my calendar** there to decline a
+  meeting and remove it.
+</ZulipTip>
+
+## Invitations and reminders
+
+Notification Bot sends you a direct message when someone invites you
+to a meeting, and when a meeting you are invited to is moved or
+cancelled, or you are removed from it. As an organizer, you get one
+when someone answers your invitation. Click **Open in calendar** in
+the message to open the meeting.
+
+Before a meeting starts, at the time of your reminder for it, a
+reminder shows at the top of Zulip. Click **Join** to join the
+meeting's call, or **Close** to dismiss the reminder.
+
+<ZulipTip>
+  Reminders show only while Zulip is open in your browser or in the
+  desktop app.
+</ZulipTip>
+
+## Open a meeting
+
+You can open a meeting on the whole window to read its description and
+see how its attendees responded.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click the **open the meeting** (<MaximizeDiagonalIcon />) icon.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+**Attendee responses** on the right lists the organizer and the
+attendees by their response to the meeting, or to this occurrence of a
+series. If the organizer hid the list of attendees, only they see it.
+
+From there you can also:
+
+* Answer the invitation, and choose how the meeting shows your time,
+  your reminder, and a category.
+* Invite more people with the **forward** (<ForwardMessageIcon />)
+  icon, if the organizer allows it. The organizer sees who invited
+  them.
+* Make a new event with the same details with the **copy**
+  (<CopyIcon />) icon.
+* Open the next occurrences of a series with **All occurrences**, or
+  the series itself with **The whole series**.
+
+When you open a meeting you organize, you can change it, and click
+**Attendee responses** to see the responses next to it.
+
+## Discuss a meeting
+
+Each meeting has its own chat with everyone invited to it, which is
+shown among your direct message conversations, including in your
+inbox and in recent conversations, where **Include DMs** shows or
+hides it. People invited later join the chat and see its history;
+people removed from the meeting stay in it. A series has one chat for
+all of its occurrences.
+
+A [meeting in a channel](#schedule-a-meeting-in-a-channel) is
+discussed in its topic of the channel instead. People invited to it
+who can't access the channel only join its call.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click **Discussion**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+The chat is named after the meeting, and its header shows when the
+meeting next takes place. To leave the chat, click the **more actions**
+(<MoreVerticalIcon />) icon next to it in the left sidebar, and select
+**Leave chat**. **Discussion** in the meeting brings you back.
+
+## Join a meeting's call
+
+A meeting with a Zulip call has its call in the meeting's chat. The
+first person to join starts it, which posts its link in the chat, and
+the people who join after them join the same call. Anyone in the
+meeting's chat can join it.
+
+The call of a meeting in a channel takes place in its topic, and anyone
+who can access the channel can join it. People invited to the meeting
+who can't access the channel can join the call once someone in the
+channel has started it.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting in the calendar.
+
+      1. Click **Join**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  To join without your camera, click the arrow next to **Join**, and
+  select **Join without video**.
+</ZulipTip>
+
+You can also join from the header of the meeting's chat, or with the
+**Join the call** link under **Zulip call** in the opened meeting. The
+link stays the same for the whole meeting, so you can share it with
+the people invited. When the call has not started, the link offers to
+start it.
+
+Zulip calls need LiveKit to be your organization's [call
+provider](/help/configure-call-provider).
+
+## Meet now
+
+**Meet now** schedules a 30-minute meeting starting now, with a Zulip
+call, and joins its call.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Meet now** (<VideoCallIcon />) in the upper right of the
+         calendar.
+
+      1. Change the title if you like, and add the colleagues to invite.
+
+      1. Click **Join now**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Cancel a meeting or delete an event
+
+You can cancel the meetings you organize, and delete your personal
+events. For a meeting or event that repeats, you can cancel one
+occurrence or the whole series.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the meeting or event in the calendar.
+
+      1. Click **Cancel meeting** or **Delete**, and confirm.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Show your colleagues' calendars
+
+You can show the calendars of colleagues next to your own, to see when
+they are busy. You see the titles only of the meetings you are invited
+to, and never of a colleague's private events. The time outside of a
+colleague's work hours, in their time zone, is shaded in their
+calendar. Your list of colleagues is the same on all your devices.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click <CalendarPlusIcon /> **Add calendar** in the panel on the
+         left of the calendar.
+
+      1. Select a colleague.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  Use the checkboxes under **Colleagues' calendars** to choose whose
+  calendars to show. Click the **remove from the list**
+  (<CloseIcon />) icon next to a colleague's name to remove them from
+  the list.
+</ZulipTip>
+
+## Filter your events
+
+You can hide some kinds of your events, such as personal events,
+meetings you haven't answered, events of a category, or recurring
+events. **Meetings in channels** shows or hides the meetings in your
+channels that you aren't invited to. The filter applies to your own
+calendar on this device.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click **Filter** in the upper right of the calendar.
+
+      1. Uncheck the kinds of events to hide. Hover over an item with
+         an arrow to choose among its kinds.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  The **Filter** button is highlighted while some events are hidden.
+  Click **Reset filters** in its menu to show all your events again.
+</ZulipTip>
+
+## Hide the calendar panel
+
+The panel on the left of the calendar can be hidden to make more room
+for your week.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the **hide calendar panel** (<PanelLeftIcon />) icon in
+         the upper left of the calendar. Click it again to show the
+         panel.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+## Change your calendar settings
+
+Your work days are the days the work week shows, and your work hours
+are when suggested meeting times fall. You can also choose the view
+the calendar opens in, its time scale, and the reminder for meetings
+you are invited to.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <NavigationSteps target="settings/calendar" />
+
+      1. Change the settings you like. They are saved right away.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+<ZulipTip>
+  You can also open these settings from the view menu in the calendar,
+  and the view or time scale you choose there becomes your default.
+</ZulipTip>

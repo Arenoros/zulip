@@ -19,6 +19,9 @@ import * as banners from "./banners.ts";
 import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import {is_browser_unsupported_old_version} from "./browser_support.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
+import * as calendar_reminders from "./calendar_reminders.ts";
+import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel from "./channel.ts";
 import * as channel_folders from "./channel_folders.ts";
@@ -30,6 +33,7 @@ import * as compose from "./compose.ts";
 import * as compose_closed_ui from "./compose_closed_ui.ts";
 import * as compose_notifications from "./compose_notifications.ts";
 import * as compose_paste from "./compose_paste.ts";
+import * as compose_plus_menu_popover from "./compose_plus_menu_popover.ts";
 import * as compose_pm_pill from "./compose_pm_pill.ts";
 import * as compose_recipient from "./compose_recipient.ts";
 import * as compose_reply from "./compose_reply.ts";
@@ -40,6 +44,7 @@ import * as compose_tooltips from "./compose_tooltips.ts";
 import * as compose_validate from "./compose_validate.ts";
 import * as composebox_typeahead from "./composebox_typeahead.ts";
 import * as condense from "./condense.ts";
+import * as conversation_people_popover from "./conversation_people_popover.ts";
 import * as copy_messages from "./copy_messages.ts";
 import * as desktop_integration from "./desktop_integration.ts";
 import * as desktop_notifications from "./desktop_notifications.ts";
@@ -514,6 +519,8 @@ export async function initialize_everything(state_data) {
     };
     message_actions_popover.initialize({message_reminder_click_handler});
     compose_send_menu_popover.initialize();
+    compose_plus_menu_popover.initialize();
+    conversation_people_popover.initialize();
 
     realm_user_settings_defaults.initialize(state_data.realm_settings_defaults);
 
@@ -591,10 +598,19 @@ export async function initialize_everything(state_data) {
                 first_unread_message_id,
             });
         },
-        hide_other_views: inbox_ui.hide,
+        hide_other_views() {
+            inbox_ui.hide();
+            calendar_ui.hide();
+        },
     });
     inbox_ui.initialize({
-        hide_other_views: recent_view_ui.hide,
+        hide_other_views() {
+            recent_view_ui.hide();
+            calendar_ui.hide();
+        },
+    });
+    calendar_ui.initialize({
+        unanswered_invitation_count: state_data.calendar.calendar_unanswered_invitation_count,
     });
     alert_words.initialize(state_data.alert_words);
     saved_snippets.initialize(state_data.saved_snippets);
@@ -793,6 +809,8 @@ export async function initialize_everything(state_data) {
     personal_menu_popover.initialize();
     pm_list.initialize();
     personal_sections_ui.initialize();
+    calendar_meeting_chat.initialize();
+    calendar_reminders.initialize();
     topic_list.initialize({
         on_topic_click(stream_id, topic) {
             const sub = sub_store.get(stream_id);

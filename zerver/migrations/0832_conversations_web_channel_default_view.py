@@ -15,9 +15,7 @@ def set_conversations_as_web_channel_default_view(
     # including users who had chosen another view, since a choice
     # cannot be told apart from the previous default.
     UserProfile.objects.update(web_channel_default_view=WEB_CHANNEL_DEFAULT_VIEW_CONVERSATIONS)
-    RealmUserDefault.objects.update(
-        web_channel_default_view=WEB_CHANNEL_DEFAULT_VIEW_CONVERSATIONS
-    )
+    RealmUserDefault.objects.update(web_channel_default_view=WEB_CHANNEL_DEFAULT_VIEW_CONVERSATIONS)
 
 
 class Migration(migrations.Migration):

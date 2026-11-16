@@ -9,11 +9,14 @@ import * as blueslip from "./blueslip.ts";
 import * as bot_data from "./bot_data.ts";
 import * as browser_history from "./browser_history.ts";
 import {buddy_list} from "./buddy_list.ts";
+import * as calendar_grid from "./calendar_grid.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
+import * as calendar_reminders from "./calendar_reminders.ts";
+import * as calendar_ui from "./calendar_ui.ts";
 import * as call_ringing from "./call_ringing.ts";
 import * as channel_folders from "./channel_folders.ts";
 import * as compose from "./compose.ts";
 import {compose_call_session_manager} from "./compose_call_session.ts";
-import * as compose_call_ui from "./compose_call_ui.ts";
 import * as compose_closed_ui from "./compose_closed_ui.ts";
 import * as compose_pm_pill from "./compose_pm_pill.ts";
 import * as compose_recipient from "./compose_recipient.ts";
@@ -40,6 +43,7 @@ import * as message_store from "./message_store.ts";
 import * as message_view from "./message_view.ts";
 import * as message_view_header from "./message_view_header.ts";
 import * as muted_users_ui from "./muted_users_ui.ts";
+import * as narrow_state from "./narrow_state.ts";
 import * as narrow_title from "./narrow_title.ts";
 import * as navbar_alerts from "./navbar_alerts.ts";
 import * as navigation_views from "./navigation_views.ts";
@@ -68,6 +72,7 @@ import * as scheduled_messages_ui from "./scheduled_messages_ui.ts";
 import * as scroll_bar from "./scroll_bar.ts";
 import * as settings_account from "./settings_account.ts";
 import * as settings_bots from "./settings_bots.ts";
+import * as settings_calendar from "./settings_calendar.ts";
 import * as settings_components from "./settings_components.ts";
 import * as settings_config from "./settings_config.ts";
 import * as settings_emoji from "./settings_emoji.ts";
@@ -124,6 +129,25 @@ export function dispatch_normal_event(event) {
 
         case "attachment":
             attachments_ui.update_attachments(event);
+            break;
+
+        case "calendar":
+            calendar_ui.update_unanswered_invitation_count(event.unanswered_invitation_count);
+            calendar_grid.refresh();
+            calendar_reminders.fetch();
+            calendar_meeting_chat.clear_next_occurrences();
+            if (stream_data.is_meeting_chat(narrow_state.stream_id())) {
+                message_view_header.render_title_area();
+            }
+            break;
+
+        case "calendar_free_busy":
+            calendar_grid.refresh_free_busy(event.user_ids);
+            break;
+
+        case "calendar_settings":
+            calendar_grid.update_settings(event.settings);
+            settings_calendar.update();
             break;
 
         case "call":
@@ -403,8 +427,8 @@ export function dispatch_normal_event(event) {
                 signup_announcements_stream_id: noop,
                 zulip_update_announcements_stream_id: noop,
                 emails_restricted_to_domains: noop,
-                video_chat_provider: compose_call_ui.update_audio_and_video_chat_button_display,
-                jitsi_server_url: compose_call_ui.update_audio_and_video_chat_button_display,
+                video_chat_provider: message_view_header.render_title_area,
+                jitsi_server_url: noop,
                 gif_rating_policy: gif_state.update_gif_icon_visibility,
                 waiting_period_threshold: noop,
                 want_advertise_in_communities_directory: noop,
@@ -902,6 +926,8 @@ export function dispatch_normal_event(event) {
                             });
                         }
                     }
+                    // The calendar shows the meetings in the user's channels.
+                    calendar_grid.refresh();
                     break;
                 case "peer_add": {
                     const stream_ids = sub_store.validate_stream_ids(event.stream_ids);
@@ -924,6 +950,7 @@ export function dispatch_normal_event(event) {
                         const sub = sub_store.get(rec.stream_id);
                         stream_events.mark_unsubscribed(sub);
                     }
+                    calendar_grid.refresh();
                     break;
                 case "update":
                     stream_events.update_property(event.stream_id, event.property, event.value);

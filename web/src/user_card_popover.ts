@@ -181,7 +181,11 @@ function clipboard_enable(arg: HTMLElement | string): ClipboardJS {
 
 // Functions related to user card popover.
 
-export function toggle_user_card_popover(element: HTMLElement, user: User): void {
+export function toggle_user_card_popover(
+    element: HTMLElement,
+    user: User,
+    placement: tippy.Placement = "right",
+): void {
     show_user_card_popover(
         user,
         $(element),
@@ -189,7 +193,7 @@ export function toggle_user_card_popover(element: HTMLElement, user: User): void
         false,
         "compose_private_message",
         "user_card",
-        "right",
+        placement,
     );
 }
 

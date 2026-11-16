@@ -34,6 +34,7 @@ link_mapping = {
     "uploaded-files": ["Personal settings", "Uploaded files", "/#settings/uploaded-files"],
     "topics": ["Personal settings", "Topics", "/#settings/topics"],
     "muted-users": ["Personal settings", "Muted users", "/#settings/muted-users"],
+    "calendar": ["Personal settings", "Calendar", "/#settings/calendar"],
     "organization-profile": [
         "Organization settings",
         "Organization profile",
@@ -94,6 +95,11 @@ link_mapping = {
         "Organization settings",
         "Code playgrounds",
         "/#organization/playground-settings",
+    ],
+    "meeting-rooms": [
+        "Organization settings",
+        "Meeting rooms",
+        "/#organization/meeting-rooms",
     ],
     "profile-field-settings": [
         "Organization settings",

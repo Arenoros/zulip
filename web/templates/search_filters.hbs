@@ -1,0 +1,7 @@
+<nav class="search-filters" aria-label="{{t 'Search filters' }}">
+    {{#each search_filters}}
+        <a class="search-filter{{#if is_active}} active{{/if}}" href="{{url}}" data-search-filter="{{kind}}"{{#if is_active}} aria-current="page"{{/if}}>
+            <span class="search-filter-label">{{label}}</span><span class="search-filter-count"></span>
+        </a>
+    {{/each}}
+</nav>

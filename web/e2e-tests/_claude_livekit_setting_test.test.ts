@@ -9,7 +9,10 @@ function check(name: string, ok: boolean): void {
 }
 
 async function visible(page: Page, selector: string): Promise<boolean> {
-    return page.$eval(selector, (element) => (element as HTMLElement).offsetParent !== null);
+    return page.$eval(
+        selector,
+        (element) => element instanceof HTMLElement && element.offsetParent !== null,
+    );
 }
 
 async function select_provider(page: Page, key: "livekit" | "jitsi_meet"): Promise<void> {
@@ -36,17 +39,21 @@ async function livekit_setting_test(page: Page): Promise<void> {
     );
     check(
         "checked by default",
-        await page.$eval(
-            "#id_realm_enable_livekit_remote_control",
-            (element) => (element as HTMLInputElement).checked,
-        ),
+        await page.$eval("#id_realm_enable_livekit_remote_control", (element) => {
+            if (!(element instanceof HTMLInputElement)) {
+                throw new TypeError("Expected <input>");
+            }
+            return element.checked;
+        }),
     );
     const block = await page.$("#org-compose-settings");
     await block!.screenshot({path: "var/puppeteer/livekit-setting-shown.png"});
     await page.screenshot({path: "var/puppeteer/livekit-setting-page.png"});
 
     await page.click("#id_realm_enable_livekit_remote_control + .rendered-checkbox");
-    await page.waitForSelector('#org-compose-settings .save-button[data-status="unsaved"]', {visible: true});
+    await page.waitForSelector('#org-compose-settings .save-button[data-status="unsaved"]', {
+        visible: true,
+    });
     await page.click("#org-compose-settings .save-button");
     await page.waitForFunction(
         () =>

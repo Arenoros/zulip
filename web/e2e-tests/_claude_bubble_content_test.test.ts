@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -140,11 +141,11 @@ const shot_prefix = process.env["SHOT_PREFIX"] ?? "content";
 // with the same screenshots taken before these changes.
 const classic_only = process.env["CLASSIC_ONLY"] === "1";
 
-type Seeded = {
-    ids: Record<string, number>;
-    othello: number;
-    welcome_bot: number;
-};
+const seeded_schema = z.object({
+    ids: z.record(z.string(), z.number()),
+    othello: z.number(),
+    welcome_bot: z.number(),
+});
 
 async function shot_list(page: Page, name: string): Promise<void> {
     // Let images and fonts settle.
@@ -308,7 +309,7 @@ async function check_code_colors(
 
 async function content_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {input: seed_script, encoding: "utf8"});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     const {ids} = seeded;
 
     await fetch(`${base_url}flush_caches`, {method: "POST"});
@@ -336,7 +337,16 @@ async function content_test(page: Page): Promise<void> {
                 headers: {"X-CSRFToken": csrf_token},
                 body: form,
             });
-            return ((await response.json()) as {url: string}).url;
+            const data: unknown = await response.json();
+            if (
+                typeof data !== "object" ||
+                data === null ||
+                !("url" in data) ||
+                typeof data.url !== "string"
+            ) {
+                throw new TypeError("Expected the URL of the upload");
+            }
+            return data.url;
         }
         async function image(width: number, height: number, hue: number): Promise<Blob> {
             const canvas = document.createElement("canvas");
@@ -386,7 +396,16 @@ async function content_test(page: Page): Promise<void> {
                 },
                 body: `type=direct&to=${JSON.stringify([othello])}&content=${encodeURIComponent(content)}`,
             });
-            return ((await response.json()) as {id: number}).id;
+            const data: unknown = await response.json();
+            if (
+                typeof data !== "object" ||
+                data === null ||
+                !("id" in data) ||
+                typeof data.id !== "number"
+            ) {
+                throw new TypeError("Expected the ID of the message");
+            }
+            return data.id;
         }
         const wide = await upload(await image(1600, 900, 200), "wide.png");
         const first = await upload(await image(800, 600, 30), "first.png");
@@ -444,7 +463,8 @@ async function content_test(page: Page): Promise<void> {
         const sender_edge = row.own ? bubble.right - row.feed_right : bubble.left - row.feed_left;
         check(
             `the ${name} bubble takes the whole column`,
-            Math.abs(free_edge - expected) < 2 && Math.abs(Math.abs(sender_edge) - (row.own ? 0 : 42)) < 3,
+            Math.abs(free_edge - expected) < 2 &&
+                Math.abs(Math.abs(sender_edge) - (row.own ? 0 : 42)) < 3,
             `${Math.round(free_edge)} vs ${Math.round(expected)}, ${Math.round(sender_edge)}`,
         );
     }
@@ -524,7 +544,7 @@ async function content_test(page: Page): Promise<void> {
     const me = await page.$eval(row_selector(ids["me"]!), (row) => ({
         background: getComputedStyle(row.querySelector(".status-message")!).backgroundColor,
         italic: getComputedStyle(row.querySelector(".status-message")!).fontStyle,
-        avatar: row.querySelector(".message-avatar img")!.getBoundingClientRect().width,
+        avatar: row.querySelector(":scope .message-avatar img")!.getBoundingClientRect().width,
         time_after_text:
             row.querySelector(".message-time")!.getBoundingClientRect().left -
             row.querySelector(".message_sender")!.getBoundingClientRect().right,
@@ -577,7 +597,8 @@ async function content_test(page: Page): Promise<void> {
         return {
             border: getComputedStyle(controller).borderTopStyle,
             right: controller.getBoundingClientRect().right,
-            content_background: getComputedStyle(row.querySelector(".message_content")!).backgroundColor,
+            content_background: getComputedStyle(row.querySelector(".message_content")!)
+                .backgroundColor,
             label: controller.textContent?.trim(),
         };
     });

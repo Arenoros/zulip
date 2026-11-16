@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {HTTPRequest, Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -200,8 +201,7 @@ async function rows_info(page: Page): Promise<RowInfo[]> {
                     id: Number(row.dataset["messageId"]),
                     own: row.classList.contains("own-message"),
                     includes_sender: row.classList.contains("messagebox-includes-sender"),
-                    avatar_visible:
-                        avatar !== null && avatar.getBoundingClientRect().width > 0,
+                    avatar_visible: avatar !== null && avatar.getBoundingClientRect().width > 0,
                     name_text: name?.textContent?.trim() ?? "",
                     name_visible: name_rect !== undefined && name_rect.width > 2,
                     bubble_left: bubble.left,
@@ -223,12 +223,14 @@ async function visual_test(page: Page): Promise<void> {
     // Seed before logging in, so that the web app fetches the messages
     // with their backdated timestamps instead of receiving them as events.
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as {
-        ids: number[];
-        yesterday: number;
-        iago: number;
-        desdemona: number;
-    };
+    const seeded = z
+        .object({
+            ids: z.array(z.number()),
+            yesterday: z.number(),
+            iago: z.number(),
+            desdemona: z.number(),
+        })
+        .parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.setViewport({width: 1280, height: 1000});
     await common.log_in(page);
@@ -246,7 +248,7 @@ async function visual_test(page: Page): Promise<void> {
             function bubble(id: number): DOMRect {
                 return document
                     .querySelector(
-                        `.focused-message-list .message_row[data-message-id="${id}"] .message_content`,
+                        `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"] .message_content`,
                     )!
                     .getBoundingClientRect();
             }
@@ -262,15 +264,23 @@ async function visual_test(page: Page): Promise<void> {
                 unread_markers_shown: [...list.querySelectorAll(".unread_marker")].filter(
                     (marker) => getComputedStyle(marker).display !== "none",
                 ).length,
-                new_messages: [...list.querySelectorAll(".new-messages-divider")].map((divider) => ({
-                    id: Number(divider.closest<HTMLElement>(".message_row")!.dataset["messageId"]),
-                    text: divider.textContent?.trim(),
-                })),
+                new_messages: [...list.querySelectorAll(".new-messages-divider")].map(
+                    (divider) => ({
+                        id: Number(
+                            divider.closest<HTMLElement>(".message_row")!.dataset["messageId"],
+                        ),
+                        text: divider.textContent?.trim(),
+                    }),
+                ),
                 dates: [...list.querySelectorAll(".date-divider-content")].map((content) => {
-                    const divider = content.closest(".message_feed_divider")!.getBoundingClientRect();
+                    const divider = content
+                        .closest(".message_feed_divider")!
+                        .getBoundingClientRect();
                     const label = content.getBoundingClientRect();
                     return {
-                        id: Number(content.closest<HTMLElement>(".message_row")!.dataset["messageId"]),
+                        id: Number(
+                            content.closest<HTMLElement>(".message_row")!.dataset["messageId"],
+                        ),
                         text: content.textContent?.trim(),
                         off_center:
                             label.left + label.width / 2 - (divider.left + divider.width / 2),
@@ -278,7 +288,11 @@ async function visual_test(page: Page): Promise<void> {
                 }),
             };
         });
-        check("the recipient bar is hidden", dividers.headers_shown === 0, String(dividers.headers_shown));
+        check(
+            "the recipient bar is hidden",
+            dividers.headers_shown === 0,
+            String(dividers.headers_shown),
+        );
         check(
             "unread markers are hidden",
             dividers.unread_markers_shown === 0,
@@ -307,7 +321,21 @@ async function visual_test(page: Page): Promise<void> {
         check(
             "the first unread message starts a series",
             JSON.stringify(series_with_divider) ===
-                JSON.stringify([true, false, true, false, true, true, true, true, true, false, true, true, true]),
+                JSON.stringify([
+                    true,
+                    false,
+                    true,
+                    false,
+                    true,
+                    true,
+                    true,
+                    true,
+                    true,
+                    false,
+                    true,
+                    true,
+                    true,
+                ]),
             JSON.stringify(series_with_divider),
         );
         await shot_list(page, "dividers");
@@ -323,7 +351,9 @@ async function visual_test(page: Page): Promise<void> {
     await page.waitForFunction(
         (id: number) =>
             !document
-                .querySelector(`.focused-message-list .message_row[data-message-id="${id}"]`)!
+                .querySelector(
+                    `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"]`,
+                )!
                 .classList.contains("unread"),
         {polling: 200},
         first_unread_id,
@@ -377,14 +407,30 @@ async function visual_test(page: Page): Promise<void> {
     check(
         "a pause of more than five minutes starts a new series",
         JSON.stringify(series_starts) ===
-            JSON.stringify([true, false, true, false, true, false, true, true, true, false, true, true, true]),
+            JSON.stringify([
+                true,
+                false,
+                true,
+                false,
+                true,
+                false,
+                true,
+                true,
+                true,
+                false,
+                true,
+                true,
+                true,
+            ]),
         JSON.stringify(series_starts),
     );
 
     const gaps = await page.evaluate((ids: number[]) => {
         function rect(id: number, selector: string): DOMRect {
             return document
-                .querySelector(`.focused-message-list .message_row[data-message-id="${id}"] ${selector}`)!
+                .querySelector(
+                    `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"] ${selector}`,
+                )!
                 .getBoundingClientRect();
         }
         const font_size = Number.parseFloat(
@@ -393,9 +439,11 @@ async function visual_test(page: Page): Promise<void> {
         );
         return {
             font_size,
-            within_series: rect(ids[1]!, ".message_content").top - rect(ids[0]!, ".message_content").bottom,
+            within_series:
+                rect(ids[1]!, ".message_content").top - rect(ids[0]!, ".message_content").bottom,
             between_series:
-                rect(ids[6]!, ".message-sender-and-time").top - rect(ids[5]!, ".message_content").bottom,
+                rect(ids[6]!, ".message-sender-and-time").top -
+                rect(ids[5]!, ".message_content").bottom,
         };
     }, seeded.ids);
     check(
@@ -418,7 +466,9 @@ async function visual_test(page: Page): Promise<void> {
     );
     check(
         "own messages leave 15% free on the left",
-        own_rows.every((row) => row.bubble_left - row.row_left >= 0.15 * (row.row_right - row.row_left) - 1),
+        own_rows.every(
+            (row) => row.bubble_left - row.row_left >= 0.15 * (row.row_right - row.row_left) - 1,
+        ),
         JSON.stringify(own_rows.map((row) => [row.bubble_left, row.row_left, row.row_right])),
     );
     check(
@@ -428,13 +478,17 @@ async function visual_test(page: Page): Promise<void> {
     );
     check(
         "messages from others leave 15% free on the right",
-        other_rows.every((row) => row.row_right - row.bubble_right >= 0.15 * (row.row_right - row.row_left) - 1),
+        other_rows.every(
+            (row) => row.row_right - row.bubble_right >= 0.15 * (row.row_right - row.row_left) - 1,
+        ),
         JSON.stringify(other_rows.map((row) => row.row_right - row.bubble_right)),
     );
     check(
         "short bubbles fit their text",
         rows.filter((row) => row.id === seeded.ids[7]).every((row) => row.bubble_width < 100),
-        JSON.stringify(rows.filter((row) => row.id === seeded.ids[7]).map((row) => row.bubble_width)),
+        JSON.stringify(
+            rows.filter((row) => row.id === seeded.ids[7]).map((row) => row.bubble_width),
+        ),
     );
     check(
         "own messages have no visible avatar or name",
@@ -442,9 +496,7 @@ async function visual_test(page: Page): Promise<void> {
     );
     check(
         "own names stay in the markup",
-        own_rows
-            .filter((row) => row.includes_sender)
-            .every((row) => row.name_text === "Desdemona"),
+        own_rows.filter((row) => row.includes_sender).every((row) => row.name_text === "Desdemona"),
         JSON.stringify(own_rows.map((row) => row.name_text)),
     );
     check(
@@ -472,7 +524,9 @@ async function visual_test(page: Page): Promise<void> {
     );
 
     const second_id = seeded.ids[1]!;
-    await page.hover(`.focused-message-list .message_row[data-message-id="${second_id}"] .message_content`);
+    await page.hover(
+        `.focused-message-list .message_row[data-message-id="${second_id}"] .message_content`,
+    );
     const hovered_visibility = await page.$eval(
         `.focused-message-list .message_row[data-message-id="${second_id}"] .message-time`,
         (time) => getComputedStyle(time).visibility,
@@ -491,7 +545,7 @@ async function visual_test(page: Page): Promise<void> {
     await api(page, "POST", `/json/messages/${seeded.ids[1]}/reactions`, "emoji_name=thumbs_up");
     await api(page, "POST", `/json/messages/${seeded.ids[3]}/reactions`, "emoji_name=heart");
     // Seeded messages are too old to edit, so send and edit a new one.
-    const sent_id = await page.evaluate(async (iago) => {
+    const sent = await page.evaluate(async (iago) => {
         const csrf_token =
             document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
             "";
@@ -503,8 +557,10 @@ async function visual_test(page: Page): Promise<void> {
             },
             body: `type=direct&to=${JSON.stringify([iago])}&content=A message to edit`,
         });
-        return ((await response.json()) as {id: number}).id;
+        const data: unknown = await response.json();
+        return data;
     }, seeded.iago);
+    const sent_id = z.object({id: z.number()}).parse(sent).id;
     await page.waitForSelector(`.focused-message-list .message_row[data-message-id="${sent_id}"]`);
     await api(page, "PATCH", `/json/messages/${sent_id}`, "content=An edited message");
     await page.waitForSelector(
@@ -523,7 +579,7 @@ async function visual_test(page: Page): Promise<void> {
     });
 
     // An uploaded image, from someone else and from oneself.
-    const image_message_id = await page.evaluate(async (iago) => {
+    const image_message = await page.evaluate(async (iago) => {
         const csrf_token =
             document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
             "";
@@ -547,7 +603,16 @@ async function visual_test(page: Page): Promise<void> {
             headers: {"X-CSRFToken": csrf_token},
             body: form,
         });
-        const {url} = (await upload.json()) as {url: string};
+        const upload_data: unknown = await upload.json();
+        if (
+            typeof upload_data !== "object" ||
+            upload_data === null ||
+            !("url" in upload_data) ||
+            typeof upload_data.url !== "string"
+        ) {
+            throw new TypeError("Expected the URL of the upload");
+        }
+        const {url} = upload_data;
         const response = await fetch("/json/messages", {
             method: "POST",
             headers: {
@@ -556,8 +621,10 @@ async function visual_test(page: Page): Promise<void> {
             },
             body: `type=direct&to=${JSON.stringify([iago])}&content=${encodeURIComponent(`[screenshot.png](${url})`)}`,
         });
-        return ((await response.json()) as {id: number}).id;
+        const data: unknown = await response.json();
+        return data;
     }, seeded.iago);
+    const image_message_id = z.object({id: z.number()}).parse(image_message).id;
     await page.waitForSelector(
         `.focused-message-list .message_row[data-message-id="${image_message_id}"] .message_content img`,
     );
@@ -644,8 +711,7 @@ async function visual_test(page: Page): Promise<void> {
         void request.continue();
     };
     page.on("request", hold_sends);
-    await page.click("#left_bar_compose_reply_button_big");
-    await page.waitForSelector("#compose-textarea", {visible: true});
+    await page.click("#compose-textarea");
     await page.type("#compose-textarea", "A message that will not go through");
     await page.click("#compose-send-button");
     await page.waitForSelector(".focused-message-list .message_row.locally-echoed");
@@ -661,7 +727,10 @@ async function visual_test(page: Page): Promise<void> {
     }));
     check(
         "a message being sent is faded and says Sending",
-        echo.notice !== "none" && echo.text === "Sending…" && echo.opacity === "0.6" && echo.time === "none",
+        echo.notice !== "none" &&
+            echo.text === "Sending…" &&
+            echo.opacity === "0.6" &&
+            echo.time === "none",
         JSON.stringify(echo),
     );
     const echo_id = await page.$eval(".focused-message-list .message_row.locally-echoed", (row) =>
@@ -671,15 +740,18 @@ async function visual_test(page: Page): Promise<void> {
 
     await held!.abort("failed");
     await page.waitForSelector(".focused-message-list .message_row .failed_message_action");
-    const failure = await page.$eval(".focused-message-list .message_row.locally-echoed", (row) => ({
-        notice: row.querySelector(".failed-message-notice")!.textContent?.trim(),
-        notice_shown: getComputedStyle(row.querySelector(".failed-message-notice")!).display,
-        labels: [...row.querySelectorAll(".failed-message-action-label")].map(
-            (label) => getComputedStyle(label).display !== "none" && label.textContent?.trim(),
-        ),
-        border: getComputedStyle(row.querySelector(".message_content")!).borderTopColor,
-        sending_shown: getComputedStyle(row.querySelector(".message-sending-notice")!).display,
-    }));
+    const failure = await page.$eval(
+        ".focused-message-list .message_row.locally-echoed",
+        (row) => ({
+            notice: row.querySelector(".failed-message-notice")!.textContent?.trim(),
+            notice_shown: getComputedStyle(row.querySelector(".failed-message-notice")!).display,
+            labels: [...row.querySelectorAll(".failed-message-action-label")].map(
+                (label) => getComputedStyle(label).display !== "none" && label.textContent?.trim(),
+            ),
+            border: getComputedStyle(row.querySelector(".message_content")!).borderTopColor,
+            sending_shown: getComputedStyle(row.querySelector(".message-sending-notice")!).display,
+        }),
+    );
     check(
         "a failed message says Not sent, with Retry and Delete",
         failure.notice === "Not sent." &&
@@ -694,7 +766,9 @@ async function visual_test(page: Page): Promise<void> {
     await page.setRequestInterception(false);
     await page.click(".focused-message-list .message_row .refresh-failed-message");
     await page.waitForFunction(
-        () => document.querySelectorAll(".focused-message-list .message_row.locally-echoed").length === 0,
+        () =>
+            document.querySelectorAll(".focused-message-list .message_row.locally-echoed")
+                .length === 0,
     );
     check("retrying sends the message", true);
 
@@ -722,18 +796,25 @@ async function visual_test(page: Page): Promise<void> {
     await shot_row(page, seeded.ids[1]!, "muted");
     await api(page, "DELETE", `/json/users/me/muted_users/${seeded.iago}`);
     await page.waitForFunction(
-        (selector: string) => !document.querySelector(selector)!.classList.contains("muted-message-sender"),
+        (selector: string) =>
+            !document.querySelector(selector)!.classList.contains("muted-message-sender"),
         {},
         row_selector(seeded.ids[1]!),
     );
     await shot_list(page, "states-light");
 
-    await set_setting(page, "color_scheme=2&twenty_four_hour_time=false&web_font_size_px=17&web_line_height_percent=150");
+    await set_setting(
+        page,
+        "color_scheme=2&twenty_four_hour_time=false&web_font_size_px=17&web_line_height_percent=150",
+    );
     await page.reload();
     await open_view(page, conversation);
     await shot_list(page, "dark-12h-17px");
 
-    await set_setting(page, "color_scheme=3&twenty_four_hour_time=true&web_font_size_px=15&web_line_height_percent=140");
+    await set_setting(
+        page,
+        "color_scheme=3&twenty_four_hour_time=true&web_font_size_px=15&web_line_height_percent=140",
+    );
     await page.setViewport({width: 480, height: 900});
     await page.reload();
     await open_view(page, conversation);
@@ -745,12 +826,17 @@ async function visual_test(page: Page): Promise<void> {
             const free = (row.bubble_left - row.row_left) / (row.row_right - row.row_left);
             return free >= 0.115 && (row.bubble_width < 300 || free < 0.14);
         }),
-        JSON.stringify(narrow_own.map((row) => (row.bubble_left - row.row_left) / (row.row_right - row.row_left))),
+        JSON.stringify(
+            narrow_own.map(
+                (row) => (row.bubble_left - row.row_left) / (row.row_right - row.row_left),
+            ),
+        ),
     );
-    const overflowing = await page.evaluate(() =>
-        [...document.querySelectorAll(".focused-message-list .messagebox-content")].filter(
-            (content) => content.scrollWidth > content.clientWidth + 1,
-        ).length,
+    const overflowing = await page.evaluate(
+        () =>
+            [...document.querySelectorAll(".focused-message-list .messagebox-content")].filter(
+                (content) => content.scrollWidth > content.clientWidth + 1,
+            ).length,
     );
     check("nothing overflows in a narrow window", overflowing === 0, String(overflowing));
     await shot_list(page, "narrow-480");
@@ -766,7 +852,21 @@ async function visual_test(page: Page): Promise<void> {
     check(
         "turning the setting off restores the classic series",
         JSON.stringify(classic_rows.map((row) => row.includes_sender)) ===
-            JSON.stringify([true, false, true, false, true, false, false, true, false, false, true, true, true]),
+            JSON.stringify([
+                true,
+                false,
+                true,
+                false,
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true,
+            ]),
         JSON.stringify(classic_rows.map((row) => row.includes_sender)),
     );
     await set_setting(page, "web_direct_message_bubbles=true");

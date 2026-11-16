@@ -72,6 +72,10 @@ def get_event_checker(event: dict[str, Any]) -> Callable[[str, dict[str, Any]], 
     if name == "Presence":
         name = "Modern" + name
 
+    # CalendarEvent is the name of the model of calendar events.
+    if name == "Calendar":
+        name = "CalendarChange"
+
     # And add the suffix.
     name = name + "Event"
 

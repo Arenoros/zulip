@@ -57,6 +57,9 @@ import * as views_util from "./views_util.ts";
 type DirectMessageContext = {
     conversation_key: string;
     is_direct: boolean;
+    // The chat of a calendar meeting, shown among direct messages.
+    meeting_chat_stream_id: number | undefined;
+    meeting_chat_name: string | undefined;
     rendered_dm_with_html: string;
     is_group: boolean;
     user_circle_class: string | false | undefined;
@@ -501,6 +504,8 @@ function format_dm(
     const context = {
         conversation_key: user_ids_string,
         is_direct: true,
+        meeting_chat_stream_id: undefined,
+        meeting_chat_name: undefined,
         rendered_dm_with_html,
         is_group: recipient_ids.length > 1,
         user_circle_class,
@@ -516,6 +521,67 @@ function format_dm(
     };
 
     return context;
+}
+
+function get_meeting_chat_key(stream_id: number): string {
+    return `meeting_chat_${stream_id}`;
+}
+
+function format_meeting_chat(
+    stream_id: number,
+    unread_count: number,
+    latest_msg_id: number,
+): DirectMessageContext {
+    const sub = sub_store.get(stream_id);
+    assert(sub !== undefined);
+    return {
+        conversation_key: get_meeting_chat_key(stream_id),
+        is_direct: true,
+        meeting_chat_stream_id: stream_id,
+        meeting_chat_name: sub.name,
+        rendered_dm_with_html: "",
+        is_group: true,
+        user_circle_class: false,
+        is_bot: false,
+        dm_url: hash_util.by_stream_topic_url(stream_id, ""),
+        user_ids_string: "",
+        unread_count,
+        is_hidden: !row_in_search_results(search_keyword, sub.name.toLowerCase()),
+        is_collapsed: collapsed_containers.has("inbox-dm-header"),
+        latest_msg_id,
+        column_indexes: COLUMNS,
+        has_unread_mention: unread.stream_has_any_unread_mentions(stream_id),
+    };
+}
+
+// Meeting chats are channels, but are shown among direct messages.
+function get_unread_meeting_chats(
+    unread_streams_dict: Map<number, Map<string, {topic_count: number; latest_msg_id: number}>>,
+): {
+    meeting_chats: Map<number, {count: number; latest_msg_id: number}>;
+    total_count: number;
+    has_unread_mention: boolean;
+} {
+    const meeting_chats = new Map<number, {count: number; latest_msg_id: number}>();
+    let total_count = 0;
+    let has_unread_mention = false;
+    for (const [stream_id, topic_dict] of unread_streams_dict) {
+        if (!stream_data.is_meeting_chat(stream_id)) {
+            continue;
+        }
+        let count = 0;
+        let latest_msg_id = -1;
+        for (const topic_info of topic_dict.values()) {
+            count += topic_info.topic_count;
+            latest_msg_id = Math.max(latest_msg_id, topic_info.latest_msg_id);
+        }
+        if (count > 0) {
+            meeting_chats.set(stream_id, {count, latest_msg_id});
+            total_count += count;
+            has_unread_mention ||= unread.stream_has_any_unread_mentions(stream_id);
+        }
+    }
+    return {meeting_chats, total_count, has_unread_mention};
 }
 
 function insert_dms(keys_to_insert: string[]): void {
@@ -982,16 +1048,19 @@ function reset_data(): {
     channel_folders_dict = new Map();
 
     const unread_dms = unread.get_unread_pm();
-    const unread_dms_count = unread_dms.total_count;
     const unread_dms_dict = unread_dms.pm_dict;
-    const has_unread_mention = unread.num_unread_mentions_in_dms() > 0;
 
     const unread_stream_message = unread.get_unread_topics();
     const unread_stream_msg_count = unread_stream_message.stream_unread_messages;
     const unread_streams_dict = unread_stream_message.topic_counts;
 
+    const unread_meeting_chats = get_unread_meeting_chats(unread_streams_dict);
+    const unread_dms_count = unread_dms.total_count + unread_meeting_chats.total_count;
+    const has_unread_mention =
+        unread.num_unread_mentions_in_dms() > 0 || unread_meeting_chats.has_unread_mention;
+
     let has_dms_post_filter = false;
-    if (unread_dms_count) {
+    if (unread_dms.total_count) {
         for (const [key, {count, latest_msg_id}] of unread_dms_dict) {
             if (count) {
                 const dm_data = format_dm(key, count, latest_msg_id);
@@ -1002,11 +1071,21 @@ function reset_data(): {
             }
         }
     }
+    for (const [stream_id, {count, latest_msg_id}] of unread_meeting_chats.meeting_chats) {
+        const dm_data = format_meeting_chat(stream_id, count, latest_msg_id);
+        dms_dict.set(dm_data.conversation_key, dm_data);
+        if (!dm_data.is_hidden) {
+            has_dms_post_filter = true;
+        }
+    }
     dms_dict = get_sorted_row_dict(dms_dict);
 
     let has_topics_post_filter = false;
     if (unread_stream_msg_count) {
         for (const [stream_id, topic_dict] of unread_streams_dict) {
+            if (stream_data.is_meeting_chat(stream_id)) {
+                continue;
+            }
             const stream_unread = unread.unread_count_info_for_stream(stream_id);
             const stream_unread_count = stream_unread.unmuted_count + stream_unread.muted_count;
             const stream_key = get_stream_key(stream_id);
@@ -1610,7 +1689,13 @@ function update_closed_compose_text($row: JQuery, is_header_row: boolean): void 
 
     let reply_recipient_information: compose_closed_ui.ReplyRecipientInformation;
     const is_dm = $row.parent("#inbox-direct-messages-container").length > 0;
-    if (is_dm) {
+    const meeting_chat_stream_id = $row.attr("data-meeting-chat-stream-id");
+    if (meeting_chat_stream_id !== undefined) {
+        reply_recipient_information = {
+            stream_id: Number(meeting_chat_stream_id),
+            topic: "",
+        };
+    } else if (is_dm) {
         const $recipients_info = $row.find(".recipients_info");
         const narrow_url = $recipients_info.attr("href");
         assert(narrow_url !== undefined);
@@ -1683,6 +1768,9 @@ export function get_focused_row_message(): {message?: Message | undefined} & (
         const row_info = dms_dict.get(conversation_key);
         assert(row_info !== undefined);
         const message = message_store.get(row_info.latest_msg_id);
+        if (message === undefined && row_info.meeting_chat_stream_id !== undefined) {
+            return {msg_type: "stream", stream_id: row_info.meeting_chat_stream_id, topic: ""};
+        }
         if (message === undefined) {
             return {
                 msg_type: "private",
@@ -1717,7 +1805,11 @@ export function toggle_topic_visibility_policy(): boolean {
     // need to move the focus as it is already on the correct row.
 
     const inbox_message = get_focused_row_message();
-    if (inbox_message.msg_type === "stream" && inbox_message.topic !== undefined) {
+    if (
+        inbox_message.msg_type === "stream" &&
+        inbox_message.topic !== undefined &&
+        !stream_data.is_meeting_chat(inbox_message.stream_id)
+    ) {
         user_topics_ui.toggle_topic_visibility_policy({
             stream_id: inbox_message.stream_id,
             topic: inbox_message.topic,
@@ -2067,12 +2159,15 @@ export function update_internal(): void {
     }
 
     const unread_dms = unread.get_unread_pm();
-    const unread_dms_count = unread_dms.total_count;
     const unread_dms_dict = unread_dms.pm_dict;
-    const has_unread_mention = unread.num_unread_mentions_in_dms() > 0;
 
     const unread_stream_message = unread.get_unread_topics();
     const unread_streams_dict = unread_stream_message.topic_counts;
+
+    const unread_meeting_chats = get_unread_meeting_chats(unread_streams_dict);
+    const unread_dms_count = unread_dms.total_count + unread_meeting_chats.total_count;
+    const has_unread_mention =
+        unread.num_unread_mentions_in_dms() > 0 || unread_meeting_chats.has_unread_mention;
 
     let has_dms_post_filter = false;
     const dm_keys_to_insert: string[] = [];
@@ -2094,6 +2189,25 @@ export function update_internal(): void {
         }
     }
 
+    for (const [stream_id, {count, latest_msg_id}] of unread_meeting_chats.meeting_chats) {
+        const new_dm_data = format_meeting_chat(stream_id, count, latest_msg_id);
+        const key = new_dm_data.conversation_key;
+        rerender_dm_inbox_row_if_needed(new_dm_data, dms_dict.get(key), dm_keys_to_insert);
+        dms_dict.set(key, new_dm_data);
+        if (!new_dm_data.is_hidden) {
+            has_dms_post_filter = true;
+        }
+    }
+    for (const [key, dm_data] of dms_dict) {
+        if (
+            dm_data.meeting_chat_stream_id !== undefined &&
+            !unread_meeting_chats.meeting_chats.has(dm_data.meeting_chat_stream_id)
+        ) {
+            dms_dict.delete(key);
+            get_row_from_conversation_key(key).remove();
+        }
+    }
+
     dms_dict = get_sorted_row_dict(dms_dict);
     insert_dms(dm_keys_to_insert);
 
@@ -2111,6 +2225,9 @@ export function update_internal(): void {
 
     let has_topics_post_filter = false;
     for (const [stream_id, topic_dict] of unread_streams_dict) {
+        if (stream_data.is_meeting_chat(stream_id)) {
+            continue;
+        }
         const stream_unread = unread.unread_count_info_for_stream(stream_id);
         const stream_unread_count = stream_unread.unmuted_count + stream_unread.muted_count;
         const stream_key = get_stream_key(stream_id);

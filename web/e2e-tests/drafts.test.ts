@@ -52,17 +52,18 @@ async function test_restore_stream_message_draft_by_opening_compose_box(page: Pa
     const wait_for_change = true;
     await common.get_current_msg_list_id(page, wait_for_change);
 
-    await page.waitForSelector("#left_bar_compose_reply_button_big", {visible: true});
-    await page.click("#left_bar_compose_reply_button_big");
-    await page.waitForSelector("#send_message_form", {visible: true});
+    // A topic has its compose box always open, with its draft.
+    await page.waitForSelector("#compose.compose-for-view #send_message_form", {visible: true});
 
     await common.check_compose_state(page, {
         stream_name: "Denmark",
         topic: "tests",
         content: "Test stream message. ",
     });
-    await page.click("#compose_close");
-    await page.waitForSelector("#send_message_form", {visible: false});
+
+    // Leaving the topic keeps the draft, and closes the compose box.
+    await page.click("#left-sidebar-navigation-list .top_left_all_messages");
+    await page.waitForSelector("#compose-textarea", {hidden: true});
 }
 
 async function create_private_message_draft(page: Page): Promise<void> {
@@ -75,15 +76,12 @@ async function create_private_message_draft(page: Page): Promise<void> {
 }
 
 async function test_restore_private_message_draft_by_opening_composebox(page: Page): Promise<void> {
-    await page.waitForSelector("#left_bar_compose_reply_button_big", {visible: true});
-    await page.click("#left_bar_compose_reply_button_big");
-    await page.waitForSelector("#private_message_recipient", {visible: true});
+    // The conversation gets its compose box back, with the draft.
+    await page.waitForSelector("#compose.compose-for-view #send_message_form", {visible: true});
 
     await common.check_form_contents(page, "form#send_message_form", {
         content: "Test direct message. ",
     });
-    await page.click("#compose_close");
-    await page.waitForSelector("#private_message_recipient", {visible: false});
 }
 
 async function open_compose_markdown_preview(page: Page): Promise<void> {
@@ -147,7 +145,8 @@ async function test_restore_message_draft_via_draft_overlay(page: Page): Promise
     console.log("Restoring stream message draft");
     await page.click("#drafts_table .message_row:not(.private-message) .restore-overlay-message");
     await wait_for_drafts_to_disappear(page);
-    await page.waitForSelector("#stream_message_recipient_topic", {visible: true});
+    // The draft opens in the compose box of its topic.
+    await page.waitForSelector("#compose.compose-for-view #send_message_form", {visible: true});
     await page.waitForSelector("#preview_message_area", {hidden: true});
     await common.check_compose_state(page, {
         stream_name: "Denmark",
@@ -162,10 +161,13 @@ async function test_restore_message_draft_via_draft_overlay(page: Page): Promise
 }
 
 async function edit_stream_message_draft(page: Page): Promise<void> {
-    await common.select_stream_in_compose_via_dropdown(page, "Denmark");
     await common.fill_form(page, "form#send_message_form", {
         content: "Updated stream message",
     });
+    // Leaving the topic keeps what was typed in the compose box, which
+    // closing saves as the draft.
+    await page.click("#left-sidebar-navigation-list .top_left_all_messages");
+    await page.waitForSelector("#compose_close", {visible: true});
     await page.click("#compose_close");
 }
 
@@ -201,7 +203,8 @@ async function test_restore_private_message_draft_via_draft_overlay(page: Page):
     console.log("Restoring direct message draft.");
     await page.click(".message_row.private-message .restore-overlay-message");
     await wait_for_drafts_to_disappear(page);
-    await page.waitForSelector("#compose-direct-recipient", {visible: true});
+    // The draft opens in the compose box of its conversation.
+    await page.waitForSelector("#compose.compose-for-view #send_message_form", {visible: true});
     await common.check_compose_state(page, {
         content: "Test direct message.",
     });
@@ -219,7 +222,13 @@ async function test_restore_private_message_draft_via_draft_overlay(page: Page):
         "Cordelia, Lear's daughter and King Hamlet - Zulip Dev - Zulip",
         "Didn't narrow to the direct messages with cordelia and hamlet",
     );
+    // Leaving the conversation keeps what was restored in the compose
+    // box, which closing saves as the draft again. Starred messages are
+    // a view with an empty feed, as the conversation was.
+    await page.click("#left-sidebar-navigation-list .top_left_starred_messages");
+    await page.waitForSelector("#compose_close", {visible: true});
     await page.click("#compose_close");
+    await page.waitForSelector("#compose-textarea", {hidden: true});
 }
 
 async function test_delete_draft(page: Page): Promise<void> {
@@ -246,9 +255,8 @@ async function test_save_draft_by_reloading(page: Page): Promise<void> {
     await common.pm_recipient.set(page, "cordelia@zulip.com");
     await page.reload();
 
-    // Reloading into a direct messages narrow opens compose box.
-    await page.waitForSelector("#compose-textarea", {visible: true});
-    await page.click("#compose_close");
+    // Reloading into starred messages leaves the compose box closed.
+    await page.waitForSelector("#compose-textarea", {hidden: true});
 
     console.log("Reloading finished. Opening drafts again now.");
     await page.waitForSelector(drafts_button, {visible: true});
@@ -280,8 +288,9 @@ async function test_delete_draft_on_clearing_text(page: Page): Promise<void> {
     await wait_for_drafts_to_disappear(page);
     await page.waitForSelector("#send_message_form", {visible: true});
     await common.fill_form(page, "form#send_message_form", {content: ""});
-    await page.click("#compose_close");
-    await page.waitForSelector("#send_message_form", {hidden: true});
+    // Leaving the topic with an empty compose box closes it.
+    await page.click("#left-sidebar-navigation-list .top_left_all_messages");
+    await page.waitForSelector("#compose-textarea", {hidden: true});
     await page.click(drafts_button);
     await wait_for_drafts_to_appear(page);
     const drafts_count = await get_drafts_count(page);
@@ -313,6 +322,9 @@ async function drafts_test(page: Page): Promise<void> {
     await page.click("#compose_close");
     await test_restore_private_message_draft_by_opening_composebox(page);
 
+    // Go back to a view where the compose box starts off closed.
+    await page.click("#left-sidebar-navigation-list .top_left_all_messages");
+    await page.waitForSelector("#compose-textarea", {hidden: true});
     await open_drafts_after_markdown_preview(page);
     await test_previously_created_drafts_rendered(page);
 

@@ -277,6 +277,20 @@ run_test("recipient_label_text_for_call_creation", () => {
         })?.label_text,
         `#stream test > translated: ${REALM_EMPTY_TOPIC_DISPLAY_NAME}`,
     );
+
+    // The chat of a calendar meeting is named like a group chat.
+    const meeting_chat = make_stream({
+        subscribed: true,
+        name: "Weekly sync",
+        stream_id: 12,
+        is_meeting_chat: true,
+    });
+    stream_data.add_sub_for_tests(meeting_chat);
+    assert.deepEqual(compose_closed_ui.get_recipient_label({stream_id: 12, topic: ""}), {
+        label_text: "Weekly sync",
+        is_meeting_chat: true,
+        stream: meeting_chat,
+    });
 });
 
 run_test("update_reply_button_state", ({override, override_rewire}) => {

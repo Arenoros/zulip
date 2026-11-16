@@ -114,6 +114,26 @@ export function is_full_size(): boolean {
     return full_size_status;
 }
 
+// In formatting mode, the compose box of a single conversation shows
+// the formatting toolbar above a taller message field, where Enter
+// starts a new line.
+let formatting_mode = false;
+
+export function set_formatting_mode(on: boolean): void {
+    if (!on && is_expanded()) {
+        make_compose_box_original_size();
+    }
+    formatting_mode = on;
+    $("#compose").toggleClass("formatting-mode", on);
+    $("#compose .compose-formatting-mode-button")
+        .attr("aria-pressed", String(on))
+        .toggleClass("compose-row-button-active", on);
+}
+
+export function is_formatting_mode(): boolean {
+    return formatting_mode;
+}
+
 export let autosize_textarea = ($textarea: JQuery<HTMLTextAreaElement>): void => {
     // Since this supports both compose and file upload, one must pass
     // in the text area to autosize.
@@ -433,6 +453,14 @@ export function compute_placeholder_text(opts: ComposePlaceholderOptions): strin
         let stream_name = "";
         if (opts.stream_id !== undefined) {
             const stream = stream_data.get_sub_by_id(opts.stream_id);
+            if (stream?.is_meeting_chat) {
+                // The chat of a calendar meeting is named like a
+                // group chat.
+                return $t(
+                    {defaultMessage: "Message {recipient_names}"},
+                    {recipient_names: stream.name},
+                );
+            }
             if (stream !== undefined) {
                 stream_name = stream.name;
             }

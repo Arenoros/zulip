@@ -1,0 +1,11 @@
+{{#each suggestions}}
+    <button type="button" class="calendar-form-suggestion {{#if is_selected}}selected{{/if}}" data-minute="{{minute}}" aria-pressed="{{#if is_selected}}true{{else}}false{{/if}}">
+        <i class="zulip-icon zulip-icon-{{#if ../is_recurring}}refresh-cw{{else}}calendar{{/if}}" aria-hidden="true"></i>
+        <span class="calendar-form-suggestion-day">{{../day_label}}</span>
+        <span class="calendar-form-suggestion-time">{{time_label}}</span>
+        <span class="calendar-form-suggestion-free {{#if is_everyone_free}}everyone-free{{/if}}">
+            <i class="zulip-icon zulip-icon-users" aria-hidden="true"></i>
+            {{free_label}}
+        </span>
+    </button>
+{{/each}}

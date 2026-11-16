@@ -843,33 +843,187 @@
     }
 }
 
-/* Message-editing styles */
-.message-edit-buttons-and-timer {
-    margin-top: 5px;
-    display: flex;
-    gap: 5px;
-    /* Allow items to occupy full height.
-       This is especially important for
-       buttons that are flex items. */
-    align-items: stretch;
+/* Message-editing styles. The edit form is a row, like the compose
+   box of a conversation, with its buttons and formatting mode; see
+   compose_row.css. Sizes are in em at the 15px font size of the
+   design. */
+.message_edit_form {
+    container: message-edit-form / inline-size;
+    margin-bottom: 10px;
+    cursor: default;
+
+    .edit-form {
+        /* Override Bootstrap. */
+        margin-bottom: 0;
+    }
+
+    .message-edit-field {
+        display: grid;
+        grid-template:
+            "message-edit-content message-edit-row-buttons message-edit-controls"
+            auto / minmax(0, 1fr) auto auto;
+        align-items: end;
+        /* 44px; 0 6px 0 14px */
+        min-height: 2.9333em;
+        padding: 0 0.4em 0 0.9333em;
+        box-sizing: border-box;
+        background-color: var(--color-background-compose-field);
+        border: 1px solid var(--color-border-compose-field);
+        border-radius: 8px;
+
+        /* The design's 2px bottom border in the accent color, drawn
+           without moving the content. */
+        &:focus-within {
+            border-bottom-color: var(--color-border-compose-field-focus);
+            box-shadow: inset 0 -1px 0 var(--color-border-compose-field-focus);
+        }
+    }
+
+    .edit-content-container {
+        grid-area: message-edit-content;
+        display: grid;
+        grid-template-areas: "message-edit-content";
+    }
+
+    .message-edit-textbox {
+        /* Setting `position:relative` on this container ensures that .copy-button
+           (a possible immediate child with `position: absolute`) is positioned
+           relative to this container instead of <html>. */
+        position: relative;
+        grid-area: message-edit-content;
+    }
+
+    .message_edit_content,
+    .preview_message_area {
+        box-sizing: border-box;
+        /* 10px 0 */
+        padding: 0.6667em 0;
+    }
+
+    .preview_message_area {
+        max-height: var(--max-message-edit-height);
+        grid-area: message-edit-content;
+    }
+
+    .message-edit-row-buttons,
+    .message-edit-buttons-and-timer {
+        display: flex;
+        align-items: center;
+        /* Centers the 32px buttons in the 44px row. */
+        padding-bottom: 0.4em;
+    }
+
+    .message-edit-row-buttons {
+        grid-area: message-edit-row-buttons;
+        gap: 0.1333em;
+    }
+
+    .message-edit-buttons-and-timer {
+        grid-area: message-edit-controls;
+        /* 4px */
+        gap: 0.2667em;
+    }
+
+    .message-edit-feature-group {
+        display: none;
+    }
+
+    &.formatting-mode {
+        .message-edit-field {
+            grid-template:
+                "message-edit-toolbar message-edit-toolbar message-edit-toolbar"
+                auto
+                "message-edit-content message-edit-content message-edit-content"
+                minmax(0, 1fr)
+                ". message-edit-row-buttons message-edit-controls"
+                auto / minmax(0, 1fr) auto auto;
+            padding: 0;
+        }
+
+        .message-edit-feature-group {
+            grid-area: message-edit-toolbar;
+            display: flex;
+            align-items: flex-start;
+            /* 6px 6px 2px 10px */
+            padding: 0.4em 0.4em 0.1333em 0.6667em;
+
+            .formatting-control-scroller-button {
+                display: none;
+            }
+        }
+
+        .message_edit_content,
+        .preview_message_area {
+            /* 8px 14px */
+            padding: 0.5333em 0.9333em;
+        }
+
+        .message_edit_content {
+            /* 140px */
+            min-height: 9.3333em;
+            max-height: var(--max-message-edit-height);
+        }
+
+        .message-edit-row-buttons,
+        .message-edit-buttons-and-timer {
+            /* 2px 6px 6px */
+            padding: 0.1333em 0 0.4em;
+        }
+
+        .message-edit-buttons-and-timer {
+            padding-right: 0.4em;
+        }
+    }
+
+    /* In a narrow form, the buttons go below the message, and the time
+       left to edit above the buttons to cancel or save. */
+    @container message-edit-form (width < 32em) {
+        .message-edit-field,
+        &.formatting-mode .message-edit-field {
+            grid-template:
+                "message-edit-toolbar message-edit-toolbar"
+                auto
+                "message-edit-content message-edit-content"
+                minmax(0, 1fr)
+                "message-edit-row-buttons message-edit-controls"
+                auto / auto minmax(0, 1fr);
+        }
+
+        .message-edit-field {
+            padding: 0 0.4em 0 0.9333em;
+        }
+
+        &.formatting-mode .message-edit-field {
+            padding: 0;
+        }
+
+        .message-edit-buttons-and-timer {
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .message-edit-timer {
+            flex-basis: 100%;
+            text-align: right;
+        }
+    }
 }
 
 .message-actions-button {
     box-sizing: border-box;
-    align-self: stretch;
     /* Display the actions buttons as
        flex containers for positioning
        text and spinners. */
     display: flex;
     align-items: center;
     justify-content: center;
-    /* 28px at 16px/1em, per Vlad's spec. */
-    height: 1.75em;
+    /* 32px, as the buttons of the row. */
+    height: 2.1333em;
     /* 65px at 16px/1em, which is the width of
        the Cancel button. */
     min-width: 4.0625em;
     padding: 0 10px;
-    border-radius: 4px;
+    border-radius: 6px;
     border: 0;
     line-height: 1;
     font-family: inherit;
@@ -914,23 +1068,7 @@
 }
 
 .edit-content-container {
-    border-radius: 4px;
-    border: 1px solid var(--color-message-content-container-border);
-    transition: border-color 0.2s ease;
-    display: grid;
-    grid-template-areas: "message-edit-content";
-
-    &:has(.message_edit_content:focus) {
-        border-color: var(--color-message-content-container-border-focus);
-    }
-
     .message-edit-textbox {
-        /* Setting `position:relative` on this container ensures that .copy-button
-           (a possible immediate child with `position: absolute`) is positioned
-           relative to this container instead of <html>. */
-        position: relative;
-        grid-area: message-edit-content;
-
         .textarea-over-limit {
             background-color: var(
                 --color-compose-message-content-background-over-limit
@@ -946,21 +1084,16 @@
 }
 
 .message_edit_content {
-    max-height: var(--max-message-edit-height);
+    /* Six lines at most, before the message scrolls; formatting mode
+       allows more. */
+    max-height: calc(6em * var(--base-line-height-unitless) + 1.3333em);
     width: 100%;
-    min-width: 206px;
-    min-height: 52px;
-    box-sizing: border-box;
+    min-width: 0;
     color: var(--color-text-default);
-    background-color: var(--background-color-textarea);
-    /* Flatten the bottom edge of the textarea to
-    merge with the flat top edge of the buttons row */
-    border-radius: 3px 3px 0 0;
+    background-color: transparent;
+    border-radius: 0;
     vertical-align: middle;
     border: none;
-    /* Match textarea padding to compose box and
-       message-edit preview area. */
-    padding: 5px 5px 0;
     margin: 0;
 
     box-shadow: none;
@@ -968,13 +1101,10 @@
     font-size: 1em;
     line-height: var(--base-line-height-unitless);
     font-family: inherit;
+    resize: none;
 
     &:focus {
         outline: 0;
-    }
-
-    &:read-write {
-        resize: vertical !important;
     }
 
     &:read-only,
@@ -1048,20 +1178,9 @@
     /* Center vertically relative to
        buttons. */
     align-self: center;
-    /* Use flexbox to position to far right of
-       the Save and Cancel buttons. */
-    margin-left: auto;
-}
-
-.message-edit-feature-group {
-    border-radius: 0 0 3px 3px;
-    background-color: var(--color-message-formatting-controls-container);
-    /* margin on either side to let the border of
-       .edit-content-container show through. */
-    margin: 0 1px;
-    /* Display before Save/Cancel visually, even though
-       it comes after them in the DOM (for Tab order). */
-    order: -1;
+    /* 13px at 15px/1em */
+    font-size: 0.8667em;
+    white-space: nowrap;
 }
 
 .message_edit_save .loader {
@@ -1090,41 +1209,8 @@
     z-index: 0;
 }
 
-.edit-controls {
-    .button-wrapper {
-        cursor: not-allowed;
-    }
-}
-
 .message-edit-button-disabled {
     pointer-events: none;
-}
-
-/* Reduce some of the heavy padding from Bootstrap. */
-.message_edit_form {
-    margin-bottom: 10px;
-    cursor: default;
-
-    .edit-form {
-        /* Override Bootstrap. */
-        margin-bottom: 0;
-    }
-
-    .edit-controls {
-        /* Use flex column layout so that we can use `order`
-           to keep the formatting buttons row visually above
-           the Save/Cancel buttons, while the DOM order has
-           Save/Cancel first for correct Tab key navigation. */
-        display: flex;
-        flex-direction: column;
-        margin-left: 0;
-        margin-top: 0;
-    }
-
-    .preview_message_area {
-        max-height: var(--max-message-edit-height);
-        grid-area: message-edit-content;
-    }
 }
 
 .message_edit_notice {

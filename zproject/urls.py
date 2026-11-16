@@ -38,6 +38,29 @@ from zerver.views.auth import (
     start_social_login,
     start_social_signup,
 )
+from zerver.views.calendar import (
+    add_calendar_attendees_backend,
+    create_calendar_event_backend,
+    create_calendar_room_backend,
+    delete_calendar_event,
+    get_calendar_event_backend,
+    get_calendar_events,
+    get_calendar_free_busy,
+    get_calendar_pinned_users,
+    get_calendar_rooms_backend,
+    get_calendar_settings,
+    get_or_create_calendar_event_chat_backend,
+    join_calendar_event_call_backend,
+    meet_calendar_event,
+    pin_calendar_user,
+    respond_to_calendar_event_backend,
+    unpin_calendar_user,
+    update_calendar_event_backend,
+    update_calendar_personal_settings,
+    update_calendar_pinned_user,
+    update_calendar_room_backend,
+    update_calendar_settings,
+)
 from zerver.views.channel_folders import (
     create_channel_folder,
     get_channel_folders,
@@ -76,7 +99,11 @@ from zerver.views.message_edit import (
     json_fetch_raw_message,
     update_message_backend,
 )
-from zerver.views.message_fetch import get_messages_backend, messages_in_narrow_backend
+from zerver.views.message_fetch import (
+    get_message_count_backend,
+    get_messages_backend,
+    messages_in_narrow_backend,
+)
 from zerver.views.message_flags import (
     mark_all_as_read,
     mark_stream_as_read,
@@ -404,6 +431,43 @@ v1_api_and_json_patterns = [
         PATCH=update_navigation_view,
         DELETE=remove_navigation_view,
     ),
+    # calendar -> zerver.views.calendar
+    rest_path("calendar/events", GET=get_calendar_events, POST=create_calendar_event_backend),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>",
+        GET=get_calendar_event_backend,
+        PATCH=update_calendar_event_backend,
+        DELETE=delete_calendar_event,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/response",
+        POST=respond_to_calendar_event_backend,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/attendees", POST=add_calendar_attendees_backend
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/chat",
+        POST=get_or_create_calendar_event_chat_backend,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/call",
+        POST=join_calendar_event_call_backend,
+    ),
+    rest_path(
+        "calendar/events/<int:calendar_event_id>/personal_settings",
+        PATCH=update_calendar_personal_settings,
+    ),
+    rest_path("calendar/free_busy", GET=get_calendar_free_busy),
+    rest_path("calendar/pinned_users", GET=get_calendar_pinned_users, POST=pin_calendar_user),
+    rest_path(
+        "calendar/pinned_users/<int:user_id>",
+        PATCH=update_calendar_pinned_user,
+        DELETE=unpin_calendar_user,
+    ),
+    rest_path("calendar/settings", GET=get_calendar_settings, PATCH=update_calendar_settings),
+    rest_path("calendar/rooms", GET=get_calendar_rooms_backend, POST=create_calendar_room_backend),
+    rest_path("calendar/rooms/<int:room_id>", PATCH=update_calendar_room_backend),
     # saved_snippets -> zerver.views.saved_snippets
     rest_path("saved_snippets", GET=get_saved_snippets, POST=create_saved_snippet),
     rest_path(
@@ -450,6 +514,7 @@ v1_api_and_json_patterns = [
     rest_path("messages/flags/narrow", POST=update_message_flags_for_narrow),
     rest_path("messages/<int:message_id>/history", GET=get_message_edit_history),
     rest_path("messages/matches_narrow", GET=messages_in_narrow_backend),
+    rest_path("messages/count", GET=get_message_count_backend),
     rest_path("users/me/subscriptions/properties", POST=update_subscription_properties_backend),
     rest_path("users/me/subscriptions/<int:stream_id>", PATCH=update_subscriptions_property),
     rest_path("submessage", POST=process_submessage),
@@ -767,6 +832,7 @@ i18n_urls = [
     path("calls/bigbluebutton/join", join_bigbluebutton),
     # Used to join a LiveKit video call
     path("calls/livekit/join", join_livekit_call),
+    path("meet/<str:meet_code>", meet_calendar_event),
     path("calls/livekit/webhook", livekit_webhook),
     # Integrations documentation
     path(

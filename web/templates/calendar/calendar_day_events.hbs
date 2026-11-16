@@ -1,0 +1,11 @@
+{{#each events}}
+    <button type="button" class="calendar-event calendar-timed-event {{class_names}}" data-css-calendar-event-top="{{top}}" data-css-calendar-event-height="{{height}}" data-css-calendar-event-left="{{left}}" data-css-calendar-event-width="{{width}}" {{#if category_color}}data-css-calendar-event-bar-color="{{category_color}}"{{/if}} aria-label="{{label}}" {{#if has_card}}data-event-id="{{event_id}}" data-original-start="{{original_start}}" aria-haspopup="dialog"{{/if}}>
+        <span class="calendar-event-title">{{title}}</span>
+        {{#if organizer_name}}
+            <span class="calendar-event-organizer">{{organizer_name}}</span>
+        {{/if}}
+        {{#if is_recurring}}
+            <i class="zulip-icon zulip-icon-refresh-cw calendar-event-series-icon" aria-hidden="true"></i>
+        {{/if}}
+    </button>
+{{/each}}

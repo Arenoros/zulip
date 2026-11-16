@@ -1,0 +1,18 @@
+<form class="meeting-room-form modal-form">
+    <div class="input-group">
+        <label for="meeting-room-name" class="modal-field-label">{{t "Name" }}</label>
+        <input type="text" autocomplete="off" id="meeting-room-name" class="modal_text_input" name="name" maxlength="60" value="{{name}}" />
+    </div>
+    <div class="input-group">
+        <label for="meeting-room-capacity" class="modal-field-label">{{t "Capacity" }}</label>
+        <input type="number" autocomplete="off" id="meeting-room-capacity" class="modal_text_input" name="capacity" min="1" value="{{capacity}}" />
+    </div>
+    <div class="input-group">
+        <label for="meeting-room-location" class="modal-field-label">{{t "Location" }}</label>
+        <input type="text" autocomplete="off" id="meeting-room-location" class="modal_text_input" name="location" maxlength="255" placeholder="{{t 'Building, floor' }}" value="{{location}}" />
+    </div>
+    <div class="input-group">
+        <label for="meeting-room-email" class="modal-field-label">{{t "Exchange mailbox" }}</label>
+        <input type="email" autocomplete="off" id="meeting-room-email" class="modal_text_input" name="email" maxlength="254" value="{{email}}" />
+    </div>
+</form>

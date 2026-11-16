@@ -8,6 +8,7 @@ import * as activity_ui from "./activity_ui.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
 import * as bubble_layout from "./bubble_layout.ts";
+import * as calendar_ui from "./calendar_ui.ts";
 import * as channel from "./channel.ts";
 import * as compose_actions from "./compose_actions.ts";
 import type {NarrowActivateOpts} from "./compose_actions.ts";
@@ -58,6 +59,7 @@ import * as resize from "./resize.ts";
 import * as rows from "./rows.ts";
 import * as scheduled_messages_feed_ui from "./scheduled_messages_feed_ui.ts";
 import * as scroll_to_bottom_button from "./scroll_to_bottom_button.ts";
+import * as search_filters from "./search_filters.ts";
 import {
     message_edit_history_visibility_policy_values,
     web_mark_read_on_scroll_policy_values,
@@ -329,6 +331,10 @@ function handle_post_message_list_change(
     then_select_offset: number | undefined,
     anchored_for_date?: boolean,
 ): void {
+    // Before rendering the list, so that positioning the selected
+    // message accounts for the search filters above the feed.
+    search_filters.handle_narrow_activated(msg_list.data.filter);
+
     // Important: We need to consider opening the compose box
     // before calling render_message_list_with_selected_message, so that the logic in
     // recenter_view for positioning the currently selected
@@ -759,6 +765,7 @@ export let show = (raw_terms: NarrowTerm[], show_opts: ShowMessageViewOpts): voi
         } else if (coming_from_inbox) {
             inbox_ui.hide();
         }
+        calendar_ui.hide();
 
         blueslip.debug("Narrowed", {
             operators: terms.map((e) => e.operator),

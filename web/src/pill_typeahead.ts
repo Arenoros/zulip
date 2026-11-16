@@ -36,9 +36,11 @@ export function set_up_user(
     pills: UserPillWidget,
     opts: {
         exclude_bots?: boolean;
+        exclude_user_ids?: number[];
     },
 ): void {
     const exclude_bots = opts.exclude_bots;
+    const exclude_user_ids = new Set(opts.exclude_user_ids);
     const bootstrap_typeahead_input: TypeaheadInputElement = {
         $element: $input,
         type: "contenteditable",
@@ -46,7 +48,9 @@ export function set_up_user(
     new Typeahead(bootstrap_typeahead_input, {
         dropup: true,
         source(_query: string): UserPillData[] {
-            return user_pill.typeahead_source(pills, exclude_bots);
+            return user_pill
+                .typeahead_source(pills, exclude_bots)
+                .filter((item) => !exclude_user_ids.has(item.user.user_id));
         },
         item_html(_query: string): (item: UserPillData) => string {
             return (item: UserPillData) => typeahead_helper.render_person(item);

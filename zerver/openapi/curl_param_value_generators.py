@@ -20,10 +20,14 @@ from zerver.actions.realm_domains import do_add_realm_domain
 from zerver.actions.realm_linkifiers import do_add_linkifier
 from zerver.actions.realm_playgrounds import check_add_realm_playground
 from zerver.lib.bot_storage import set_bot_storage
+from zerver.lib.calendar.changes import create_calendar_event
+from zerver.lib.calendar.rooms import create_calendar_room
+from zerver.lib.calendar.user_settings import pin_user
 from zerver.lib.events import do_events_register
 from zerver.lib.initial_password import initial_password
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.test_helpers import read_test_image_file
+from zerver.lib.timestamp import timestamp_to_datetime
 from zerver.lib.types import ProfileFieldData
 from zerver.lib.upload import upload_message_attachment
 from zerver.models import Client, CustomProfileField, Message, NamedUserGroup, UserPresence
@@ -561,3 +565,84 @@ def delete_realm_export() -> dict[str, object]:
         export_path="/dummy",
     )
     return {"export_id": export.id}
+
+
+def create_weekly_calendar_event(organizer: UserProfile, attendees: list[UserProfile]) -> int:
+    # Starts at the documented example of `occurrence`, so that it is
+    # an occurrence of the event.
+    return create_calendar_event(
+        organizer,
+        title="Planning",
+        start=timestamp_to_datetime(1763276400),
+        end=timestamp_to_datetime(1763278200),
+        event_timezone="Europe/Moscow",
+        rrule="FREQ=WEEKLY",
+        required_attendees=attendees,
+        optional_attendees=[],
+    )
+
+
+def create_example_calendar_room(name: str) -> int:
+    return create_calendar_room(
+        helpers.example_user("iago").realm, name=name, capacity=4, location="", email=""
+    )
+
+
+@openapi_param_value_generator(["/calendar/events:post"])
+def calendar_event_room_ids() -> dict[str, object]:
+    return {"room_ids": [create_example_calendar_room("Attic")]}
+
+
+@openapi_param_value_generator(["/calendar/free_busy:get"])
+def calendar_free_busy_room_ids() -> dict[str, object]:
+    return {"room_ids": [create_example_calendar_room("Library")]}
+
+
+@openapi_param_value_generator(["/calendar/events/{calendar_event_id}:patch"])
+def iago_calendar_event_id_and_room_ids() -> dict[str, object]:
+    event_id = create_weekly_calendar_event(helpers.example_user("iago"), [])
+    return {"calendar_event_id": event_id, "room_ids": [create_example_calendar_room("Den")]}
+
+
+@openapi_param_value_generator(
+    [
+        "/calendar/events/{calendar_event_id}:get",
+        "/calendar/events/{calendar_event_id}:delete",
+        "/calendar/events/{calendar_event_id}/attendees:post",
+        "/calendar/events/{calendar_event_id}/chat:post",
+        "/calendar/events/{calendar_event_id}/personal_settings:patch",
+    ]
+)
+def iago_calendar_event_id() -> dict[str, object]:
+    event_id = create_weekly_calendar_event(helpers.example_user("iago"), [])
+    return {"calendar_event_id": event_id}
+
+
+@openapi_param_value_generator(["/calendar/events/{calendar_event_id}/response:post"])
+def calendar_event_id_inviting_iago() -> dict[str, object]:
+    # The organizer cannot respond to their own event.
+    event_id = create_weekly_calendar_event(
+        helpers.example_user("hamlet"), [helpers.example_user("iago")]
+    )
+    return {"calendar_event_id": event_id}
+
+
+@openapi_param_value_generator(["/calendar/pinned_users/{user_id}:patch"])
+def update_calendar_pinned_user() -> dict[str, object]:
+    othello = helpers.example_user("othello")
+    pin_user(helpers.example_user("iago"), othello, "#4f7cff")
+    return {"user_id": othello.id}
+
+
+@openapi_param_value_generator(["/calendar/pinned_users/{user_id}:delete"])
+def unpin_calendar_user() -> dict[str, object]:
+    cordelia = helpers.example_user("cordelia")
+    pin_user(helpers.example_user("iago"), cordelia, "#4f7cff")
+    return {"user_id": cordelia.id}
+
+
+@openapi_param_value_generator(["/calendar/rooms/{room_id}:patch"])
+def update_calendar_room() -> dict[str, object]:
+    # Renamed to a name other than that of the room the example of
+    # POST /calendar/rooms adds.
+    return {"room_id": create_example_calendar_room("Small room"), "name": "Large room"}

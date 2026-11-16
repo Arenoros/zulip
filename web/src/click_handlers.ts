@@ -403,6 +403,16 @@ export function initialize(): void {
         },
     );
 
+    $("body").on(
+        "click",
+        ".message_edit_form .compose-formatting-mode-button",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            message_edit.toggle_formatting_mode($(this));
+        },
+    );
+
     $("body").on("click", ".message_edit_form .markdown_preview", function (this: HTMLElement, e) {
         e.preventDefault();
         message_edit.show_preview_area($(this));
@@ -511,7 +521,10 @@ export function initialize(): void {
         e.stopPropagation();
 
         assert(message_lists.current !== undefined);
-        if ($(this).hasClass("recipient_row_date")) {
+        if (
+            $(this).hasClass("recipient_row_date") ||
+            $(this).closest(".conversation-fragment-date-divider").length > 0
+        ) {
             const $recipient_row = $(this).closest(".recipient_row");
             const message_id = rows.id_for_recipient_row($recipient_row);
             open_scroll_to_time_popover(this, message_id);
@@ -962,9 +975,13 @@ export function initialize(): void {
 
     $("body").on("click", "#compose-content", handle_compose_click);
 
-    $("body").on("click", "#compose_close, #new-conversation-cancel", () => {
-        compose_actions.cancel();
-    });
+    $("body").on(
+        "click",
+        "#compose_close, .new-conversation-form-close, .compose-reply-line-close",
+        () => {
+            compose_actions.cancel();
+        },
+    );
 
     $("body").on(
         "focus",

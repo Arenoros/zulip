@@ -1,0 +1,35 @@
+<div class="popover-menu calendar-menu" id="calendar-view-menu" data-simplebar data-simplebar-tab-index="-1">
+    <ul role="menu" class="popover-menu-list">
+        {{#each views}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitemradio" tabindex="0" class="popover-menu-link calendar-view-option" data-calendar-view="{{view}}" aria-checked="{{#if is_current}}true{{else}}false{{/if}}">
+                    <i class="popover-menu-icon zulip-icon {{#if is_current}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                    <span class="popover-menu-label">{{label}}</span>
+                </a>
+            </li>
+        {{/each}}
+        <li role="separator" class="popover-menu-separator"></li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitemcheckbox" tabindex="0" class="popover-menu-link calendar-side-by-side-option" aria-checked="{{#if is_side_by_side}}true{{else}}false{{/if}}">
+                <i class="popover-menu-icon zulip-icon {{#if is_side_by_side}}zulip-icon-check{{/if}}" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Colleagues' calendars side by side" }}</span>
+            </a>
+        </li>
+        <li role="separator" class="popover-menu-separator"></li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" tabindex="0" class="popover-menu-link calendar-submenu-trigger" data-submenu="time_scale" aria-haspopup="true">
+                <i class="popover-menu-icon zulip-icon" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Time scale" }}</span>
+                <span class="calendar-menu-value">{{time_scale_label}}</span>
+                <i class="zulip-icon zulip-icon-chevron-right calendar-submenu-icon" aria-hidden="true"></i>
+            </a>
+        </li>
+        <li role="separator" class="popover-menu-separator"></li>
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" tabindex="0" class="popover-menu-link calendar-settings-option">
+                <i class="popover-menu-icon zulip-icon zulip-icon-gear" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Calendar settings" }}</span>
+            </a>
+        </li>
+    </ul>
+</div>

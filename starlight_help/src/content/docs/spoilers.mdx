@@ -6,6 +6,7 @@ import {TabItem, Tabs} from "@astrojs/starlight/components";
 
 import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import SpoilersExamples from "../include/_SpoilersExamples.mdx";
 import SpoilersIntro from "../include/_SpoilersIntro.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
@@ -21,9 +22,11 @@ import SpoilerIcon from "~icons/zulip-icon/spoiler";
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. *(optional)* Select the text you want to hide inside the spoiler.
-      1. Click the **spoiler** (<SpoilerIcon />) icon at the bottom of the
-         compose box to insert spoiler formatting.
+      1. Click the **spoiler** (<SpoilerIcon />) icon in the compose
+         box to insert spoiler formatting.
       1. Replace `Header` with the desired heading text.
     </FlattenedSteps>
 

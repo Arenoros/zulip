@@ -593,9 +593,10 @@ export class BuddyList extends BuddyListConf {
             $(
                 render_section_header({
                     id: "buddy-list-users-matching-view-section-heading",
-                    header_text: current_sub
-                        ? $t({defaultMessage: "THIS CHANNEL"})
-                        : $t({defaultMessage: "THIS CONVERSATION"}),
+                    header_text:
+                        current_sub && !current_sub.is_meeting_chat
+                            ? $t({defaultMessage: "THIS CHANNEL"})
+                            : $t({defaultMessage: "THIS CONVERSATION"}),
                     is_collapsed: this.users_matching_view_section.is_collapsed,
                 }),
             ),

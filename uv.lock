@@ -3,12 +3,12 @@ revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.11.*' or (python_full_version == '3.12.*' and sys_platform != 'emscripten')",
     "python_full_version < '3.11'",
 ]
@@ -5389,12 +5389,12 @@ version = "2026.9.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.11.*' or (python_full_version == '3.12.*' and sys_platform != 'emscripten')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/68/3bd46b8a5e01d3c2ebdf9c5e9497912e3fe0cde02bac21a7130ca866e403/rpds_py-2026.9.1.tar.gz", hash = "sha256:4793ef7f78268b124b73fa933440f01d258bbae01de9fa53e9080c9ab0425a12", size = 63948, upload-time = "2026-10-04T16:32:36.469Z" }
@@ -6395,6 +6395,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-python-dateutil"
+version = "2.9.0.20261104"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/da/aaf5b20ea6c9e714fae9fdc611b68bde4edcba0aa4b1b853fc157d3d7b37/types_python_dateutil-2.9.0.20261104.tar.gz", hash = "sha256:5d0495702a5f7343741f5d842c531bcd1c941da8b4a85307d52ef43ba80252db", size = 17861, upload-time = "2026-11-04T08:14:27.977Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/4d/f9beea6da46a838025209b06d91374c8af9fbb82c599167ae99ee59cfb7a/types_python_dateutil-2.9.0.20261104-py3-none-any.whl", hash = "sha256:f6ee76c91c547716b4795373a53d4c07e8e06cf98384ecb89fcf134d212de2ad", size = 18509, upload-time = "2026-11-04T08:14:26.989Z" },
+]
+
+[[package]]
 name = "types-pyyaml"
 version = "6.0.12.20260906"
 source = { registry = "https://pypi.org/simple" }
@@ -7187,6 +7196,7 @@ dev = [
     { name = "pyoembed" },
     { name = "python-binary-memcached" },
     { name = "python-bsonstream" },
+    { name = "python-dateutil" },
     { name = "python-debian" },
     { name = "python-digitalocean" },
     { name = "python-ldap" },
@@ -7232,6 +7242,7 @@ dev = [
     { name = "types-psycopg2" },
     { name = "types-pygments" },
     { name = "types-pyopenssl" },
+    { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
     { name = "types-redis" },
     { name = "types-regex" },
@@ -7324,6 +7335,7 @@ prod = [
     { name = "pyoembed" },
     { name = "python-binary-memcached" },
     { name = "python-bsonstream" },
+    { name = "python-dateutil" },
     { name = "python-ldap" },
     { name = "python-magic" },
     { name = "python3-saml" },
@@ -7445,6 +7457,7 @@ dev = [
     { name = "pyoembed" },
     { name = "python-binary-memcached" },
     { name = "python-bsonstream", specifier = ">=0.1.4" },
+    { name = "python-dateutil" },
     { name = "python-debian" },
     { name = "python-digitalocean" },
     { name = "python-ldap" },
@@ -7491,6 +7504,7 @@ dev = [
     { name = "types-psycopg2" },
     { name = "types-pygments" },
     { name = "types-pyopenssl" },
+    { name = "types-python-dateutil" },
     { name = "types-pyyaml" },
     { name = "types-redis" },
     { name = "types-regex" },
@@ -7583,6 +7597,7 @@ prod = [
     { name = "pyoembed" },
     { name = "python-binary-memcached" },
     { name = "python-bsonstream", specifier = ">=0.1.4" },
+    { name = "python-dateutil" },
     { name = "python-ldap" },
     { name = "python-magic" },
     { name = "python3-saml" },

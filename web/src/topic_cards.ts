@@ -51,7 +51,10 @@ function get_topic_card_info(msg_list: MessageList): Map<string, TopicCardInfo> 
 export function get_anchor(msg_list: MessageList): number | undefined {
     // Each page holds the topics last active before the oldest
     // topic we already have.
-    const max_ids = [...get_topic_card_info(msg_list).values()].map((card) => card.max_id);
+    const max_ids = get_topic_card_info(msg_list)
+        .values()
+        .map((card) => card.max_id)
+        .toArray();
     return max_ids.length > 0 ? Math.min(...max_ids) : undefined;
 }
 
@@ -115,7 +118,8 @@ function get_hidden_replies(
     const new_reply_count =
         info === undefined
             ? loaded_replies.length
-            : info.reply_count + loaded_replies.filter((message) => message.id > info.max_id).length;
+            : info.reply_count +
+              loaded_replies.filter((message) => message.id > info.max_id).length;
     const count = Math.max(new_reply_count, loaded_replies.length) - shown_replies.length;
     if (count <= 0) {
         return undefined;
@@ -127,10 +131,7 @@ function get_hidden_replies(
         ...(info?.hidden_reply_sender_ids ?? []),
     ];
     const distinct_sender_ids = [...new Set(sender_ids)];
-    const sender_count = Math.max(
-        distinct_sender_ids.length,
-        info?.hidden_reply_sender_count ?? 0,
-    );
+    const sender_count = Math.max(distinct_sender_ids.length, info?.hidden_reply_sender_count ?? 0);
     const sender_names = distinct_sender_ids
         .slice(0, MAX_HIDDEN_REPLY_SENDER_NAMES)
         .map((user_id) => people.get_display_full_name(user_id));

@@ -3,9 +3,6 @@ import * as z from "zod/mini";
 
 import * as banners from "./banners.ts";
 import * as channel from "./channel.ts";
-import * as compose_banner from "./compose_banner.ts";
-import * as compose_state from "./compose_state.ts";
-import * as compose_validate from "./compose_validate.ts";
 import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
 import type {CallConversation} from "./livekit_call_invites.ts";
@@ -99,10 +96,15 @@ function open_call(url: string): void {
 // shows the call's chat and lets people invite others if the server has
 // the call when the window loads, so it shows the call once the call is
 // started.
-function open_window_for_new_call(): {show: (url: string) => void; close: () => void} {
+export function open_window_for_new_call(): {show: (url: string) => void; close: () => void} {
     // The desktop app opens calls in its own window, whenever asked.
     if (electron_bridge !== undefined) {
-        return {show: open_call, close() {}};
+        return {
+            show: open_call,
+            close() {
+                // No window is open until the call is shown.
+            },
+        };
     }
     // Browsers block windows that are not opened directly in response
     // to a click, so an empty window opens right away.
@@ -141,44 +143,29 @@ function update_call_ring(message_id: number, op: "accept" | "decline" | "cancel
     });
 }
 
-export let start_call_from_compose = (call_id: number, voice_only: boolean): void => {
-    let data: Record<string, string>;
-    let url: string;
-    let ring_user_ids: number[] = [];
-    if (compose_state.get_message_type() === "stream") {
-        const stream_id = compose_state.stream_id();
-        if (stream_id === undefined) {
-            compose_banner.show_error_message(
-                compose_validate.NO_CHANNEL_SELECTED_ERROR_MESSAGE,
-                compose_banner.CLASSNAMES.missing_stream,
-                $("#compose_banners"),
-            );
-            return;
-        }
-        data = {
-            type: "channel",
-            channel_id: JSON.stringify(stream_id),
-            topic: compose_state.topic(),
-        };
-        url = get_call_url(call_id, voice_only, {channel_id: stream_id});
-    } else {
-        if (!compose_validate.validate_private_message()) {
-            return;
-        }
-        const recipient_ids = compose_state.private_message_recipient_ids();
-        data = {type: "direct", to: JSON.stringify(recipient_ids)};
-        url = get_call_url(call_id, voice_only, {
-            dm_user_ids: [...recipient_ids, current_user.user_id],
-        });
-        ring_user_ids = recipient_ids.filter(
-            (user_id) => user_id !== current_user.user_id && !people.is_valid_bot_user(user_id),
-        );
-    }
+// Starts a call with the other people in a direct message conversation,
+// which the server announces there with the call's link.
+export function start_direct_message_call(
+    call_id: number,
+    recipient_ids: number[],
+    voice_only: boolean,
+): void {
+    const url = get_call_url(call_id, voice_only, {
+        dm_user_ids: [...recipient_ids, current_user.user_id],
+    });
+    const ring_user_ids = recipient_ids.filter(
+        (user_id) => user_id !== current_user.user_id && !people.is_valid_bot_user(user_id),
+    );
 
     const call_window = open_window_for_new_call();
     void channel.post({
         url: "/json/calls/livekit/start",
-        data: {...data, call_id: JSON.stringify(call_id), voice_only: JSON.stringify(voice_only)},
+        data: {
+            type: "direct",
+            to: JSON.stringify(recipient_ids),
+            call_id: JSON.stringify(call_id),
+            voice_only: JSON.stringify(voice_only),
+        },
         success(raw_data) {
             const {message_id} = start_call_response_schema.parse(raw_data);
             call_window.show(url);
@@ -188,17 +175,21 @@ export let start_call_from_compose = (call_id: number, voice_only: boolean): voi
         },
         error(xhr) {
             call_window.close();
-            compose_banner.show_error_message(
-                channel.xhr_error_message($t({defaultMessage: "Failed to start the call."}), xhr),
-                compose_banner.CLASSNAMES.generic_compose_error,
-                $("#compose_banners"),
+            banners.append(
+                {
+                    intent: "danger",
+                    label: channel.xhr_error_message(
+                        $t({defaultMessage: "Failed to start the call."}),
+                        xhr,
+                    ),
+                    buttons: [],
+                    close_button: true,
+                    custom_classes: "call-start-error-banner popup-banner",
+                },
+                $("#popup_banners_wrapper"),
             );
         },
     });
-};
-
-export function rewire_start_call_from_compose(value: typeof start_call_from_compose): void {
-    start_call_from_compose = value;
 }
 
 function show_outgoing_call(message_id: number, user_ids: number[]): void {

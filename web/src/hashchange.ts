@@ -6,6 +6,8 @@ import * as about_zulip from "./about_zulip.ts";
 import * as admin from "./admin.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
+import * as calendar_ui from "./calendar_ui.ts";
+import * as calendar_util from "./calendar_util.ts";
 import * as drafts_overlay_ui from "./drafts_overlay_ui.ts";
 import * as embedded_call_chat from "./embedded_call_chat.ts";
 import {Filter} from "./filter.ts";
@@ -172,9 +174,55 @@ function show_invalid_url_error(): void {
     ui_report.error($t_html({defaultMessage: "Invalid URL"}), undefined, $("#home-error"), 2000);
 }
 
+// The hash of the view that is shown behind the calendar when it
+// opens, rendering the home view there if nothing is shown yet.
+function get_hash_of_view_behind_calendar(old_hash: string | undefined): string {
+    if (old_hash === undefined) {
+        // The user opened the app with a calendar hash.
+        show_home_view();
+        return browser_history.get_home_view_hash();
+    }
+    let hash = old_hash;
+    if (hash_parser.is_overlay_hash(hash)) {
+        hash = browser_history.state.hash_before_overlay ?? "";
+    }
+    if (hash === "" || hash === "#" || calendar_util.is_calendar_hash(hash)) {
+        return browser_history.get_home_view_hash();
+    }
+    return hash;
+}
+
+function show_calendar(old_hash: string | undefined): void {
+    const event_link = calendar_util.parse_calendar_event_hash(window.location.hash);
+    if (event_link !== undefined) {
+        calendar_ui.open_event_link(event_link, get_hash_of_view_behind_calendar(old_hash));
+        return;
+    }
+    let location = calendar_ui.get_location_from_hash(window.location.hash);
+    if (location === undefined) {
+        show_invalid_url_error();
+        location = calendar_ui.get_location_from_hash("#calendar")!;
+    }
+    if (calendar_util.is_visible()) {
+        calendar_ui.go_to_location(location);
+    } else {
+        calendar_ui.show(location, get_hash_of_view_behind_calendar(old_hash));
+    }
+}
+
 // Returns true if this function performed a narrow
-function do_hashchange_normal(from_reload: boolean, restore_selected_id: boolean): boolean {
+function do_hashchange_normal(
+    from_reload: boolean,
+    restore_selected_id: boolean,
+    old_hash: string | undefined,
+): boolean {
     message_viewport.stop_auto_scrolling();
+
+    if (calendar_ui.is_hash_behind_calendar(window.location.hash)) {
+        // The view is still rendered behind the calendar.
+        calendar_ui.hide();
+        return false;
+    }
 
     // NB: In Firefox, window.location.hash is URI-decoded.
     // Even if the URL bar says #%41%42%43%44, the value here will
@@ -279,6 +327,9 @@ function do_hashchange_normal(from_reload: boolean, restore_selected_id: boolean
             break;
         case "#feed":
             show_all_message_view(narrow_opts);
+            break;
+        case "#calendar":
+            show_calendar(old_hash);
             break;
         case "#keyboard-shortcuts":
         case "#message-formatting":
@@ -615,7 +666,7 @@ function hashchanged(
     sidebar_ui.hide_all();
     modals.close_active_if_any();
     browser_history.state.changing_hash = true;
-    const ret = do_hashchange_normal(from_reload, restore_selected_id);
+    const ret = do_hashchange_normal(from_reload, restore_selected_id, old_hash);
     browser_history.state.changing_hash = false;
     return ret;
 }

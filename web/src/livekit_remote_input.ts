@@ -80,7 +80,11 @@ export class RemoteInput {
     private readonly pressed_keys = new Set<string>();
     private focused = false;
 
-    constructor(video: HTMLVideoElement, send: RemoteInput["send"], on_keyboard_change: () => void) {
+    constructor(
+        video: HTMLVideoElement,
+        send: RemoteInput["send"],
+        on_keyboard_change: () => void,
+    ) {
         this.video = video;
         this.send = send;
         this.on_keyboard_change = on_keyboard_change;
@@ -143,7 +147,13 @@ export class RemoteInput {
             options,
         );
         for (const event of ["lostpointercapture", "pointercancel", "pointerleave"]) {
-            video.addEventListener(event, () => this.release_buttons(), options);
+            video.addEventListener(
+                event,
+                () => {
+                    this.release_buttons();
+                },
+                options,
+            );
         }
         for (const event of ["contextmenu", "dragstart"]) {
             video.addEventListener(
@@ -221,7 +231,13 @@ export class RemoteInput {
             },
             options,
         );
-        window.addEventListener("blur", () => this.release_all(), options);
+        window.addEventListener(
+            "blur",
+            () => {
+                this.release_all();
+            },
+            options,
+        );
         document.addEventListener(
             "visibilitychange",
             () => {
@@ -235,6 +251,24 @@ export class RemoteInput {
 
     get keyboard_active(): boolean {
         return this.token !== undefined && this.focused;
+    }
+
+    set_token(token: string | undefined): void {
+        if (this.token === token) {
+            return;
+        }
+        this.release_all();
+        clearTimeout(this.flush_timer);
+        this.flush_timer = undefined;
+        this.pending_wheel = undefined;
+        this.token = token;
+        this.sequence = 0;
+        this.on_keyboard_change();
+    }
+
+    destroy(): void {
+        this.set_token(undefined);
+        this.listeners.abort();
     }
 
     private button(button: number): "left" | "middle" | "right" | undefined {
@@ -258,11 +292,16 @@ export class RemoteInput {
         }
         this.sequence += 1;
         const token = this.token;
-        void this.send(token, this.sequence, event).catch(() => {
-            if (this.token === token) {
-                this.set_token(undefined);
+        const sequence = this.sequence;
+        void (async () => {
+            try {
+                await this.send(token, sequence, event);
+            } catch {
+                if (this.token === token) {
+                    this.set_token(undefined);
+                }
             }
-        });
+        })();
     }
 
     private publish_pending_wheel(): void {
@@ -306,15 +345,19 @@ export class RemoteInput {
         this.pending_position = undefined;
         this.sequence += 1;
         this.move_in_flight = true;
-        void this.send(this.token, this.sequence, {type: "move", ...point})
-            // A later move replaces a lost position.
-            .catch(() => undefined)
-            .finally(() => {
-                this.move_in_flight = false;
-                if (this.pending_position !== undefined) {
-                    this.schedule_flush();
-                }
-            });
+        const token = this.token;
+        const sequence = this.sequence;
+        void (async () => {
+            try {
+                await this.send(token, sequence, {type: "move", ...point});
+            } catch {
+                // A later move replaces a lost position.
+            }
+            this.move_in_flight = false;
+            if (this.pending_position !== undefined) {
+                this.schedule_flush();
+            }
+        })();
     }
 
     private release_buttons(): void {
@@ -337,23 +380,5 @@ export class RemoteInput {
     private release_all(): void {
         this.release_buttons();
         this.release_keys();
-    }
-
-    set_token(token: string | undefined): void {
-        if (this.token === token) {
-            return;
-        }
-        this.release_all();
-        clearTimeout(this.flush_timer);
-        this.flush_timer = undefined;
-        this.pending_wheel = undefined;
-        this.token = token;
-        this.sequence = 0;
-        this.on_keyboard_change();
-    }
-
-    destroy(): void {
-        this.set_token(undefined);
-        this.listeners.abort();
     }
 }

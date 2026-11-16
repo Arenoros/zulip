@@ -72,23 +72,6 @@ export function rewire_get_recipient_label_for_call(
     get_recipient_label_for_call = value;
 }
 
-export function update_audio_and_video_chat_button_display(): void {
-    update_audio_chat_button_display();
-    update_video_chat_button_display();
-}
-
-export function update_video_chat_button_display(): void {
-    const show_video_chat_button = compose_call.compute_show_video_chat_button();
-    $(".compose-control-buttons-container .video_link").toggle(show_video_chat_button);
-    $(".message-edit-feature-group .video_link").toggle(show_video_chat_button);
-}
-
-export function update_audio_chat_button_display(): void {
-    const show_audio_chat_button = compose_call.compute_show_audio_chat_button();
-    $(".compose-control-buttons-container .audio_link").toggle(show_audio_chat_button);
-    $(".message-edit-feature-group .audio_link").toggle(show_audio_chat_button);
-}
-
 function insert_video_call_url(url: string, $target_textarea: JQuery<HTMLTextAreaElement>): void {
     const link_text = $t({defaultMessage: "Join video call."});
     compose_ui.insert_syntax_and_focus(`[${link_text}](${url})`, $target_textarea, "block", 1);
@@ -350,10 +333,6 @@ export function generate_and_insert_audio_or_video_call_link(
             }
             case available_providers.livekit?.id: {
                 const call_id = util.random_int(100000000000000, 999999999999999);
-                if (edit_message_id === undefined) {
-                    call_ringing.start_call_from_compose(call_id, is_audio_call);
-                    break;
-                }
                 const url = call_ringing.get_call_url(call_id, is_audio_call);
                 if (is_audio_call) {
                     insert_audio_call_url(url, $target_textarea);

@@ -1,5 +1,7 @@
 import {$} from "jquery";
 
+import * as calendar_util from "./calendar_util.ts";
+
 export function disable_scrolling(): void {
     // Why disable scrolling?
     // Since fixed / absolute positioned elements don't capture the scroll event unless
@@ -11,6 +13,10 @@ export function disable_scrolling(): void {
 }
 
 export function enable_scrolling(): void {
+    if (calendar_util.is_visible()) {
+        // The calendar keeps the message feed behind it from scrolling.
+        return;
+    }
     $(":root").css({"overflow-y": "scroll", "--disabled-scrollbar-width": "0px"});
 }
 

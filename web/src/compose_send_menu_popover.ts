@@ -241,6 +241,10 @@ export function initialize(): void {
                     }),
                 ),
             );
+            // Sized like the menu of the "+" button next to it.
+            $(instance.popper)
+                .find("#send_later_popover")
+                .toggleClass("compose-row-send-menu", $("#compose").hasClass("compose-row-layout"));
             popover_menus.popover_instances.send_later = instance;
         },
         onMount(instance) {

@@ -243,8 +243,28 @@ export function setup_saved_snippets_dropdown_widget(widget_selector: string): v
     saved_snippets_widget.setup();
 }
 
+// The compose box of a single conversation has its saved snippets in
+// the menu of its "+" button, which the dropdown opens from; other
+// compose boxes have a button for them.
+function get_compose_saved_snippets_reference(): HTMLElement | undefined {
+    const $compose = $("#compose");
+    if ($compose.hasClass("compose-row-layout")) {
+        return $compose.find(".saved-snippets-composebox-widget.compose-plus-menu-anchor").get(0);
+    }
+    return $compose.find(".compose_control_button.saved-snippets-composebox-widget").get(0);
+}
+
 export function open_saved_snippets_dropdown_via_hotkey(): void {
-    saved_snippets_widget?.open({trigger: "keyboard"});
+    saved_snippets_widget?.open({
+        trigger: "keyboard",
+        reference: get_compose_saved_snippets_reference(),
+    });
+}
+
+// The snippet goes into the compose box or the edit form that the
+// reference, the anchor of its "+" button, is in.
+export function open_saved_snippets_dropdown_from(reference: HTMLElement): void {
+    saved_snippets_widget?.open({reference});
 }
 
 export function setup_saved_snippets_dropdown_widget_if_needed(): void {

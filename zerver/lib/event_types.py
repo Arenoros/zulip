@@ -71,6 +71,31 @@ class AttachmentUpdateEvent(BaseEvent):
     upload_space_used: int
 
 
+class CalendarChangeEvent(BaseEvent):
+    type: Literal["calendar"] = "calendar"
+    event_id: int
+    unanswered_invitation_count: int
+
+
+class CalendarFreeBusyEvent(BaseEvent):
+    type: Literal["calendar_free_busy"] = "calendar_free_busy"
+    user_ids: list[int]
+
+
+class CalendarSettings(BaseEventModel):
+    work_days: list[int]
+    work_day_start_minutes: int
+    work_day_end_minutes: int
+    default_reminder_minutes: int | None
+    default_view: int
+    time_scale_minutes: int
+
+
+class CalendarSettingsEvent(BaseEvent):
+    type: Literal["calendar_settings"] = "calendar_settings"
+    settings: CalendarSettings
+
+
 class CallConversation(BaseEventModel):
     message_id: int
     stream_id: int | None = None
@@ -968,6 +993,7 @@ class BasicStreamFields(BaseEventModel):
     creator_id: int | None
     date_created: int
     default_push_notifications: bool
+    is_meeting_chat: bool
     description: str
     first_message_id: int | None
     folder_id: int | None
@@ -1042,6 +1068,7 @@ class SingleSubscription(BaseEventModel):
     creator_id: int | None
     date_created: int
     default_push_notifications: bool
+    is_meeting_chat: bool
     description: str
     first_message_id: int | None
     folder_id: int | None

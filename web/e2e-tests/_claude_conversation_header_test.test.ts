@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -97,16 +98,16 @@ print(
 )
 `;
 
-type Seeded = {
-    desdemona: number;
-    othello: number;
-    hamlet: number;
-    iago: number;
-    prospero: number;
-    welcome_bot: number;
-    many: number[];
-    denmark: number;
-};
+const seeded_schema = z.object({
+    desdemona: z.number(),
+    othello: z.number(),
+    hamlet: z.number(),
+    iago: z.number(),
+    prospero: z.number(),
+    welcome_bot: z.number(),
+    many: z.array(z.number()),
+    denmark: z.number(),
+});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -172,14 +173,16 @@ async function header_facts(page: Page): Promise<HeaderFacts> {
         const title = header.querySelector(".message-header-navbar-title")!;
         const subtitle = header.querySelector(".conversation-header-subtitle");
         const circle = header.querySelector(".conversation-header-presence");
-        const box = (element: Element): {left: number; right: number; top: number; bottom: number} => {
+        const box = (
+            element: Element,
+        ): {left: number; right: number; top: number; bottom: number} => {
             const rect = element.getBoundingClientRect();
             return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
         };
         const header_rect = header.getBoundingClientRect();
         return {
             conversation: conversation !== null,
-            title: title.textContent!.trim(),
+            title: title.textContent.trim(),
             subtitle: subtitle?.textContent?.trim(),
             subtitle_shown: subtitle !== null && getComputedStyle(subtitle).display !== "none",
             avatars: [...header.querySelectorAll(".conversation-header-avatar")].map((avatar) => ({
@@ -192,9 +195,8 @@ async function header_facts(page: Page): Promise<HeaderFacts> {
             circle_box: circle ? box(circle) : undefined,
             header: {top: header_rect.top, bottom: header_rect.bottom, right: header_rect.right},
             text_right: (conversation ?? title).getBoundingClientRect().right,
-            search_left: document
-                .querySelector("#searchbox .search_icon")!
-                .getBoundingClientRect().left,
+            search_left: document.querySelector("#searchbox .search_icon")!.getBoundingClientRect()
+                .left,
             title_truncated: title.scrollWidth > title.clientWidth,
         };
     });
@@ -205,7 +207,7 @@ function dm_hash(user_ids: number[]): string {
 }
 
 async function header_test(page: Page): Promise<void> {
-    const seeded = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(run_python(seed_script).split("SEEDED ", 2)[1]!));
 
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await common.log_in(page);
@@ -258,9 +260,8 @@ async function header_test(page: Page): Promise<void> {
         `${facts.circle} ${facts.subtitle}`,
     );
     const centered =
-        Math.abs(
-            (avatar.top + avatar.bottom) / 2 - (facts.header.top + facts.header.bottom) / 2,
-        ) < 1;
+        Math.abs((avatar.top + avatar.bottom) / 2 - (facts.header.top + facts.header.bottom) / 2) <
+        1;
     const circle = facts.circle_box!;
     // The center of the presence circle lies on the edge of the round
     // avatar, at its lower right.
@@ -295,7 +296,9 @@ do_update_user_presence(
 )
 `,
     );
-    await page.waitForSelector("#message_view_header .conversation-header-presence.user-circle-active");
+    await page.waitForSelector(
+        "#message_view_header .conversation-header-presence.user-circle-active",
+    );
     const search_text = await page.$eval("#searchbox-input-container .input", (input) =>
         input.textContent?.trim(),
     );
@@ -311,9 +314,8 @@ do_update_user_presence(
     await shot_header(page, "light-othello-active");
 
     // Name and avatar update live.
-    const old_avatar = await page.$eval(
-        "#message_view_header .conversation-header-avatar",
-        (img) => img.getAttribute("src"),
+    const old_avatar = await page.$eval("#message_view_header .conversation-header-avatar", (img) =>
+        img.getAttribute("src"),
     );
     run_python(
         python_prelude +
@@ -438,7 +440,9 @@ do_change_avatar_fields(othello, UserProfile.AVATAR_FROM_GRAVATAR, acting_user=N
 
     // Hamlet is deactivated while his conversation is open.
     await open_view(page, views["hamlet"]!);
-    run_python(python_prelude + String.raw`do_deactivate_user(user("hamlet@zulip.com"), acting_user=None)`);
+    run_python(
+        python_prelude + String.raw`do_deactivate_user(user("hamlet@zulip.com"), acting_user=None)`,
+    );
     await page.waitForSelector(
         "#message_view_header .conversation-header-presence.user-circle-deactivated",
     );

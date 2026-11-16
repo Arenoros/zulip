@@ -24,6 +24,7 @@ function hide_history_limit_notice(): void {
 function hide_end_of_results_notice(): void {
     $(".all-messages-search-caution").hide();
     $(".combined-feed-notice").hide();
+    $(".search-end-of-results-notice").hide();
 }
 
 function show_end_of_results_notice(): void {
@@ -69,6 +70,12 @@ export function update_top_of_narrow_notices(msg_list: MessageList): void {
             // by a potential spammer user.
             if (filter?.may_have_incomplete_message_history(false)) {
                 show_end_of_results_notice();
+            } else if (
+                filter?.is_keyword_search() &&
+                !msg_list.data.fetch_status.history_limited() &&
+                !msg_list.empty()
+            ) {
+                $(".search-end-of-results-notice").show();
             }
         }
 

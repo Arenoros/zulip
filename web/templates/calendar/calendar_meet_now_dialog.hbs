@@ -1,0 +1,14 @@
+<form id="calendar-meet-now-form" class="modal-form calendar-meet-now">
+    <div class="input-group">
+        <label for="calendar-meet-now-title" class="modal-field-label">{{t "Title" }}</label>
+        <input type="text" id="calendar-meet-now-title" class="modal_text_input calendar-meet-now-title" maxlength="255" value="{{title}}"/>
+    </div>
+    <div class="input-group">
+        <label class="modal-field-label">{{t "People" }}</label>
+        <div class="pill-container person_picker calendar-meet-now-attendees">
+            <div class="input" contenteditable="true" data-placeholder="{{t 'Invite people (optional)' }}" aria-label="{{t 'People' }}">
+                {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
+            </div>
+        </div>
+    </div>
+</form>

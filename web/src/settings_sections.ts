@@ -5,11 +5,13 @@ import * as attachments_ui from "./attachments_ui.ts";
 import * as blueslip from "./blueslip.ts";
 import * as settings_account from "./settings_account.ts";
 import * as settings_bots from "./settings_bots.ts";
+import * as settings_calendar from "./settings_calendar.ts";
 import * as settings_emoji from "./settings_emoji.ts";
 import * as settings_exports from "./settings_exports.ts";
 import * as settings_folders from "./settings_folders.ts";
 import * as settings_invites from "./settings_invites.ts";
 import * as settings_linkifiers from "./settings_linkifiers.ts";
+import * as settings_meeting_rooms from "./settings_meeting_rooms.ts";
 import * as settings_muted_users from "./settings_muted_users.ts";
 import * as settings_notifications from "./settings_notifications.ts";
 import * as settings_org from "./settings_org.ts";
@@ -63,6 +65,7 @@ export function initialize(): void {
         assert(settings_notifications.user_settings_panel !== undefined);
         settings_notifications.set_up(settings_notifications.user_settings_panel);
     });
+    load_func_dict.set("calendar", settings_calendar.set_up);
     load_func_dict.set("alert-words", alert_words_ui.set_up_alert_words);
     load_func_dict.set("uploaded-files", attachments_ui.set_up_attachments);
     load_func_dict.set("topics", settings_user_topics.set_up);
@@ -77,6 +80,7 @@ export function initialize(): void {
     load_func_dict.set("default-channels-list", settings_streams.set_up);
     load_func_dict.set("linkifier-settings", settings_linkifiers.set_up);
     load_func_dict.set("playground-settings", settings_playgrounds.set_up);
+    load_func_dict.set("meeting-rooms", settings_meeting_rooms.set_up);
     load_func_dict.set("profile-field-settings", settings_profile_fields.set_up);
     load_func_dict.set("data-exports-admin", settings_exports.set_up);
     load_func_dict.set(
@@ -114,6 +118,7 @@ export function reset_sections(): void {
     settings_exports.reset();
     settings_linkifiers.reset();
     settings_playgrounds.reset();
+    settings_meeting_rooms.reset();
     settings_invites.reset();
     settings_org.reset();
     settings_profile_fields.reset();

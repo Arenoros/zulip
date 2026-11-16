@@ -1443,31 +1443,26 @@ def capture_message_fetch_query_for_testing(query: QuerySet[Any]) -> None:
     pass
 
 
-def fetch_messages(
+@dataclass
+class NarrowQuery:
+    query: QuerySet[Message]
+    include_history: bool
+    need_user_message: bool
+    is_search: bool
+    is_dm_narrow: bool
+
+
+def build_narrow_query(
     *,
     narrow: list[NarrowParameter] | None,
     user_profile: UserProfile | None,
     realm: Realm,
     is_web_public_query: bool,
-    anchor_info: AnchorInfo | None,
-    include_anchor: bool,
-    num_before: int,
-    num_after: int,
-    client_requested_message_ids: list[int] | None = None,
-) -> FetchedMessages:
+) -> NarrowQuery | None:
+    """The query for the messages in a narrow that the user can access,
+    or None if the user cannot access the narrow at all."""
     if access_narrow(user_profile, narrow, is_web_public_query, realm) is False:
-        # If user is requesting messages from a narrow they don't have
-        # access to, do an early return.
-        return FetchedMessages(
-            rows=[],
-            found_anchor=False,
-            found_oldest=True,
-            found_newest=True,
-            history_limited=False,
-            anchor=LARGER_THAN_MAX_MESSAGE_ID,
-            include_history=False,
-            is_search=False,
-        )
+        return None
 
     include_history = ok_to_include_history(narrow, user_profile, is_web_public_query)
     if include_history:
@@ -1499,6 +1494,75 @@ def fetch_messages(
         realm=realm,
         is_web_public_query=is_web_public_query,
     )
+    return NarrowQuery(
+        query=query,
+        include_history=include_history,
+        need_user_message=need_user_message,
+        is_search=is_search,
+        is_dm_narrow=is_dm_narrow,
+    )
+
+
+def count_messages_in_narrow(
+    *,
+    narrow: list[NarrowParameter] | None,
+    user_profile: UserProfile,
+    realm: Realm,
+    limit: int,
+) -> int:
+    """The number of messages in a narrow that the user can access,
+    counting no further than limit."""
+    narrow_query = build_narrow_query(
+        narrow=narrow,
+        user_profile=user_profile,
+        realm=realm,
+        is_web_public_query=False,
+    )
+    if narrow_query is None:
+        return 0
+    query = narrow_query.query
+    first_visible_message_id = get_first_visible_message_id(realm)
+    if first_visible_message_id > 0:
+        query = query.filter(id__gte=first_visible_message_id)
+    return query.values("id")[:limit].count()
+
+
+def fetch_messages(
+    *,
+    narrow: list[NarrowParameter] | None,
+    user_profile: UserProfile | None,
+    realm: Realm,
+    is_web_public_query: bool,
+    anchor_info: AnchorInfo | None,
+    include_anchor: bool,
+    num_before: int,
+    num_after: int,
+    client_requested_message_ids: list[int] | None = None,
+) -> FetchedMessages:
+    narrow_query = build_narrow_query(
+        narrow=narrow,
+        user_profile=user_profile,
+        realm=realm,
+        is_web_public_query=is_web_public_query,
+    )
+    if narrow_query is None:
+        # If user is requesting messages from a narrow they don't have
+        # access to, do an early return.
+        return FetchedMessages(
+            rows=[],
+            found_anchor=False,
+            found_oldest=True,
+            found_newest=True,
+            history_limited=False,
+            anchor=LARGER_THAN_MAX_MESSAGE_ID,
+            include_history=False,
+            is_search=False,
+        )
+    query = narrow_query.query
+    include_history = narrow_query.include_history
+    need_user_message = narrow_query.need_user_message
+    is_search = narrow_query.is_search
+    is_dm_narrow = narrow_query.is_dm_narrow
 
     if anchor_info is None:
         anchor_info = DEFAULT_ANCHOR_INFO

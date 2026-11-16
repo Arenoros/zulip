@@ -484,6 +484,12 @@ test("get_conversation_participants", () => {
         buddy_data.get_conversation_participants_callback()(),
         new Set([selma.user_id]),
     );
+
+    // Like a group chat, the chat of a calendar meeting has no
+    // separate participants.
+    rome_sub.is_meeting_chat = true;
+    assert.deepEqual(buddy_data.get_conversation_participants_callback()(), new Set());
+    rome_sub.is_meeting_chat = false;
 });
 
 test("level", ({override}) => {

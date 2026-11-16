@@ -27,12 +27,14 @@ import type {ShowMessageViewOpts} from "./message_view.ts";
 import * as message_viewport from "./message_viewport.ts";
 import * as narrow_state from "./narrow_state.ts";
 import {page_params} from "./page_params.ts";
+import * as people from "./people.ts";
 import * as popovers from "./popovers.ts";
 import * as reload from "./reload.ts";
 import * as reload_state from "./reload_state.ts";
 import * as resize from "./resize.ts";
 import * as saved_snippets_ui from "./saved_snippets_ui.ts";
 import * as spectators from "./spectators.ts";
+import {current_user} from "./state_data.ts";
 import * as stream_data from "./stream_data.ts";
 import * as util from "./util.ts";
 
@@ -51,6 +53,7 @@ type ComposeActionsStartOpts = {
     is_reply?: boolean;
     keep_composebox_empty?: boolean | undefined;
     defer_focus?: boolean | undefined;
+    skip_focus?: boolean | undefined;
 };
 
 // An iteration on `ComposeActionsStartOpts` that enforces that
@@ -117,12 +120,18 @@ function show_compose_box(opts: ComposeActionsOpts): void {
         };
     }
     compose_recipient.update_compose_for_message_type(opts_by_message_type);
-    // When changing this, edit the 42px in _maybe_autoscroll
-    $(".new_message_textarea").css("min-height", "3em");
+    // When changing this, edit the 42px in _maybe_autoscroll. A row
+    // starts as one line.
+    $(".new_message_textarea").css("min-height", is_row_layout() ? "" : "3em");
     // Under certain circumstances, such as focusing in the
     // automatically-opened compose box in DMs, we want to
     // defer running the focus logic.
-    if (opts.defer_focus) {
+    if (opts.skip_focus) {
+        // The compose box always open in a view of a single
+        // conversation leaves the keyboard to the message feed, even
+        // if it had the focus in the previous view.
+        blur_compose_inputs();
+    } else if (opts.defer_focus) {
         setTimeout(() => {
             compose_ui.set_focus(opts_by_message_type);
         }, 0);
@@ -207,6 +216,77 @@ export function rewire_expand_compose_box(value: typeof expand_compose_box): voi
     expand_compose_box = value;
 }
 
+// In a view of a single conversation that the user can post to, the
+// compose box is always open for that conversation.
+function get_view_compose_opts(): ComposeActionsStartOpts | undefined {
+    const filter = narrow_state.filter();
+    if (page_params.is_spectator || filter === undefined || !filter.is_conversation_view()) {
+        return undefined;
+    }
+    const {stream_id, topic, private_message_recipient_ids} = narrow_state.set_compose_defaults();
+    if (private_message_recipient_ids !== undefined) {
+        const recipient_ids_string = util.sorted_ids(private_message_recipient_ids).join(",");
+        if (!message_util.user_can_send_direct_message(recipient_ids_string)) {
+            return undefined;
+        }
+        return {message_type: "private", private_message_recipient_ids};
+    }
+    if (stream_id === undefined || topic === undefined) {
+        return undefined;
+    }
+    const stream = stream_data.get_sub_by_id(stream_id);
+    if (stream === undefined || !stream_data.can_post_messages_in_stream(stream)) {
+        return undefined;
+    }
+    return {message_type: "stream", stream_id, topic};
+}
+
+function set_compose_for_view(for_view: boolean): void {
+    compose_state.set_for_view(for_view);
+    $("#compose").toggleClass("compose-for-view", for_view);
+    update_row_layout();
+    if (!for_view) {
+        compose_ui.set_formatting_mode(false);
+    }
+}
+
+// In the conversations view of a channel, a reply to a topic card is
+// a row too, under a line naming the topic, until it is sent or closed.
+function set_reply_in_conversations_view(reply: boolean, topic = ""): void {
+    compose_state.set_reply_in_conversations_view(reply);
+    $("#compose").toggleClass("compose-reply-in-conversations", reply);
+    if (reply) {
+        $("#compose-reply-line-text").text(
+            $t(
+                {defaultMessage: "Reply in “{topic_name}”"},
+                {topic_name: util.get_final_topic_display_name(topic)},
+            ),
+        );
+    }
+    update_row_layout();
+}
+
+function is_row_layout(): boolean {
+    return (
+        compose_state.is_for_view() ||
+        compose_state.is_reply_in_conversations_view() ||
+        compose_state.is_new_conversation_form()
+    );
+}
+
+// The compose box of a single conversation is a row, with a chevron
+// for the send options next to the send button. The form for a new
+// conversation has the same buttons, under the formatting toolbar,
+// and a ⋮ for the send options next to Publish.
+function update_row_layout(): void {
+    const is_form = compose_state.is_new_conversation_form();
+    const row_layout = is_row_layout();
+    $("#compose").toggleClass("compose-row-layout", row_layout);
+    $("#send_later i")
+        .toggleClass("zulip-icon-more-vertical", !row_layout || is_form)
+        .toggleClass("zulip-icon-chevron-down", row_layout && !is_form);
+}
+
 // In the conversations view of a channel, starting a new topic in it
 // opens the compose box as the form for a new conversation.
 function update_new_conversation_form(opts: ComposeActionsOpts): void {
@@ -222,14 +302,25 @@ function update_new_conversation_form(opts: ComposeActionsOpts): void {
 function set_new_conversation_form(is_form: boolean, stream_id?: number): void {
     compose_state.set_new_conversation_form(is_form);
     $("#compose").toggleClass("new-conversation-form", is_form);
+    $("input#stream_message_recipient_topic").attr("aria-required", is_form ? "true" : null);
+    $("#compose-send-button").attr(
+        "aria-label",
+        is_form ? $t({defaultMessage: "Publish"}) : $t({defaultMessage: "Send"}),
+    );
     if (is_form && stream_id !== undefined) {
+        $(".new-conversation-form-avatar").attr(
+            "src",
+            people.small_avatar_url_for_person(current_user),
+        );
+        $(".new-conversation-form-author").text(current_user.full_name);
         $("#new-conversation-form-title").text(
             $t(
-                {defaultMessage: "New conversation in #{channel}"},
+                {defaultMessage: "new conversation in #{channel}"},
                 {channel: stream_data.get_sub_by_id(stream_id)?.name ?? ""},
             ),
         );
     }
+    update_row_layout();
 }
 
 // The form only shows in the conversations view of its channel; the
@@ -398,11 +489,11 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
     // If we are invoked by a compose hotkey (c or x) or new topic
     // button, do not assume that we know what the message's topic or
     // direct message recipient should be.
-    if (
+    const is_new_message =
         opts.trigger === "compose_hotkey" ||
         is_clear_topic_button_triggered ||
-        opts.trigger === "new direct message"
-    ) {
+        opts.trigger === "new direct message";
+    if (is_new_message) {
         opts.topic = "";
         opts.private_message_recipient_ids = [];
     }
@@ -525,6 +616,22 @@ export let start = (raw_opts: ComposeActionsStartOpts): void => {
 
     compose_state.set_message_type(opts.message_type);
 
+    const view_opts = get_view_compose_opts();
+    set_compose_for_view(
+        view_opts !== undefined &&
+            !is_new_message &&
+            same_recipient_as_before(fill_in_opts_from_current_narrowed_view(view_opts)),
+    );
+    set_reply_in_conversations_view(
+        !compose_state.is_for_view() &&
+            !is_new_message &&
+            !compose_state.is_new_conversation_form() &&
+            opts.message_type === "stream" &&
+            message_lists.current?.is_conversations_view === true &&
+            opts.stream_id === narrow_state.stream_id(),
+        opts.topic,
+    );
+
     // Show either stream/topic fields or "You and" field.
     show_compose_box(opts);
 
@@ -558,7 +665,23 @@ export function rewire_start(value: typeof start): void {
     start = value;
 }
 
+function open_compose_for_view(view_opts: ComposeActionsStartOpts, focus = false): void {
+    start({
+        ...view_opts,
+        trigger: "conversation view",
+        skip_focus: !focus,
+        skip_scrolling_selected_message: true,
+    });
+}
+
 export let cancel = (): void => {
+    if (compose_state.is_for_view()) {
+        // The compose box for the conversation of the view stays open,
+        // keeping what was typed.
+        blur_compose_inputs();
+        return;
+    }
+
     // As user closes the compose box, restore the compose box max height
     if (compose_ui.is_expanded()) {
         compose_ui.make_compose_box_original_size();
@@ -591,10 +714,18 @@ export let cancel = (): void => {
     compose_tooltips.dismiss_intro_go_to_conversation_tooltip();
     call_hooks(compose_cancel_hooks);
     set_new_conversation_form(false);
+    set_reply_in_conversations_view(false);
     compose_state.set_message_type(undefined);
     compose_pm_pill.clear();
     message_viewport.bottom_of_feed.reset();
     reload.maybe_reset_pending_reload_timeout("compose_end");
+
+    // Closing the compose box for another conversation brings back
+    // the one for the conversation of the view.
+    const view_opts = get_view_compose_opts();
+    if (view_opts !== undefined) {
+        open_compose_for_view(view_opts);
+    }
 };
 
 export function rewire_cancel(value: typeof cancel): void {
@@ -604,6 +735,8 @@ export function rewire_cancel(value: typeof cancel): void {
 export function on_show_navigation_view(): void {
     /* This function dictates the behavior of the compose box
      * when navigating to a view, as opposed to a narrow. */
+    set_compose_for_view(false);
+    set_reply_in_conversations_view(false);
 
     // Leave the compose box closed if it was already closed.
     if (!compose_state.composing()) {
@@ -710,6 +843,22 @@ export function on_narrow(opts: NarrowActivateOpts): void {
         show_call_chat_compose();
         return;
     }
+
+    // The compose box follows a view of a single conversation, saving
+    // what was typed for another conversation as a draft. Elsewhere,
+    // it shows its recipient row.
+    const view_opts = get_view_compose_opts();
+    if (view_opts !== undefined) {
+        // Narrowing to what one is composing to, or to where one just
+        // sent a message, is a sign of being ready to write.
+        open_compose_for_view(
+            view_opts,
+            opts.trigger === "narrow_to_compose_target" || opts.trigger === "outside_current_view",
+        );
+        return;
+    }
+    set_compose_for_view(false);
+    set_reply_in_conversations_view(false);
 
     // We use force_close when jumping between direct message narrows with
     // the "p" key, so that we don't have an open compose box that makes

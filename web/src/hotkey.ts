@@ -4,6 +4,7 @@ import assert from "minimalistic-assert";
 import * as activity from "./activity.ts";
 import * as activity_ui from "./activity_ui.ts";
 import * as browser_history from "./browser_history.ts";
+import * as calendar_util from "./calendar_util.ts";
 import * as clipboard_handler from "./clipboard_handler.ts";
 import * as color_picker_popover from "./color_picker_popover.ts";
 import * as common from "./common.ts";
@@ -105,6 +106,22 @@ const color_picker_hotkeys = new Set([
     "vim_left",
     "vim_right",
     "enter",
+]);
+
+// The hotkeys that work in the calendar, which covers the message feed
+// and the views behind it.
+const calendar_hotkeys = new Set([
+    "gear_menu",
+    "open_combined_feed",
+    "open_drafts",
+    "open_inbox",
+    "open_mentions_view",
+    "open_recent_view",
+    "open_starred_message_view",
+    "search",
+    "search_with_k",
+    "set_status",
+    "show_shortcuts",
 ]);
 
 // A set of characters that, on many keyboard layouts, require 'Shift' modifier key
@@ -465,6 +482,12 @@ function process_escape_key(e: JQuery.KeyDownEvent): boolean {
         return true;
     }
 
+    // Micromodal closes a dialog that is still opening by itself; the
+    // same Esc should not also leave the view behind the dialog.
+    if (modals.any_active_or_animating()) {
+        return true;
+    }
+
     if (overlays.any_active()) {
         overlays.close_active();
         return true;
@@ -537,7 +560,9 @@ function process_escape_key(e: JQuery.KeyDownEvent): boolean {
         return true;
     }
 
-    if (compose_state.composing()) {
+    // The compose box always open in a view of a single conversation
+    // leaves Esc to the rest of the app when it is not focused.
+    if (compose_state.composing() && !compose_state.is_for_view()) {
         compose_actions.cancel();
         return true;
     }
@@ -830,6 +855,19 @@ export function process_shift_tab_key(): boolean {
 // Returns true if we handled it, false if the browser should.
 function process_hotkey(e: JQuery.KeyDownEvent, hotkey: Hotkey): boolean {
     const event_name = hotkey.name;
+
+    if (
+        calendar_util.is_visible() &&
+        !calendar_hotkeys.has(event_name) &&
+        !overlays.any_active() &&
+        !modals.any_active() &&
+        !(
+            popovers.any_active() &&
+            (event_name === "escape" || menu_dropdown_hotkeys.has(event_name))
+        )
+    ) {
+        return false;
+    }
 
     // This block needs to be before the `Tab` handler.
     switch (event_name) {
@@ -1322,7 +1360,7 @@ function process_hotkey(e: JQuery.KeyDownEvent, hotkey: Hotkey): boolean {
             compose_reply.respond_to_message({trigger: "hotkey"});
             return true;
         case "compose": // 'c': compose
-            if (!compose_state.composing()) {
+            if (!compose_state.composing() || compose_state.is_for_view()) {
                 compose_actions.start({
                     message_type: "stream",
                     trigger: "compose_hotkey",
@@ -1331,7 +1369,7 @@ function process_hotkey(e: JQuery.KeyDownEvent, hotkey: Hotkey): boolean {
             }
             return true;
         case "compose_private_message":
-            if (!compose_state.composing()) {
+            if (!compose_state.composing() || compose_state.is_for_view()) {
                 compose_actions.start({
                     message_type: "private",
                     trigger: "compose_hotkey",

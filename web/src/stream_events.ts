@@ -6,6 +6,7 @@ import render_first_stream_created_modal from "../templates/stream_settings/firs
 import * as activity_ui from "./activity_ui.ts";
 import * as blueslip from "./blueslip.ts";
 import * as browser_history from "./browser_history.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
 import * as channel_folders_ui from "./channel_folders_ui.ts";
 import * as color_data from "./color_data.ts";
 import * as compose_recipient from "./compose_recipient.ts";
@@ -21,6 +22,7 @@ import * as narrow_state from "./narrow_state.ts";
 import * as overlays from "./overlays.ts";
 import * as peer_data from "./peer_data.ts";
 import * as people from "./people.ts";
+import * as pm_list from "./pm_list.ts";
 import * as recent_view_ui from "./recent_view_ui.ts";
 import * as settings_notifications from "./settings_notifications.ts";
 import * as settings_streams from "./settings_streams.ts";
@@ -174,6 +176,9 @@ export function update_property<P extends keyof UpdatableStreamProperties>(
         name(value) {
             stream_settings_ui.update_stream_name(sub, value);
             compose_recipient.possibly_update_stream_name_in_compose(sub.stream_id);
+            if (sub.is_meeting_chat) {
+                pm_list.update_private_messages();
+            }
         },
         description(value) {
             assert(other_values !== undefined);
@@ -309,6 +314,8 @@ export function mark_subscribed(
 
     // update navbar if necessary
     message_view_header.maybe_rerender_title_area_for_stream(sub.stream_id);
+
+    calendar_meeting_chat.on_subscribed(sub);
 
     if (stream_create.get_name() === sub.name) {
         // In this case, we just created this channel using this very

@@ -11,6 +11,7 @@
 * [Render a message](/api/render-message)
 * [Fetch a single message](/api/get-message)
 * [Check if messages match a narrow](/api/check-messages-match-narrow)
+* [Count messages in a narrow](/api/get-message-count)
 * [Get a message's edit history](/api/get-message-history)
 * [Update personal message flags](/api/update-message-flags)
 * [Update personal message flags for narrow](/api/update-message-flags-for-narrow)
@@ -52,6 +53,29 @@
 * [Add a navigation view](/api/add-navigation-view)
 * [Update the navigation view](/api/edit-navigation-view)
 * [Remove a navigation view](/api/remove-navigation-view)
+
+## Calendar
+
+* [Get calendar events](/api/get-calendar-events)
+* [Get a calendar event](/api/get-calendar-event)
+* [Create a calendar event](/api/create-calendar-event)
+* [Update a calendar event](/api/update-calendar-event)
+* [Delete a calendar event](/api/delete-calendar-event)
+* [Respond to a calendar event](/api/respond-to-calendar-event)
+* [Forward a calendar event](/api/add-calendar-attendees)
+* [Get the chat of a meeting](/api/get-calendar-event-chat)
+* [Join the call of a meeting](/api/join-calendar-event-call)
+* [Update personal settings for a calendar event](/api/update-calendar-personal-settings)
+* [Get free/busy times](/api/get-calendar-free-busy)
+* [Get pinned calendars](/api/get-calendar-pinned-users)
+* [Pin a calendar](/api/pin-calendar-user)
+* [Update a pinned calendar](/api/update-calendar-pinned-user)
+* [Unpin a calendar](/api/unpin-calendar-user)
+* [Get calendar settings](/api/get-calendar-settings)
+* [Update calendar settings](/api/update-calendar-settings)
+* [Get meeting rooms](/api/get-calendar-rooms)
+* [Create a meeting room](/api/create-calendar-room)
+* [Update a meeting room](/api/update-calendar-room)
 
 ## Channels
 

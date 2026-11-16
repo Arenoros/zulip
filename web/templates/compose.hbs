@@ -61,10 +61,12 @@
             <form id="send_message_form" action="/json/messages" method="post">
                 <div class="compose_table">
                     <div id="compose_top">
-                        <div id="new-conversation-form-title" class="new-conversation-form-only"></div>
-                        <label class="new-conversation-form-label new-conversation-form-only" for="stream_message_recipient_topic">
-                            {{t "Topic" }} <span class="new-conversation-form-required" aria-hidden="true">*</span>
-                        </label>
+                        <div id="new-conversation-form-header" class="new-conversation-form-only">
+                            <img class="new-conversation-form-avatar" src="" alt="" />
+                            <span class="new-conversation-form-author"></span>
+                            <span class="new-conversation-form-channel"><span aria-hidden="true">· </span><span id="new-conversation-form-title"></span></span>
+                            {{> components/icon_button icon="close" intent="neutral" custom_classes="new-conversation-form-close tippy-zulip-delayed-tooltip" data-tippy-content=(t "Close without publishing") aria-label=(t "Close without publishing") }}
+                        </div>
                         {{!-- We start with the low-attention-recipient-row class
                         on the template to avoid showing the transition
                         when the compose box first opens. Note that this
@@ -96,14 +98,16 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="new-conversation-form-hint new-conversation-form-only">
-                            {{t "Required. A message posted here starts a new conversation; to reply to an existing one, use Reply in topic on its card." }}
-                        </div>
-                        <label class="new-conversation-form-label new-conversation-form-only" for="compose-textarea">{{t "Message" }}</label>
+                    </div>
+                    {{!-- In the conversations view of a channel, the topic a
+                    reply goes to. --}}
+                    <div id="compose-reply-line">
+                        <span id="compose-reply-line-text"></span>
+                        {{> components/icon_button icon="close" intent="neutral" custom_classes="compose-reply-line-close tippy-zulip-delayed-tooltip" data-tippy-content=(t "Close") aria-label=(t "Close") }}
                     </div>
                     <div class="messagebox">
                         <div id="message-content-container" class="surround-formatting-buttons-row">
-                            <textarea class="new_message_textarea message-textarea" name="content" id='compose-textarea' placeholder="{{t 'Compose your message here' }}" tabindex="0" aria-label="{{t 'Compose your message here…' }}"></textarea>
+                            <textarea class="new_message_textarea message-textarea" name="content" id='compose-textarea' rows="1" placeholder="{{t 'Compose your message here' }}" tabindex="0" aria-label="{{t 'Compose your message here…' }}"></textarea>
                             <div id="preview-message-area-container">
                                 <div class="scrolling_list preview_message_area" data-simplebar data-simplebar-tab-index="-1" id="preview_message_area" style="display:none;">
                                     <div class="markdown_preview_spinner"></div>
@@ -118,12 +122,18 @@
                             <div class="drag"></div>
                         </div>
 
+                        {{!-- In a view of a single conversation, the compose box
+                        is one row: the message, these buttons, and the send
+                        controls. --}}
+                        <div id="compose-row-buttons">
+                            {{> compose_row_buttons . }}
+                        </div>
+
                         <div id="message-send-controls-container">
                             <a id="compose-drafts-button" role="button" class="send-control-button hide-sm" tabindex=0 href="#drafts">
                                 <span class="compose-drafts-text">{{t 'Drafts' }}</span><span class="compose-drafts-count-container">(<span class="compose-drafts-count"></span>)</span>
                             </a>
                             <span id="compose-limit-indicator" class="message-limit-indicator"></span>
-                            {{> components/action_button id="new-conversation-cancel" label=(t "Cancel") variant="subtle" intent="neutral" custom_classes="new-conversation-form-only" }}
                             <div class="message-send-controls">
                                 <button type="submit" id="compose-send-button" class="send_message compose-submit-button compose-send-or-save-button" aria-label="{{t 'Send' }}">
                                     <img class="loader" alt="" src="" />
@@ -144,6 +154,19 @@
                             <button type="button" class="formatting-control-scroller-button formatting-scroller-backward" aria-label="{{t 'Scroll backward' }}">
                                 <i class="scroller-backward-icon zulip-icon zulip-icon-compose-scroll-left"></i>
                             </button>
+                            {{!-- At the end of the formatting toolbar of the compose
+                            box of a single conversation. --}}
+                            <div class="compose-toolbar-end">
+                                <button type="button" class="compose-row-button maximize-composebox-button" aria-label="{{t 'Maximize compose box' }}" data-tippy-content="{{t 'Maximize compose box' }}">
+                                    <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="compose-row-button collapse-composebox-button" aria-label="{{t 'Collapse compose box' }}" data-tippy-content="{{t 'Collapse compose box' }}">
+                                    <i class="zulip-icon zulip-icon-collapse-diagonal" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="compose-row-button compose-delete-draft-button tippy-zulip-delayed-tooltip" aria-label="{{t 'Delete draft' }}" data-tippy-content="{{t 'Delete draft' }}">
+                                    <i class="zulip-icon zulip-icon-trash" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -9,8 +9,10 @@ import KeyboardTip from "../../components/KeyboardTip.astro";
 import ZulipNote from "../../components/ZulipNote.astro";
 import ComposeBoxMenu from "../include/_ComposeBoxMenu.mdx";
 import GoToDraftMessages from "../include/_GoToDraftMessages.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
+import ChevronDownIcon from "~icons/zulip-icon/chevron-down";
 import CloseIcon from "~icons/zulip-icon/close";
 import TrashIcon from "~icons/zulip-icon/trash";
 
@@ -87,6 +89,9 @@ counter next to the **Drafts** button in the compose box shows how many there ar
       <StartComposing />
 
       1. Click the **Drafts** button on the right side of the compose box.
+         In a direct message conversation or a topic, click the
+         **chevron** (<ChevronDownIcon />) next to the **send** button
+         instead, and choose **View drafts**.
       1. Click on the draft you want to restore.
     </FlattenedSteps>
 
@@ -121,6 +126,9 @@ counter next to the **Drafts** button in the compose box shows how many there ar
       <StartComposing />
 
       1. Click the **Drafts** button on the right side of the compose box.
+         In a direct message conversation or a topic, click the
+         **chevron** (<ChevronDownIcon />) next to the **send** button
+         instead, and choose **View drafts**.
       1. Click the **delete** (<TrashIcon />) icon on the draft you
          want to delete.
     </FlattenedSteps>
@@ -129,6 +137,16 @@ counter next to the **Drafts** button in the compose box shows how many there ar
       You can also use <kbd>D</kbd> to bring up your list of saved drafts, and
       <kbd>Backspace</kbd> within the drafts view to delete the selected draft.
     </KeyboardTip>
+  </TabItem>
+
+  <TabItem label="In a conversation">
+    <FlattenedSteps>
+      <ShowFormattingButtons />
+
+      1. Click the **delete draft** (<TrashIcon />) icon at the end of the
+         formatting buttons. This empties the compose box and deletes its
+         draft.
+    </FlattenedSteps>
   </TabItem>
 </Tabs>
 
@@ -156,6 +174,9 @@ counter next to the **Drafts** button in the compose box shows how many there ar
       <StartComposing />
 
       1. Click the **Drafts** button on the right side of the compose box.
+         In a direct message conversation or a topic, click the
+         **chevron** (<ChevronDownIcon />) next to the **send** button
+         instead, and choose **View drafts**.
       1. Click **Select all drafts** in the upper right corner of
          the drafts view, or select the drafts you want to delete
          by toggling the checkboxes on the right.

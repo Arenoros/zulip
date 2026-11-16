@@ -180,12 +180,17 @@ from zerver.actions.video_calls import (
     do_update_livekit_call_participant,
 )
 from zerver.lib import event_types
+from zerver.lib.calendar.changes import create_calendar_event, respond_to_calendar_event
+from zerver.lib.calendar.user_settings import update_calendar_user_settings
 from zerver.lib.drafts import DraftData, do_create_drafts, do_delete_draft, do_edit_draft
 from zerver.lib.event_schema import (
     check_alert_words,
     check_attachment_add,
     check_attachment_remove,
     check_attachment_update,
+    check_calendar,
+    check_calendar_free_busy,
+    check_calendar_settings,
     check_call_answer,
     check_call_cancel,
     check_call_missed_seen,
@@ -310,6 +315,7 @@ from zerver.lib.user_groups import (
 )
 from zerver.models import (
     Attachment,
+    CalendarPinnedUser,
     CustomProfileField,
     Device,
     ImageAttachment,
@@ -337,6 +343,7 @@ from zerver.models import (
     UserTopic,
 )
 from zerver.models.bots import get_bot_services
+from zerver.models.calendar import CalendarResponse
 from zerver.models.clients import get_client
 from zerver.models.groups import SystemGroups
 from zerver.models.realm_audit_logs import AuditLogEventType
@@ -2178,6 +2185,46 @@ class NormalActionsTest(BaseAction):
         with self.verify_action() as events:
             do_remove_alert_words(self.user_profile, ["alert_word"])
         check_alert_words("events[0]", events[0])
+
+    def test_calendar_events(self) -> None:
+        othello = self.example_user("othello")
+        cordelia = self.example_user("cordelia")
+        start = timezone_now() + timedelta(days=1)
+        event_fields: dict[str, Any] = dict(
+            title="Planning",
+            start=start,
+            end=start + timedelta(hours=1),
+            event_timezone="UTC",
+            optional_attendees=[],
+        )
+
+        # Notification Bot also invites the user.
+        with self.verify_action(num_events=2) as events:
+            event_id = create_calendar_event(
+                othello, required_attendees=[self.user_profile], **event_fields
+            )
+        check_direct_message("events[0]", events[0])
+        check_calendar("events[1]", events[1])
+        self.assertEqual(events[1]["unanswered_invitation_count"], 1)
+
+        with self.verify_action() as events:
+            respond_to_calendar_event(self.user_profile, event_id, CalendarResponse.ACCEPTED)
+        check_calendar("events[0]", events[0])
+        self.assertEqual(events[0]["unanswered_invitation_count"], 0)
+
+        CalendarPinnedUser.objects.create(
+            user=self.user_profile, pinned_user=cordelia, order=1, color="#4f7cff"
+        )
+        with self.verify_action(state_change_expected=False) as events:
+            create_calendar_event(othello, required_attendees=[cordelia], **event_fields)
+        check_calendar_free_busy("events[0]", events[0])
+        self.assertEqual(events[0]["user_ids"], [cordelia.id])
+
+    def test_calendar_settings_events(self) -> None:
+        with self.verify_action(state_change_expected=False) as events:
+            update_calendar_user_settings(self.user_profile, work_days=[1, 2, 3, 4])
+        check_calendar_settings("events[0]", events[0])
+        self.assertEqual(events[0]["settings"]["work_days"], [1, 2, 3, 4])
 
     def test_personal_sections_events(self) -> None:
         with self.verify_action() as events:

@@ -1,4 +1,13 @@
-{{#if conversation_header}}
+{{#if has_view_switcher}}
+<nav class="navbar_title view-switcher" aria-label="{{t 'Views' }}">
+    {{#each view_switcher_segments}}
+        <a class="view-switcher-segment tippy-zulip-delayed-tooltip{{#if is_active}} active{{/if}}" href="{{url}}" aria-label="{{label}}" data-tippy-content="{{label}}" data-tippy-placement="bottom"{{#if is_active}} aria-current="page"{{/if}}>
+            <i class="zulip-icon zulip-icon-{{zulip_icon}}" aria-hidden="true"></i>
+            <span class="view-switcher-label">{{label}}</span>
+        </a>
+    {{/each}}
+</nav>
+{{else if conversation_header}}
 {{> conversation_header conversation_header}}
 {{else if open_conversation_header}}
 {{> open_conversation_header open_conversation_header}}
@@ -40,4 +49,17 @@
         {{/if}}
     </span>
 {{/if}}
+{{/if}}
+{{#if can_join_meeting_call}}
+<span class="message-view-header-buttons">
+    {{> components/action_button label=(t "Join") icon="video-call" variant="solid" intent="brand" custom_classes="message-view-header-join-meeting-call" }}
+</span>
+{{/if}}
+{{#if has_people_button}}
+<span class="message-view-header-buttons">
+    {{#if can_start_call}}
+    {{> message_view_header_call_buttons}}
+    {{/if}}
+    {{> message_view_header_people_button}}
+</span>
 {{/if}}

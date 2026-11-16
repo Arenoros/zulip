@@ -1,0 +1,133 @@
+<div class="calendar-scheduler" role="region" aria-label="{{t 'Scheduler' }}">
+    <div class="calendar-form-card calendar-form-toolbar">
+        <button type="button" class="calendar-toolbar-button calendar-scheduler-back">
+            <i class="zulip-icon zulip-icon-arrow-left" aria-hidden="true"></i>
+            {{t "Back" }}
+        </button>
+        <span class="calendar-toolbar-separator" aria-hidden="true"></span>
+        <button type="button" class="calendar-toolbar-button calendar-scheduler-options" aria-haspopup="true">
+            <i class="zulip-icon zulip-icon-sliders" aria-hidden="true"></i>
+            {{t "Display options" }}
+            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+        </button>
+        <span class="calendar-toolbar-spacer"></span>
+        <button type="button" class="calendar-toolbar-button calendar-form-save calendar-scheduler-save">
+            <i class="zulip-icon zulip-icon-check" aria-hidden="true"></i>
+            {{t "Save" }}
+        </button>
+    </div>
+    <div class="calendar-form-error calendar-scheduler-error alert-error" role="alert"></div>
+    <div class="calendar-form-card calendar-scheduler-body">
+        <div class="calendar-scheduler-time">
+            <button type="button" class="calendar-form-input-button calendar-scheduler-date" aria-haspopup="true" aria-label="{{date_aria_label}}">
+                {{date_label}}
+                <i class="zulip-icon zulip-icon-calendar" aria-hidden="true"></i>
+            </button>
+            {{#unless is_all_day}}
+                <select class="calendar-form-select calendar-scheduler-start" aria-label="{{t 'Start time' }}"></select>
+                <span class="calendar-scheduler-to">{{t "to" }}</span>
+                <select class="calendar-form-select calendar-scheduler-end" aria-label="{{t 'End time' }}"></select>
+            {{/unless}}
+            <label class="calendar-scheduler-all-day">
+                <input type="checkbox" class="calendar-switch calendar-scheduler-all-day-checkbox" {{#if is_all_day}}checked{{/if}}/>
+                {{t "All day" }}
+            </label>
+        </div>
+        <div class="calendar-scheduler-scroll">
+            <div class="calendar-scheduler-grid" data-css-calendar-scheduler-scale="{{scale}}" data-css-calendar-scheduler-total="{{total_minutes}}">
+                <div class="calendar-scheduler-corner"></div>
+                <div class="calendar-scheduler-header">
+                    {{#each days}}
+                        <div class="calendar-scheduler-day {{#if is_selected}}selected{{/if}}" data-css-calendar-scheduler-span="{{../day_minutes}}">
+                            <div class="calendar-scheduler-day-label">{{label}}</div>
+                            <div class="calendar-scheduler-hours">
+                                {{#each hours}}
+                                    <span class="calendar-scheduler-hour" data-css-calendar-scheduler-span="{{minutes}}">{{label}}</span>
+                                {{/each}}
+                            </div>
+                        </div>
+                    {{/each}}
+                </div>
+                {{#each rows}}
+                    <div class="calendar-scheduler-label calendar-scheduler-{{kind}}-label {{#if is_hidden}}hide{{/if}}">
+                        {{#if (eq kind "availability")}}
+                            <span class="calendar-scheduler-availability-title">{{t "Availability" }}</span>
+                        {{else if (eq kind "section")}}
+                            <button type="button" class="calendar-text-button calendar-scheduler-section-toggle" data-section="{{section}}" aria-expanded="{{#if is_collapsed}}false{{else}}true{{/if}}">
+                                <i class="zulip-icon zulip-icon-chevron-{{#if is_collapsed}}right{{else}}down{{/if}}" aria-hidden="true"></i>
+                                {{title}}
+                            </button>
+                        {{else if (eq kind "person")}}
+                            <img class="calendar-scheduler-avatar" src="{{avatar_url}}" alt=""/>
+                            <span class="calendar-scheduler-person">
+                                <span class="calendar-scheduler-name" title="{{name}}">{{name}}</span>
+                                {{#if is_unavailable}}
+                                    <span class="calendar-scheduler-unavailable">{{t "Unavailable" }}</span>
+                                {{/if}}
+                            </span>
+                            <span class="calendar-scheduler-local-time">
+                                <span>{{local_day}}</span>
+                                <span>{{local_time}}</span>
+                            </span>
+                            {{#if can_remove}}
+                                <button type="button" class="calendar-icon-button calendar-scheduler-remove tippy-zulip-delayed-tooltip" data-user-id="{{user_id}}" data-tippy-content="{{t 'Remove' }}" aria-label="{{remove_label}}">
+                                    <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                                </button>
+                            {{/if}}
+                        {{else if (eq kind "room")}}
+                            <span class="calendar-scheduler-room-icon" aria-hidden="true">
+                                <i class="zulip-icon zulip-icon-building"></i>
+                            </span>
+                            <span class="calendar-scheduler-person">
+                                <span class="calendar-scheduler-name" title="{{name}}">{{name}}</span>
+                                {{#if is_unavailable}}
+                                    <span class="calendar-scheduler-unavailable">{{t "Unavailable" }}</span>
+                                {{/if}}
+                            </span>
+                            {{#if details}}
+                                <span class="calendar-scheduler-room-details">{{details}}</span>
+                            {{/if}}
+                            {{#if can_remove}}
+                                <button type="button" class="calendar-icon-button calendar-scheduler-remove tippy-zulip-delayed-tooltip" data-room-id="{{room_id}}" data-tippy-content="{{t 'Remove' }}" aria-label="{{remove_label}}">
+                                    <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                                </button>
+                            {{/if}}
+                        {{else if (eq kind "add")}}
+                            <i class="zulip-icon zulip-icon-user-plus calendar-scheduler-add-icon" aria-hidden="true"></i>
+                            <div class="pill-container person_picker calendar-scheduler-add" data-section="{{section}}">
+                                <div class="input" contenteditable="true" data-placeholder="{{placeholder}}" aria-label="{{placeholder}}">
+                                    {{~! Squash whitespace so that placeholder is displayed when empty. ~}}
+                                </div>
+                            </div>
+                        {{/if}}
+                    </div>
+                    <div class="calendar-scheduler-track calendar-scheduler-{{kind}}-track {{#if is_hidden}}hide{{/if}}">
+                        {{#each off_hours}}
+                            <span class="calendar-scheduler-off-hours" data-css-calendar-scheduler-start="{{start}}" data-css-calendar-scheduler-span="{{span}}"></span>
+                        {{/each}}
+                        {{#if has_no_data}}
+                            <span class="calendar-scheduler-no-data" data-css-calendar-scheduler-start="0" data-css-calendar-scheduler-span="{{../total_minutes}}"></span>
+                        {{/if}}
+                        {{#each blocks}}
+                            <span class="calendar-event free-busy {{class_name}} calendar-scheduler-block" data-css-calendar-scheduler-start="{{start}}" data-css-calendar-scheduler-span="{{span}}" title="{{label}}"></span>
+                        {{/each}}
+                    </div>
+                {{/each}}
+                <div class="calendar-scheduler-selection {{#unless has_selection}}hide{{/unless}}" tabindex="0" role="slider" aria-label="{{t 'Time of the event' }}" aria-valuetext="{{selection_label}}" data-css-calendar-scheduler-start="{{selection.start}}" data-css-calendar-scheduler-span="{{selection.span}}"></div>
+            </div>
+        </div>
+        <button type="button" class="calendar-toolbar-button calendar-scheduler-find">
+            <i class="zulip-icon zulip-icon-calendar-days" aria-hidden="true"></i>
+            {{t "Find a time" }}
+            <i class="zulip-icon zulip-icon-chevron-right" aria-hidden="true"></i>
+        </button>
+    </div>
+    <div class="calendar-scheduler-legend">
+        {{#each legend}}
+            <span class="calendar-legend-item">
+                <span class="calendar-legend-swatch {{swatch_class}}" aria-hidden="true"></span>
+                {{label}}
+            </span>
+        {{/each}}
+    </div>
+</div>

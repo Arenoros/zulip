@@ -1,0 +1,217 @@
+import {$} from "jquery";
+import assert from "minimalistic-assert";
+import * as z from "zod/mini";
+
+import render_left_sidebar_meeting_chat_popover from "../templates/popovers/left_sidebar/left_sidebar_meeting_chat_popover.hbs";
+
+import * as browser_history from "./browser_history.ts";
+import * as calendar_actions from "./calendar_actions.ts";
+import * as calendar_call from "./calendar_call.ts";
+import * as calendar_grid from "./calendar_grid.ts";
+import * as channel from "./channel.ts";
+import * as confirm_dialog from "./confirm_dialog.ts";
+import * as hash_util from "./hash_util.ts";
+import {$t_html} from "./i18n.ts";
+import * as people from "./people.ts";
+import * as popover_menus from "./popover_menus.ts";
+import * as stream_data from "./stream_data.ts";
+import * as sub_store from "./sub_store.ts";
+import type {StreamSubscription} from "./sub_store.ts";
+import * as subscriber_api from "./subscriber_api.ts";
+import * as ui_report from "./ui_report.ts";
+import * as ui_util from "./ui_util.ts";
+import * as util from "./util.ts";
+
+// The chat of a meeting is a private channel without topics, which
+// the server creates when someone first opens it and which is shown
+// among direct message conversations. A meeting in a channel is
+// discussed in a topic of that channel instead.
+
+// How far ahead the header of a meeting's chat looks for its next
+// occurrence; the longest range the server allows.
+const NEXT_OCCURRENCE_DAYS = 62;
+
+// The chat the user opened, until the client learns they are
+// subscribed to it.
+let pending_chat_id: number | undefined;
+
+type NextOccurrence = {
+    time_label: string;
+    event_id: number;
+    can_join_call: boolean;
+};
+
+// The next occurrence of the meeting of each chat, or null if it has
+// none soon, once fetched.
+const next_occurrences = new Map<number, NextOccurrence | null>();
+const fetching_chat_ids = new Set<number>();
+
+function go_to_chat(stream_id: number, topic = ""): void {
+    browser_history.go_to_location(hash_util.by_stream_topic_url(stream_id, topic));
+}
+
+// Whether the user can open where the meeting is discussed: attendees
+// who cannot access the channel of a meeting in a channel only join
+// its call.
+export function can_discuss(occurrence: {channel_id: number | null}): boolean {
+    if (occurrence.channel_id === null) {
+        return true;
+    }
+    const sub = sub_store.get(occurrence.channel_id);
+    return sub !== undefined && stream_data.has_content_access(sub);
+}
+
+// The channel and topic of a meeting in a channel, as "#channel >
+// topic", if the user can see the channel.
+export function get_channel_label(occurrence: {
+    channel_id: number | null;
+    topic: string;
+}): string | undefined {
+    const sub = occurrence.channel_id === null ? undefined : sub_store.get(occurrence.channel_id);
+    if (sub === undefined) {
+        return undefined;
+    }
+    return `#${sub.name} > ${util.get_final_topic_display_name(occurrence.topic)}`;
+}
+
+export function open(event_id: number, $error: JQuery): void {
+    void channel.post({
+        url: `/json/calendar/events/${event_id}/chat`,
+        success(data) {
+            const {stream_id, topic} = z
+                .object({stream_id: z.number(), topic: z.string()})
+                .parse(data);
+            // The chat of a meeting may be new, unlike a channel the
+            // user can access.
+            const sub = sub_store.get(stream_id);
+            if (
+                stream_data.is_subscribed(stream_id) ||
+                (sub !== undefined && !sub.is_meeting_chat)
+            ) {
+                go_to_chat(stream_id, topic);
+            } else {
+                pending_chat_id = stream_id;
+            }
+        },
+        error(xhr) {
+            ui_report.error($t_html({defaultMessage: "Failed to open the chat"}), xhr, $error);
+        },
+    });
+}
+
+export function on_subscribed(sub: StreamSubscription): void {
+    if (sub.stream_id === pending_chat_id) {
+        pending_chat_id = undefined;
+        go_to_chat(sub.stream_id);
+    }
+}
+
+// The meeting's next occurrence, for the header of its chat, which
+// shows when it is and offers to join its call: undefined until it is
+// fetched, when on_fetched is called.
+export function get_next_occurrence(
+    stream_id: number,
+    on_fetched: () => void,
+): NextOccurrence | null | undefined {
+    if (next_occurrences.has(stream_id) || fetching_chat_ids.has(stream_id)) {
+        return next_occurrences.get(stream_id);
+    }
+    fetching_chat_ids.add(stream_id);
+    const now = Math.floor(Date.now() / 1000);
+    void channel.get({
+        url: "/json/calendar/events",
+        data: {start: now, end: now + NEXT_OCCURRENCE_DAYS * 24 * 60 * 60},
+        success(data) {
+            const next = calendar_grid.events_schema
+                .parse(data)
+                .events.filter(
+                    (occurrence) => occurrence.chat_id === stream_id && !occurrence.is_cancelled,
+                )
+                .toSorted((a, b) => a.start - b.start)[0];
+            next_occurrences.set(
+                stream_id,
+                next === undefined
+                    ? null
+                    : {
+                          time_label: calendar_actions.get_time_label(next),
+                          event_id: next.id,
+                          can_join_call: calendar_call.can_join(next),
+                      },
+            );
+            fetching_chat_ids.delete(stream_id);
+            on_fetched();
+        },
+        error() {
+            fetching_chat_ids.delete(stream_id);
+        },
+    });
+    return undefined;
+}
+
+// Changes to meetings may change when they next take place.
+export function clear_next_occurrences(): void {
+    next_occurrences.clear();
+}
+
+// Leaving the chat unsubscribes the user; opening it from the meeting
+// brings them back.
+function confirm_leave(sub: StreamSubscription): void {
+    confirm_dialog.launch({
+        modal_title_html: $t_html({defaultMessage: "Leave {name}?"}, {name: sub.name}),
+        modal_content_html: $t_html({
+            defaultMessage: "You can return to the chat with Discussion in the meeting.",
+        }),
+        is_compact: true,
+        id: "leave_meeting_chat_modal",
+        on_click() {
+            subscriber_api.remove_user_id_from_stream(
+                people.my_current_user_id(),
+                sub,
+                () => {
+                    // The client learns it left from the server's event.
+                },
+                (xhr) => {
+                    ui_report.error(
+                        $t_html({defaultMessage: "Failed to leave the chat"}),
+                        xhr,
+                        $("#home-error"),
+                    );
+                },
+            );
+        },
+    });
+}
+
+export function initialize(): void {
+    popover_menus.register_popover_menu(
+        "#direct-messages-list .meeting-chat-sidebar-menu-icon, #modal-direct-messages-list .meeting-chat-sidebar-menu-icon",
+        {
+            ...popover_menus.left_sidebar_tippy_options,
+            onShow(instance) {
+                popover_menus.popover_instances.meeting_chat_actions = instance;
+                ui_util.show_left_sidebar_menu_icon(instance.reference);
+                popover_menus.on_show_prep(instance);
+                instance.setContent(ui_util.parse_html(render_left_sidebar_meeting_chat_popover()));
+                return undefined;
+            },
+            onMount(instance) {
+                const stream_id = Number(
+                    $(instance.reference).closest(".meeting-chat-list-item").attr("data-stream-id"),
+                );
+                const sub = sub_store.get(stream_id);
+                assert(sub !== undefined);
+                $(instance.popper).one("click", ".meeting-chat-popover-leave", () => {
+                    popover_menus.hide_current_popover_if_visible(instance);
+                    confirm_leave(sub);
+                });
+                popover_menus.focus_popover(instance);
+            },
+            onHidden(instance) {
+                ui_util.hide_left_sidebar_menu_icon();
+                instance.destroy();
+                popover_menus.popover_instances.meeting_chat_actions = null;
+            },
+        },
+        {also_trigger_on_enter: true},
+    );
+}

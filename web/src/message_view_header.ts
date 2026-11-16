@@ -3,9 +3,14 @@ import assert from "minimalistic-assert";
 
 import render_conversation_header from "../templates/conversation_header.hbs";
 import render_message_view_header from "../templates/message_view_header.hbs";
+import render_message_view_header_call_buttons from "../templates/message_view_header_call_buttons.hbs";
 
 import * as bubble_layout from "./bubble_layout.ts";
 import * as buddy_data from "./buddy_data.ts";
+import * as calendar_call from "./calendar_call.ts";
+import * as calendar_meeting_chat from "./calendar_meeting_chat.ts";
+import * as call_ringing from "./call_ringing.ts";
+import * as compose_call from "./compose_call.ts";
 import type {Filter} from "./filter.ts";
 import * as hash_util from "./hash_util.ts";
 import {$t} from "./i18n.ts";
@@ -61,6 +66,13 @@ type OpenConversationHeaderContext = {
     all_visibility_policies: AllVisibilityPolicies;
 };
 
+type ViewSwitcherSegment = {
+    label: string;
+    url: string;
+    zulip_icon: string;
+    is_active: boolean;
+};
+
 type MessageViewHeaderContext = {
     title?: string | undefined;
     title_html?: string | undefined;
@@ -75,6 +87,11 @@ type MessageViewHeaderContext = {
     stream_settings_link?: string;
     conversation_header?: ConversationHeaderContext;
     open_conversation_header?: OpenConversationHeaderContext;
+    has_view_switcher?: boolean;
+    view_switcher_segments?: ViewSwitcherSegment[];
+    can_start_call?: boolean;
+    can_join_meeting_call?: boolean;
+    has_people_button?: boolean;
 } & (
     | {
           zulip_icon: string;
@@ -84,11 +101,59 @@ type MessageViewHeaderContext = {
       }
 );
 
+// The header of a meeting's chat names the meeting, with the time of
+// its next occurrence, where a group chat shows its participants.
+function get_meeting_chat_next_occurrence(
+    stream_id: number,
+): ReturnType<typeof calendar_meeting_chat.get_next_occurrence> {
+    return calendar_meeting_chat.get_next_occurrence(stream_id, () => {
+        maybe_rerender_title_area_for_stream(stream_id);
+    });
+}
+
+// The header of a meeting's chat offers to join the meeting's call.
+function can_join_meeting_call(filter: Filter): boolean {
+    if (!filter.is_conversation_view() || !bubble_layout.is_meeting_chat(filter)) {
+        return false;
+    }
+    const stream_id = narrow_state.stream_id(filter);
+    assert(stream_id !== undefined);
+    return get_meeting_chat_next_occurrence(stream_id)?.can_join_call ?? false;
+}
+
+function get_meeting_chat_header_context(filter: Filter): ConversationHeaderContext {
+    const sub = narrow_state.stream_sub(filter);
+    assert(sub !== undefined);
+    const subtitle_parts = [
+        $t({defaultMessage: "Group chat"}),
+        $t(
+            {defaultMessage: "{N, plural, one {# participant} other {# participants}}"},
+            {N: peer_data.get_subscriber_count(sub.stream_id)},
+        ),
+    ];
+    const next_occurrence = get_meeting_chat_next_occurrence(sub.stream_id);
+    if (next_occurrence) {
+        subtitle_parts.push(next_occurrence.time_label);
+    }
+    return {
+        title: sub.name,
+        avatar_urls: [],
+        is_group: true,
+        user_circle_class: undefined,
+        channel_color: sub.color,
+        channel_icon: "calendar",
+        subtitle: subtitle_parts.join(" · "),
+    };
+}
+
 // In the bubble layout, the header of a direct message conversation
 // shows who it is with, as avatars, and their status.
 function get_conversation_header_context(filter: Filter): ConversationHeaderContext | undefined {
     if (!bubble_layout.is_bubble_layout(filter)) {
         return undefined;
+    }
+    if (bubble_layout.is_meeting_chat(filter)) {
+        return get_meeting_chat_header_context(filter);
     }
     const user_ids = filter.terms_with_operator("dm")[0]!.operand;
     const users: User[] = [];
@@ -157,6 +222,31 @@ function get_conversation_header_context(filter: Filter): ConversationHeaderCont
     };
 }
 
+// Calls start from the header of a direct message conversation, with
+// everyone in it, so they need someone else who can answer: not only
+// bots, and no one deactivated.
+function can_start_call(filter: Filter): boolean {
+    if (!filter.is_conversation_view() || !compose_call.is_livekit_call_provider()) {
+        return false;
+    }
+    const user_ids = narrow_state.pm_ids(filter);
+    if (user_ids === undefined) {
+        return false;
+    }
+    const users: User[] = [];
+    for (const user_id of user_ids) {
+        if (people.is_my_user_id(user_id)) {
+            continue;
+        }
+        const user = people.maybe_get_user_by_id(user_id, true);
+        if (user === undefined || user.is_inaccessible_user || !people.is_person_active(user_id)) {
+            return false;
+        }
+        users.push(user);
+    }
+    return users.some((user) => !user.is_bot);
+}
+
 // The header of an open conversation names the topic, under the
 // channel it is in, leads back to the channel's conversations view,
 // and offers the topic's actions.
@@ -188,6 +278,54 @@ function get_open_conversation_header_context(
         visibility_policy: user_topics.get_topic_visibility_policy(sub.stream_id, topic_name),
         all_visibility_policies: user_topics.all_visibility_policies,
     };
+}
+
+// The combined feed, mentions and starred messages are mixed views
+// with the same layout, so their headers switch between them.
+function get_view_switcher_context(filter: Filter | undefined): {
+    has_view_switcher?: boolean;
+    view_switcher_segments?: ViewSwitcherSegment[];
+} {
+    if (page_params.is_spectator) {
+        return {};
+    }
+    let active_view;
+    if (filter === undefined || filter.is_in_home()) {
+        active_view = "feed";
+    } else {
+        const term_types = filter.sorted_term_types();
+        if (term_types.length !== 1) {
+            return {};
+        }
+        if (term_types[0] === "is-mentioned") {
+            active_view = "mentions";
+        } else if (term_types[0] === "is-starred") {
+            active_view = "starred";
+        } else {
+            return {};
+        }
+    }
+    const view_switcher_segments = [
+        {
+            label: $t({defaultMessage: "Combined feed"}),
+            url: "#feed",
+            zulip_icon: "all-messages",
+            is_active: active_view === "feed",
+        },
+        {
+            label: $t({defaultMessage: "Mentions"}),
+            url: "#narrow/is/mentioned",
+            zulip_icon: "at-sign",
+            is_active: active_view === "mentions",
+        },
+        {
+            label: $t({defaultMessage: "Starred"}),
+            url: "#narrow/is/starred",
+            zulip_icon: "star",
+            is_active: active_view === "starred",
+        },
+    ];
+    return {has_view_switcher: true, view_switcher_segments};
 }
 
 function get_message_view_header_context(filter: Filter | undefined): MessageViewHeaderContext {
@@ -238,6 +376,7 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
             description,
             zulip_icon: "all-messages",
             link: "/help/combined-feed",
+            ...get_view_switcher_context(filter),
         };
     }
 
@@ -245,12 +384,19 @@ function get_message_view_header_context(filter: Filter | undefined): MessageVie
     const description = filter.get_description()?.description;
     const link = filter.get_description()?.link;
     assert(title !== undefined);
-    const context = filter.add_icon_data({
-        title,
-        description,
-        link,
-        is_spectator: page_params.is_spectator,
-    });
+    const context = {
+        ...filter.add_icon_data({
+            title,
+            description,
+            link,
+            is_spectator: page_params.is_spectator,
+        }),
+        can_start_call: can_start_call(filter),
+        can_join_meeting_call: can_join_meeting_call(filter),
+        has_people_button:
+            filter.is_conversation_view() && narrow_state.pm_ids(filter) !== undefined,
+        ...get_view_switcher_context(filter),
+    };
 
     const conversation_header = get_conversation_header_context(filter);
     if (conversation_header) {
@@ -349,6 +495,33 @@ function build_message_view_header(filter: Filter | undefined): void {
 
 export function initialize(): void {
     render_title_area();
+
+    $("#message_view_header").on(
+        "click",
+        ".message-view-header-video-call, .message-view-header-voice-call",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const user_ids = narrow_state.pm_ids();
+            assert(user_ids !== undefined);
+            // Call IDs consist of 15 random digits.
+            call_ringing.start_direct_message_call(
+                util.random_int(100000000000000, 999999999999999),
+                user_ids,
+                this.classList.contains("message-view-header-voice-call"),
+            );
+        },
+    );
+
+    $("#message_view_header").on("click", ".message-view-header-join-meeting-call", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const stream_id = narrow_state.stream_id();
+        assert(stream_id !== undefined);
+        const next_occurrence = get_meeting_chat_next_occurrence(stream_id);
+        assert(next_occurrence);
+        calendar_call.join(next_occurrence.event_id, false, $("#home-error"));
+    });
 
     const hide_stream_settings_button_width_threshold = 620;
     $("body").on("mouseenter mouseleave", ".narrow_description", function (event) {
@@ -461,20 +634,31 @@ export function maybe_update_navbar_title_for_user(modified_user_id: number): vo
 
 // Updates the conversation header for a change to the presence, avatar
 // or account of one of its participants, or of everyone's presence if
-// no user is given. Only the conversation header is replaced, because
-// rebuilding the whole header would close a search the user has open
-// to refine the narrow.
+// no user is given. Only the conversation header and the call buttons
+// are replaced, because rebuilding the whole header would close a
+// search the user has open to refine the narrow.
 export function maybe_update_conversation_header(user_id?: number): void {
-    const $conversation_header = $("#message_view_header .conversation-header");
     const filter = narrow_state.filter();
-    if ($conversation_header.length === 0 || filter === undefined) {
+    if (filter === undefined) {
         return;
     }
     if (user_id !== undefined && !narrow_state.pm_ids_set(filter).has(user_id)) {
         return;
     }
-    const context = get_conversation_header_context(filter);
-    if (context !== undefined) {
-        $conversation_header.replaceWith($(render_conversation_header(context)));
+    const $conversation_header = $("#message_view_header .conversation-header");
+    if ($conversation_header.length > 0) {
+        const context = get_conversation_header_context(filter);
+        if (context !== undefined) {
+            $conversation_header.replaceWith($(render_conversation_header(context)));
+        }
+    }
+    // Presence does not change who can be called.
+    if (user_id !== undefined && filter.is_common_narrow()) {
+        $("#message_view_header .message-view-header-call-buttons").remove();
+        if (can_start_call(filter)) {
+            $("#message_view_header .message-view-header-buttons").prepend(
+                $(render_message_view_header_call_buttons()),
+            );
+        }
     }
 }

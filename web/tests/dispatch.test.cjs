@@ -25,6 +25,10 @@ const alert_words_ui = mock_esm("../src/alert_words_ui");
 const attachments_ui = mock_esm("../src/attachments_ui");
 const audible_notifications = mock_esm("../src/audible_notifications");
 const bot_data = mock_esm("../src/bot_data");
+const calendar_grid = mock_esm("../src/calendar_grid");
+const calendar_meeting_chat = mock_esm("../src/calendar_meeting_chat");
+const calendar_reminders = mock_esm("../src/calendar_reminders");
+const calendar_ui = mock_esm("../src/calendar_ui");
 const call_ringing = mock_esm("../src/call_ringing");
 const compose_pm_pill = mock_esm("../src/compose_pm_pill");
 const compose = mock_esm("../src/compose");
@@ -81,6 +85,7 @@ const scheduled_messages_ui = mock_esm("../src/scheduled_messages_ui");
 const scroll_bar = mock_esm("../src/scroll_bar");
 const settings_account = mock_esm("../src/settings_account");
 const settings_bots = mock_esm("../src/settings_bots");
+const settings_calendar = mock_esm("../src/settings_calendar");
 const settings_data = mock_esm("../src/settings_data");
 const settings_emoji = mock_esm("../src/settings_emoji");
 const settings_exports = mock_esm("../src/settings_exports");
@@ -316,6 +321,57 @@ run_test("attachments", ({override}) => {
     dispatch(event);
     assert.equal(stub.num_calls, 1);
     assert_same(stub.get_args("event").event, event);
+});
+
+run_test("calendar", ({override}) => {
+    const event = event_fixtures.calendar;
+    const stub = make_stub();
+    override(calendar_ui, "update_unanswered_invitation_count", stub.f);
+    const refresh_stub = make_stub();
+    override(calendar_grid, "refresh", refresh_stub.f);
+    const clear_stub = make_stub();
+    override(calendar_meeting_chat, "clear_next_occurrences", clear_stub.f);
+    const reminders_stub = make_stub();
+    override(calendar_reminders, "fetch", reminders_stub.f);
+    // Nothing is narrowed to here; the stub stands in for the
+    // narrow's channel being a meeting's chat or not.
+    let is_meeting_chat = false;
+    override(stream_data, "is_meeting_chat", () => is_meeting_chat);
+    const render_stub = make_stub();
+    override(message_view_header, "render_title_area", render_stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.equal(stub.get_args("count").count, 2);
+    assert.equal(refresh_stub.num_calls, 1);
+    assert.equal(reminders_stub.num_calls, 1);
+    assert.equal(clear_stub.num_calls, 1);
+    assert.equal(render_stub.num_calls, 0);
+
+    // The header of a meeting's chat shows when it next takes place.
+    is_meeting_chat = true;
+    dispatch(event);
+    assert.equal(render_stub.num_calls, 1);
+});
+
+run_test("calendar_free_busy", ({override}) => {
+    const event = event_fixtures.calendar_free_busy;
+    const stub = make_stub();
+    override(calendar_grid, "refresh_free_busy", stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.deepEqual(stub.get_args("user_ids").user_ids, [9, 10]);
+});
+
+run_test("calendar_settings", ({override}) => {
+    const event = event_fixtures.calendar_settings;
+    const stub = make_stub();
+    override(calendar_grid, "update_settings", stub.f);
+    const settings_stub = make_stub();
+    override(settings_calendar, "update", settings_stub.f);
+    dispatch(event);
+    assert.equal(stub.num_calls, 1);
+    assert.deepEqual(stub.get_args("settings").settings, event.settings);
+    assert.equal(settings_stub.num_calls, 1);
 });
 
 run_test("call", ({override}) => {

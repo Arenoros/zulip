@@ -33,6 +33,8 @@ const people = zrequire("people");
 const personal_sections = zrequire("personal_sections");
 const pm_conversations = zrequire("pm_conversations");
 const pm_list_data = zrequire("pm_list_data");
+const stream_data = zrequire("stream_data");
+const stream_topic_history = zrequire("stream_topic_history");
 const message_lists = zrequire("message_lists");
 const {set_realm} = zrequire("state_data");
 const {initialize_user_settings} = zrequire("user_settings");
@@ -242,6 +244,61 @@ test("get_conversations bot", ({override}) => {
 
     const pm_data = pm_list_data.get_conversations();
     assert.deepEqual(pm_data, expected_data);
+});
+
+test("meeting chats", ({override}) => {
+    // The chat of a calendar meeting is among the conversations, by
+    // its latest message.
+    pm_conversations.recent.insert([alice.user_id, bob.user_id], 10);
+    pm_conversations.recent.insert([zoe.user_id], 30);
+    const planning = {
+        subscribed: true,
+        color: "blue",
+        name: "Planning",
+        stream_id: 401,
+        is_meeting_chat: true,
+        is_archived: false,
+    };
+    stream_data.add_sub_for_tests(planning);
+    stream_topic_history.add_message({stream_id: 401, message_id: 20, topic_name: ""});
+    override(unread, "num_unread_for_user_ids_string", () => 0);
+    override(unread, "unread_count_info_for_stream", () => ({unmuted_count: 2}));
+    override(unread, "stream_has_any_unmuted_mentions", () => true);
+
+    const meeting_chat = {
+        recipients: "Planning",
+        user_ids_string: "",
+        is_meeting_chat: true,
+        meeting_chat_stream_id: 401,
+        unread: 2,
+        is_zero: false,
+        is_active: false,
+        url: "#narrow/channel/401-Planning/topic/",
+        status_emoji_info: undefined,
+        user_circle_class: undefined,
+        is_group: true,
+        is_bot: false,
+        has_unread_mention: true,
+        includes_deactivated_user: false,
+        is_current_user: false,
+    };
+    let pm_data = pm_list_data.get_conversations();
+    assert.deepEqual(
+        pm_data.map((conversation) => conversation.recipients),
+        ["Zoe", "Planning", "Alice, Bob"],
+    );
+    assert.deepEqual(pm_data[1], meeting_chat);
+
+    message_lists.set_current(
+        make_message_list([
+            {operator: "channel", operand: "401"},
+            {operator: "topic", operand: ""},
+        ]),
+    );
+    pm_data = pm_list_data.get_conversations("plan");
+    assert.deepEqual(pm_data, [{...meeting_chat, is_active: true}]);
+
+    stream_data.delete_sub(401);
 });
 
 test("get_active_user_ids_string", () => {

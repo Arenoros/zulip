@@ -52,7 +52,13 @@ export function at_rendered_top(): boolean {
 }
 
 export function message_feed_visible_top(): number {
-    return util.the($("#navbar-fixed-container")).getBoundingClientRect().bottom;
+    const navbar_bottom = util.the($("#navbar-fixed-container")).getBoundingClientRect().bottom;
+    const $search_filters = $("#search-filters-container .search-filters");
+    if ($search_filters.length === 0) {
+        return navbar_bottom;
+    }
+    // The search filters stick below the navbar.
+    return Math.max(navbar_bottom, util.the($search_filters).getBoundingClientRect().bottom);
 }
 
 export function message_viewport_info(): MessageViewportInfo {

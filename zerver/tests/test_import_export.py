@@ -88,6 +88,14 @@ from zerver.models import (
     Attachment,
     BotConfigData,
     BotStorageData,
+    CalendarAttendee,
+    CalendarAttendeeOccurrenceResponse,
+    CalendarEvent,
+    CalendarEventException,
+    CalendarEventRoom,
+    CalendarPinnedUser,
+    CalendarRoom,
+    CalendarUserSettings,
     ChannelFolder,
     CustomProfileField,
     CustomProfileFieldValue,
@@ -118,6 +126,7 @@ from zerver.models import (
     UserStatus,
     UserTopic,
 )
+from zerver.models.calendar import CalendarResponse
 from zerver.models.clients import Client, get_client
 from zerver.models.groups import SystemGroups
 from zerver.models.messages import ImageAttachment, SubMessage
@@ -179,6 +188,26 @@ def get_direct_message_group_hashes(r: Realm) -> str:
 
     direct_message_group_hash = get_direct_message_group_hash(user_id_list)
     return direct_message_group_hash
+
+
+def create_calendar_event(
+    organizer: UserProfile, attendees: list[UserProfile], uid: str
+) -> CalendarEvent:
+    start = datetime(2026, 11, 16, 9, 0, tzinfo=timezone.utc)
+    event = CalendarEvent.objects.create(
+        realm=organizer.realm,
+        uid=uid,
+        organizer=organizer,
+        title="Planning",
+        start=start,
+        end=start + timedelta(hours=1),
+        timezone="Europe/Moscow",
+        meet_code=uid,
+    )
+    CalendarAttendee.objects.create(event=event, user=organizer, response=CalendarResponse.ACCEPTED)
+    for attendee in attendees:
+        CalendarAttendee.objects.create(event=event, user=attendee)
+    return event
 
 
 class ExportFile(ZulipTestCase):
@@ -989,6 +1018,59 @@ class RealmImportExportTest(ExportFile):
         }
         self.assertEqual(exported_unsafe_sub_user_ids, set())
 
+    def test_export_calendar_events_with_member_consent(self) -> None:
+        realm = get_realm("zulip")
+        iago = self.example_user("iago")
+        cordelia = self.example_user("cordelia")
+        othello = self.example_user("othello")
+
+        # An event is exported if any of its attendees consented,
+        # together with everyone it involves.
+        event_with_consenting_attendee = create_calendar_event(cordelia, [iago], "a@zulip")
+        CalendarEventException.objects.create(
+            event=event_with_consenting_attendee,
+            original_start=event_with_consenting_attendee.start,
+            is_cancelled=True,
+        )
+        cordelia_attendee = CalendarAttendee.objects.get(
+            event=event_with_consenting_attendee, user=cordelia
+        )
+        occurrence_response = CalendarAttendeeOccurrenceResponse.objects.create(
+            attendee=cordelia_attendee,
+            original_start=event_with_consenting_attendee.start,
+            response=CalendarResponse.DECLINED,
+        )
+        event_without_consenting_attendee = create_calendar_event(cordelia, [othello], "b@zulip")
+
+        self.export_realm_and_create_auditlog(
+            realm,
+            export_type=RealmExport.EXPORT_FULL_WITH_CONSENT,
+            exportable_user_ids={iago.id},
+        )
+        realm_data = read_json("realm.json")
+        self.assertEqual(
+            self.get_set(realm_data["zerver_calendarevent"], "id"),
+            {event_with_consenting_attendee.id},
+        )
+        self.assertNotIn(
+            event_without_consenting_attendee.id,
+            self.get_set(realm_data["zerver_calendarevent"], "id"),
+        )
+        self.assertEqual(
+            self.get_set(realm_data["zerver_calendarattendee"], "user"), {cordelia.id, iago.id}
+        )
+        self.assert_length(realm_data["zerver_calendareventexception"], 1)
+        self.assertEqual(
+            self.get_set(realm_data["zerver_calendarattendeeoccurrenceresponse"], "id"),
+            {occurrence_response.id},
+        )
+
+        # In a public export, nobody consents.
+        self.export_realm_and_create_auditlog(realm, export_type=RealmExport.EXPORT_PUBLIC)
+        realm_data = read_json("realm.json")
+        self.assertEqual(realm_data["zerver_calendarevent"], [])
+        self.assertEqual(realm_data["zerver_calendarattendee"], [])
+
     def test_export_realm_with_member_consent(self) -> None:
         realm = Realm.objects.get(string_id="zulip")
 
@@ -1725,6 +1807,31 @@ class RealmImportExportTest(ExportFile):
             False,
         )
 
+        # data to test import of the calendar
+        calendar_event = create_calendar_event(hamlet, [cordelia], "import@zulip")
+        calendar_event.chat = denmark_stream
+        calendar_event.save(update_fields=["chat"])
+        cordelia_attendee = CalendarAttendee.objects.get(event=calendar_event, user=cordelia)
+        cordelia_attendee.added_by = hamlet
+        cordelia_attendee.save(update_fields=["added_by"])
+        CalendarEventException.objects.create(
+            event=calendar_event, original_start=calendar_event.start, title="Moved"
+        )
+        CalendarAttendeeOccurrenceResponse.objects.create(
+            attendee=cordelia_attendee,
+            original_start=calendar_event.start,
+            response=CalendarResponse.DECLINED,
+        )
+        CalendarPinnedUser.objects.create(
+            user=hamlet, pinned_user=cordelia, order=0, color="#4f7cff"
+        )
+        CalendarUserSettings.objects.create(user=hamlet, work_day_start_minutes=8 * 60 + 30)
+        calendar_room = CalendarRoom.objects.create(
+            realm=original_realm, name="Blue room", capacity=8, email="blue-room@zulip.com"
+        )
+        CalendarRoom.objects.create(realm=original_realm, name="Attic", is_archived=True)
+        CalendarEventRoom.objects.create(event=calendar_event, room=calendar_room)
+
         user_status = UserStatus.objects.order_by("id").last()
         assert user_status
 
@@ -2454,6 +2561,54 @@ class RealmImportExportTest(ExportFile):
                 tups, {("onboarding message", OnboardingUserMessage.flags.starred.mask)}
             )
             return tups
+
+        @getter
+        def get_calendar_attendees(r: Realm) -> set[tuple[object, ...]]:
+            return {
+                (
+                    attendee.event.uid,
+                    attendee.event.organizer.full_name,
+                    attendee.event.chat.name if attendee.event.chat is not None else None,
+                    attendee.user.full_name,
+                    attendee.added_by.full_name if attendee.added_by is not None else None,
+                    tuple(
+                        attendee.calendarattendeeoccurrenceresponse_set.values_list(
+                            "original_start", "response"
+                        )
+                    ),
+                    tuple(
+                        attendee.event.calendareventexception_set.values_list(
+                            "original_start", "title"
+                        )
+                    ),
+                )
+                for attendee in CalendarAttendee.objects.filter(event__realm=r)
+            }
+
+        @getter
+        def get_calendar_user_data(r: Realm) -> set[tuple[object, ...]]:
+            pinned_users = {
+                (pinned.user.full_name, pinned.pinned_user.full_name, pinned.color)
+                for pinned in CalendarPinnedUser.objects.filter(user__realm=r)
+            }
+            user_settings = {
+                (user_settings.user.full_name, user_settings.work_day_start_minutes)
+                for user_settings in CalendarUserSettings.objects.filter(user__realm=r)
+            }
+            return pinned_users | user_settings
+
+        @getter
+        def get_calendar_rooms(r: Realm) -> set[tuple[object, ...]]:
+            return {
+                (
+                    room.name,
+                    room.capacity,
+                    room.email,
+                    room.is_archived,
+                    tuple(room.calendareventroom_set.values_list("event__uid", flat=True)),
+                )
+                for room in CalendarRoom.objects.filter(realm=r)
+            }
 
         @getter
         def get_channel_folders(r: Realm) -> set[str]:
@@ -3665,6 +3820,29 @@ class SingleUserExportTest(ExportFile):
         @checker
         def zerver_alertword(records: list[Record]) -> None:
             self.assertEqual(records[-1]["word"], "pizza")
+
+        CalendarPinnedUser.objects.create(
+            user=cordelia, pinned_user=hamlet, order=0, color="#4f7cff"
+        )
+        CalendarPinnedUser.objects.create(
+            user=othello, pinned_user=hamlet, order=0, color="#000000"
+        )
+
+        @checker
+        def zerver_calendarpinneduser(records: list[Record]) -> None:
+            (rec,) = records
+            self.assertEqual(rec["user"], cordelia.id)
+            self.assertEqual(rec["pinned_user"], hamlet.id)
+            self.assertEqual(rec["color"], "#4f7cff")
+
+        CalendarUserSettings.objects.create(user=cordelia, work_days=[1, 2, 3, 4])
+        CalendarUserSettings.objects.create(user=othello, work_days=[7])
+
+        @checker
+        def zerver_calendarusersettings(records: list[Record]) -> None:
+            (rec,) = records
+            self.assertEqual(rec["user"], cordelia.id)
+            self.assertEqual(rec["work_days"], [1, 2, 3, 4])
 
         ExternalAuthID.objects.create(
             user=cordelia,

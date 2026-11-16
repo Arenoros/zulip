@@ -53,6 +53,14 @@ from zerver.models import (
     Attachment,
     BotConfigData,
     BotStorageData,
+    CalendarAttendee,
+    CalendarAttendeeOccurrenceResponse,
+    CalendarEvent,
+    CalendarEventException,
+    CalendarEventRoom,
+    CalendarPinnedUser,
+    CalendarRoom,
+    CalendarUserSettings,
     ChannelFolder,
     Client,
     CustomProfileField,
@@ -154,6 +162,14 @@ ALL_ZULIP_TABLES = {
     "zerver_archivetransaction",
     "zerver_botconfigdata",
     "zerver_botstoragedata",
+    "zerver_calendarattendee",
+    "zerver_calendarattendeeoccurrenceresponse",
+    "zerver_calendarevent",
+    "zerver_calendareventexception",
+    "zerver_calendareventroom",
+    "zerver_calendarpinneduser",
+    "zerver_calendarroom",
+    "zerver_calendarusersettings",
     "zerver_channelemailaddress",
     "zerver_channelfolder",
     "zerver_client",
@@ -563,6 +579,13 @@ def floatify_datetime_fields(item: Record, table: TableName) -> Record:
     return {**item, **updates}
 
 
+def floatify_datetime_fields_of_rows(rows: Iterable[Record], table: TableName) -> Iterator[Record]:
+    # A generator expression in the caller's loop would see the loop
+    # variable's last table when it is consumed.
+    for row in rows:
+        yield floatify_datetime_fields(row, table)
+
+
 class Config:
     """A Config object configures a single table for exporting (and, maybe
     some day importing as well.  This configuration defines what
@@ -897,7 +920,7 @@ def export_from_config(
             # of the exported data for the tables - e.g. to strip out private data.
             response[t] = custom_process_results(response[t], context)
         if date_fields_for_table(t):
-            response[t] = (floatify_datetime_fields(r, t) for r in response[t])
+            response[t] = floatify_datetime_fields_of_rows(response[t], t)
 
         if not config.use_iterator:
             response[t] = list(response[t])
@@ -1161,6 +1184,28 @@ def get_realm_config() -> Config:
         include_rows="realm_id__in",
     )
 
+    Config(
+        table="zerver_calendarroom",
+        model=CalendarRoom,
+        normal_parent=realm_config,
+        include_rows="realm_id__in",
+    )
+
+    Config(
+        custom_tables=[
+            "zerver_calendarevent",
+            "zerver_calendareventexception",
+            "zerver_calendareventroom",
+            "zerver_calendarattendee",
+            "zerver_calendarattendeeoccurrenceresponse",
+        ],
+        virtual_parent=user_profile_config,
+        custom_fetch=custom_fetch_calendar_events,
+        # It is the custom_fetch function that must handle consent logic if applicable.
+        # limit_to_consenting_users can't be used here.
+        limit_to_consenting_users=False,
+    )
+
     add_user_profile_child_configs(user_profile_config)
 
     return realm_config
@@ -1236,6 +1281,22 @@ def add_user_profile_child_configs(user_profile_config: Config) -> None:
         model=AlertWord,
         normal_parent=user_profile_config,
         include_rows="user_profile_id__in",
+        limit_to_consenting_users=True,
+    )
+
+    Config(
+        table="zerver_calendarpinneduser",
+        model=CalendarPinnedUser,
+        normal_parent=user_profile_config,
+        include_rows="user_id__in",
+        limit_to_consenting_users=True,
+    )
+
+    Config(
+        table="zerver_calendarusersettings",
+        model=CalendarUserSettings,
+        normal_parent=user_profile_config,
+        include_rows="user_id__in",
         limit_to_consenting_users=True,
     )
 
@@ -1643,6 +1704,46 @@ def custom_fetch_direct_message_groups(response: TableData, context: Context) ->
     )
     response["zerver_huddle"] = make_raw(
         DirectMessageGroup.objects.filter(id__in=direct_message_group_ids).iterator()
+    )
+
+
+def custom_fetch_calendar_events(response: TableData, context: Context) -> None:
+    realm = context["realm"]
+    export_type = context["export_type"]
+
+    events = CalendarEvent.objects.filter(realm=realm)
+    if export_type != RealmExport.EXPORT_FULL_WITHOUT_CONSENT:
+        # Like a direct message conversation, an event can be exported
+        # only if one of its attendees, who include its organizer,
+        # consents to the export of private data, and then it is
+        # exported with all its attendees.
+        if export_type == RealmExport.EXPORT_FULL_WITH_CONSENT:
+            consented_user_ids = context["exportable_user_ids"]
+            assert consented_user_ids is not None
+        else:
+            assert export_type == RealmExport.EXPORT_PUBLIC
+            consented_user_ids = set()
+        events = events.filter(
+            id__in=CalendarAttendee.objects.filter(user_id__in=consented_user_ids).values(
+                "event_id"
+            )
+        )
+
+    event_ids = set(events.values_list("id", flat=True))
+    response["zerver_calendarevent"] = make_raw(events.order_by("id"))
+    response["zerver_calendareventexception"] = make_raw(
+        CalendarEventException.objects.filter(event_id__in=event_ids).order_by("id")
+    )
+    response["zerver_calendareventroom"] = make_raw(
+        CalendarEventRoom.objects.filter(event_id__in=event_ids).order_by("id")
+    )
+    response["zerver_calendarattendee"] = make_raw(
+        CalendarAttendee.objects.filter(event_id__in=event_ids).order_by("id")
+    )
+    response["zerver_calendarattendeeoccurrenceresponse"] = make_raw(
+        CalendarAttendeeOccurrenceResponse.objects.filter(
+            attendee__event_id__in=event_ids
+        ).order_by("id")
     )
 
 

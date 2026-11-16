@@ -65,6 +65,4 @@ def get_personal_sections(user_profile: UserProfile) -> PersonalSectionsDict:
     personal_sections = PersonalSections.objects.filter(user_profile=user_profile).first()
     if personal_sections is None:
         return PersonalSectionsDict(conversation_sections=[])
-    return PersonalSectionsDict(
-        conversation_sections=personal_sections.conversation_sections
-    )
+    return PersonalSectionsDict(conversation_sections=personal_sections.conversation_sections)

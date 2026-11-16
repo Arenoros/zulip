@@ -1450,6 +1450,136 @@ paths:
                                 }
                             - type: object
                               description: |
+                                Event sent to the attendees of a calendar event when the event is
+                                created, changed, cancelled or responded to, and to users who stop
+                                being attendees of it. Clients should fetch the events they show
+                                again with [`GET /calendar/events`](/api/get-calendar-events).
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - calendar
+                                event_id:
+                                  type: integer
+                                  description: |
+                                    The ID of the calendar event that changed.
+                                unanswered_invitation_count:
+                                  type: integer
+                                  description: |
+                                    The new value of `calendar_unanswered_invitation_count`
+                                    for the user.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "calendar",
+                                  "event_id": 12,
+                                  "unanswered_invitation_count": 1,
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to users who pinned a colleague's calendar when the
+                                colleague's free/busy times may have changed. Clients that show
+                                those calendars should fetch them again with
+                                [`GET /calendar/free_busy`](/api/get-calendar-free-busy).
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - calendar_free_busy
+                                user_ids:
+                                  type: array
+                                  items:
+                                    type: integer
+                                  description: |
+                                    The IDs of the pinned users whose free/busy times may have
+                                    changed.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "calendar_free_busy",
+                                  "user_ids": [10],
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
+                                Event sent to a user's clients when the user changes their
+                                [calendar settings](/api/update-calendar-settings).
+
+                                **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+                              properties:
+                                id:
+                                  $ref: "#/components/schemas/EventIdSchema"
+                                type:
+                                  allOf:
+                                    - $ref: "#/components/schemas/EventTypeSchema"
+                                    - enum:
+                                        - calendar_settings
+                                settings:
+                                  type: object
+                                  description: |
+                                    All of the user's calendar settings, as in
+                                    [`GET /calendar/settings`](/api/get-calendar-settings).
+                                  additionalProperties: false
+                                  properties:
+                                    work_days:
+                                      type: array
+                                      items:
+                                        type: integer
+                                      description: |
+                                        The ISO weekdays the user works on, Monday being 1.
+                                    work_day_start_minutes:
+                                      type: integer
+                                      description: |
+                                        When the user's work day starts, in minutes after
+                                        midnight in the user's timezone.
+                                    work_day_end_minutes:
+                                      type: integer
+                                      description: |
+                                        When the user's work day ends, in minutes after
+                                        midnight in the user's timezone.
+                                    default_reminder_minutes:
+                                      type: integer
+                                      nullable: true
+                                      description: |
+                                        The reminder for events the user is invited to, in
+                                        minutes before the start, or `null` for no reminder.
+                                    default_view:
+                                      type: integer
+                                      description: |
+                                        The view the calendar opens in: 1 for the week,
+                                        2 for the work week.
+                                    time_scale_minutes:
+                                      type: integer
+                                      description: |
+                                        How many minutes each row of the calendar grid takes.
+                              additionalProperties: false
+                              example:
+                                {
+                                  "type": "calendar_settings",
+                                  "settings":
+                                    {
+                                      "work_days": [1, 2, 3, 4, 5],
+                                      "work_day_start_minutes": 540,
+                                      "work_day_end_minutes": 1080,
+                                      "default_reminder_minutes": 15,
+                                      "default_view": 2,
+                                      "time_scale_minutes": 30,
+                                    },
+                                  "id": 0,
+                                }
+                            - type: object
+                              description: |
                                 Event sent to a user's clients when the user completes the OAuth flow
                                 for the [Zoom integration](/help/configure-call-provider). Clients need
                                 to know whether initiating Zoom OAuth is required before creating a Zoom
@@ -1894,6 +2024,7 @@ paths:
                                         "is_recently_active": true,
                                         "message_retention_days": null,
                                         "default_push_notifications": false,
+                                        "is_meeting_chat": false,
                                         "is_announcement_only": false,
                                         "can_add_subscribers_group": 2,
                                         "can_remove_subscribers_group": 2,
@@ -8289,6 +8420,1526 @@ paths:
                         "result": "error",
                         "msg": "Navigation view does not exist.",
                       }
+  /calendar/events:
+    get:
+      operationId: get-calendar-events
+      tags: ["calendar"]
+      summary: Get calendar events
+      description: |
+        Get the events in the current user's calendar that overlap a time
+        range, with each occurrence of a repeating event listed separately.
+
+        Events and occurrences the user declined are not included, and
+        neither are those the user cancelled as their organizer. Attendees
+        see events the organizer cancelled, with `is_cancelled`, until they
+        remove them with
+        [`DELETE /calendar/events/{calendar_event_id}`](/api/delete-calendar-event).
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarRangeStart"
+        - $ref: "#/components/parameters/CalendarRangeEnd"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      events:
+                        type: array
+                        description: |
+                          The occurrences, by their start.
+                        items:
+                          $ref: "#/components/schemas/CalendarEvent"
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "events":
+                          [
+                            {
+                              "id": 12,
+                              "uid": "1b0e7d1e-4a52-4f45-9f3c-6f5b1e2f7a10",
+                              "original_start": null,
+                              "start": 1763276400,
+                              "end": 1763278200,
+                              "timezone": "Europe/Moscow",
+                              "is_all_day": false,
+                              "title": "Planning",
+                              "location": "Room 1",
+                              "description": "",
+                              "rendered_description": "",
+                              "show_as": 3,
+                              "is_private": false,
+                              "is_cancelled": false,
+                              "rrule": "",
+                              "organizer_id": 10,
+                              "response": 1,
+                              "reminder_minutes": 15,
+                              "category": "",
+                              "response_requested": true,
+                              "allow_forwarding": true,
+                              "hide_attendees": false,
+                              "has_zulip_call": false,
+                              "meet_code": "Xc3oQ9pL2mKd",
+                              "chat_id": null,
+                              "channel_id": null,
+                              "topic": "",
+                              "is_invited": true,
+                              "date_created": 1763190000,
+                              "attendees":
+                                [
+                                  {
+                                    "user_id": 10,
+                                    "is_required": true,
+                                    "response": 2,
+                                    "added_by": null,
+                                  },
+                                  {
+                                    "user_id": 9,
+                                    "is_required": true,
+                                    "response": 1,
+                                    "added_by": null,
+                                  },
+                                ],
+                              "room_ids": [3],
+                            },
+                          ],
+                      }
+    post:
+      operationId: create-calendar-event
+      tags: ["calendar"]
+      summary: Create a calendar event
+      description: |
+        Create an event in the current user's calendar, with the current
+        user as its organizer, and invite the attendees, if any.
+
+        The attendees get a direct message from Notification Bot inviting
+        them, and a [`calendar`](/api/get-events#calendar) event.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                title:
+                  description: |
+                    The title of the event.
+                  type: string
+                  example: Planning
+                start:
+                  description: |
+                    When the event starts, as a UNIX timestamp.
+                  type: integer
+                  example: 1763276400
+                end:
+                  description: |
+                    When the event ends, as a UNIX timestamp. Must not be before
+                    `start`.
+                  type: integer
+                  example: 1763278200
+                timezone:
+                  description: |
+                    The IANA timezone the event repeats in. An all-day event
+                    starts and ends at midnight in this timezone.
+                  type: string
+                  example: Europe/Moscow
+                is_all_day:
+                  description: |
+                    Whether the event takes whole days in its timezone.
+                  type: boolean
+                  default: false
+                  example: false
+                description:
+                  description: |
+                    The description in [Zulip-flavored Markdown](/help/format-your-message-using-markdown).
+                  type: string
+                  default: ""
+                  example: Agenda for the week.
+                location:
+                  description: |
+                    Where the event takes place.
+                  type: string
+                  default: ""
+                  maxLength: 255
+                  example: Room 1
+                show_as:
+                  description: |
+                    How the event shows the attendees in their free/busy times, as in `show_as` in [`GET /calendar/events`](/api/get-calendar-events).
+                  allOf:
+                    - $ref: "#/components/schemas/CalendarShowAs"
+                    - default: 3
+                      example: 3
+                is_private:
+                  description: |
+                    Whether only the organizer sees the title of the event in the free/busy times of the attendees.
+                  type: boolean
+                  default: false
+                  example: false
+                rrule:
+                  description: |
+                    How the event repeats, as an iCalendar `RRULE` without the
+                    `RRULE:` prefix, or an empty string for an event that does not
+                    repeat.
+
+                    The supported parts are `FREQ` (`DAILY`, `WEEKLY`, `MONTHLY`
+                    or `YEARLY`), `INTERVAL` (1 to 99), `BYDAY` (weekdays, only
+                    with `WEEKLY`) and `UNTIL` (in UTC, like `20261231T235959Z`).
+                    Monthly and yearly events repeat on the day of the start.
+                  type: string
+                  default: ""
+                  example: FREQ=WEEKLY;BYDAY=MO,WE
+                response_requested:
+                  description: |
+                    Whether the organizer asks the attendees to respond.
+                  type: boolean
+                  default: true
+                  example: true
+                allow_forwarding:
+                  description: |
+                    Whether attendees may invite more people.
+                  type: boolean
+                  default: true
+                  example: true
+                hide_attendees:
+                  description: |
+                    Whether only the organizer sees who is invited.
+                  type: boolean
+                  default: false
+                  example: false
+                has_zulip_call:
+                  description: |
+                    Whether the event has a Zulip call.
+                  type: boolean
+                  default: false
+                  example: false
+                required_attendees:
+                  description: |
+                    The IDs of the users who are invited as required attendees.
+                  type: array
+                  items:
+                    type: integer
+                  example: [9]
+                optional_attendees:
+                  description: |
+                    The IDs of the users who are invited as optional attendees.
+                  type: array
+                  items:
+                    type: integer
+                  example: [11]
+                room_ids:
+                  description: |
+                    The IDs of the [meeting rooms](/api/get-calendar-rooms) the
+                    event books. A room accepts the booking only if no other
+                    meeting booked it during the occurrences of the event in the
+                    next 180 days; otherwise, the event is not created.
+                  type: array
+                  items:
+                    type: integer
+                  example: [3]
+                channel_id:
+                  description: |
+                    The ID of a channel to schedule the meeting in, which the
+                    current user must be able to post in. The meeting is
+                    discussed in a topic of the channel named after it, or in
+                    the general chat of a channel without topics, and
+                    Notification Bot announces it, its moves and its
+                    cancellation there. The channel's subscribers see the
+                    meeting without being invited to it. Such a meeting cannot
+                    be private, and its channel cannot be changed.
+                  type: integer
+                  example: 3
+              required:
+                - title
+                - start
+                - end
+                - timezone
+            encoding:
+              start:
+                contentType: application/json
+              end:
+                contentType: application/json
+              is_all_day:
+                contentType: application/json
+              show_as:
+                contentType: application/json
+              is_private:
+                contentType: application/json
+              response_requested:
+                contentType: application/json
+              allow_forwarding:
+                contentType: application/json
+              hide_attendees:
+                contentType: application/json
+              has_zulip_call:
+                contentType: application/json
+              required_attendees:
+                contentType: application/json
+              optional_attendees:
+                contentType: application/json
+              room_ids:
+                contentType: application/json
+              channel_id:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      id:
+                        type: integer
+                        description: |
+                          The ID of the new calendar event.
+                    example: {"msg": "", "result": "success", "id": 12}
+  /calendar/events/{calendar_event_id}:
+    get:
+      operationId: get-calendar-event
+      tags: ["calendar"]
+      summary: Get a calendar event
+      description: |
+        Get an event in the current user's calendar. For a repeating
+        event, this is the series as a whole: its first occurrence, with
+        the fields of the series rather than those of a changed
+        occurrence.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      event:
+                        $ref: "#/components/schemas/CalendarEvent"
+                      has_changed_occurrences:
+                        type: boolean
+                        description: |
+                          Whether some occurrences of a repeating event were
+                          changed or cancelled. Changing when the series takes
+                          place drops those changes.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "event":
+                          {
+                            "id": 12,
+                            "uid": "1b0e7d1e-4a52-4f45-9f3c-6f5b1e2f7a10",
+                            "original_start": null,
+                            "start": 1763276400,
+                            "end": 1763278200,
+                            "timezone": "Europe/Moscow",
+                            "is_all_day": false,
+                            "title": "Planning",
+                            "location": "Room 1",
+                            "description": "",
+                            "rendered_description": "",
+                            "show_as": 3,
+                            "is_private": false,
+                            "is_cancelled": false,
+                            "rrule": "FREQ=WEEKLY;BYDAY=MO",
+                            "organizer_id": 10,
+                            "response": 2,
+                            "reminder_minutes": 15,
+                            "category": "",
+                            "response_requested": true,
+                            "allow_forwarding": true,
+                            "hide_attendees": false,
+                            "has_zulip_call": false,
+                            "meet_code": "Xc3oQ9pL2mKd",
+                            "chat_id": null,
+                            "channel_id": null,
+                            "topic": "",
+                            "is_invited": true,
+                            "date_created": 1763190000,
+                            "attendees":
+                              [
+                                {
+                                  "user_id": 10,
+                                  "is_required": true,
+                                  "response": 2,
+                                  "added_by": null,
+                                },
+                              ],
+                            "room_ids": [],
+                          },
+                        "has_changed_occurrences": false,
+                      }
+    patch:
+      operationId: update-calendar-event
+      tags: ["calendar"]
+      summary: Update a calendar event
+      description: |
+        Change a calendar event that the current user organizes, or with
+        `occurrence`, one occurrence of a repeating event.
+
+        Changing when a repeating event takes place drops the changes made
+        to its occurrences. Changing when an event or an occurrence takes
+        place asks the attendees to respond again.
+
+        When an event or an occurrence is moved, its attendees get a direct
+        message from Notification Bot, and so do attendees who are invited
+        or removed. Attendees get a [`calendar`](/api/get-events#calendar)
+        event.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      x-curl-examples-parameters:
+        oneOf:
+          - type: exclude
+            parameters:
+              enum:
+                - occurrence
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                occurrence:
+                  $ref: "#/components/schemas/CalendarOccurrenceParameter"
+                title:
+                  description: |
+                    The title of the event.
+                  type: string
+                  example: Weekly planning
+                description:
+                  description: |
+                    The description in [Zulip-flavored Markdown](/help/format-your-message-using-markdown).
+                  type: string
+                  example: Agenda for the week.
+                location:
+                  description: |
+                    Where the event takes place.
+                  type: string
+                  maxLength: 255
+                  example: Room 2
+                start:
+                  description: |
+                    When the event starts, as a UNIX timestamp. If `end` is not
+                    passed, the event keeps its duration.
+                  type: integer
+                  example: 1763280000
+                end:
+                  description: |
+                    When the event ends, as a UNIX timestamp.
+                  type: integer
+                  example: 1763281800
+                timezone:
+                  description: |
+                    The IANA timezone the event repeats in.
+                  type: string
+                  example: Europe/Moscow
+                is_all_day:
+                  description: |
+                    Whether the event takes whole days in its timezone.
+                  type: boolean
+                  example: false
+                show_as:
+                  description: |
+                    How the event shows the attendees in their free/busy times, as in `show_as` in [`GET /calendar/events`](/api/get-calendar-events).
+                  allOf:
+                    - $ref: "#/components/schemas/CalendarShowAs"
+                    - example: 3
+                is_private:
+                  description: |
+                    Whether only the organizer sees the title of the event in the free/busy times of the attendees.
+                  type: boolean
+                  example: false
+                rrule:
+                  description: |
+                    The new repetition rule, as in
+                    [`POST /calendar/events`](/api/create-calendar-event).
+                  type: string
+                  example: FREQ=WEEKLY;BYDAY=MO
+                response_requested:
+                  description: |
+                    Whether the organizer asks the attendees to respond.
+                  type: boolean
+                  example: true
+                allow_forwarding:
+                  description: |
+                    Whether attendees may invite more people.
+                  type: boolean
+                  example: true
+                hide_attendees:
+                  description: |
+                    Whether only the organizer sees who is invited.
+                  type: boolean
+                  example: false
+                has_zulip_call:
+                  description: |
+                    Whether the event has a Zulip call.
+                  type: boolean
+                  example: true
+                required_attendees:
+                  description: |
+                    The IDs of all required attendees, replacing the current ones.
+                  type: array
+                  items:
+                    type: integer
+                  example: [9]
+                optional_attendees:
+                  description: |
+                    The IDs of all optional attendees, replacing the current ones.
+                  type: array
+                  items:
+                    type: integer
+                  example: [11]
+                room_ids:
+                  description: |
+                    The IDs of all the [meeting rooms](/api/get-calendar-rooms)
+                    the event books, replacing the current ones. Archived rooms
+                    the event already booked can be kept. As when creating an
+                    event, the change fails if a room is booked by another
+                    meeting during the event, which is also checked when its
+                    time changes.
+                  type: array
+                  items:
+                    type: integer
+                  example: [3]
+            encoding:
+              occurrence:
+                contentType: application/json
+              start:
+                contentType: application/json
+              end:
+                contentType: application/json
+              is_all_day:
+                contentType: application/json
+              show_as:
+                contentType: application/json
+              is_private:
+                contentType: application/json
+              response_requested:
+                contentType: application/json
+              allow_forwarding:
+                contentType: application/json
+              hide_attendees:
+                contentType: application/json
+              has_zulip_call:
+                contentType: application/json
+              required_attendees:
+                contentType: application/json
+              optional_attendees:
+                contentType: application/json
+              room_ids:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+    delete:
+      operationId: delete-calendar-event
+      tags: ["calendar"]
+      summary: Delete a calendar event
+      description: |
+        For the organizer, cancel the event, or with `occurrence`, one
+        occurrence of it, for all attendees. For an attendee, remove it from
+        their calendar by declining it.
+
+        When the organizer cancels the event, its attendees get a direct
+        message from Notification Bot. Attendees get a
+        [`calendar`](/api/get-events#calendar) event.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+        - name: occurrence
+          in: query
+          description: |
+            For a repeating event, the `original_start` of the occurrence.
+          schema:
+            type: integer
+          example: 1763276400
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/events/{calendar_event_id}/response:
+    post:
+      operationId: respond-to-calendar-event
+      tags: ["calendar"]
+      summary: Respond to a calendar event
+      description: |
+        Respond to an invitation to a calendar event, or with `occurrence`,
+        to one occurrence of a repeating event. A cancelled event can only
+        be declined.
+
+        If the organizer asked for responses, they get a direct message from
+        Notification Bot with any response other than following the event.
+
+        Attendees get a [`calendar`](/api/get-events#calendar) event.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                response:
+                  description: |
+                    The response, as in `response` in
+                    [`GET /calendar/events`](/api/get-calendar-events), other than 1.
+                  type: integer
+                  enum: [2, 3, 4, 5]
+                  example: 2
+                occurrence:
+                  $ref: "#/components/schemas/CalendarOccurrenceParameter"
+                notify_organizer:
+                  description: |
+                    Whether to tell the organizer of the response, if they asked
+                    for responses.
+                  type: boolean
+                  default: true
+                  example: true
+                message:
+                  description: |
+                    A message for the organizer, sent with the response.
+                  type: string
+                  default: ""
+                  example: "I will join from the train."
+              required:
+                - response
+            encoding:
+              response:
+                contentType: application/json
+              occurrence:
+                contentType: application/json
+              notify_organizer:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/events/{calendar_event_id}/attendees:
+    post:
+      operationId: add-calendar-attendees
+      tags: ["calendar"]
+      summary: Forward a calendar event
+      description: |
+        Invite more users to a calendar event. Attendees other than the
+        organizer may do so only if the organizer allows forwarding the
+        event.
+
+        The invited users get a direct message from Notification Bot.
+        Attendees get a [`calendar`](/api/get-events#calendar) event.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                user_ids:
+                  description: |
+                    The IDs of the users to invite. Users who are already invited
+                    are ignored.
+                  type: array
+                  items:
+                    type: integer
+                  example: [11]
+                is_required:
+                  description: |
+                    Whether the users are invited as required attendees.
+                  type: boolean
+                  default: false
+                  example: false
+              required:
+                - user_ids
+            encoding:
+              user_ids:
+                contentType: application/json
+              is_required:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/events/{calendar_event_id}/chat:
+    post:
+      operationId: get-calendar-event-chat
+      tags: ["calendar"]
+      summary: Get the chat of a meeting
+      description: |
+        Get the chat of a meeting, creating it the first time someone opens it.
+
+        A meeting's chat is a private channel without topics, with
+        `is_meeting_chat` set, whose history is available to its subscribers.
+        It is named after the meeting, with a number added if another channel
+        already has that name, and renamed with it. All of the meeting's
+        attendees are subscribed to it when it is created, and those invited
+        later when they are invited; attendees removed from the meeting stay
+        in it. Getting the chat subscribes the current user if they left it.
+        A series has one chat for all of its occurrences.
+
+        A meeting in a channel is discussed in its topic of the channel instead,
+        which those who can access the channel get, whether they are invited to
+        the meeting or subscribed to the channel.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - stream_id
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      stream_id:
+                        type: integer
+                        description: |
+                          The ID of the meeting's chat, or of the channel of
+                          a meeting in a channel.
+                      topic:
+                        type: string
+                        description: |
+                          The topic the meeting is discussed in: `""` for a
+                          meeting's chat, which has no topics.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "stream_id": 15,
+                        "topic": "",
+                      }
+  /calendar/events/{calendar_event_id}/call:
+    post:
+      operationId: join-calendar-event-call
+      tags: ["calendar"]
+      summary: Join the call of a meeting
+      description: |
+        Get the link to the [LiveKit](/help/configure-call-provider) call of a
+        meeting with a Zulip call, starting the call if it is not taking place.
+
+        The call takes place in the [meeting's
+        chat](/api/get-calendar-event-chat), where starting it posts its link.
+        The meeting's attendees can join it, and so can people removed from the
+        meeting who are still in its chat. Attendees who left the chat join it
+        again.
+
+        The call of a meeting in a channel takes place in its topic, and anyone
+        who can access the channel can join it. Attendees who cannot access the
+        channel can join the call once it takes place, but not start it.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+        - name: voice_only
+          in: query
+          description: |
+            Whether to join the call without video.
+          schema:
+            type: boolean
+            default: false
+          example: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - url
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      url:
+                        type: string
+                        description: |
+                          The path of the link to join the call.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "url": "/calls/livekit/join?call_id=4281396815&channel_id=15&voice_only=true",
+                      }
+        "400":
+          description: Bad request.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CodedError"
+                  - example:
+                      {
+                        "code": "BAD_REQUEST",
+                        "msg": "This event has no Zulip call",
+                        "result": "error",
+                      }
+                    description: |
+                      An example JSON response for when the meeting has no Zulip call:
+  /calendar/events/{calendar_event_id}/personal_settings:
+    patch:
+      operationId: update-calendar-personal-settings
+      tags: ["calendar"]
+      summary: Update personal settings for a calendar event
+      description: |
+        Change the current user's own reminder, category and free/busy
+        status for a calendar event they are invited to.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarEventId"
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                reminder_minutes:
+                  description: |
+                    How many minutes before the start to remind the user, or
+                    `null` for no reminder.
+                  type: integer
+                  nullable: true
+                  example: 15
+                category:
+                  description: |
+                    One of Outlook's color categories, `"Red category"`,
+                    `"Orange category"`, `"Yellow category"`, `"Green category"`,
+                    `"Blue category"` and `"Purple category"`, or an empty string.
+                  type: string
+                  example: Blue category
+                show_as:
+                  description: |
+                    How the event shows the user in their free/busy times, as in
+                    `show_as` in [`GET /calendar/events`](/api/get-calendar-events),
+                    or `null` to show them as the event does.
+                  type: integer
+                  nullable: true
+                  example: 2
+            encoding:
+              reminder_minutes:
+                contentType: application/json
+              show_as:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/free_busy:
+    get:
+      operationId: get-calendar-free-busy
+      tags: ["calendar"]
+      summary: Get free/busy times
+      description: |
+        Get when users are busy during a time range.
+
+        Details of an event are included only if the current user is
+        invited to it, and for a private event, only if the current user
+        organizes it.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - name: user_ids
+          in: query
+          description: |
+            The IDs of the users, at most 100.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                example: [9, 11]
+          required: true
+        - name: room_ids
+          in: query
+          description: |
+            The IDs of [meeting rooms](/api/get-calendar-rooms), at most 100
+            together with the users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: integer
+                example: [3]
+        - $ref: "#/components/parameters/CalendarRangeStart"
+        - $ref: "#/components/parameters/CalendarRangeEnd"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      free_busy:
+                        type: object
+                        description: |
+                          The busy times of each user, keyed by the user's ID.
+                        additionalProperties:
+                          type: array
+                          description: |
+                            `{user_id}`: The times the user is busy, by their start.
+                          items:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              start:
+                                type: integer
+                                description: |
+                                  When the busy time starts, as a UNIX timestamp.
+                              end:
+                                type: integer
+                                description: |
+                                  When the busy time ends, as a UNIX timestamp.
+                              show_as:
+                                $ref: "#/components/schemas/CalendarShowAs"
+                              event_id:
+                                type: integer
+                                nullable: true
+                                description: |
+                                  The ID of the calendar event, if the current user
+                                  may see its details.
+                              title:
+                                type: string
+                                nullable: true
+                                description: |
+                                  The title of the calendar event, if the current user
+                                  may see its details.
+                      working_hours:
+                        type: object
+                        description: |
+                          When each user works, keyed by the user's ID, as they set
+                          it in their [calendar settings](/api/update-calendar-settings).
+                        additionalProperties:
+                          type: object
+                          additionalProperties: false
+                          description: |
+                            `{user_id}`: When the user works.
+                          properties:
+                            timezone:
+                              type: string
+                              description: |
+                                The user's timezone, in which they work, or `""` if
+                                they did not set one.
+                            work_days:
+                              type: array
+                              items:
+                                type: integer
+                              description: |
+                                The ISO weekdays the user works on, Monday being 1.
+                            work_day_start_minutes:
+                              type: integer
+                              description: |
+                                When the user's work day starts, in minutes after
+                                midnight in their timezone.
+                            work_day_end_minutes:
+                              type: integer
+                              description: |
+                                When the user's work day ends, in minutes after
+                                midnight in their timezone.
+                      room_free_busy:
+                        type: object
+                        description: |
+                          The times each meeting room is booked, keyed by the
+                          room's ID, like the busy times of users; they show as
+                          busy.
+                        additionalProperties:
+                          type: array
+                          description: |
+                            `{room_id}`: The times the room is booked, by their
+                            start.
+                          items:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              start:
+                                type: integer
+                                description: |
+                                  When the booking starts, as a UNIX timestamp.
+                              end:
+                                type: integer
+                                description: |
+                                  When the booking ends, as a UNIX timestamp.
+                              show_as:
+                                $ref: "#/components/schemas/CalendarShowAs"
+                              event_id:
+                                type: integer
+                                nullable: true
+                                description: |
+                                  The ID of the calendar event, if the current user
+                                  may see its details.
+                              title:
+                                type: string
+                                nullable: true
+                                description: |
+                                  The title of the calendar event, if the current user
+                                  may see its details.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "free_busy":
+                          {
+                            "9":
+                              [
+                                {
+                                  "start": 1763276400,
+                                  "end": 1763278200,
+                                  "show_as": 3,
+                                  "event_id": null,
+                                  "title": null,
+                                },
+                              ],
+                            "11": [],
+                          },
+                        "working_hours":
+                          {
+                            "9":
+                              {
+                                "timezone": "Europe/Moscow",
+                                "work_days": [1, 2, 3, 4, 5],
+                                "work_day_start_minutes": 540,
+                                "work_day_end_minutes": 1080,
+                              },
+                            "11":
+                              {
+                                "timezone": "",
+                                "work_days": [1, 2, 3, 4, 5],
+                                "work_day_start_minutes": 540,
+                                "work_day_end_minutes": 1080,
+                              },
+                          },
+                        "room_free_busy":
+                          {
+                            "3":
+                              [
+                                {
+                                  "start": 1763276400,
+                                  "end": 1763278200,
+                                  "show_as": 3,
+                                  "event_id": null,
+                                  "title": null,
+                                },
+                              ],
+                          },
+                      }
+  /calendar/pinned_users:
+    get:
+      operationId: get-calendar-pinned-users
+      tags: ["calendar"]
+      summary: Get pinned calendars
+      description: |
+        Get the colleagues whose calendars the current user shows next to
+        their own.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      pinned_users:
+                        type: array
+                        description: |
+                          The pinned colleagues, in the order the user pinned them.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            user_id:
+                              type: integer
+                              description: |
+                                The ID of the colleague.
+                            color:
+                              type: string
+                              description: |
+                                The color of the colleague's calendar, like `"#4f7cff"`.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "pinned_users": [{"user_id": 9, "color": "#4f7cff"}],
+                      }
+    post:
+      operationId: pin-calendar-user
+      tags: ["calendar"]
+      summary: Pin a calendar
+      description: |
+        Show a colleague's calendar next to the current user's own, after
+        the calendars the user already pinned.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  description: |
+                    The ID of the colleague.
+                  type: integer
+                  example: 9
+                color:
+                  description: |
+                    The color of the colleague's calendar, as `#` and six
+                    hexadecimal digits.
+                  type: string
+                  example: "#4f7cff"
+              required:
+                - user_id
+                - color
+            encoding:
+              user_id:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/pinned_users/{user_id}:
+    patch:
+      operationId: update-calendar-pinned-user
+      tags: ["calendar"]
+      summary: Update a pinned calendar
+      description: |
+        Change the color of a colleague's pinned calendar.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarPinnedUserId"
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                color:
+                  description: |
+                    The color of the colleague's calendar, as `#` and six
+                    hexadecimal digits.
+                  type: string
+                  example: "#30a46c"
+              required:
+                - color
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+    delete:
+      operationId: unpin-calendar-user
+      tags: ["calendar"]
+      summary: Unpin a calendar
+      description: |
+        Stop showing a colleague's calendar next to the current user's own.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - $ref: "#/components/parameters/CalendarPinnedUserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/settings:
+    get:
+      operationId: get-calendar-settings
+      tags: ["calendar"]
+      summary: Get calendar settings
+      description: |
+        Get the current user's calendar settings.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      settings:
+                        type: object
+                        description: |
+                          The settings, with their defaults if the user never
+                          changed them.
+                        additionalProperties: false
+                        properties:
+                          work_days:
+                            type: array
+                            items:
+                              type: integer
+                            description: |
+                              The ISO weekdays the user works on, Monday being 1.
+                          work_day_start_minutes:
+                            type: integer
+                            description: |
+                              When the user's work day starts, in minutes after
+                              midnight in the user's timezone.
+                          work_day_end_minutes:
+                            type: integer
+                            description: |
+                              When the user's work day ends, in minutes after
+                              midnight in the user's timezone.
+                          default_reminder_minutes:
+                            type: integer
+                            nullable: true
+                            description: |
+                              The reminder for events the user is invited to, in
+                              minutes before the start, or `null` for no reminder.
+                          default_view:
+                            type: integer
+                            enum: [1, 2]
+                            description: |
+                              The view the calendar opens in:
+
+                              - 1 = Week
+                              - 2 = Work week
+                          time_scale_minutes:
+                            type: integer
+                            enum: [15, 30, 60]
+                            description: |
+                              How many minutes each row of the calendar grid takes.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "settings":
+                          {
+                            "work_days": [1, 2, 3, 4, 5],
+                            "work_day_start_minutes": 540,
+                            "work_day_end_minutes": 1080,
+                            "default_reminder_minutes": 15,
+                            "default_view": 2,
+                            "time_scale_minutes": 30,
+                          },
+                      }
+    patch:
+      operationId: update-calendar-settings
+      tags: ["calendar"]
+      summary: Update calendar settings
+      description: |
+        Change the current user's calendar settings, which are described in
+        [`GET /calendar/settings`](/api/get-calendar-settings).
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                work_days:
+                  description: |
+                    The ISO weekdays the user works on, at least one.
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 2, 3, 4]
+                work_day_start_minutes:
+                  description: |
+                    When the user's work day starts, in minutes after midnight.
+                  type: integer
+                  example: 480
+                work_day_end_minutes:
+                  description: |
+                    When the user's work day ends, in minutes after midnight. Must
+                    be after the start.
+                  type: integer
+                  example: 1020
+                default_reminder_minutes:
+                  description: |
+                    The reminder for events the user is invited to, in minutes
+                    before the start, or `null` for no reminder.
+                  type: integer
+                  nullable: true
+                  example: 30
+                default_view:
+                  description: |
+                    The view the calendar opens in: 1 for the week, 2 for the work
+                    week.
+                  type: integer
+                  enum: [1, 2]
+                  example: 1
+                time_scale_minutes:
+                  description: |
+                    How many minutes each row of the calendar grid takes.
+                  type: integer
+                  enum: [15, 30, 60]
+                  example: 15
+            encoding:
+              work_days:
+                contentType: application/json
+              work_day_start_minutes:
+                contentType: application/json
+              work_day_end_minutes:
+                contentType: application/json
+              default_reminder_minutes:
+                contentType: application/json
+              default_view:
+                contentType: application/json
+              time_scale_minutes:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
+  /calendar/rooms:
+    get:
+      operationId: get-calendar-rooms
+      tags: ["calendar"]
+      summary: Get meeting rooms
+      description: |
+        Get the meeting rooms of the organization, which meetings book by
+        inviting them, including archived ones.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      rooms:
+                        type: array
+                        description: |
+                          The rooms, by their names.
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: integer
+                              description: |
+                                The ID of the room.
+                            name:
+                              type: string
+                              description: |
+                                The name of the room.
+                            capacity:
+                              type: integer
+                              nullable: true
+                              description: |
+                                How many people fit in the room, or `null` if
+                                unknown.
+                            location:
+                              type: string
+                              description: |
+                                Where the room is, like the building and floor.
+                            email:
+                              type: string
+                              description: |
+                                The address of the room's mailbox in Exchange,
+                                or `""`.
+                            is_archived:
+                              type: boolean
+                              description: |
+                                Whether the room is archived, which means it can
+                                no longer be booked. Meetings keep the archived
+                                rooms they booked.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "rooms":
+                          [
+                            {
+                              "id": 3,
+                              "name": "Blue room",
+                              "capacity": 8,
+                              "location": "Floor 2",
+                              "email": "blue-room@example.com",
+                              "is_archived": false,
+                            },
+                          ],
+                      }
+    post:
+      operationId: create-calendar-room
+      tags: ["calendar"]
+      summary: Create a meeting room
+      description: |
+        Add a meeting room to the organization.
+
+        This endpoint is only available to organization administrators.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: |
+                    The name of the room, unique in the organization.
+                  type: string
+                  example: Blue room
+                capacity:
+                  description: |
+                    How many people fit in the room, or `null` if unknown.
+                  type: integer
+                  nullable: true
+                  example: 8
+                location:
+                  description: |
+                    Where the room is, like the building and floor.
+                  type: string
+                  example: Floor 2
+                email:
+                  description: |
+                    The address of the room's mailbox in Exchange, if any.
+                  type: string
+                  example: blue-room@example.com
+              required:
+                - name
+            encoding:
+              capacity:
+                contentType: application/json
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      id:
+                        type: integer
+                        description: |
+                          The ID of the new room.
+                    example: {"msg": "", "result": "success", "id": 3}
+  /calendar/rooms/{room_id}:
+    patch:
+      operationId: update-calendar-room
+      tags: ["calendar"]
+      summary: Update a meeting room
+      description: |
+        Change a meeting room of the organization, or archive it.
+
+        This endpoint is only available to organization administrators.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      parameters:
+        - name: room_id
+          in: path
+          description: |
+            The ID of the room.
+          schema:
+            type: integer
+          example: 3
+          required: true
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: |
+                    The name of the room, unique in the organization.
+                  type: string
+                  example: Blue room
+                capacity:
+                  description: |
+                    How many people fit in the room, or `null` if unknown.
+                  type: integer
+                  nullable: true
+                  example: 8
+                location:
+                  description: |
+                    Where the room is, like the building and floor.
+                  type: string
+                  example: Floor 2
+                email:
+                  description: |
+                    The address of the room's mailbox in Exchange, if any.
+                  type: string
+                  example: blue-room@example.com
+                is_archived:
+                  description: |
+                    Whether the room is archived. An archived room can no longer
+                    be booked, but the meetings that booked it keep it.
+                  type: boolean
+                  example: true
+            encoding:
+              capacity:
+                contentType: application/json
+              is_archived:
+                contentType: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/SimpleSuccess"
   /saved_snippets:
     get:
       operationId: get-saved-snippets
@@ -10822,6 +12473,74 @@ paths:
                                 "match_subject": "test_topic",
                               },
                           },
+                      }
+  /messages/count:
+    get:
+      operationId: get-message-count
+      summary: Count messages in a narrow
+      tags: ["messages"]
+      description: |
+        Count the messages in a [narrow](/api/construct-narrow), for
+        example the results of a search.
+
+        The messages counted are the ones that [`GET
+        /messages`](/api/get-messages) would return for the same narrow,
+        so the count follows the same access rules, including access to
+        channel history and the organization's limit on visible message
+        history.
+
+        Counting stops at 1000 messages, so that counting a broad search
+        stays quick.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-bb25d1).
+      parameters:
+        - name: narrow
+          in: query
+          description: |
+            A structure defining the narrow whose messages to count. See how to
+            [construct a narrow](/api/construct-narrow).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+              example: [{"operator": "search", "operand": "lunch"}]
+          required: true
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/JsonSuccessBase"
+                  - additionalProperties: false
+                    required:
+                      - result
+                      - msg
+                      - count
+                      - count_is_limited
+                    properties:
+                      result: {}
+                      msg: {}
+                      ignored_parameters_unsupported: {}
+                      count:
+                        type: integer
+                        description: |
+                          The number of messages in the narrow, or 1000 if
+                          more messages are in it.
+                      count_is_limited:
+                        type: boolean
+                        description: |
+                          Whether more than 1000 messages are in the narrow,
+                          in which case `count` is 1000.
+                    example:
+                      {
+                        "result": "success",
+                        "msg": "",
+                        "count": 12,
+                        "count_is_limited": false,
                       }
   /messages/{message_id}:
     get:
@@ -20082,6 +21801,7 @@ paths:
                                 message_retention_days:
                                   nullable: true
                                 default_push_notifications: {}
+                                is_meeting_chat: {}
                                 history_public_to_subscribers: {}
                                 topics_policy: {}
                                 first_message_id:
@@ -21023,6 +22743,16 @@ paths:
                           Webex call.
 
                           **Changes**: New in Zulip 12.0 (feature level 493).
+                      calendar_unanswered_invitation_count:
+                        type: integer
+                        description: |
+                          Present if `calendar` is present in `fetch_event_types`.
+
+                          The number of invitations to calendar events that have not
+                          ended which the user has not responded to, counting only those
+                          whose organizer asked for responses.
+
+                          **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
                       has_google_meet_token:
                         type: boolean
                         description: |
@@ -25243,6 +26973,7 @@ paths:
                                 message_retention_days:
                                   nullable: true
                                 default_push_notifications: {}
+                                is_meeting_chat: {}
                                 history_public_to_subscribers: {}
                                 topics_policy: {}
                                 first_message_id:
@@ -25301,6 +27032,7 @@ paths:
                                 - stream_post_policy
                                 - message_retention_days
                                 - default_push_notifications
+                                - is_meeting_chat
                                 - history_public_to_subscribers
                                 - first_message_id
                                 - folder_id
@@ -25334,6 +27066,7 @@ paths:
                               "is_web_public": false,
                               "message_retention_days": null,
                               "default_push_notifications": false,
+                              "is_meeting_chat": false,
                               "name": "management",
                               "rendered_description": "<p>A private channel</p>",
                               "stream_id": 2,
@@ -25359,6 +27092,7 @@ paths:
                               "is_web_public": false,
                               "message_retention_days": null,
                               "default_push_notifications": false,
+                              "is_meeting_chat": false,
                               "name": "welcome",
                               "rendered_description": "<p>A default public channel</p>",
                               "stream_id": 1,
@@ -25416,6 +27150,7 @@ paths:
                             "is_web_public": false,
                             "message_retention_days": null,
                             "default_push_notifications": false,
+                            "is_meeting_chat": false,
                             "name": "Denmark",
                             "rendered_description": "<p>A Scandinavian country</p>",
                             "stream_id": 7,
@@ -29142,6 +30877,221 @@ components:
         `/fetch_api_key` or `/dev_fetch_api_key` endpoints.
 
   schemas:
+    CalendarShowAs:
+      type: integer
+      enum: [1, 2, 3, 4, 5]
+      description: |
+        How the event shows the user in their free/busy times:
+
+        - 1 = Free
+        - 2 = Tentative
+        - 3 = Busy
+        - 4 = Out of office
+        - 5 = Working elsewhere
+    CalendarResponse:
+      type: integer
+      enum: [1, 2, 3, 4, 5]
+      description: |
+        The attendee's response to the invitation:
+
+        - 1 = No response
+        - 2 = Accepted
+        - 3 = Tentative
+        - 4 = Declined
+        - 5 = Following, which keeps the attendee informed without
+          showing them as busy
+    CalendarEvent:
+      type: object
+      description: |
+        An event in the user's calendar, or an occurrence of a repeating
+        event.
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          description: |
+            The ID of the calendar event.
+        uid:
+          type: string
+          description: |
+            The iCalendar UID of the event, shared by all of its
+            occurrences.
+        original_start:
+          type: integer
+          nullable: true
+          description: |
+            For an occurrence of a repeating event, when the
+            occurrence starts according to the repetition rule, as a
+            UNIX timestamp. This identifies the occurrence in the
+            `occurrence` parameter of other endpoints, even if it was
+            moved.
+
+            `null` for an event that does not repeat, and for a
+            repeating event as a whole, as in
+            [`GET /calendar/events/{calendar_event_id}`](/api/get-calendar-event).
+        start:
+          type: integer
+          description: |
+            When the occurrence starts, as a UNIX timestamp.
+        end:
+          type: integer
+          description: |
+            When the occurrence ends, as a UNIX timestamp.
+        timezone:
+          type: string
+          description: |
+            The IANA timezone the event repeats in.
+        is_all_day:
+          type: boolean
+          description: |
+            Whether the event takes whole days in its timezone.
+        title:
+          type: string
+          description: |
+            The title of the occurrence.
+        location:
+          type: string
+          description: |
+            Where the occurrence takes place.
+        description:
+          type: string
+          description: |
+            The description in [Zulip-flavored Markdown](/help/format-your-message-using-markdown).
+        rendered_description:
+          type: string
+          description: |
+            The description rendered as HTML.
+        show_as:
+          $ref: "#/components/schemas/CalendarShowAs"
+        is_private:
+          type: boolean
+          description: |
+            Whether only the organizer sees the title of the event
+            in the free/busy times of the attendees.
+        is_cancelled:
+          type: boolean
+          description: |
+            Whether the organizer cancelled the event or the
+            occurrence.
+        rrule:
+          type: string
+          description: |
+            The repetition rule of the event, in the subset of
+            iCalendar `RRULE` syntax described in
+            [`POST /calendar/events`](/api/create-calendar-event),
+            or an empty string if the event does not repeat.
+        organizer_id:
+          type: integer
+          description: |
+            The ID of the user who organizes the event.
+        response:
+          $ref: "#/components/schemas/CalendarResponse"
+        reminder_minutes:
+          type: integer
+          nullable: true
+          description: |
+            How many minutes before the start the current user wants
+            a reminder, or `null` for no reminder.
+        category:
+          type: string
+          description: |
+            The color category the current user gave the event, like
+            `"Red category"`, or an empty string.
+        response_requested:
+          type: boolean
+          description: |
+            Whether the organizer asks the attendees to respond.
+        allow_forwarding:
+          type: boolean
+          description: |
+            Whether attendees may invite more people.
+        hide_attendees:
+          type: boolean
+          description: |
+            Whether the organizer hides the attendees from
+            one another, in which case `attendees` is empty
+            for invitees.
+        has_zulip_call:
+          type: boolean
+          description: |
+            Whether the event has a Zulip call.
+        meet_code:
+          type: string
+          description: |
+            The code that identifies the call of the event.
+        chat_id:
+          type: integer
+          nullable: true
+          description: |
+            The ID of the channel for the chat of the event, if any.
+        channel_id:
+          type: integer
+          nullable: true
+          description: |
+            For a meeting in a channel, the ID of the channel, whose
+            subscribers see the meeting without being invited to it.
+            Such a meeting is discussed in a topic of the channel
+            rather than in a chat of its own.
+        topic:
+          type: string
+          description: |
+            For a meeting in a channel, the topic it is discussed in, or
+            `""`. The topic keeps its name when the meeting is renamed.
+        is_invited:
+          type: boolean
+          description: |
+            Whether the current user is invited to the event. It is
+            `false` for a meeting in a channel the user is subscribed
+            to, which they see without having been invited; the
+            user's `response` is then `1` (no response) and they have
+            no reminder or category.
+        date_created:
+          type: integer
+          description: |
+            When the organizer created the event and sent its
+            invitations, as a UNIX timestamp.
+        attendees:
+          type: array
+          description: |
+            The attendees, including the organizer. Empty if the
+            organizer hides the attendees and the current user is not
+            the organizer.
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              user_id:
+                type: integer
+                description: |
+                  The ID of the attendee.
+              is_required:
+                type: boolean
+                description: |
+                  Whether the attendee is required, rather than
+                  optional.
+              response:
+                $ref: "#/components/schemas/CalendarResponse"
+              added_by:
+                type: integer
+                nullable: true
+                description: |
+                  The ID of the attendee who forwarded the event to
+                  this attendee, or `null` if the organizer invited
+                  them.
+        room_ids:
+          type: array
+          items:
+            type: integer
+          description: |
+            The IDs of the [meeting rooms](/api/get-calendar-rooms) the
+            event booked, by their names.
+    CalendarOccurrenceParameter:
+      type: integer
+      description: |
+        For a repeating event, the `original_start` of the occurrence, as
+        in [`GET /calendar/events`](/api/get-calendar-events), to act on
+        that occurrence rather than the whole series.
+      example: 1763276400
     LiveKitCallConversation:
       type: object
       additionalProperties: false
@@ -29260,6 +31210,7 @@ components:
             message_retention_days:
               nullable: true
             default_push_notifications: {}
+            is_meeting_chat: {}
             history_public_to_subscribers: {}
             topics_policy: {}
             first_message_id:
@@ -29309,6 +31260,7 @@ components:
             - subscriber_count
             - message_retention_days
             - default_push_notifications
+            - is_meeting_chat
             - history_public_to_subscribers
             - first_message_id
             - folder_id
@@ -29437,6 +31389,8 @@ components:
             **Changes**: New in Zulip 3.0 (feature level 17).
         default_push_notifications:
           $ref: "#/components/schemas/DefaultPushNotifications"
+        is_meeting_chat:
+          $ref: "#/components/schemas/IsMeetingChat"
         history_public_to_subscribers:
           type: boolean
           description: |
@@ -30673,6 +32627,8 @@ components:
             **Changes**: New in Zulip 3.0 (feature level 17).
         default_push_notifications:
           $ref: "#/components/schemas/DefaultPushNotifications"
+        is_meeting_chat:
+          $ref: "#/components/schemas/IsMeetingChat"
         history_public_to_subscribers:
           type: boolean
           description: |
@@ -32812,6 +34768,16 @@ components:
 
         **Changes**: New in Zulip 13.0 (feature level 507).
       example: true
+    IsMeetingChat:
+      type: boolean
+      description: |
+        Whether the channel is the chat of a calendar meeting. Such a
+        channel is created for the meeting's attendees, has no topics, and
+        is shown among direct message conversations rather than among
+        channels.
+
+        **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
+      example: false
     TopicsPolicy:
       type: string
       enum:
@@ -33270,6 +35236,43 @@ components:
   # Shared parameters
   ####################
   parameters:
+    CalendarEventId:
+      name: calendar_event_id
+      in: path
+      description: |
+        The ID of the calendar event.
+      schema:
+        type: integer
+      example: 12
+      required: true
+    CalendarPinnedUserId:
+      name: user_id
+      in: path
+      description: |
+        The ID of the colleague whose calendar is pinned.
+      schema:
+        type: integer
+      example: 9
+      required: true
+    CalendarRangeStart:
+      name: start
+      in: query
+      description: |
+        The start of the time range, as a UNIX timestamp.
+      schema:
+        type: integer
+      example: 1763251200
+      required: true
+    CalendarRangeEnd:
+      name: end
+      in: query
+      description: |
+        The end of the time range, as a UNIX timestamp. The range can be at
+        most 62 days long.
+      schema:
+        type: integer
+      example: 1763856000
+      required: true
     UserGroupId:
       name: user_group_id
       in: path

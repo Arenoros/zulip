@@ -1,4 +1,5 @@
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -9,12 +10,7 @@ function check(name: string, ok: boolean, detail = ""): void {
     console.log(line);
 }
 
-async function api_request(
-    page: Page,
-    method: string,
-    url: string,
-    body: string,
-): Promise<void> {
+async function api_request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.evaluate(
         async (method, url, body) => {
             const csrf_token =
@@ -121,23 +117,25 @@ async function visual_test(page: Page): Promise<void> {
         dm_header.tabs.join(","),
     );
     // Mark a few channel messages and the direct message unread.
-    const unread_ids = await page.evaluate(async () => {
-        const fetch_ids = async (narrow: unknown[]): Promise<number[]> => {
+    const fetch_ids = async (narrow: unknown[]): Promise<number[]> => {
+        const response_data = await page.evaluate(async (narrow_json) => {
             const params = new URLSearchParams({
                 anchor: "newest",
                 num_before: "3",
                 num_after: "0",
-                narrow: JSON.stringify(narrow),
+                narrow: narrow_json,
             });
             const response = await fetch(`/json/messages?${params.toString()}`);
-            const data = (await response.json()) as {messages: {id: number}[]};
-            return data.messages.map((message) => message.id);
-        };
-        return [
-            ...(await fetch_ids([{operator: "channel", operand: "Verona"}])),
-            ...(await fetch_ids([{operator: "is", operand: "dm"}])).slice(-1),
-        ];
-    });
+            const data: unknown = await response.json();
+            return data;
+        }, JSON.stringify(narrow));
+        const data = z.object({messages: z.array(z.object({id: z.number()}))}).parse(response_data);
+        return data.messages.map((message) => message.id);
+    };
+    const unread_ids = [
+        ...(await fetch_ids([{operator: "channel", operand: "Verona"}])),
+        ...(await fetch_ids([{operator: "is", operand: "dm"}])).slice(-1),
+    ];
     await api_request(
         page,
         "POST",
@@ -287,7 +285,10 @@ async function visual_test(page: Page): Promise<void> {
         metrics.header.x === metrics.row.x && metrics.header.w === metrics.row.w,
     );
     check("long section name is cut off inside the header", metrics.long_name_overflows);
-    check("long section name stays inside the header", metrics.long_name_right <= metrics.header_right);
+    check(
+        "long section name stays inside the header",
+        metrics.long_name_right <= metrics.header_right,
+    );
 
     // Hover a conversation in a section and open its menu.
     const row_selector = `#direct-messages-list .dm-list-item[data-user-ids-string="${cordelia}"]`;
@@ -303,9 +304,7 @@ async function visual_test(page: Page): Promise<void> {
     await page.click('.dm-popover-move-to-section[data-section-name="Notes"]');
     await page.waitForFunction(
         (cordelia) => {
-            const headers = [
-                ...document.querySelectorAll("#direct-messages-list .dm-list > li"),
-            ];
+            const headers = [...document.querySelectorAll("#direct-messages-list .dm-list > li")];
             const notes = headers.findIndex(
                 (li) => li.getAttribute("data-section-name") === "Notes",
             );
@@ -499,15 +498,22 @@ async function visual_test(page: Page): Promise<void> {
     );
     // Zoomed-in list of all conversations; it needs more conversations
     // than the sidebar shows.
-    const user_ids = await page.evaluate(async () => {
-        const response = await fetch("/json/users");
-        const data = (await response.json()) as {
-            members: {user_id: number; is_bot: boolean; is_active: boolean}[];
-        };
-        return data.members
-            .filter((member) => !member.is_bot && member.is_active)
-            .map((member) => member.user_id);
-    });
+    const users = z
+        .object({
+            members: z.array(
+                z.object({user_id: z.number(), is_bot: z.boolean(), is_active: z.boolean()}),
+            ),
+        })
+        .parse(
+            await page.evaluate(async () => {
+                const response = await fetch("/json/users");
+                const data: unknown = await response.json();
+                return data;
+            }),
+        );
+    const user_ids = users.members
+        .filter((member) => !member.is_bot && member.is_active)
+        .map((member) => member.user_id);
     for (const user_id of user_ids) {
         await api_request(
             page,
@@ -517,8 +523,7 @@ async function visual_test(page: Page): Promise<void> {
         );
     }
     await page.waitForFunction(
-        (count) =>
-            document.querySelectorAll("#direct-messages-list .dm-list-item").length >= count,
+        (count) => document.querySelectorAll("#direct-messages-list .dm-list-item").length >= count,
         {},
         user_ids.length - 1,
     );

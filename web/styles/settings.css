@@ -2375,7 +2375,8 @@ label.preferences-radio-choice-label {
 
 #admin_users_table .deactivated_user,
 #admin_imported_users_table .deactivated_user,
-#admin_deactivated_users_table .active-user {
+#admin_deactivated_users_table .active-user,
+#admin_meeting_rooms_table .archived_meeting_room_row {
     color: hsl(0deg 0% 64%);
 
     & a {
@@ -2385,6 +2386,11 @@ label.preferences-radio-choice-label {
 
 .deactivate-user-container {
     width: fit-content;
+}
+
+.meeting_room_archived {
+    margin-left: 0.5em;
+    font-style: italic;
 }
 
 .settings_url_input,

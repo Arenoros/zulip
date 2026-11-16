@@ -1,4 +1,4 @@
-import $ from "jquery";
+import {$} from "jquery";
 import assert from "minimalistic-assert";
 import type * as tippy from "tippy.js";
 
@@ -20,39 +20,50 @@ function get_topic(element: HTMLElement): {stream_id: number; topic_name: string
 export function initialize(): void {
     // The header of an open conversation offers the actions of the
     // topic's recipient bar.
-    $("#message_view_header").on("click", ".open-conversation-resolve", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const {stream_id, topic_name} = get_topic(this);
-        message_edit.with_first_message_id(stream_id, topic_name, (message_id) => {
-            assert(message_id !== undefined);
-            message_edit.toggle_resolve_topic(message_id, topic_name, true);
-        });
-    });
+    $("#message_view_header").on(
+        "click",
+        ".open-conversation-resolve",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const {stream_id, topic_name} = get_topic(this);
+            message_edit.with_first_message_id(stream_id, topic_name, (message_id) => {
+                assert(message_id !== undefined);
+                message_edit.toggle_resolve_topic(message_id, topic_name, true);
+            });
+        },
+    );
 
-    $("#message_view_header").on("click", ".open-conversation-rename", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const {stream_id, topic_name} = get_topic(this);
-        void stream_popover.build_move_topic_to_stream_popover(stream_id, topic_name, true);
-    });
+    $("#message_view_header").on(
+        "click",
+        ".open-conversation-rename",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const {stream_id, topic_name} = get_topic(this);
+            void stream_popover.build_move_topic_to_stream_popover(stream_id, topic_name, true);
+        },
+    );
 
-    $("#message_view_header").on("click", ".open-conversation-copy-link", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const {url} = get_topic(this);
-        void (async () => {
-            await clipboard_handler.copy_link_to_clipboard(url);
-            const tippy_instance: tippy.Instance | undefined = (
-                this as tippy.ReferenceElement
-            )._tippy;
-            if (tippy_instance) {
-                tippy_instance.setContent($t_html({defaultMessage: "Copied!"}));
-                tippy_instance.show();
-                setTimeout(() => {
-                    tippy_instance.hide();
-                }, 1000);
-            }
-        })();
-    });
+    $("#message_view_header").on(
+        "click",
+        ".open-conversation-copy-link",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const {url} = get_topic(this);
+            void (async () => {
+                await clipboard_handler.copy_link_to_clipboard(url);
+                const tippy_reference: tippy.ReferenceElement | undefined = $(this).get(0);
+                const tippy_instance: tippy.Instance | undefined = tippy_reference!._tippy;
+                if (tippy_instance) {
+                    tippy_instance.setContent($t_html({defaultMessage: "Copied!"}));
+                    tippy_instance.show();
+                    setTimeout(() => {
+                        tippy_instance.hide();
+                    }, 1000);
+                }
+            })();
+        },
+    );
 }

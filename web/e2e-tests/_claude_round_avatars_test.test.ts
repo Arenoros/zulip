@@ -52,7 +52,7 @@ async function step(name: string, body: () => Promise<void>): Promise<void> {
     try {
         await body();
     } catch (error) {
-        console.log(`SKIP ${name}: ${String(error).split("\n")[0]}`);
+        console.log(`SKIP ${name}: ${String(error).split("\n", 1)[0]}`);
     }
 }
 
@@ -295,9 +295,9 @@ async function visual_test(page: Page): Promise<void> {
         // An earlier, closed profile modal can still be in the document.
         await page.waitForFunction(
             () =>
-                [...document.querySelectorAll<HTMLElement>("#user-profile-modal .guest-avatar")].some(
-                    (element) => element.offsetParent !== null,
-                ),
+                [
+                    ...document.querySelectorAll<HTMLElement>("#user-profile-modal .guest-avatar"),
+                ].some((element) => element.offsetParent !== null),
             {timeout: 20000},
         );
         await page.evaluate(() => {

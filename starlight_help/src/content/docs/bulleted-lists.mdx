@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import BulletedListsExamples from "../include/_BulletedListsExamples.mdx";
 import BulletedListsIntro from "../include/_BulletedListsIntro.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import UnorderedListIcon from "~icons/zulip-icon/unordered-list";
@@ -21,9 +22,11 @@ import UnorderedListIcon from "~icons/zulip-icon/unordered-list";
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. *(optional)* Select the text you want to format.
-      1. Click the **bulleted list** (<UnorderedListIcon />) icon at the
-         bottom of the compose box to insert list formatting.
+      1. Click the **bulleted list** (<UnorderedListIcon />) icon in the
+         compose box to insert list formatting.
       1. Press <kbd>Enter</kbd> to automatically add a new bullet to the list.
       1. When your list is done, press <kbd>Enter</kbd> a second time to remove the
          bullet.

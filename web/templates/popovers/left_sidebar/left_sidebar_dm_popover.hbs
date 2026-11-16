@@ -5,12 +5,12 @@
             <span class="popover-menu-label">{{t "Move to section" }}</span>
         </li>
         {{#each sections}}
-        <li role="none" class="link-item popover-menu-list-item">
-            <a role="menuitemradio" aria-checked="{{#if is_current}}true{{else}}false{{/if}}" class="dm-popover-move-to-section popover-menu-link" data-section-name="{{name}}" tabindex="0">
-                <i class="popover-menu-icon zulip-icon {{#if is_current}}zulip-icon-check{{else}}zulip-icon-folder{{/if}}" aria-hidden="true"></i>
-                <span class="popover-menu-label">{{name}}</span>
-            </a>
-        </li>
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitemradio" aria-checked="{{#if is_current}}true{{else}}false{{/if}}" class="dm-popover-move-to-section popover-menu-link" data-section-name="{{name}}" tabindex="0">
+                    <i class="popover-menu-icon zulip-icon {{#if is_current}}zulip-icon-check{{else}}zulip-icon-folder{{/if}}" aria-hidden="true"></i>
+                    <span class="popover-menu-label">{{name}}</span>
+                </a>
+            </li>
         {{/each}}
         <li role="separator" class="popover-menu-separator"></li>
         {{/if}}

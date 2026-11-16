@@ -533,6 +533,38 @@ test("basics", () => {
     ]);
 });
 
+test("meeting chats", () => {
+    // The chat of a calendar meeting is shown among direct message
+    // conversations rather than among channels.
+    const planning = {
+        subscribed: true,
+        color: "blue",
+        name: "Planning",
+        stream_id: 301,
+        is_meeting_chat: true,
+        is_archived: false,
+    };
+    const retro = {...planning, name: "Retro", stream_id: 302, subscribed: false};
+    stream_data.add_sub_for_tests(planning);
+    stream_data.add_sub_for_tests(retro);
+
+    assert.ok(stream_data.is_meeting_chat(planning.stream_id));
+    assert.ok(!stream_data.is_meeting_chat(undefined));
+    assert.deepEqual(stream_data.get_meeting_chats(), [planning]);
+    for (const subs of [
+        stream_data.get_unsorted_subs(),
+        stream_data.get_unsorted_subs_with_content_access(),
+        stream_data.subscribed_subs(),
+        stream_data.unsubscribed_subs(),
+    ]) {
+        assert.ok(!subs.includes(planning) && !subs.includes(retro));
+    }
+    assert.equal(stream_data.num_subscribed_subs(), stream_data.subscribed_subs().length);
+
+    stream_data.delete_sub(planning.stream_id);
+    stream_data.delete_sub(retro.stream_id);
+});
+
 test("get_streams_for_user", async ({override}) => {
     channel.get = (payload) =>
         payload.success({

@@ -46,6 +46,7 @@ UNTESTED_GENERATED_CURL_EXAMPLES = {
     "start-livekit-call",
     "update-livekit-call-ring",
     "invite-to-livekit-call",
+    "join-calendar-event-call",
     # Successfully running this example would deactivate the "zulip"
     # realm used by the test server, breaking the curl examples that
     # run after it.

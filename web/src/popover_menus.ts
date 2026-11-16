@@ -17,6 +17,8 @@ import * as util from "./util.ts";
 
 type PopoverName =
     | "compose_control_buttons"
+    | "compose_plus_menu"
+    | "conversation_people"
     | "starred_messages"
     | "drafts"
     | "left_sidebar_inbox_popover"
@@ -42,10 +44,17 @@ type PopoverName =
     | "folder_actions"
     | "dm_actions"
     | "dm_section_actions"
-    | "send_later_options";
+    | "meeting_chat_actions"
+    | "send_later_options"
+    | "calendar_view_menu"
+    | "calendar_date_picker"
+    | "calendar_filter_menu"
+    | "calendar_card";
 
 export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     compose_control_buttons: null,
+    compose_plus_menu: null,
+    conversation_people: null,
     starred_messages: null,
     drafts: null,
     left_sidebar_inbox_popover: null,
@@ -71,7 +80,12 @@ export const popover_instances: Record<PopoverName, tippy.Instance | null> = {
     folder_actions: null,
     dm_actions: null,
     dm_section_actions: null,
+    meeting_chat_actions: null,
     send_later_options: null,
+    calendar_view_menu: null,
+    calendar_date_picker: null,
+    calendar_filter_menu: null,
+    calendar_card: null,
 };
 
 // Font size in em for popover derived from popover font size being

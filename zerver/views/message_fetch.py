@@ -20,6 +20,7 @@ from zerver.lib.narrow import (
     NarrowParameter,
     add_narrow_conditions,
     clean_narrow_for_message_fetch,
+    count_messages_in_narrow,
     fetch_messages,
     get_base_query_for_search,
     is_spectator_compatible,
@@ -33,6 +34,9 @@ from zerver.lib.typed_endpoint import ApiParamConfig, typed_endpoint
 from zerver.models import UserMessage, UserProfile
 
 MAX_MESSAGES_PER_FETCH = 5000
+# Counting stops here, so that counting the matches of a broad search
+# stays quick.
+MAX_MESSAGES_COUNTED = 1000
 
 
 def highlight_string(text: str, locs: Iterable[tuple[int, int]]) -> str:
@@ -327,6 +331,30 @@ def get_messages_backend(
         )
 
     return json_success(request, data=ret)
+
+
+@typed_endpoint
+def get_message_count_backend(
+    request: HttpRequest,
+    user_profile: UserProfile,
+    *,
+    narrow: Json[list[NarrowParameter]],
+) -> HttpResponse:
+    realm = user_profile.realm
+    cleaned_narrow = clean_narrow_for_message_fetch(narrow, realm, user_profile)
+    count = count_messages_in_narrow(
+        narrow=cleaned_narrow,
+        user_profile=user_profile,
+        realm=realm,
+        limit=MAX_MESSAGES_COUNTED + 1,
+    )
+    return json_success(
+        request,
+        data={
+            "count": min(count, MAX_MESSAGES_COUNTED),
+            "count_is_limited": count > MAX_MESSAGES_COUNTED,
+        },
+    )
 
 
 @typed_endpoint

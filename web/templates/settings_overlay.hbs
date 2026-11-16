@@ -27,6 +27,10 @@
                         <i class="sidebar-item-icon fa fa-exclamation-triangle" aria-hidden="true"></i>
                         <div class="text">{{t "Notifications" }}</div>
                     </li>
+                    <li class="sidebar-item" tabindex="0" data-section="calendar">
+                        <i class="sidebar-item-icon zulip-icon zulip-icon-calendar" aria-hidden="true"></i>
+                        <div class="text">{{t "Calendar" }}</div>
+                    </li>
                     {{#unless is_guest}}
                         <li class="sidebar-item" tabindex="0" data-section="bots">
                             <i class="sidebar-item-icon zulip-icon zulip-icon-bot" aria-hidden="true"></i>
@@ -83,6 +87,11 @@
                     <li class="sidebar-item" tabindex="0" data-section="playground-settings">
                         <i class="sidebar-item-icon fa fa-external-link" aria-hidden="true"></i>
                         <div class="text">{{t "Code playgrounds" }}</div>
+                        <i class="locked fa fa-lock tippy-zulip-tooltip" {{#if is_admin}}style="display: none;"{{/if}} data-tippy-content="{{t 'Only organization administrators can edit these settings.' }}"></i>
+                    </li>
+                    <li class="sidebar-item" tabindex="0" data-section="meeting-rooms">
+                        <i class="sidebar-item-icon zulip-icon zulip-icon-building" aria-hidden="true"></i>
+                        <div class="text">{{t "Meeting rooms" }}</div>
                         <i class="locked fa fa-lock tippy-zulip-tooltip" {{#if is_admin}}style="display: none;"{{/if}} data-tippy-content="{{t 'Only organization administrators can edit these settings.' }}"></i>
                     </li>
                     {{#unless is_guest}}

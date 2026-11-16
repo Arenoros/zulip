@@ -94,6 +94,7 @@ rules:
       - pattern-not: from zerver.lib.mime_types import $X
       - pattern-not: from zerver.lib.redis_utils import get_redis_client
       - pattern-not: from zerver.lib.utils import generate_api_key
+      - pattern-not: from zerver.models.calendar import default_work_days
       - pattern-not: from zerver.models.linkifiers import filter_pattern_validator
       - pattern-not: from zerver.models.linkifiers import url_template_validator
       - pattern-not: from zerver.models.streams import generate_email_token_for_stream

@@ -249,7 +249,13 @@ export class DropdownWidget {
         if (this.hide_search_box) {
             dropdown_search_box_and_padding_height = 0;
         }
-        const dropdown_input_props = $(this.dropdown_input_visible_selector).get_offset_to_window();
+        // The widget's selector may match more than the element the
+        // dropdown opened from; see `open`.
+        const $dropdown_input =
+            this.dropdown_input_visible_selector === this.widget_selector
+                ? $(tippy_instance.reference)
+                : $(this.dropdown_input_visible_selector);
+        const dropdown_input_props = $dropdown_input.get_offset_to_window();
         const dropdown_input_top = dropdown_input_props.top;
 
         // Pixels above the dropdown input.
@@ -781,8 +787,13 @@ export class DropdownWidget {
         return this.current_value;
     }
 
-    open({trigger = "mouse"}: {trigger?: DropdownTrigger} = {}): void {
-        const widget_element = $(this.widget_selector).get(0);
+    // Opens the dropdown from the first element of the widget, or from
+    // the given one, which must match the widget's selector.
+    open({
+        trigger = "mouse",
+        reference,
+    }: {trigger?: DropdownTrigger; reference?: HTMLElement | undefined} = {}): void {
+        const widget_element = reference ?? $(this.widget_selector).get(0);
         if (widget_element === undefined) {
             return;
         }

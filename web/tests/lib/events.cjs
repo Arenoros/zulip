@@ -70,6 +70,7 @@ exports.test_streams = {
         folder_id: null,
         is_recently_active: true,
         default_push_notifications: false,
+        is_meeting_chat: false,
         subscriber_count: 10,
     },
     test: {
@@ -102,6 +103,7 @@ exports.test_streams = {
         folder_id: null,
         is_recently_active: true,
         default_push_notifications: false,
+        is_meeting_chat: false,
         subscriber_count: 2,
     },
 };
@@ -155,6 +157,29 @@ exports.fixtures = {
             message_ids: [1000],
         },
         upload_space_used: 90000,
+    },
+
+    calendar: {
+        type: "calendar",
+        event_id: 7,
+        unanswered_invitation_count: 2,
+    },
+
+    calendar_free_busy: {
+        type: "calendar_free_busy",
+        user_ids: [9, 10],
+    },
+
+    calendar_settings: {
+        type: "calendar_settings",
+        settings: {
+            work_days: [1, 2, 3, 4],
+            work_day_start_minutes: 540,
+            work_day_end_minutes: 1080,
+            default_reminder_minutes: 15,
+            default_view: 1,
+            time_scale_minutes: 30,
+        },
     },
 
     call__ring: {

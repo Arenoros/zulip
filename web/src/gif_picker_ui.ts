@@ -388,14 +388,18 @@ function get_gif_network(): GifNetwork {
     return new giphy_network.GiphyNetwork();
 }
 
+export function toggle_gif_picker(trigger: HTMLElement): void {
+    compose_icon_session = new ComposeIconSession(trigger);
+    if (network) {
+        network.abandon();
+    }
+    network = get_gif_network();
+    toggle_picker_popover(trigger);
+}
+
 function register_click_handlers(): void {
     $("body").on("click", ".compose_control_button.compose-gif-icon", function (this: HTMLElement) {
-        compose_icon_session = new ComposeIconSession(this);
-        if (network) {
-            network.abandon();
-        }
-        network = get_gif_network();
-        toggle_picker_popover(this);
+        toggle_gif_picker(this);
     });
 }
 

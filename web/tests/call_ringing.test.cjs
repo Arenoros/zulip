@@ -9,16 +9,6 @@ const {$} = require("./lib/zjquery.cjs");
 
 const banners = mock_esm("../src/banners");
 const channel = mock_esm("../src/channel");
-const compose_banner = mock_esm("../src/compose_banner", {
-    CLASSNAMES: {
-        missing_stream: "missing_stream",
-        generic_compose_error: "generic_compose_error",
-    },
-});
-const compose_state = mock_esm("../src/compose_state");
-const compose_validate = mock_esm("../src/compose_validate", {
-    NO_CHANNEL_SELECTED_ERROR_MESSAGE: "Please select a channel.",
-});
 const electron_bridge = mock_esm("../src/electron_bridge");
 const popup_banners = mock_esm("../src/popup_banners");
 const ui_util = mock_esm("../src/ui_util");
@@ -135,15 +125,15 @@ function test(label, f) {
             banners,
             "append",
             (banner) => {
-            banner_count += 1;
-            const $banner = $.create(`call-banner-${banner_count}`);
-            $banner.banner = banner;
-            $banner.$label = $.create(`call-banner-label-${banner_count}`);
-            $banner.$buttons = $.create(`call-banner-buttons-${banner_count}`);
-            $banner.set_find_results(".banner-label", $banner.$label);
-            $banner.set_find_results(".banner-action-buttons", $banner.$buttons);
-            $last_banner = $banner;
-            return $banner;
+                banner_count += 1;
+                const $banner = $.create(`call-banner-${banner_count}`);
+                $banner.banner = banner;
+                $banner.$label = $.create(`call-banner-label-${banner_count}`);
+                $banner.$buttons = $.create(`call-banner-buttons-${banner_count}`);
+                $banner.set_find_results(".banner-label", $banner.$label);
+                $banner.set_find_results(".banner-action-buttons", $banner.$buttons);
+                $last_banner = $banner;
+                return $banner;
             },
             {unused: false},
         );
@@ -160,11 +150,8 @@ function click(selector, $banner) {
         .call({to_$: () => $button});
 }
 
-function start_direct_message_call({override}, recipient_ids, message_id) {
-    override(compose_state, "get_message_type", () => "private");
-    override(compose_validate, "validate_private_message", () => true);
-    override(compose_state, "private_message_recipient_ids", () => recipient_ids);
-    call_ringing.start_call_from_compose(123456789012345, false);
+function start_direct_message_call(recipient_ids, message_id) {
+    call_ringing.start_direct_message_call(123456789012345, recipient_ids, false);
     posts.at(-1).success({message_id, result: "success", msg: ""});
     return $last_banner;
 }
@@ -196,21 +183,8 @@ test("get_call_url", () => {
     );
 });
 
-test("start channel call", ({override, disallow}) => {
-    override(compose_state, "get_message_type", () => "stream");
-    override(compose_state, "stream_id", () => undefined);
-    let error;
-    override(compose_banner, "show_error_message", (...args) => {
-        error = args;
-    });
-    call_ringing.start_call_from_compose(123, false);
-    assert.deepEqual(error.slice(0, 2), ["Please select a channel.", "missing_stream"]);
-    assert.deepEqual(new_call_windows, []);
-    assert.deepEqual(posts, []);
-
-    override(compose_state, "stream_id", () => 5);
-    override(compose_state, "topic", () => "standup");
-    call_ringing.start_call_from_compose(123, true);
+test("start direct message call", () => {
+    call_ringing.start_direct_message_call(123, [alice.user_id], true);
     // The window opens right away, but shows the call once it is
     // started, so that the call window knows the call.
     assert.equal(new_call_windows.length, 1);
@@ -220,64 +194,57 @@ test("start channel call", ({override, disallow}) => {
     assert.equal(posts.length, 1);
     assert.equal(posts[0].url, "/json/calls/livekit/start");
     assert.deepEqual(posts[0].data, {
-        type: "channel",
-        channel_id: "5",
-        topic: "standup",
+        type: "direct",
+        to: JSON.stringify([alice.user_id]),
         call_id: "123",
         voice_only: "true",
     });
 
-    // Calls in channels don't ring anyone.
-    disallow(banners, "append");
     posts[0].success({message_id: 42, result: "success", msg: ""});
     assert.equal(
         call_window.url,
-        "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&channel_id=5&voice_only=true",
+        "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&dm=1,2&voice_only=true",
     );
     assert.deepEqual(opened_urls, []);
+});
+
+test("start call with only bots", ({disallow}) => {
+    call_ringing.start_direct_message_call(123, [bot.user_id], false);
+    // Bots don't answer calls, so no one is rung.
+    disallow(banners, "append");
+    posts[0].success({message_id: 42, result: "success", msg: ""});
+    assert.equal(
+        new_call_windows[0].url,
+        "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&dm=1,4",
+    );
 });
 
 test("start call in the desktop app", ({override}) => {
     // The desktop app opens the call window when asked, so it opens once
     // the call is started.
     override(electron_bridge, "electron_bridge", {});
-    override(compose_state, "get_message_type", () => "stream");
-    override(compose_state, "stream_id", () => 5);
-    override(compose_state, "topic", () => "standup");
-    call_ringing.start_call_from_compose(123, false);
+    call_ringing.start_direct_message_call(123, [bot.user_id], false);
     assert.deepEqual(opened_urls, []);
     posts[0].success({message_id: 42, result: "success", msg: ""});
-    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&channel_id=5"]);
+    assert.deepEqual(opened_urls, ["/calls/livekit/join?call_id=123&dm=1,4"]);
     assert.deepEqual(new_call_windows, []);
 });
 
 test("start call with the window blocked", ({override}) => {
     window.open = () => null;
-    override(compose_state, "get_message_type", () => "stream");
-    override(compose_state, "stream_id", () => 5);
-    override(compose_state, "topic", () => "standup");
-    call_ringing.start_call_from_compose(123, false);
+    call_ringing.start_direct_message_call(123, [bot.user_id], false);
     posts[0].success({message_id: 42, result: "success", msg: ""});
 
-    call_ringing.start_call_from_compose(124, false);
+    call_ringing.start_direct_message_call(124, [bot.user_id], false);
     override(channel, "xhr_error_message", (message) => message);
-    override(compose_banner, "show_error_message", () => {});
     posts[1].error({});
     // The call still starts, and its link is in the conversation.
     assert.equal(posts.length, 2);
     assert.deepEqual(opened_urls, []);
 });
 
-test("start direct message call errors", ({override}) => {
-    override(compose_state, "get_message_type", () => "private");
-    override(compose_validate, "validate_private_message", () => false);
-    call_ringing.start_call_from_compose(123, false);
-    assert.deepEqual(new_call_windows, []);
-    assert.deepEqual(posts, []);
-
-    override(compose_validate, "validate_private_message", () => true);
-    override(compose_state, "private_message_recipient_ids", () => [alice.user_id]);
-    call_ringing.start_call_from_compose(123, false);
+test("start call error", ({override}) => {
+    call_ringing.start_direct_message_call(123, [alice.user_id], false);
     assert.equal(new_call_windows.length, 1);
 
     const xhr = {responseJSON: {msg: "Invalid user ID 9999"}};
@@ -285,26 +252,20 @@ test("start direct message call errors", ({override}) => {
         assert.equal(error_xhr, xhr);
         return `${message}: ${error_xhr.responseJSON.msg}`;
     });
-    let error;
-    override(compose_banner, "show_error_message", (...args) => {
-        error = args;
-    });
     posts[0].error(xhr);
-    assert.deepEqual(error.slice(0, 2), [
+    assert.equal($last_banner.banner.intent, "danger");
+    assert.equal(
+        $last_banner.banner.label,
         "translated: Failed to start the call.: Invalid user ID 9999",
-        "generic_compose_error",
-    ]);
+    );
+    assert.ok($last_banner.banner.close_button);
     // A call that could not start does not open.
     assert.ok(new_call_windows[0].closed);
     assert.equal(new_call_windows[0].url, undefined);
 });
 
-test("outgoing call is accepted", (helpers) => {
-    const $banner = start_direct_message_call(
-        helpers,
-        [me.user_id, alice.user_id, bot.user_id],
-        42,
-    );
+test("outgoing call is accepted", () => {
+    const $banner = start_direct_message_call([me.user_id, alice.user_id, bot.user_id], 42);
     assert.deepEqual(posts[0].data, {
         type: "direct",
         to: JSON.stringify([me.user_id, alice.user_id, bot.user_id]),
@@ -323,8 +284,8 @@ test("outgoing call is accepted", (helpers) => {
     assert.equal(timeouts.size, 0);
 });
 
-test("outgoing call is declined", (helpers) => {
-    const $banner = start_direct_message_call(helpers, [alice.user_id, bob.user_id], 43);
+test("outgoing call is declined", () => {
+    const $banner = start_direct_message_call([alice.user_id, bob.user_id], 43);
     assert.equal($banner.banner.label, "translated: Calling Alice and Bob…");
     const initial_label = $banner.$label.text();
 
@@ -339,8 +300,8 @@ test("outgoing call is declined", (helpers) => {
     assert.deepEqual(faded_banners, [$banner]);
 });
 
-test("outgoing call is not answered", (helpers) => {
-    const $banner = start_direct_message_call(helpers, [alice.user_id, bob.user_id], 44);
+test("outgoing call is not answered", () => {
+    const $banner = start_direct_message_call([alice.user_id, bob.user_id], 44);
     call_ringing.dispatch({op: "decline", message_id: 44, user_id: bob.user_id});
 
     run_timeouts(call_ringing.RING_TIMEOUT_MS);
@@ -350,8 +311,8 @@ test("outgoing call is not answered", (helpers) => {
     assert.deepEqual(faded_banners, [$banner]);
 });
 
-test("outgoing call is cancelled", (helpers) => {
-    const $banner = start_direct_message_call(helpers, [alice.user_id], 45);
+test("outgoing call is cancelled", () => {
+    const $banner = start_direct_message_call([alice.user_id], 45);
     click(".outgoing-call-cancel", $banner);
     assert.equal(posts.at(-1).url, "/json/calls/livekit/ring");
     assert.deepEqual(posts.at(-1).data, {message_id: "45", op: "cancel"});
@@ -364,15 +325,15 @@ test("outgoing call is cancelled", (helpers) => {
     assert.deepEqual(faded_banners, [$banner]);
 });
 
-test("call windows' events are ignored", (helpers) => {
-    const $banner = start_direct_message_call(helpers, [alice.user_id], 47);
+test("call windows' events are ignored", () => {
+    const $banner = start_direct_message_call([alice.user_id], 47);
     call_ringing.dispatch({op: "rings", message_id: 47, rings: []});
     assert.deepEqual(faded_banners, []);
     assert.equal($banner.banner.label, "translated: Calling Alice…");
 });
 
-test("outgoing call ends", (helpers) => {
-    const $banner = start_direct_message_call(helpers, [alice.user_id], 46);
+test("outgoing call ends", () => {
+    const $banner = start_direct_message_call([alice.user_id], 46);
     call_ringing.dispatch({op: "cancel", message_id: 46});
     assert.deepEqual(faded_banners, [$banner]);
     assert.equal(timeouts.size, 0);
@@ -455,4 +416,3 @@ test("incoming call stops ringing", () => {
     call_ringing.dispatch({op: "missed_seen", message_ids: [53, 54]});
     assert.equal(livekit_missed_calls.get_unseen_count(), 0);
 });
-

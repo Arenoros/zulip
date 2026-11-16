@@ -1,0 +1,11 @@
+<div class="popover-menu calendar-menu calendar-card-choices">
+    <ul role="menu" class="popover-menu-list">
+        {{#each choices}}
+            <li role="none" class="link-item popover-menu-list-item">
+                <a role="menuitem" tabindex="0" class="popover-menu-link calendar-card-choice" data-choice="{{value}}">
+                    <span class="popover-menu-label">{{label}}</span>
+                </a>
+            </li>
+        {{/each}}
+    </ul>
+</div>

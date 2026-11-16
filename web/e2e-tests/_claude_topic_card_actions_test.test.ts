@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -34,14 +35,14 @@ for topic in ["checklist", "venue", "press"]:
 print("SEEDED " + json.dumps({"ids": ids, "stream_id": stream.id}))
 `;
 
-type Seeded = {ids: Record<string, number>; stream_id: number};
+const seeded_schema = z.object({ids: z.record(z.string(), z.number()), stream_id: z.number()});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -72,7 +73,10 @@ async function label_cards(page: Page): Promise<void> {
     });
 }
 
-async function panel_state(page: Page, title: string): Promise<{
+async function panel_state(
+    page: Page,
+    title: string,
+): Promise<{
     visible: boolean;
     buttons: string[];
     hidden_parts_shown: number;
@@ -88,16 +92,17 @@ async function panel_state(page: Page, title: string): Promise<{
                 getComputedStyle(panel.querySelector(".recipient_bar_controls")!).opacity === "1",
             buttons: [...panel.querySelectorAll(".recipient-bar-control")]
                 .filter((button) => shown(button))
-                .map((button) =>
-                    [...button.classList].find((name) =>
-                        [
-                            "topic-card-react",
-                            "on_hover_topic_resolve",
-                            "recipient-bar-copy-link-to-topic",
-                            "change_visibility_policy",
-                            "recipient-row-topic-menu",
-                        ].includes(name),
-                    ) ?? button.className,
+                .map(
+                    (button) =>
+                        [...button.classList].find((name) =>
+                            [
+                                "topic-card-react",
+                                "on_hover_topic_resolve",
+                                "recipient-bar-copy-link-to-topic",
+                                "change_visibility_policy",
+                                "recipient-row-topic-menu",
+                            ].includes(name),
+                        ) ?? button.className,
                 ),
             hidden_parts_shown: [
                 ...panel.querySelectorAll(
@@ -126,15 +131,17 @@ async function hover_card(page: Page, title: string): Promise<void> {
             cards.filter(
                 (card) =>
                     !card.matches(hovered) &&
-                    !(
-                        matchMedia("(hover: none)").matches &&
-                        card.querySelector(".selected_message") !== null
-                    ) &&
+                    (!matchMedia("(hover: none)").matches ||
+                        card.querySelector(".selected_message") === null) &&
                     getComputedStyle(card.querySelector(".message_header")!).opacity === "1",
             ).length,
         card(title),
     );
-    check(`hovering "${title}" shows no other card's panel`, others_shown === 0, String(others_shown));
+    check(
+        `hovering "${title}" shows no other card's panel`,
+        others_shown === 0,
+        String(others_shown),
+    );
 }
 
 // Counts the buttons of a card's panel that something else covers.
@@ -153,7 +160,7 @@ async function covered_buttons(page: Page, title: string): Promise<number> {
 
 async function topic_card_actions_test(page: Page): Promise<void> {
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -191,7 +198,9 @@ async function topic_card_actions_test(page: Page): Promise<void> {
     const focused = await panel_state(page, "venue");
     check("focusing a panel button shows the panel", focused.visible, JSON.stringify(focused));
     await page.evaluate(() => {
-        (document.activeElement as HTMLElement).blur();
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
     });
 
     await hover_card(page, "venue");
@@ -212,7 +221,7 @@ async function topic_card_actions_test(page: Page): Promise<void> {
     );
     const geometry = await page.$eval(card("venue"), (card) => {
         const panel = card
-            .querySelector(".message_header .recipient_bar_controls")!
+            .querySelector(":scope .message_header .recipient_bar_controls")!
             .getBoundingClientRect();
         const box = card.getBoundingClientRect();
         const time = document.createRange();
@@ -331,11 +340,10 @@ async function topic_card_actions_test(page: Page): Promise<void> {
     await page.click(`${card("press")} .change_visibility_policy`);
     await page.waitForSelector(".visibility-policy-popover", {visible: true});
     await page.click('.visibility-policy-popover label[for="select-muted-policy"]');
-    await page.waitForFunction(
-        () =>
-            ![...document.querySelectorAll(".focused-message-list .topic-card-title-text")].some(
-                (title) => title.textContent.trim() === "press",
-            ),
+    await page.waitForFunction(() =>
+        [...document.querySelectorAll(".focused-message-list .topic-card-title-text")].every(
+            (title) => title.textContent.trim() !== "press",
+        ),
     );
     check("muting the topic from the bell removes its card", true);
 

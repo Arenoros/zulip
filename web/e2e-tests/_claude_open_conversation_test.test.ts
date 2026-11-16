@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -85,14 +86,17 @@ UserMessage.objects.filter(user_profile=desdemona, message_id__in=ids["venue"][4
 print("SEEDED " + json.dumps({"ids": ids, "stream_id": stream.id}))
 `;
 
-type Seeded = {ids: Record<string, number[]>; stream_id: number};
+const seeded_schema = z.object({
+    ids: z.record(z.string(), z.array(z.number())),
+    stream_id: z.number(),
+});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -113,11 +117,10 @@ function row(id: number): string {
 }
 
 async function replies_label(page: Page): Promise<string | undefined> {
-    return await page.evaluate(
-        () =>
-            document
-                .querySelector(".focused-message-list .open-conversation-replies-label")
-                ?.textContent.trim(),
+    return await page.evaluate(() =>
+        document
+            .querySelector(".focused-message-list .open-conversation-replies-label")
+            ?.textContent.trim(),
     );
 }
 
@@ -158,8 +161,7 @@ async function shot(page: Page, name: string): Promise<void> {
 
 async function open_conversation_test(page: Page): Promise<void> {
     const output = run_python(seed_script);
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
-    const {ids, stream_id} = seeded;
+    const {ids, stream_id} = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     const venue = ids["venue"]!;
     const history = ids["history"]!;
     await fetch(`${base_url}flush_caches`, {method: "POST"});
@@ -229,7 +231,7 @@ async function open_conversation_test(page: Page): Promise<void> {
         (venue: number[]) =>
             venue.map((id) => {
                 const row = document.querySelector(
-                    `.focused-message-list .message_row[data-message-id="${id}"]`,
+                    `.focused-message-list .message_row[data-message-id="${CSS.escape(String(id))}"]`,
                 )!;
                 const name = row.querySelector(".sender_name")?.getBoundingClientRect();
                 const time = row.querySelector(".message-time")!.getBoundingClientRect();
@@ -275,7 +277,7 @@ async function open_conversation_test(page: Page): Promise<void> {
             channel: header?.querySelector(".open-conversation-header-channel")?.textContent.trim(),
             topic: header?.querySelector(".open-conversation-header-topic")?.textContent.trim(),
             actions: [
-                ...(header?.querySelectorAll(".open-conversation-header-actions > *") ?? []),
+                ...(header?.querySelectorAll(":scope .open-conversation-header-actions > *") ?? []),
             ].map((action) => action.classList[0]),
         };
     });
@@ -367,8 +369,9 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
             document.querySelector(
                 "#message_view_header .open-conversation-header-topic .topic-card-resolved-label",
             ) !== null &&
-            document.querySelector("#message_view_header .open-conversation-resolve .zulip-icon-check-x") !==
-                null,
+            document.querySelector(
+                "#message_view_header .open-conversation-resolve .zulip-icon-check-x",
+            ) !== null,
     );
     const resolved_title = await page.$eval(
         "#message_view_header .open-conversation-header-topic .message-header-navbar-title",
@@ -419,7 +422,9 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
         `${base_url}#narrow/channel/${stream_id}-offsite/topic/history/near/${history.at(-1)}`,
     );
     await page.waitForSelector(row(history.at(-1)!), {visible: true});
-    const card_before_scrolling = await page.$(".focused-message-list .open-conversation-first-message");
+    const card_before_scrolling = await page.$(
+        ".focused-message-list .open-conversation-first-message",
+    );
     // Scrolling up moves the selection to the top, which loads the
     // older messages.
     await page.mouse.move(640, 500);
@@ -486,7 +491,7 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
     });
     const large = await page.evaluate((first_id: number) => {
         const card = document.querySelector(
-            `.focused-message-list .message_row[data-message-id="${first_id}"]`,
+            `.focused-message-list .message_row[data-message-id="${CSS.escape(String(first_id))}"]`,
         )!;
         const list = document.querySelector(".focused-message-list")!.getBoundingClientRect();
         return {
@@ -494,14 +499,14 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
             font: getComputedStyle(document.documentElement).getPropertyValue(
                 "--base-font-size-px",
             ),
-            overflowing: [...document.querySelectorAll(".focused-message-list .message_row")].filter(
-                (row) => row.getBoundingClientRect().right > list.right + 1,
-            ).length,
+            overflowing: [
+                ...document.querySelectorAll(".focused-message-list .message_row"),
+            ].filter((row) => row.getBoundingClientRect().right > list.right + 1).length,
         };
     }, venue[0]!);
     check(
         "with 24-hour time and 17px text, the card shows its date and time and nothing overflows",
-        / at 09:00$/.test(large.time) && large.font === "17px" && large.overflowing === 0,
+        large.time.endsWith(" at 09:00") && large.font === "17px" && large.overflowing === 0,
         JSON.stringify(large),
     );
     await shot(page, "dark-24h-17px");

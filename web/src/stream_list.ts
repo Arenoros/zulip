@@ -312,6 +312,10 @@ class StreamSidebar {
 export const stream_sidebar = new StreamSidebar();
 
 export function add_sidebar_row(sub: StreamSubscription): void {
+    // Meeting chats are shown among direct message conversations.
+    if (sub.is_meeting_chat) {
+        return;
+    }
     create_sidebar_row(sub);
     update_streams_sidebar();
 }

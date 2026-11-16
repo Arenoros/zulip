@@ -3,13 +3,23 @@ import * as settings_config from "./settings_config.ts";
 import * as stream_data from "./stream_data.ts";
 import {user_settings} from "./user_settings.ts";
 
+// The chat of a calendar meeting is a channel that is shown as a group
+// direct message conversation.
+export function is_meeting_chat(filter: Filter): boolean {
+    if (!filter.is_conversation_view() || !filter.has_operator("channel")) {
+        return false;
+    }
+    const channel_id = Number.parseInt(filter.terms_with_operator("channel")[0]!.operand, 10);
+    return stream_data.is_meeting_chat(channel_id);
+}
+
 // A single direct message conversation is shown as chat bubbles if the
 // user has the setting on; views that mix conversations keep the
 // classic layout.
 export function is_bubble_layout(filter: Filter): boolean {
     return (
         filter.is_conversation_view() &&
-        filter.has_operator("dm") &&
+        (filter.has_operator("dm") || is_meeting_chat(filter)) &&
         user_settings.web_direct_message_bubbles
     );
 }
@@ -30,6 +40,12 @@ export function is_open_conversation(filter: Filter): boolean {
         stream_data.get_sub_by_id(channel_id) !== undefined &&
         !stream_data.is_empty_topic_only_channel(channel_id)
     );
+}
+
+// A view that gathers messages from more than one conversation shows
+// each conversation's consecutive messages as a conversation fragment.
+export function is_mixed_view(filter: Filter): boolean {
+    return !filter.is_conversation_view();
 }
 
 // The chat layout shows a single conversation as a chat: messages in

@@ -35,6 +35,7 @@ const stream3 = 3;
 const stream4 = 4;
 const stream5 = 5; // Deleted stream
 const stream6 = 6; // Muted stream
+const stream7 = 7; // The chat of a calendar meeting
 
 // Topics in the stream, all unread except topic1 & stream1.
 const topic1 = "topic-1"; // No other sender & read.
@@ -134,6 +135,7 @@ mock_esm("../src/user_topics", {
         }
         return false;
     },
+    is_topic_followed: () => false,
     get_topic_visibility_policy(stream_id, topic) {
         if (stream_id === stream1 && topic === topic7) {
             return all_visibility_policies.MUTED;
@@ -170,6 +172,7 @@ mock_esm("../src/stream_data", {
     },
     get_stream_name_from_id: () => "stream_name",
     get_sub_by_name: noop,
+    is_meeting_chat: (stream_id) => stream_id === stream7,
 });
 mock_esm("../src/stream_list", {
     handle_message_view_deactivated: noop,
@@ -405,6 +408,14 @@ sample_messages[13] = {
     type: "stream",
 };
 
+const meeting_chat_message = {
+    stream_id: stream7,
+    id: 1000,
+    topic: "",
+    sender_id: sender2,
+    type: "stream",
+};
+
 private_messages[0] = {
     id: (id += 1),
     sender_id: sender1,
@@ -461,6 +472,7 @@ function generate_topic_data(topic_info_array) {
             is_empty_string_topic: topic === "",
             conversation_key: get_topic_key(stream_id, topic),
             topic_url: "https://www.example.com/with/12",
+            is_meeting_chat: false,
             unread_count,
             missed_calls_count: 0,
             unseen_missed_calls_count: 0,
@@ -591,7 +603,9 @@ function test(label, f) {
         page_params.is_node_test = true;
         messages = sample_messages.map((message) => ({...message}));
         message_store.set_messages_for_tests(
-            [...messages, ...private_messages].map((message) => ({message})),
+            [...messages, ...private_messages, meeting_chat_message].map((message) => ({
+                message,
+            })),
         );
         rt.set_default_focus();
         f(helpers);
@@ -1800,6 +1814,32 @@ test("test_folder_filter", () => {
     // Clean up folder_id modifications.
     delete sub1.folder_id;
     delete sub4.folder_id;
+});
+
+test("meeting chats are filtered like direct messages", () => {
+    sub_store.add_hydrated_sub(stream7, {
+        color: "",
+        invite_only: true,
+        is_web_public: false,
+        is_archived: false,
+        subscribed: true,
+        folder_id: null,
+    });
+    const meeting_chat = {last_msg_id: meeting_chat_message.id, participated: true, type: "stream"};
+    rt.clear_for_tests();
+    rt.set_filters_for_tests();
+    stub_out_filter_buttons();
+    assert.equal(rt.filters_should_hide_row(meeting_chat), true);
+
+    rt.set_filter("include_private");
+    assert.equal(rt.filters_should_hide_row(meeting_chat), false);
+
+    rt.set_filters_for_tests([views_util.FILTERS.FOLLOWED_TOPICS]);
+    assert.equal(rt.filters_should_hide_row(meeting_chat), false);
+
+    // "Uncategorized" folder filter hides direct messages and meeting chats.
+    rt.set_folder_filter_for_tests(-101);
+    assert.equal(rt.filters_should_hide_row(meeting_chat), true);
 });
 
 test("test_filter_missed_calls", () => {

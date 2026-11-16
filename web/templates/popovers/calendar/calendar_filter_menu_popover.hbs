@@ -1,0 +1,24 @@
+<div class="popover-menu calendar-menu" id="calendar-filter-menu" data-simplebar data-simplebar-tab-index="-1">
+    <ul role="menu" class="popover-menu-list">
+        <li role="none" class="link-item popover-menu-list-item">
+            <a role="menuitem" tabindex="0" class="popover-menu-link calendar-filter-reset">
+                <i class="popover-menu-icon zulip-icon zulip-icon-close" aria-hidden="true"></i>
+                <span class="popover-menu-label">{{t "Reset filters" }}</span>
+            </a>
+        </li>
+        {{#each groups}}
+            <li role="separator" class="popover-menu-separator"></li>
+            {{#each this}}
+                <li role="none" class="link-item popover-menu-list-item">
+                    <a role="menuitemcheckbox" tabindex="0" class="popover-menu-link calendar-filter-option {{#if has_submenu}}calendar-submenu-trigger{{/if}}" data-filter-option="{{id}}" {{#if has_submenu}}data-submenu="{{id}}" aria-haspopup="true"{{/if}} aria-checked="{{checked}}">
+                        {{> calendar_menu_checkbox .}}
+                        <span class="popover-menu-label">{{label}}</span>
+                        {{#if has_submenu}}
+                            <i class="zulip-icon zulip-icon-chevron-right calendar-submenu-icon" aria-hidden="true"></i>
+                        {{/if}}
+                    </a>
+                </li>
+            {{/each}}
+        {{/each}}
+    </ul>
+</div>

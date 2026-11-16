@@ -992,12 +992,20 @@ export function get_counts(): FullUnreadCountsData {
     first_unread_unmuted_message_id = Infinity;
     const topic_res = unread_topic_counter.get_counts(update_first_unmuted_message_id);
     const pm_res = unread_direct_message_counter.get_counts(update_first_unmuted_message_id);
+    // Meeting chats are counted with direct messages, among which
+    // they are shown.
+    let meeting_chat_unread_messages = 0;
+    for (const [stream_id, stream_count_info] of topic_res.stream_count) {
+        if (sub_store.get(stream_id)?.is_meeting_chat) {
+            meeting_chat_unread_messages += stream_count_info.unmuted_count;
+        }
+    }
 
     return {
-        direct_message_count: pm_res.total_count,
+        direct_message_count: pm_res.total_count + meeting_chat_unread_messages,
         mentioned_message_count: unread_mentions_counter.size,
         direct_message_with_mention_count: direct_message_with_mention_count.size,
-        stream_unread_messages: topic_res.stream_unread_messages,
+        stream_unread_messages: topic_res.stream_unread_messages - meeting_chat_unread_messages,
         followed_topic_unread_messages_count: topic_res.followed_topic_unread_messages,
         followed_topic_unread_messages_with_mention_count:
             unread_topic_counter.get_followed_topic_unread_mentions(),

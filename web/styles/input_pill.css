@@ -300,7 +300,8 @@
 .add_subscribers_container .pill-container,
 .add_streams_container .pill-container,
 .add-user-group-container .pill-container,
-.add_members_container .pill-container {
+.add_members_container .pill-container,
+.start-group-chat-people.pill-container {
     width: 100%;
 
     .input:first-child:empty::before {
@@ -310,8 +311,13 @@
 }
 
 .add_streams_container .input,
-.add-user-group-container .input {
+.add-user-group-container .input,
+.start-group-chat-people .input {
     flex-grow: 1;
+}
+
+.start-group-chat-people.pill-container {
+    box-sizing: border-box;
 }
 
 .display_only_pill,

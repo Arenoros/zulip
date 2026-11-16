@@ -1,0 +1,47 @@
+<div class="calendar-responses-header">
+    <h2 class="calendar-responses-title">{{t "Attendee responses" }}</h2>
+    <button type="button" class="calendar-icon-button calendar-responses-hide tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Hide attendee responses' }}" aria-label="{{t 'Hide attendee responses' }}">
+        <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
+    </button>
+</div>
+<div class="calendar-responses-scroll">
+    <section class="calendar-responses-section">
+        <h3 class="calendar-responses-heading">{{t "Organizer" }}</h3>
+        <div class="calendar-responses-person">
+            <img class="calendar-responses-avatar" src="{{organizer.avatar_url}}" alt=""/>
+            <div class="calendar-responses-person-text">
+                <span class="calendar-responses-name">{{organizer.name}}</span>
+                <span class="calendar-responses-detail">{{organizer.sent_label}}</span>
+            </div>
+        </div>
+    </section>
+    <section class="calendar-responses-section">
+        <h3 class="calendar-responses-heading">{{t "Attendees" }}</h3>
+        {{#if own_status}}
+            <p class="calendar-responses-detail calendar-responses-own">{{own_status}}</p>
+        {{/if}}
+        {{#if is_hidden}}
+            <p class="calendar-responses-detail">{{t "The organizer hid the list of attendees." }}</p>
+        {{else}}
+            {{#each groups}}
+                <div class="calendar-responses-group {{#if is_collapsed}}collapsed{{/if}}" data-response="{{response}}">
+                    <button type="button" class="calendar-responses-group-toggle" aria-expanded="{{#if is_collapsed}}false{{else}}true{{/if}}">
+                        <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+                        {{label}}
+                    </button>
+                    <ul class="calendar-responses-people">
+                        {{#each people}}
+                            <li class="calendar-responses-person">
+                                <img class="calendar-responses-avatar" src="{{avatar_url}}" alt=""/>
+                                <div class="calendar-responses-person-text">
+                                    <span class="calendar-responses-name">{{name}}</span>
+                                    <span class="calendar-responses-detail">{{role}}{{#if added_by}} · {{added_by}}{{/if}}</span>
+                                </div>
+                            </li>
+                        {{/each}}
+                    </ul>
+                </div>
+            {{/each}}
+        {{/if}}
+    </section>
+</div>

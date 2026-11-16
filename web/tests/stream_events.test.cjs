@@ -18,6 +18,7 @@ const compose_recipient = mock_esm("../src/compose_recipient");
 const dialog_widget = mock_esm("../src/dialog_widget");
 const message_live_update = mock_esm("../src/message_live_update");
 const message_view = mock_esm("../src/message_view");
+const pm_list = mock_esm("../src/pm_list");
 const settings_streams = mock_esm("../src/settings_streams");
 const stream_color_events = mock_esm("../src/stream_color_events");
 const stream_list = mock_esm("../src/stream_list");
@@ -221,6 +222,14 @@ test("update_property", ({override, override_rewire}) => {
         const args = stub.get_args("sub", "val");
         assert.equal(args.sub.stream_id, stream_id);
         assert.equal(args.val, "the frontend");
+
+        // Meeting chats are listed among direct message conversations.
+        const pm_list_stub = make_stub();
+        override(pm_list, "update_private_messages", pm_list_stub.f);
+        sub.is_meeting_chat = true;
+        stream_events.update_property(stream_id, "name", "Planning");
+        assert.equal(pm_list_stub.num_calls, 1);
+        sub.is_meeting_chat = false;
     }
 
     // Test description change

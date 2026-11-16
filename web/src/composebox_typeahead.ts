@@ -271,7 +271,18 @@ export function should_enter_send(e: JQuery.KeyDownEvent): boolean {
     const has_non_shift_modifier_key = e.ctrlKey || e.metaKey || e.altKey;
     const has_modifier_key = e.shiftKey || has_non_shift_modifier_key;
     let this_enter_sends;
-    if (user_settings.enter_sends) {
+    // The compose box and the edit form of a message each have their
+    // own formatting mode.
+    const $target = $(e.target);
+    const formatting_mode =
+        $target.attr("id") === "compose-textarea"
+            ? compose_ui.is_formatting_mode()
+            : $target.closest(".message_edit_form").hasClass("formatting-mode");
+    if (formatting_mode) {
+        // Formatting mode is for writing longer messages, where Enter
+        // starts a new line, whatever the setting.
+        this_enter_sends = has_non_shift_modifier_key;
+    } else if (user_settings.enter_sends) {
         // With the enter_sends setting, we should send
         // the message unless the user was holding a
         // modifier key.
@@ -424,6 +435,10 @@ function handle_keydown(
                 // Enter
                 if (should_enter_send(e)) {
                     e.preventDefault();
+                    // The compose box may close once the message is
+                    // sent; this Enter must not then go on to reply
+                    // to the selected message.
+                    e.stopPropagation();
                     if (
                         compose_validate.validate_message_length($("#send_message_form")) &&
                         !$("#compose-send-button").hasClass("disabled-message-send-controls")

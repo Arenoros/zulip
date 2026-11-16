@@ -21,6 +21,9 @@ from zerver.lib.event_types import (
     BaseEvent,
     BotServicesEmbedded,
     BotServicesOutgoing,
+    CalendarChangeEvent,
+    CalendarFreeBusyEvent,
+    CalendarSettingsEvent,
     CallAnswerEvent,
     CallCancelEvent,
     CallMissedSeenEvent,
@@ -174,6 +177,9 @@ check_alert_words = make_checker(AlertWordsEvent)
 check_attachment_add = make_checker(AttachmentAddEvent)
 check_attachment_remove = make_checker(AttachmentRemoveEvent)
 check_attachment_update = make_checker(AttachmentUpdateEvent)
+check_calendar = make_checker(CalendarChangeEvent)
+check_calendar_free_busy = make_checker(CalendarFreeBusyEvent)
+check_calendar_settings = make_checker(CalendarSettingsEvent)
 check_call_answer = make_checker(CallAnswerEvent)
 check_call_cancel = make_checker(CallCancelEvent)
 check_call_missed_seen = make_checker(CallMissedSeenEvent)

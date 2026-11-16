@@ -225,7 +225,7 @@
     /*
     This is the header, aka the navbar.
     */
-    --header-height: 2.5em; /* 40px at 16px em */
+    --header-height: 3em; /* 48px at 16px em */
     --header-line-height: 40px;
     /*
     At 600px, the header starts taking up more than 5%
@@ -338,8 +338,10 @@
         var(--left-sidebar-max-width)
     );
     --right-sidebar-left-spacing: 5px;
-    /* 50px per icon * 4 icons + 3px space (legacy) = 203px at 20px/1em */
-    --right-column-collapsed-sidebar-width: 10.15em;
+    /* Five navbar buttons, square with the header, + 3px space (legacy). */
+    --right-column-collapsed-sidebar-width: calc(
+        var(--header-height) * 5 + 3px
+    );
     /* 288px at 14px/1em */
     --right-sidebar-max-width: 20.57em;
     /* We open the right sidebar at xl_min at a size of 240px,
@@ -860,6 +862,69 @@
     --color-background-topic-card-replies: light-dark(
         hsl(0deg 0% 98%),
         hsl(0deg 0% 12.9%)
+    );
+    /* The compose box of a view of a single conversation. */
+    --color-background-compose-field: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 14.9%)
+    );
+    --color-border-compose-field: light-dark(
+        hsl(0deg 0% 82%),
+        hsl(0deg 0% 22.7%)
+    );
+    --color-border-compose-field-focus: light-dark(
+        hsl(237.8deg 49.1% 56.9%),
+        hsl(236.9deg 85.5% 72.9%)
+    );
+    --color-compose-field-button: light-dark(
+        hsl(0deg 0% 36.1%),
+        hsl(0deg 0% 71%)
+    );
+    --color-compose-field-button-hover: light-dark(
+        hsl(0deg 0% 14.1%),
+        hsl(0deg 0% 91%)
+    );
+    --color-background-compose-field-button-hover: light-dark(
+        hsl(0deg 0% 92.2%),
+        hsl(0deg 0% 20%)
+    );
+    --color-compose-field-button-pressed: light-dark(
+        hsl(237.3deg 43.8% 30%),
+        hsl(232.5deg 100% 93.7%)
+    );
+    --color-background-compose-field-button-pressed: light-dark(
+        hsl(230deg 64.3% 94.5%),
+        hsl(237deg 27.8% 28.2%)
+    );
+    --color-compose-field-send: light-dark(
+        hsl(238.2deg 39.1% 50.4%),
+        hsl(237.3deg 100% 78%)
+    );
+    --color-compose-field-send-disabled: light-dark(
+        hsl(0deg 0% 65.9%),
+        hsl(0deg 0% 43.5%)
+    );
+    /* The form for a new conversation in the conversations view. */
+    --color-background-new-conversation-form: light-dark(
+        hsl(0deg 0% 100%),
+        hsl(0deg 0% 16.1%)
+    );
+    --color-border-new-conversation-form: light-dark(
+        hsl(0deg 0% 87.8%),
+        hsl(0deg 0% 22.7%)
+    );
+    --color-background-new-conversation-publish: hsl(237.8deg 49.1% 56.9%);
+    --color-background-new-conversation-publish-hover: hsl(
+        238.2deg 39.1% 50.4%
+    );
+    --color-text-new-conversation-publish: hsl(0deg 0% 100%);
+    --color-background-new-conversation-publish-disabled: light-dark(
+        hsl(240deg 29.6% 89.4%),
+        hsl(237.8deg 18.9% 28%)
+    );
+    --color-text-new-conversation-publish-disabled: light-dark(
+        hsl(236.8deg 17.9% 40.6%),
+        hsl(236.2deg 22.9% 72.5%)
     );
     /* Bubble layout of direct message conversations. */
     --color-background-message-bubble: light-dark(
@@ -1997,10 +2062,13 @@
         var(--color-markdown-pre-border)
     );
     --color-background-search-highlight: light-dark(
-        hsl(51deg 100% 79%),
-        hsl(51deg 100% 72%)
+        hsl(46.5deg 100% 77.1%),
+        hsl(47deg 61% 26.1%)
     );
-    --color-text-search-highlight: light-dark(currentcolor, hsl(0deg 0% 0%));
+    --color-text-search-highlight: light-dark(
+        currentcolor,
+        hsl(48deg 100% 88.4%)
+    );
     --color-text-alert-word: light-dark(currentcolor, hsl(0deg 0% 0%));
     --color-text-missed-call: light-dark(
         hsl(359deg 93% 39%),
@@ -2034,7 +2102,7 @@
     --color-markdown-code-link-active: var(--color-markdown-link-active);
     --color-markdown-link-highlight: light-dark(
         hsl(200deg 100% 40%),
-        hsl(210deg 100% 25%)
+        hsl(200deg 100% 80%)
     );
     /* Alert words share this underline color, since they share the
        link color it is mixed from. */
@@ -2045,7 +2113,7 @@
     );
     --color-markdown-link-highlight-hover: light-dark(
         hsl(200deg 100% 25%),
-        hsl(210deg 100% 18%)
+        hsl(200deg 100% 90%)
     );
     --color-markdown-link-alert-word: light-dark(
         hsl(200deg 100% 40%),
@@ -2448,6 +2516,31 @@
         0 12.177px 21.4737px 0 hsl(0deg 0% 0% / 11%),
         0 18.7257px 35.4802px 0 hsl(0deg 0% 0% / 15%),
         0 41px 80px 0 hsl(0deg 0% 0% / 20%);
+    /* Calendar colors, from the Teams-style calendar design. */
+    --color-calendar-background: light-dark(#f5f5f5, #1c1c1c);
+    --color-calendar-background-left-panel: light-dark(#fafafa, #202020);
+    --color-calendar-background-toolbar: light-dark(#fff, #242424);
+    --color-calendar-background-hover: light-dark(#ebebeb, #333);
+    --color-calendar-background-selected-week: light-dark(#e8ebfa, #34365c);
+    --color-calendar-border: light-dark(#e0e0e0, #333);
+    --color-calendar-text: light-dark(#242424, #e8e8e8);
+    --color-calendar-text-secondary: light-dark(#616161, #a3a3a3);
+    --color-calendar-text-selected-week: light-dark(#2b2e6e, #e8e9ff);
+    --color-calendar-text-accent: light-dark(#4f52b2, #a9adff);
+    --color-calendar-icon: light-dark(#424242, #c8c8c8);
+    --color-calendar-accent: #5b5fc7;
+    --color-calendar-text-on-accent: #fff;
+    --color-calendar-checkbox: light-dark(#5b5fc7, #7f85f5);
+    --color-calendar-grid-row-line: light-dark(#f0f0f0, #292929);
+    --color-calendar-event-background: light-dark(#e8ebfa, #272a4a);
+    --color-calendar-event-bar: light-dark(#5b5fc7, #7f85f5);
+    --color-calendar-event-text: light-dark(#242424, #eceeff);
+    --color-calendar-event-text-secondary: light-dark(#555, #b6b9e0);
+    --color-calendar-personal-event-background: light-dark(#d6f0f0, #103d40);
+    --color-calendar-personal-event-bar: light-dark(#038387, #35c0c0);
+    /* Outlook's color for out of office. */
+    --color-calendar-away: light-dark(#8764b8, #a283d6);
+    --color-calendar-legend: light-dark(#2f6fc4, #4d94e8);
     --color-navbar-icon: light-dark(hsl(240deg 20% 50%), hsl(240deg 35% 60%));
     --color-navbar-spectator-low-attention-brand-button-text: light-dark(
         hsl(240deg 40% 50%),

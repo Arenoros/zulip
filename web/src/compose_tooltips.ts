@@ -9,6 +9,7 @@ import render_narrow_to_compose_recipients_tooltip from "../templates/narrow_to_
 
 import * as blueslip from "./blueslip.ts";
 import * as compose_state from "./compose_state.ts";
+import * as compose_ui from "./compose_ui.ts";
 import * as compose_validate from "./compose_validate.ts";
 import {$t} from "./i18n.ts";
 import * as narrow_state from "./narrow_state.ts";
@@ -333,7 +334,7 @@ export function initialize(): void {
                 }
             }
 
-            if (user_settings.enter_sends) {
+            if (user_settings.enter_sends && !compose_ui.is_formatting_mode()) {
                 instance.setContent(parse_html($("#send-enter-tooltip-template").html()));
             } else {
                 instance.setContent(parse_html($("#send-ctrl-enter-tooltip-template").html()));

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -25,7 +26,8 @@ async function api(page: Page, method: string, url: string, body?: string): Prom
                 },
                 body: body ?? null,
             });
-            return await response.json();
+            const data: unknown = await response.json();
+            return data;
         },
         method,
         url,
@@ -46,14 +48,20 @@ async function sidebar_clip(page: Page, name: string): Promise<void> {
     });
 }
 
-type Folder = {
-    id: number;
-    name: string;
-    can_administer_group: number | {direct_members: number[]; direct_subgroups: number[]};
-};
+const folder_schema = z.object({
+    id: z.number(),
+    name: z.string(),
+    can_administer_group: z.union([
+        z.number(),
+        z.object({direct_members: z.array(z.number()), direct_subgroups: z.array(z.number())}),
+    ]),
+});
+type Folder = z.infer<typeof folder_schema>;
 
 async function get_folder(page: Page, name: string): Promise<Folder> {
-    const data = (await api(page, "GET", "/json/channel_folders")) as {channel_folders: Folder[]};
+    const data = z
+        .object({channel_folders: z.array(folder_schema)})
+        .parse(await api(page, "GET", "/json/channel_folders"));
     const folder = data.channel_folders.find((folder) => folder.name === name);
     assert.ok(folder !== undefined);
     return folder;
@@ -92,7 +100,9 @@ async function visual_test(page: Page): Promise<void> {
 
     // The link to create a folder takes the place of the one to create
     // a channel, which is only shown without more channels to browse.
-    const streams = (await api(page, "GET", "/json/streams")) as {streams: {name: string}[]};
+    const streams = z
+        .object({streams: z.array(z.object({name: z.string()}))})
+        .parse(await api(page, "GET", "/json/streams"));
     await api(
         page,
         "POST",
@@ -154,9 +164,12 @@ async function visual_test(page: Page): Promise<void> {
     );
     check(
         "nothing to save before a change",
-        await page.$eval("#edit_channel_folder .dialog_submit_button", (e) =>
-            (e as HTMLButtonElement).disabled,
-        ),
+        await page.$eval("#edit_channel_folder .dialog_submit_button", (e) => {
+            if (!(e instanceof HTMLButtonElement)) {
+                throw new TypeError("Expected <button>");
+            }
+            return e.disabled;
+        }),
     );
 
     // Appoint another administrator.
@@ -168,8 +181,7 @@ async function visual_test(page: Page): Promise<void> {
     );
     await page.waitForFunction(
         () =>
-            document.querySelectorAll("#id_channel_folder_can_administer_group .pill").length ===
-            2,
+            document.querySelectorAll("#id_channel_folder_can_administer_group .pill").length === 2,
     );
     await common.screenshot(page, "cf-07-administrator-added");
     await page.click("#edit_channel_folder .dialog_submit_button");
@@ -215,12 +227,16 @@ async function visual_test(page: Page): Promise<void> {
     await sidebar_clip(page, "cf-09-channel-in-folder");
 
     // A folder of someone else, with a channel of the member in it.
-    const research = (await api(
-        owner_page,
-        "POST",
-        "/json/channel_folders/create",
-        "name=Research&description=",
-    )) as {channel_folder_id: number};
+    const research = z
+        .object({channel_folder_id: z.number()})
+        .parse(
+            await api(
+                owner_page,
+                "POST",
+                "/json/channel_folders/create",
+                "name=Research&description=",
+            ),
+        );
     const verona_id = await common.get_stream_id(owner_page, "Verona");
     await api(
         owner_page,
@@ -240,7 +256,9 @@ async function visual_test(page: Page): Promise<void> {
     // The settings of the channel the member administers offer the
     // folders they can move it to.
     const sketches_id = await common.get_stream_id(page, "Design/sketches");
-    await page.goto(`http://zulip.zulipdev.com:9981/#channels/${sketches_id}/Design.2Fsketches/general`);
+    await page.goto(
+        `http://zulip.zulipdev.com:9981/#channels/${sketches_id}/Design.2Fsketches/general`,
+    );
     await page.waitForSelector("#folder_id_widget", {visible: true});
     await page.click("#folder_id_widget");
     await page.waitForSelector(".folder_id-dropdown-list-container .list-item", {visible: true});
@@ -256,12 +274,16 @@ async function visual_test(page: Page): Promise<void> {
     await page.keyboard.press("Escape");
 
     // The server refuses what the options leave out.
-    const refused = (await api(
-        page,
-        "PATCH",
-        `/json/streams/${sketches_id}`,
-        `folder_id=${research.channel_folder_id}`,
-    )) as {result: string; msg: string};
+    const refused = z
+        .object({result: z.string(), msg: z.string()})
+        .parse(
+            await api(
+                page,
+                "PATCH",
+                `/json/streams/${sketches_id}`,
+                `folder_id=${research.channel_folder_id}`,
+            ),
+        );
     check("moving to a folder of someone else is refused", refused.result === "error", refused.msg);
 
     await owner_page.close();

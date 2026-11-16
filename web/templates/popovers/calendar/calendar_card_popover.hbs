@@ -1,0 +1,106 @@
+<div class="popover-menu calendar-card" role="dialog" aria-label="{{title}}">
+    <div class="calendar-card-header">
+        {{#if is_organizer_of_meeting}}
+            <i class="zulip-icon zulip-icon-users calendar-card-meeting-icon" aria-hidden="true"></i>
+        {{/if}}
+        <h2 class="calendar-card-title">{{title}}</h2>
+        <button type="button" class="calendar-icon-button calendar-card-expand tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Open the meeting' }}" aria-label="{{t 'Open the meeting' }}">
+            <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
+        </button>
+    </div>
+    {{#if (or can_join_call can_discuss)}}
+        <div class="calendar-card-join">
+            {{#if can_join_call}}
+                {{> ../../calendar/calendar_join_button button_class="calendar-card-button"}}
+            {{/if}}
+            {{#if can_discuss}}
+                <button type="button" class="calendar-card-button calendar-card-chat">
+                    <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
+                    {{t "Discussion" }}
+                </button>
+            {{/if}}
+        </div>
+    {{/if}}
+    <div class="calendar-card-section">
+        <div class="calendar-card-row">
+            <i class="zulip-icon zulip-icon-clock calendar-card-row-icon" aria-hidden="true"></i>
+            <span class="calendar-card-time">{{time_label}}</span>
+            {{#if is_recurring}}
+                <span class="calendar-card-series">
+                    {{t "Series" }}
+                    <i class="zulip-icon zulip-icon-refresh-cw" aria-hidden="true"></i>
+                </span>
+            {{/if}}
+        </div>
+        {{#if location}}
+            <div class="calendar-card-row">
+                <i class="zulip-icon zulip-icon-globe calendar-card-row-icon" aria-hidden="true"></i>
+                <span class="calendar-card-location">{{location}}</span>
+            </div>
+        {{/if}}
+        {{#if channel_label}}
+            <div class="calendar-card-row">
+                <i class="zulip-icon zulip-icon-hashtag calendar-card-row-icon" aria-hidden="true"></i>
+                <span class="calendar-card-channel">{{channel_label}}</span>
+            </div>
+        {{/if}}
+    </div>
+    {{#unless is_personal}}
+        <div class="calendar-card-section calendar-card-organizer">
+            <img class="calendar-card-avatar" src="{{organizer_avatar_url}}" alt=""/>
+            <div class="calendar-card-organizer-text">
+                <span>{{organizer_label}}</span>
+                {{#if counts_label}}
+                    <span class="calendar-card-counts">{{counts_label}}</span>
+                {{/if}}
+            </div>
+        </div>
+    {{/unless}}
+    {{#if can_notify_organizer}}
+        <div class="calendar-card-section calendar-card-notify">
+            <i class="zulip-icon zulip-icon-calendar calendar-card-row-icon" aria-hidden="true"></i>
+            <div class="calendar-card-notify-fields">
+                <label class="calendar-card-notify-label">
+                    <input type="checkbox" class="calendar-list-checkbox calendar-card-notify-checkbox" checked/>
+                    {{t "Notify the organizer" }}
+                </label>
+                <input type="text" class="calendar-card-message" placeholder="{{t 'Message (optional)' }}" aria-label="{{t 'Message for the organizer' }}"/>
+            </div>
+        </div>
+    {{/if}}
+    <div class="calendar-card-error alert-error" role="alert"></div>
+    {{#if is_invited}}
+    <div class="calendar-card-actions">
+        {{#if is_invitee}}
+            <button type="button" class="calendar-card-button calendar-card-respond {{#if (eq response "accepted")}}selected{{/if}}" data-response="accepted" {{#if is_recurring}}aria-haspopup="true"{{/if}} aria-pressed="{{#if (eq response "accepted")}}true{{else}}false{{/if}}">
+                <i class="zulip-icon zulip-icon-check calendar-card-accept-icon" aria-hidden="true"></i>
+                {{t "Accept" }}
+                {{#if is_recurring}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
+            </button>
+            <button type="button" class="calendar-card-button calendar-card-respond {{#if (eq response "declined")}}selected{{/if}}" data-response="declined" {{#if is_recurring}}aria-haspopup="true"{{/if}} aria-pressed="{{#if (eq response "declined")}}true{{else}}false{{/if}}">
+                <i class="zulip-icon zulip-icon-close calendar-card-decline-icon" aria-hidden="true"></i>
+                {{t "Decline" }}
+                {{#if is_recurring}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
+            </button>
+            <button type="button" class="calendar-card-button calendar-card-respond {{#if (eq response "tentative")}}selected{{/if}}" data-response="tentative" aria-pressed="{{#if (eq response "tentative")}}true{{else}}false{{/if}}">
+                <i class="zulip-icon zulip-icon-help" aria-hidden="true"></i>
+                {{t "Tentative" }}
+            </button>
+            <button type="button" class="calendar-card-button calendar-card-more" aria-label="{{t 'More actions' }}" aria-haspopup="true">
+                <i class="zulip-icon zulip-icon-more-vertical" aria-hidden="true"></i>
+            </button>
+        {{else}}
+            <button type="button" class="calendar-card-button calendar-card-edit" {{#if is_recurring}}aria-haspopup="true"{{/if}}>
+                <i class="zulip-icon zulip-icon-edit" aria-hidden="true"></i>
+                {{t "Edit" }}
+                {{#if is_recurring}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
+            </button>
+            <button type="button" class="calendar-card-button calendar-card-cancel" {{#if is_recurring}}aria-haspopup="true"{{/if}}>
+                <i class="zulip-icon zulip-icon-trash" aria-hidden="true"></i>
+                {{#if is_personal}}{{t "Delete" }}{{else}}{{t "Cancel meeting" }}{{/if}}
+                {{#if is_recurring}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
+            </button>
+        {{/if}}
+    </div>
+    {{/if}}
+</div>

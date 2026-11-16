@@ -1,6 +1,7 @@
 import process from "node:process";
 
-import puppeteer, {type Browser, type Page} from "puppeteer";
+import type {Browser, Page} from "puppeteer";
+import * as puppeteer from "puppeteer";
 
 import * as common from "./lib/common.ts";
 
@@ -32,6 +33,7 @@ async function launch_media_browser(): Promise<Browser> {
 // Headless Chrome has no screen to capture, so share a canvas instead.
 async function fake_screen_share(page: Page): Promise<void> {
     await page.evaluateOnNewDocument(() => {
+        // eslint-disable-next-line @typescript-eslint/require-await
         navigator.mediaDevices.getDisplayMedia = async () => {
             const canvas = document.createElement("canvas");
             canvas.width = 1280;
@@ -84,24 +86,6 @@ async function livekit_call_test(page: Page): Promise<void> {
     );
     await page.waitForFunction(() => zulip_test.realm.realm_video_chat_provider === 10);
 
-    await page.keyboard.press("KeyC");
-    await page.waitForSelector("#compose-textarea", {visible: true});
-    check(
-        "audio call button is shown",
-        await page.$eval(
-            ".compose-control-buttons-container .audio_link",
-            (element) => (element as HTMLElement).offsetParent !== null,
-        ),
-    );
-    await page.click(".compose-control-buttons-container .video_link");
-    await page.waitForFunction(() =>
-        document
-            .querySelector<HTMLTextAreaElement>("#compose-textarea")
-            ?.value.includes("/calls/livekit/join?call_id="),
-    );
-    check("video call button inserts a LiveKit link", true);
-    await common.screenshot(page, "livekit-0-compose");
-
     const cordelia_password = process.env["CORDELIA_PASSWORD"];
     if (cordelia_password === undefined) {
         throw new Error("CORDELIA_PASSWORD is not set");
@@ -130,7 +114,9 @@ async function livekit_call_test(page: Page): Promise<void> {
         await page_a.goto(call_url);
         await page_a.waitForSelector(".livekit-call-tile .livekit-call-video", {visible: true});
         await page_a.waitForFunction(
-            () => document.querySelector("#livekit-call-camera")?.getAttribute("aria-pressed") === "true",
+            () =>
+                document.querySelector("#livekit-call-camera")?.getAttribute("aria-pressed") ===
+                "true",
         );
         check("microphone is on", (await pressed(page_a, "#livekit-call-microphone")) === "true");
         check("camera is on", (await pressed(page_a, "#livekit-call-camera")) === "true");
@@ -161,8 +147,9 @@ async function livekit_call_test(page: Page): Promise<void> {
         });
         await page_b.waitForFunction(
             () =>
-                document.querySelector("#livekit-call-screen-share")?.getAttribute("aria-pressed") ===
-                "true",
+                document
+                    .querySelector("#livekit-call-screen-share")
+                    ?.getAttribute("aria-pressed") === "true",
         );
         const layout = await page_a.evaluate(() => {
             const stage = document.querySelector(".livekit-call-stage")!.getBoundingClientRect();
@@ -232,7 +219,12 @@ async function livekit_call_test(page: Page): Promise<void> {
         check("leaving updates both sides", true);
         check(
             "controls are disabled after leaving",
-            await page_b.$eval("#livekit-call-leave", (element) => (element as HTMLButtonElement).disabled),
+            await page_b.$eval("#livekit-call-leave", (element) => {
+                if (!(element instanceof HTMLButtonElement)) {
+                    throw new TypeError("Expected <button>");
+                }
+                return element.disabled;
+            }),
         );
         await common.screenshot(page_b, "livekit-7-left");
 
@@ -242,18 +234,23 @@ async function livekit_call_test(page: Page): Promise<void> {
                 document.querySelector("#livekit-call-microphone")?.getAttribute("aria-pressed") ===
                 "true",
         );
-        check("voice call starts without camera", (await pressed(page_b, "#livekit-call-camera")) === "false");
+        check(
+            "voice call starts without camera",
+            (await pressed(page_b, "#livekit-call-camera")) === "false",
+        );
         await common.screenshot(page_b, "livekit-8-voice-call");
 
         // Share from a desktop app that supports remote control.
         await page_b.evaluateOnNewDocument(() => {
-            window.electron_bridge = {
-                send_event: () => true,
-                on_event() {
-                    /* Not used by the call page. */
+            Object.assign(window, {
+                electron_bridge: {
+                    send_event: () => true,
+                    on_event() {
+                        /* Not used by the call page. */
+                    },
+                    get_remote_control_supported: () => true,
                 },
-                get_remote_control_supported: () => true,
-            };
+            });
         });
         await page_b.goto(call_url);
         await page_b.waitForFunction(
@@ -266,25 +263,34 @@ async function livekit_call_test(page: Page): Promise<void> {
         await page_b.waitForSelector(".livekit-call-screen-share-label", {visible: true});
         check(
             "desktop share is marked controllable for viewers",
-            (await page_a.$eval(".livekit-call-screen-share-label", (element) => element.textContent)) ===
-                "Remote control available",
+            (await page_a.$eval(
+                ".livekit-call-screen-share-label",
+                (element) => element.textContent,
+            )) === "Remote control available",
         );
         check(
             "viewers can request control",
             (await page_a.$eval(".livekit-call-screen-share-button", (element) =>
-                (element as HTMLButtonElement).hidden ? null : element.textContent,
+                element instanceof HTMLElement && element.hidden ? null : element.textContent,
             )) === "Request control",
         );
         check(
             "the presenter cannot request control",
             await page_b.$eval(
                 ".livekit-call-screen-share-button",
-                (element) => (element as HTMLButtonElement).hidden === true,
+                (element) => element instanceof HTMLElement && element.hidden === true,
             ),
         );
-        async function controls_layout(controls_page: Page) {
+        async function controls_layout(controls_page: Page): Promise<{
+            gap_em: number;
+            left: number;
+            controls_bottom: number;
+            button_inside: boolean;
+            label_truncated: boolean;
+            video_height: number;
+        }> {
             return controls_page.evaluate(() => {
-                const rect = (selector: string) =>
+                const rect = (selector: string): DOMRect =>
                     document.querySelector(selector)!.getBoundingClientRect();
                 const share = rect(".livekit-call-screen-share");
                 const video = rect(".livekit-call-screen-share .livekit-call-video");
@@ -330,7 +336,10 @@ async function livekit_call_test(page: Page): Promise<void> {
         });
         const hidden_height = (await controls_layout(page_a)).video_height;
         console.log("video height with and without the button", shown_height, hidden_height);
-        check("the shared screen does not move when the button hides", shown_height === hidden_height);
+        check(
+            "the shared screen does not move when the button hides",
+            shown_height === hidden_height,
+        );
         check(
             "a hidden button cannot be focused",
             await page_a.evaluate(() => {

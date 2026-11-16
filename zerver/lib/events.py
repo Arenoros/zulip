@@ -24,6 +24,7 @@ from zerver.lib import emoji
 from zerver.lib.alert_words import user_alert_words
 from zerver.lib.avatar import avatar_url
 from zerver.lib.bot_config import load_bot_config_template
+from zerver.lib.calendar.occurrences import get_unanswered_invitation_counts
 from zerver.lib.channel_folders import (
     get_channel_folders_for_spectators,
     get_channel_folders_for_user,
@@ -314,6 +315,13 @@ def fetch_initial_state_data(
         # values that are higher than this.  We likely can eventually
         # remove this parameter from the API.
         state["max_message_id"] = max_message_id_for_user(user_profile)
+
+    if want("calendar"):
+        state["calendar_unanswered_invitation_count"] = (
+            0
+            if user_profile is None
+            else get_unanswered_invitation_counts({user_profile.id})[user_profile.id]
+        )
 
     if want("saved_snippets"):
         if user_profile is None:
@@ -1843,6 +1851,12 @@ def apply_event(
         pass
     elif event["type"] == "submessage":
         # The client will get submessages with their messages
+        pass
+    elif event["type"] == "calendar":
+        state["calendar_unanswered_invitation_count"] = event["unanswered_invitation_count"]
+    elif event["type"] in ("calendar_free_busy", "calendar_settings"):
+        # Clients fetch the free/busy times and the calendar settings
+        # when they need them.
         pass
     elif event["type"] == "call":
         # Call ringing events are transient and thus ignored

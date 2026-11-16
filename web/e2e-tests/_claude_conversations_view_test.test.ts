@@ -1,6 +1,7 @@
 import {execSync} from "node:child_process";
 
 import type {Page} from "puppeteer";
+import * as z from "zod/mini";
 
 import * as common from "./lib/common.ts";
 
@@ -86,14 +87,18 @@ print(
 )
 `;
 
-type Seeded = {ids: Record<string, number[]>; stream_id: number; quiet_id: number};
+const seeded_schema = z.object({
+    ids: z.record(z.string(), z.array(z.number())),
+    stream_id: z.number(),
+    quiet_id: z.number(),
+});
 
 async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -170,7 +175,7 @@ async function conversations_view_test(page: Page): Promise<void> {
     // Seed before logging in, so that the web app fetches the messages
     // with their backdated timestamps.
     const output = execSync("./manage.py shell", {encoding: "utf8", input: seed_script});
-    const seeded = JSON.parse(output.split("SEEDED ")[1]!) as Seeded;
+    const seeded = seeded_schema.parse(JSON.parse(output.split("SEEDED ", 2)[1]!));
     await fetch(`${base_url}flush_caches`, {method: "POST"});
     await page.emulateTimezone("UTC");
     await page.setViewport({width: 1280, height: 1000});
@@ -183,7 +188,9 @@ async function conversations_view_test(page: Page): Promise<void> {
     await page.waitForSelector("#left-sidebar-navigation-list", {visible: true});
 
     // Clicking the channel opens its conversations.
-    await page.click(`#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`);
+    await page.click(
+        `#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`,
+    );
     await page.waitForSelector(".focused-message-list.conversations-view .recipient_row", {
         visible: true,
     });
@@ -196,7 +203,9 @@ async function conversations_view_test(page: Page): Promise<void> {
     );
 
     const header = await page.$eval("#message_view_header", (header) => ({
-        icon: header.querySelector(".conversation-header-channel-icon .zulip-icon-hashtag") !== null,
+        icon:
+            header.querySelector(":scope .conversation-header-channel-icon .zulip-icon-hashtag") !==
+            null,
         icon_color: getComputedStyle(header.querySelector(".conversation-header-channel-icon")!)
             .backgroundColor,
         title: header.querySelector(".message-header-navbar-title")?.textContent.trim(),
@@ -249,17 +258,13 @@ async function conversations_view_test(page: Page): Promise<void> {
         "a card shows its first message and the three latest replies",
         talk.rows === 4 &&
             JSON.stringify(talk.senders) ===
-                JSON.stringify([
-                    "Desdemona",
-                    "Iago",
-                    "King Hamlet",
-                    "Othello, the Moor of Venice",
-                ]),
+                JSON.stringify(["Desdemona", "Iago", "King Hamlet", "Othello, the Moor of Venice"]),
         JSON.stringify(talk.senders),
     );
     check(
         "the replies left out are summarized with their authors",
-        talk.hidden_replies === "Open 4 replies from Cordelia, Lear's daughter, Othello, the Moor of Venice, and 2 others",
+        talk.hidden_replies ===
+            "Open 4 replies from Cordelia, Lear's daughter, Othello, the Moor of Venice, and 2 others",
         talk.hidden_replies,
     );
     check("the card ends with a reply button", talk.footer);
@@ -353,10 +358,15 @@ async function conversations_view_test(page: Page): Promise<void> {
     // Other values of the setting keep the channel feed.
     await set_setting(page, "web_channel_default_view=2&color_scheme=3");
     await page.reload();
-    await page.waitForSelector(`#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`, {
-        visible: true,
-    });
-    await page.click(`#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`);
+    await page.waitForSelector(
+        `#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`,
+        {
+            visible: true,
+        },
+    );
+    await page.click(
+        `#left-sidebar .narrow-filter[data-stream-id="${seeded.stream_id}"] .stream-name`,
+    );
     await page.waitForSelector(".focused-message-list .message_row", {visible: true});
     const feed = await page.evaluate(() => ({
         url: window.location.hash,

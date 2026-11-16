@@ -8,6 +8,7 @@ import FlattenedSteps from "../../components/FlattenedSteps.astro";
 import ZulipTip from "../../components/ZulipTip.astro";
 import QuotesExamples from "../include/_QuotesExamples.mdx";
 import QuotesIntro from "../include/_QuotesIntro.mdx";
+import ShowFormattingButtons from "../include/_ShowFormattingButtons.mdx";
 import StartComposing from "../include/_StartComposing.mdx";
 
 import QuoteIcon from "~icons/zulip-icon/quote";
@@ -21,9 +22,11 @@ import QuoteIcon from "~icons/zulip-icon/quote";
     <FlattenedSteps>
       <StartComposing />
 
+      <ShowFormattingButtons />
+
       1. *(optional)* Select the text you want to format.
-      1. Click the **quote** (<QuoteIcon />) icon at the
-         bottom of the compose box to insert quote block formatting.
+      1. Click the **quote** (<QuoteIcon />) icon in the
+         compose box to insert quote block formatting.
     </FlattenedSteps>
 
     <ZulipTip>

@@ -1,4 +1,3 @@
-import assert from "minimalistic-assert";
 import {
     ConnectionQuality,
     type Participant,
@@ -8,6 +7,7 @@ import {
     type TrackPublication,
     supportsAudioOutputSelection,
 } from "livekit-client";
+import assert from "minimalistic-assert";
 import * as z from "zod/mini";
 
 import {page_params} from "./base_page_params.ts";
@@ -15,9 +15,9 @@ import * as csrf from "./csrf.ts";
 import {electron_bridge} from "./electron_bridge.ts";
 import {$t} from "./i18n.ts";
 import * as livekit_call_invites from "./livekit_call_invites.ts";
-import {localstorage} from "./localstorage.ts";
 import * as livekit_remote_control from "./livekit_remote_control.ts";
 import {RemoteInput} from "./livekit_remote_input.ts";
+import {localstorage} from "./localstorage.ts";
 import {get_retry_backoff_seconds} from "./retry_backoff.ts";
 
 assert(page_params.page_type === "livekit_call");
@@ -31,34 +31,34 @@ const {
     call_message_id,
 } = page_params;
 
-function get_element<T extends HTMLElement>(selector: string): T {
-    const element = document.querySelector<T>(selector);
-    assert(element !== null);
+function get_element<T extends HTMLElement>(selector: string, element_class: new () => T): T {
+    const element = document.querySelector(selector);
+    assert(element instanceof element_class);
     return element;
 }
 
-const stage_element = get_element(".livekit-call-stage");
-const participants_element = get_element(".livekit-call-participants");
-const audio_element = get_element(".livekit-call-audio");
-const status_element = get_element(".livekit-call-status");
-const microphone_button = get_element<HTMLButtonElement>("#livekit-call-microphone");
-const camera_button = get_element<HTMLButtonElement>("#livekit-call-camera");
-const screen_share_button = get_element<HTMLButtonElement>("#livekit-call-screen-share");
-const enable_audio_button = get_element<HTMLButtonElement>("#livekit-call-enable-audio");
-const leave_button = get_element<HTMLButtonElement>("#livekit-call-leave");
-const participants_toggle = get_element<HTMLButtonElement>("#livekit-call-participants-toggle");
-const chat_toggle = get_element<HTMLButtonElement>("#livekit-call-chat-toggle");
-const chat_unread_count_element = get_element(".livekit-call-unread-count");
+const stage_element = get_element(".livekit-call-stage", HTMLElement);
+const participants_element = get_element(".livekit-call-participants", HTMLElement);
+const audio_element = get_element(".livekit-call-audio", HTMLElement);
+const status_element = get_element(".livekit-call-status", HTMLElement);
+const microphone_button = get_element("#livekit-call-microphone", HTMLButtonElement);
+const camera_button = get_element("#livekit-call-camera", HTMLButtonElement);
+const screen_share_button = get_element("#livekit-call-screen-share", HTMLButtonElement);
+const enable_audio_button = get_element("#livekit-call-enable-audio", HTMLButtonElement);
+const leave_button = get_element("#livekit-call-leave", HTMLButtonElement);
+const participants_toggle = get_element("#livekit-call-participants-toggle", HTMLButtonElement);
+const chat_toggle = get_element("#livekit-call-chat-toggle", HTMLButtonElement);
+const chat_unread_count_element = get_element(".livekit-call-unread-count", HTMLElement);
 type DeviceMenu = {toggle: HTMLButtonElement; menu: HTMLElement; kinds: MediaDeviceKind[]};
 const device_menus: DeviceMenu[] = [
     {
-        toggle: get_element<HTMLButtonElement>("#livekit-call-microphone-devices"),
-        menu: get_element("#livekit-call-microphone-menu"),
+        toggle: get_element("#livekit-call-microphone-devices", HTMLButtonElement),
+        menu: get_element("#livekit-call-microphone-menu", HTMLElement),
         kinds: supportsAudioOutputSelection() ? ["audioinput", "audiooutput"] : ["audioinput"],
     },
     {
-        toggle: get_element<HTMLButtonElement>("#livekit-call-camera-devices"),
-        menu: get_element("#livekit-call-camera-menu"),
+        toggle: get_element("#livekit-call-camera-devices", HTMLButtonElement),
+        menu: get_element("#livekit-call-camera-menu", HTMLElement),
         kinds: ["videoinput"],
     },
 ];
@@ -71,25 +71,25 @@ const call_buttons = [
     leave_button,
     ...device_menus.map(({toggle}) => toggle),
 ];
-const controls_element = get_element(".livekit-call-controls");
-const duration_element = get_element(".livekit-call-duration");
-const body_element = get_element(".livekit-call-body");
-const side_panel = get_element("#livekit-call-side-panel");
-const side_panel_title = get_element(".livekit-call-side-panel-title");
-const side_panel_close = get_element<HTMLButtonElement>(".livekit-call-side-panel-close");
-const chat_element = get_element(".livekit-call-chat");
-const chat_frame = get_element<HTMLIFrameElement>(".livekit-call-chat-frame");
-const participants_panel = get_element(".livekit-call-participants-panel");
-const participant_list = get_element(".livekit-call-participant-list");
-const invite_element = get_element(".livekit-call-invite");
-const invite_search = get_element<HTMLInputElement>(".livekit-call-invite-search");
-const invite_results = get_element(".livekit-call-invite-results");
-const invited_element = get_element(".livekit-call-invited");
-const invited_list = get_element(".livekit-call-invited-list");
-const left_element = get_element(".livekit-call-left");
-const left_message_element = get_element(".livekit-call-left-message");
-const rejoin_button = get_element<HTMLButtonElement>(".livekit-call-rejoin");
-const conversation_link = get_element<HTMLAnchorElement>(".livekit-call-conversation-link");
+const controls_element = get_element(".livekit-call-controls", HTMLElement);
+const duration_element = get_element(".livekit-call-duration", HTMLElement);
+const body_element = get_element(".livekit-call-body", HTMLElement);
+const side_panel = get_element("#livekit-call-side-panel", HTMLElement);
+const side_panel_title = get_element(".livekit-call-side-panel-title", HTMLElement);
+const side_panel_close = get_element(".livekit-call-side-panel-close", HTMLButtonElement);
+const chat_element = get_element(".livekit-call-chat", HTMLElement);
+const chat_frame = get_element(".livekit-call-chat-frame", HTMLIFrameElement);
+const participants_panel = get_element(".livekit-call-participants-panel", HTMLElement);
+const participant_list = get_element(".livekit-call-participant-list", HTMLElement);
+const invite_element = get_element(".livekit-call-invite", HTMLElement);
+const invite_search = get_element(".livekit-call-invite-search", HTMLInputElement);
+const invite_results = get_element(".livekit-call-invite-results", HTMLElement);
+const invited_element = get_element(".livekit-call-invited", HTMLElement);
+const invited_list = get_element(".livekit-call-invited-list", HTMLElement);
+const left_element = get_element(".livekit-call-left", HTMLElement);
+const left_message_element = get_element(".livekit-call-left-message", HTMLElement);
+const rejoin_button = get_element(".livekit-call-rejoin", HTMLButtonElement);
+const conversation_link = get_element(".livekit-call-conversation-link", HTMLAnchorElement);
 conversation_link.href = conversation_url;
 
 const ls = localstorage();
@@ -186,7 +186,8 @@ function get_device_kind_name(kind: MediaDeviceKind): string {
             return $t({defaultMessage: "Microphone"});
         case "audiooutput":
             return $t({defaultMessage: "Speakers"});
-        case "videoinput":
+        default:
+            kind satisfies "videoinput";
             return $t({defaultMessage: "Camera"});
     }
 }
@@ -229,7 +230,10 @@ async function note_active_device(kind: MediaDeviceKind): Promise<void> {
     switch (kind) {
         case "audioinput":
             show_notice(
-                $t({defaultMessage: "Your microphone changed to {device}."}, {device: current.label}),
+                $t(
+                    {defaultMessage: "Your microphone changed to {device}."},
+                    {device: current.label},
+                ),
             );
             break;
         case "audiooutput":
@@ -245,7 +249,11 @@ async function note_active_device(kind: MediaDeviceKind): Promise<void> {
     }
 }
 
-async function choose_device(kind: MediaDeviceKind, device_id: string, label: string): Promise<void> {
+async function choose_device(
+    kind: MediaDeviceKind,
+    device_id: string,
+    label: string,
+): Promise<void> {
     chosen_devices.set(kind, device_id);
     try {
         // Not exact, so that LiveKit can fall back to another device
@@ -267,7 +275,10 @@ function close_device_menu(device_menu: DeviceMenu, return_focus = false): void 
     }
 }
 
-async function render_device_group(device_menu: DeviceMenu, kind: MediaDeviceKind): Promise<HTMLElement> {
+async function render_device_group(
+    device_menu: DeviceMenu,
+    kind: MediaDeviceKind,
+): Promise<HTMLElement> {
     const devices = await Room.getLocalDevices(kind, false);
     const group = document.createElement("div");
     group.setAttribute("role", "group");
@@ -319,7 +330,9 @@ async function open_device_menu(device_menu: DeviceMenu): Promise<void> {
 
 function get_display_name(participant: Participant): string {
     const name = participant.name ?? participant.identity;
-    return participant === room.localParticipant ? $t({defaultMessage: "{name} (you)"}, {name}) : name;
+    return participant === room.localParticipant
+        ? $t({defaultMessage: "{name} (you)"}, {name})
+        : name;
 }
 
 function format_duration(total_seconds: number): string {
@@ -424,7 +437,10 @@ function update_invited_list(): void {
     );
     invited_element.hidden = invited_users.length === 0;
     if (invited_users.length > 0 && users === undefined) {
-        void load_users().then(update_invited_list);
+        void (async () => {
+            await load_users();
+            update_invited_list();
+        })();
     }
     invited_list.replaceChildren(
         ...invited_users.map(({user_id, status}) => {
@@ -480,7 +496,8 @@ async function update_invite_results(): Promise<void> {
     }
     const all_users = await load_users();
     const connected_user_ids = get_connected_user_ids();
-    const matches = [...all_users.values()]
+    const matches = all_users
+        .values()
         .filter(
             (user) =>
                 user.is_active &&
@@ -488,7 +505,8 @@ async function update_invite_results(): Promise<void> {
                 !connected_user_ids.has(user.user_id) &&
                 user.full_name.toLowerCase().includes(query),
         )
-        .slice(0, 8);
+        .take(8)
+        .toArray();
     if (matches.length === 0) {
         const empty_element = document.createElement("li");
         empty_element.classList.add("livekit-call-invite-empty");
@@ -556,7 +574,8 @@ async function listen_for_call_events(): Promise<void> {
                 queue = undefined;
                 continue;
             }
-            for (const event of z.object({events: z.array(event_schema)}).parse(data).events) {
+            const {events} = z.object({events: z.array(event_schema)}).parse(data);
+            for (const event of events) {
                 queue.last_event_id = Math.max(queue.last_event_id, event.id);
                 const rings_event = rings_event_schema.safeParse(event);
                 if (rings_event.success && rings_event.data.message_id === call_message_id) {
@@ -568,8 +587,9 @@ async function listen_for_call_events(): Promise<void> {
             failures = 0;
         } catch {
             failures += 1;
+            const delay_ms = get_retry_backoff_seconds(undefined, failures) * 1000;
             await new Promise((resolve) => {
-                setTimeout(resolve, get_retry_backoff_seconds(undefined, failures) * 1000);
+                setTimeout(resolve, delay_ms);
             });
         }
     }
@@ -661,15 +681,20 @@ function send_control_message(
     // Everyone, when empty.
     destination_identities: string[] = [],
 ): void {
-    void room.localParticipant
-        .publishData(livekit_remote_control.encode_message(message), {
-            reliable: true,
-            topic: livekit_remote_control.REMOTE_CONTROL_TOPIC,
-            destinationIdentities: destination_identities,
-        })
-        .catch(() => {
+    void (async () => {
+        try {
+            await room.localParticipant.publishData(
+                livekit_remote_control.encode_message(message),
+                {
+                    reliable: true,
+                    topic: livekit_remote_control.REMOTE_CONTROL_TOPIC,
+                    destinationIdentities: destination_identities,
+                },
+            );
+        } catch {
             electron_bridge?.stop_remote_control?.();
-        });
+        }
+    })();
 }
 
 // Tells the other participants who may control our screen share, and
@@ -736,7 +761,10 @@ function render_screen_share(
     const screen_share_element = document.createElement("div");
     screen_share_element.classList.add("livekit-call-screen-share");
     screen_share_element.append(media_element);
-    if (remote_control_enabled && livekit_remote_control.is_controllable_screen_share(publication)) {
+    if (
+        remote_control_enabled &&
+        livekit_remote_control.is_controllable_screen_share(publication)
+    ) {
         const controls_element = document.createElement("div");
         controls_element.classList.add("livekit-call-screen-share-controls");
         const label_element = document.createElement("span");
@@ -1187,12 +1215,13 @@ enable_audio_button.addEventListener("click", () => {
 });
 leave_button.addEventListener("click", () => {
     left_call = true;
-    void room.disconnect().then(() => {
+    void (async () => {
+        await room.disconnect();
         // Browsers only let a page close a window that a script opened,
         // or one with nothing to go back to; otherwise the page shows
         // that the user left.
         window.close();
-    });
+    })();
 });
 chat_toggle.addEventListener("click", () => {
     show_side_panel(side_panel_view === "chat" ? undefined : "chat");

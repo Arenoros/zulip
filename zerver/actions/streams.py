@@ -512,6 +512,7 @@ def send_subscription_add_events(
                 message_retention_days=stream_dict["message_retention_days"],
                 name=stream_dict["name"],
                 default_push_notifications=stream_dict["default_push_notifications"],
+                is_meeting_chat=stream_dict["is_meeting_chat"],
                 rendered_description=stream_dict["rendered_description"],
                 stream_id=stream_dict["stream_id"],
                 stream_post_policy=stream_dict["stream_post_policy"],
@@ -871,6 +872,12 @@ def bulk_add_subscriptions(
             # on their existing subscription.
             if stream.default_push_notifications:
                 sub.push_notifications = True
+            # A meeting's chat notifies like a group direct message.
+            if stream.is_meeting_chat:
+                sub.desktop_notifications = user_profile.enable_desktop_notifications
+                sub.audible_notifications = user_profile.enable_sounds
+                sub.push_notifications = user_profile.enable_offline_push_notifications
+                sub.email_notifications = user_profile.enable_offline_email_notifications
             sub_info = SubInfo(user_profile, sub, stream)
             subs_to_add.append(sub_info)
 
