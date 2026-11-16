@@ -380,6 +380,23 @@ function get_calendar_items(): CalendarItem[][] {
     ];
 }
 
+// Templates don't set styles, so the elements with computed positions
+// or colors get them in data-css-* attributes, which set the CSS custom
+// properties of the same names: data-css-calendar-event-top sets
+// --calendar-event-top.
+export function apply_data_css($container: JQuery): void {
+    for (const element of $container.find("*").addBack().get()) {
+        for (const [key, value] of Object.entries(element.dataset)) {
+            if (key.startsWith("css") && value !== undefined) {
+                const name = key
+                    .slice(3)
+                    .replaceAll(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+                $(element).css(`-${name}`, value);
+            }
+        }
+    }
+}
+
 function render_events(): void {
     const dates = get_shown_dates();
     const $grid = $("#calendar-view .calendar-grid");
@@ -413,6 +430,7 @@ function render_events(): void {
     $grid
         .find(".calendar-all-day-events")
         .html(render_calendar_all_day_events({events: all_day_events}));
+    apply_data_css($grid);
     const load_state = get_load_state();
     $grid.toggleClass("has-all-day-events", has_all_day_events);
     // Events that come into view, from the keyboard for instance, are

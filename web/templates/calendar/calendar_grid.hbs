@@ -1,11 +1,11 @@
-<div class="calendar-grid {{#if is_side_by_side}}side-by-side{{/if}}" style="--calendar-day-count: {{day_count}}; --calendar-column-count: {{column_count}}; --calendar-rows-per-hour: {{rows_per_hour}};">
+<div class="calendar-grid {{#if is_side_by_side}}side-by-side{{/if}}" data-css-calendar-day-count="{{day_count}}" data-css-calendar-column-count="{{column_count}}" data-css-calendar-rows-per-hour="{{rows_per_hour}}">
     <div class="calendar-grid-top">
         {{#if is_side_by_side}}
             <div class="calendar-grid-row calendar-grid-calendar-headers">
                 <span class="calendar-grid-corner"></span>
                 <div class="calendar-grid-days">
                     {{#each calendars}}
-                        <div class="calendar-grid-calendar-header {{#if is_mine}}mine{{/if}}" {{#if color}}style="--calendar-person-color: {{color}};"{{/if}}>
+                        <div class="calendar-grid-calendar-header {{#if is_mine}}mine{{/if}}" {{#if color}}data-css-calendar-person-color="{{color}}"{{/if}}>
                             <span class="calendar-grid-calendar-name">{{name}}</span>
                             {{#unless is_mine}}
                                 <button type="button" class="calendar-icon-button calendar-grid-calendar-close tippy-zulip-delayed-tooltip" data-user-id="{{user_id}}" data-tippy-content="{{t 'Hide this calendar' }}" aria-label="{{t 'Hide this calendar' }}">
@@ -38,13 +38,13 @@
     <div class="calendar-grid-row calendar-grid-body">
         <div class="calendar-time-column" aria-hidden="true">
             {{#each hours}}
-                <span class="calendar-hour-label" style="top: {{top}}%;">{{label}}</span>
+                <span class="calendar-hour-label" data-css-calendar-hour-top="{{top}}">{{label}}</span>
             {{/each}}
         </div>
         <div class="calendar-grid-days">
             {{#each calendars}}
                 {{#each ../days}}
-                    <div class="calendar-day-column {{#if is_today}}today{{/if}} {{#if @first}}first-of-calendar{{/if}}" data-date="{{date}}" {{#if ../color}}style="--calendar-person-color: {{../color}};"{{/if}}>
+                    <div class="calendar-day-column {{#if is_today}}today{{/if}} {{#if @first}}first-of-calendar{{/if}}" data-date="{{date}}" {{#if ../color}}data-css-calendar-person-color="{{../color}}"{{/if}}>
                         <div class="calendar-day-events"></div>
                         {{#if is_today}}
                             <div class="calendar-now-line"></div>

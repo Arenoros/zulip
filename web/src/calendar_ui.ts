@@ -149,9 +149,9 @@ function get_colleague_list_context(): Record<string, unknown> {
 }
 
 function render_colleague_list(): void {
-    $("#calendar-view .calendar-colleagues").html(
-        render_calendar_pinned_users(get_colleague_list_context()),
-    );
+    const $list = $("#calendar-view .calendar-colleagues");
+    $list.html(render_calendar_pinned_users(get_colleague_list_context()));
+    calendar_grid.apply_data_css($list);
 }
 
 function is_side_by_side(): boolean {

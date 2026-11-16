@@ -671,6 +671,7 @@ function render_day(): void {
             time_label: `${format_minutes(form.start_minute)} – ${format_minutes(form.start_minute + form.duration_minutes)}`,
         }),
     );
+    calendar_grid.apply_data_css($grid);
     $("#calendar-view .calendar-form-day-label").text(get_long_date_label(form.date));
     fetch_day_events();
 }
@@ -699,7 +700,8 @@ function fetch_day_events(): void {
                     (event) => editing === undefined || event.id !== editing.occurrence.id,
                 );
             const layout = calendar_layout.get_week_layout(events, [date], time_zone, 15);
-            $("#calendar-view .calendar-form-day-column .calendar-day-events").html(
+            const $events = $("#calendar-view .calendar-form-day-column .calendar-day-events");
+            $events.html(
                 render_calendar_day_events({
                     events: (layout.days[0] ?? []).map((placement) => ({
                         title: placement.event.title,
@@ -715,6 +717,7 @@ function fetch_day_events(): void {
                     })),
                 }),
             );
+            calendar_grid.apply_data_css($events);
         },
     });
 }

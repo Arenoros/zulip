@@ -510,6 +510,7 @@ function render(): void {
     const $container = $("#calendar-view .calendar-scheduler-container");
     const scroll_left = $container.find(".calendar-scheduler-scroll").scrollLeft();
     $container.html(render_calendar_scheduler(get_context(state)));
+    calendar_grid.apply_data_css($container);
     if (!state.is_all_day) {
         calendar_form.fill_time_selects(
             $container.find(".calendar-scheduler-start"),
