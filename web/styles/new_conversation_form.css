@@ -9,7 +9,9 @@
 /* The conversations view offers starting a conversation instead of
    replying to the selected message or writing a direct message,
    with just the button below the cards. */
-body:has(.focused-message-list.conversations-view) #compose:not(.compose-box-open) #compose-content {
+body:has(.focused-message-list.conversations-view)
+    #compose:not(.compose-box-open)
+    #compose-content {
     border-color: transparent;
     background-color: transparent;
 }

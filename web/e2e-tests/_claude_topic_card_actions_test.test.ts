@@ -40,8 +40,8 @@ async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -72,7 +72,10 @@ async function label_cards(page: Page): Promise<void> {
     });
 }
 
-async function panel_state(page: Page, title: string): Promise<{
+async function panel_state(
+    page: Page,
+    title: string,
+): Promise<{
     visible: boolean;
     buttons: string[];
     hidden_parts_shown: number;
@@ -88,16 +91,17 @@ async function panel_state(page: Page, title: string): Promise<{
                 getComputedStyle(panel.querySelector(".recipient_bar_controls")!).opacity === "1",
             buttons: [...panel.querySelectorAll(".recipient-bar-control")]
                 .filter((button) => shown(button))
-                .map((button) =>
-                    [...button.classList].find((name) =>
-                        [
-                            "topic-card-react",
-                            "on_hover_topic_resolve",
-                            "recipient-bar-copy-link-to-topic",
-                            "change_visibility_policy",
-                            "recipient-row-topic-menu",
-                        ].includes(name),
-                    ) ?? button.className,
+                .map(
+                    (button) =>
+                        [...button.classList].find((name) =>
+                            [
+                                "topic-card-react",
+                                "on_hover_topic_resolve",
+                                "recipient-bar-copy-link-to-topic",
+                                "change_visibility_policy",
+                                "recipient-row-topic-menu",
+                            ].includes(name),
+                        ) ?? button.className,
                 ),
             hidden_parts_shown: [
                 ...panel.querySelectorAll(
@@ -134,7 +138,11 @@ async function hover_card(page: Page, title: string): Promise<void> {
             ).length,
         card(title),
     );
-    check(`hovering "${title}" shows no other card's panel`, others_shown === 0, String(others_shown));
+    check(
+        `hovering "${title}" shows no other card's panel`,
+        others_shown === 0,
+        String(others_shown),
+    );
 }
 
 // Counts the buttons of a card's panel that something else covers.

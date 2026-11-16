@@ -229,7 +229,9 @@ check_send_stream_message(othello, get_client("test"), chat.name, "", "Room chan
     await page.waitForFunction(
         (stream_id) =>
             document
-                .querySelector(`.meeting-chat-list-item[data-stream-id="${stream_id}"] .unread_count`)
+                .querySelector(
+                    `.meeting-chat-list-item[data-stream-id="${stream_id}"] .unread_count`,
+                )
                 ?.textContent.trim() === "1",
         {},
         stream_id,

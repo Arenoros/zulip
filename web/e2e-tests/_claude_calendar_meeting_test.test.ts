@@ -164,7 +164,9 @@ async function is_shown(page: Page, selector: string): Promise<boolean> {
 }
 
 async function text(page: Page, selector: string): Promise<string> {
-    return await page.$eval(selector, (element) => element.textContent.trim().replaceAll(/\s+/g, " "));
+    return await page.$eval(selector, (element) =>
+        element.textContent.trim().replaceAll(/\s+/g, " "),
+    );
 }
 
 async function texts(page: Page, selector: string): Promise<string[]> {
@@ -177,7 +179,9 @@ async function choose(page: Page, label: string): Promise<void> {
     await page.waitForSelector(".calendar-card-choices, .calendar-submenu", {visible: true});
     await page.evaluate((label) => {
         const options = [
-            ...document.querySelectorAll<HTMLElement>(".calendar-card-choice, .calendar-submenu-option"),
+            ...document.querySelectorAll<HTMLElement>(
+                ".calendar-card-choice, .calendar-submenu-option",
+            ),
         ];
         options.find((option) => option.textContent.trim() === label)!.click();
     }, label);
@@ -232,9 +236,15 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     );
     check(
         "the organizer and when they sent it",
-        (await texts(page, ".calendar-responses-section:first-child .calendar-responses-name"))[0] ===
-            "Othello, the Moor of Venice" &&
-            (await text(page, ".calendar-responses-section:first-child .calendar-responses-detail")).startsWith("Sent "),
+        (
+            await texts(page, ".calendar-responses-section:first-child .calendar-responses-name")
+        )[0] === "Othello, the Moor of Venice" &&
+            (
+                await text(
+                    page,
+                    ".calendar-responses-section:first-child .calendar-responses-detail",
+                )
+            ).startsWith("Sent "),
     );
     check(
         "responses are by group, with this occurrence's",
@@ -249,10 +259,15 @@ async function calendar_meeting_test(page: Page): Promise<void> {
             ) === JSON.stringify(["Optional attendee"]),
         JSON.stringify(await texts(page, ".calendar-responses-group-toggle")),
     );
-    await page.click('.calendar-responses-group[data-response="accepted"] .calendar-responses-group-toggle');
+    await page.click(
+        '.calendar-responses-group[data-response="accepted"] .calendar-responses-group-toggle',
+    );
     check(
         "a group folds",
-        !(await is_shown(page, '.calendar-responses-group[data-response="accepted"] .calendar-responses-people')),
+        !(await is_shown(
+            page,
+            '.calendar-responses-group[data-response="accepted"] .calendar-responses-people',
+        )),
     );
     await page.click(".calendar-responses-hide");
     check("the responses panel hides", !(await is_shown(page, ".calendar-responses")));
@@ -264,7 +279,9 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.click('.calendar-meeting-respond[data-response="accepted"]');
     await choose(page, "This occurrence");
     await page.waitForFunction(
-        () => document.querySelector(".calendar-responses-own")?.textContent.trim() === "You accepted",
+        () =>
+            document.querySelector(".calendar-responses-own")?.textContent.trim() ===
+            "You accepted",
         {polling: 100},
     );
     check(
@@ -302,8 +319,7 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.keyboard.press("Enter");
     await page.click(".calendar-meeting-forward-send");
     await page.waitForFunction(
-        () =>
-            document.querySelector(".calendar-meeting-attendees")?.textContent.includes("4 more"),
+        () => document.querySelector(".calendar-meeting-attendees")?.textContent.includes("4 more"),
         {polling: 100},
     );
     check("forwarding adds an attendee", true);
@@ -314,7 +330,8 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     const occurrences = await texts(page, ".calendar-card-choice");
     check(
         "all occurrences lists the next ones",
-        occurrences.length >= 2 && occurrences.every((label) => label.endsWith("3:00 PM – 4:00 PM")),
+        occurrences.length >= 2 &&
+            occurrences.every((label) => label.endsWith("3:00 PM – 4:00 PM")),
         JSON.stringify(occurrences),
     );
     const current_time = await text(page, ".calendar-meeting-time");
@@ -329,7 +346,10 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.click(".calendar-meeting-series");
     await page.waitForFunction(
         () =>
-            document.querySelector(".calendar-meeting-time")?.textContent.trim().startsWith("Repeats every Wednesday"),
+            document
+                .querySelector(".calendar-meeting-time")
+                ?.textContent.trim()
+                .startsWith("Repeats every Wednesday"),
         {polling: 100},
     );
     check("the whole series opens", !(await page.$(".calendar-meeting-series")));
@@ -342,7 +362,9 @@ async function calendar_meeting_test(page: Page): Promise<void> {
         (await page.$eval(".calendar-form-title", (input) => (input as HTMLInputElement).value)) ===
             "Weekly sync" &&
             (await page.$$(".calendar-form-required-attendees .pill")).length === 0 &&
-            (await text(page, ".calendar-form-time-summary")).startsWith("Repeats every Wednesday") &&
+            (await text(page, ".calendar-form-time-summary")).startsWith(
+                "Repeats every Wednesday",
+            ) &&
             !(await page.$(".calendar-meeting")),
     );
     await page.keyboard.press("Escape");
@@ -385,7 +407,8 @@ async function calendar_meeting_test(page: Page): Promise<void> {
     await page.click(".calendar-form-responses-button");
     check(
         "the organizer can switch back to the day",
-        (await is_shown(page, ".calendar-form-day")) && !(await is_shown(page, ".calendar-responses")),
+        (await is_shown(page, ".calendar-form-day")) &&
+            !(await is_shown(page, ".calendar-responses")),
     );
     await page.keyboard.press("Escape");
     await page.waitForSelector(".calendar-form", {hidden: true});

@@ -79,14 +79,7 @@ test("filtering", () => {
 
     calendar_filter.set_hidden(["personal", "meetings:organizer"], true);
     assert.ok(calendar_filter.is_filtering());
-    assert.deepEqual(shown(), [
-        "accepted",
-        "tentative",
-        "unanswered",
-        "followed",
-        "red",
-        "series",
-    ]);
+    assert.deepEqual(shown(), ["accepted", "tentative", "unanswered", "followed", "red", "series"]);
 
     calendar_filter.set_hidden(["meetings:organizer"], false);
     calendar_filter.set_hidden(

@@ -99,10 +99,7 @@ run_test("cards with what the server told us", () => {
         message(21, "lunch", dave),
     ];
     let cards = topic_cards.get_topic_cards(msg_list, messages);
-    assert.deepEqual(cards.map(card_ids), [
-        [15],
-        [10, 19, 20, 21],
-    ]);
+    assert.deepEqual(cards.map(card_ids), [[15], [10, 19, 20, 21]]);
     assert.deepEqual(cards[1].hidden_replies, {
         count: 6,
         sender_names: ["Bob", "Carol"],

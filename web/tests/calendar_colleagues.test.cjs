@@ -44,10 +44,7 @@ function load(pinned_users, override) {
 }
 
 test("colors", () => {
-    assert.equal(
-        calendar_colleagues.get_theme_color("#2f6fc4"),
-        "light-dark(#2f6fc4, #4d94e8)",
-    );
+    assert.equal(calendar_colleagues.get_theme_color("#2f6fc4"), "light-dark(#2f6fc4, #4d94e8)");
     // A color from elsewhere is used in both themes.
     assert.equal(calendar_colleagues.get_theme_color("#123456"), "#123456");
 

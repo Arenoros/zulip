@@ -309,9 +309,8 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
     const restarred = await page
         .waitForFunction(
             (selector: string) =>
-                getComputedStyle(
-                    document.querySelector(`${selector} .message-starred-indicator`)!,
-                ).display !== "none",
+                getComputedStyle(document.querySelector(`${selector} .message-starred-indicator`)!)
+                    .display !== "none",
             {timeout: 5000},
             row(ids.starred),
         )
@@ -356,7 +355,9 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
         left: Math.round(row.querySelector(".message_content")!.getBoundingClientRect().left),
         others_left: Math.round(
             document
-                .querySelector(".focused-message-list .messagebox-includes-sender .message_content")!
+                .querySelector(
+                    ".focused-message-list .messagebox-includes-sender .message_content",
+                )!
                 .getBoundingClientRect().left,
         ),
     }));
@@ -371,11 +372,7 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
         row(ids.unread),
         (row) => getComputedStyle(row.querySelector(".message_unread_marker")!).display,
     );
-    check(
-        "messages keep Zulip's unread marker",
-        unread_marker !== "none",
-        unread_marker,
-    );
+    check("messages keep Zulip's unread marker", unread_marker !== "none", unread_marker);
     await shot(page, "states");
 
     // Actions.
@@ -447,9 +444,8 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
     await page.reload();
     await open(page, "#feed", ids.starred);
     const large = await line_of(page, ids.starred);
-    const time_text = await page.$eval(
-        `${row(ids.starred)} .message-time`,
-        (time) => time.textContent.trim(),
+    const time_text = await page.$eval(`${row(ids.starred)} .message-time`, (time) =>
+        time.textContent.trim(),
     );
     check(
         "with 24-hour time and 17px text the line keeps its layout",
@@ -463,10 +459,11 @@ async function mixed_view_rows_test(page: Page): Promise<void> {
 
     await page.setViewport({width: 480, height: 1000});
     await open(page, "#feed", ids.starred);
-    const narrow = await page.evaluate(() =>
-        [...document.querySelectorAll(".focused-message-list .messagebox-includes-sender")].filter(
-            (row) => row.scrollWidth > row.clientWidth + 1,
-        ).length,
+    const narrow = await page.evaluate(
+        () =>
+            [
+                ...document.querySelectorAll(".focused-message-list .messagebox-includes-sender"),
+            ].filter((row) => row.scrollWidth > row.clientWidth + 1).length,
     );
     check("in a 480px window no row overflows", narrow === 0, String(narrow));
     await shot(page, "480");

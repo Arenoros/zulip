@@ -80,7 +80,11 @@ export class RemoteInput {
     private readonly pressed_keys = new Set<string>();
     private focused = false;
 
-    constructor(video: HTMLVideoElement, send: RemoteInput["send"], on_keyboard_change: () => void) {
+    constructor(
+        video: HTMLVideoElement,
+        send: RemoteInput["send"],
+        on_keyboard_change: () => void,
+    ) {
         this.video = video;
         this.send = send;
         this.on_keyboard_change = on_keyboard_change;

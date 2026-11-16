@@ -180,8 +180,7 @@ export function get_week_layout<T extends LayoutEvent>(
     const all_day_placements = all_day
         .toSorted(
             (a, b) =>
-                a.first_day - b.first_day ||
-                b.last_day - b.first_day - (a.last_day - a.first_day),
+                a.first_day - b.first_day || b.last_day - b.first_day - (a.last_day - a.first_day),
         )
         .map((placement) => {
             let lane = lane_ends.findIndex((lane_end) => lane_end < placement.first_day);

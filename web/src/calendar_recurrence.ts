@@ -92,7 +92,9 @@ export function parse_rrule(rrule: string, time_zone: string): Recurrence | unde
 
 function format_utc(date: Date): string {
     return new Date(date.getTime())
-        .toISOString().replaceAll(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+        .toISOString()
+        .replaceAll(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z");
 }
 
 export function format_rrule(recurrence: Recurrence, time_zone: string): string {
@@ -234,7 +236,10 @@ export function describe_pattern(recurrence: Recurrence, date: string): string {
             );
         case "YEARLY":
             return $t(
-                {defaultMessage: "{count, plural, =1 {every year} other {every # years}} on {date}"},
+                {
+                    defaultMessage:
+                        "{count, plural, =1 {every year} other {every # years}} on {date}",
+                },
                 {
                     count,
                     date: new Intl.DateTimeFormat(user_settings.default_language, {

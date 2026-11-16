@@ -76,7 +76,9 @@ CalendarRoomEmail = Annotated[str, StringConstraints(max_length=CalendarRoom.MAX
 
 
 def access_calendar_users(user_profile: UserProfile, user_ids: list[int]) -> list[UserProfile]:
-    users = user_ids_to_users(user_ids, user_profile.realm, allow_deactivated=False, allow_bots=False)
+    users = user_ids_to_users(
+        user_ids, user_profile.realm, allow_deactivated=False, allow_bots=False
+    )
     inaccessible_user_ids = get_inaccessible_user_ids(user_ids, user_profile)
     if inaccessible_user_ids:
         raise JsonableError(

@@ -444,7 +444,8 @@ async function content_test(page: Page): Promise<void> {
         const sender_edge = row.own ? bubble.right - row.feed_right : bubble.left - row.feed_left;
         check(
             `the ${name} bubble takes the whole column`,
-            Math.abs(free_edge - expected) < 2 && Math.abs(Math.abs(sender_edge) - (row.own ? 0 : 42)) < 3,
+            Math.abs(free_edge - expected) < 2 &&
+                Math.abs(Math.abs(sender_edge) - (row.own ? 0 : 42)) < 3,
             `${Math.round(free_edge)} vs ${Math.round(expected)}, ${Math.round(sender_edge)}`,
         );
     }
@@ -577,7 +578,8 @@ async function content_test(page: Page): Promise<void> {
         return {
             border: getComputedStyle(controller).borderTopStyle,
             right: controller.getBoundingClientRect().right,
-            content_background: getComputedStyle(row.querySelector(".message_content")!).backgroundColor,
+            content_background: getComputedStyle(row.querySelector(".message_content")!)
+                .backgroundColor,
             label: controller.textContent?.trim(),
         };
     });

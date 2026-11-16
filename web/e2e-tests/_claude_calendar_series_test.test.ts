@@ -170,8 +170,7 @@ async function wait_for_summary(page: Page, text: string): Promise<void> {
     await page
         .waitForFunction(
             (text) =>
-                document.querySelector(".calendar-form-time-summary")?.textContent.trim() ===
-                text,
+                document.querySelector(".calendar-form-time-summary")?.textContent.trim() === text,
             {polling: 100, timeout: 5000},
             text,
         )
@@ -264,13 +263,19 @@ async function calendar_series_test(page: Page): Promise<void> {
     await page.select(".calendar-form-interval", "2");
     expected = `Repeats every 2 weeks on Mon and Thu, from 10:00 AM to 10:30 AM, starting ${date_label(thursday)}`;
     await wait_for_summary(page, expected);
-    check("days and the interval change the series", (await summary(page)) === expected, await summary(page));
+    check(
+        "days and the interval change the series",
+        (await summary(page)) === expected,
+        await summary(page),
+    );
 
     // The last day, and back to forever.
     const last_day = add_days(thursday, 7);
     await page.click(".calendar-form-until");
     await page.waitForSelector(".calendar-date-picker-popover", {visible: true});
-    await page.click(`.calendar-date-picker-popover .calendar-mini-month-day[data-date="${last_day}"]`);
+    await page.click(
+        `.calendar-date-picker-popover .calendar-mini-month-day[data-date="${last_day}"]`,
+    );
     expected = `Repeats every 2 weeks on Mon and Thu, from 10:00 AM to 10:30 AM, from ${date_label(thursday)} until ${date_label(last_day)}`;
     await wait_for_summary(page, expected);
     check("the series can end on a day", (await summary(page)) === expected, await summary(page));
@@ -290,7 +295,11 @@ async function calendar_series_test(page: Page): Promise<void> {
     });
     expected = `Repeats every 2 weeks on Mon and Thu, from 11:00 AM to 11:30 AM, starting ${date_label(thursday)}`;
     await wait_for_summary(page, expected);
-    check("a suggested time sets the time", (await summary(page)) === expected, await summary(page));
+    check(
+        "a suggested time sets the time",
+        (await summary(page)) === expected,
+        await summary(page),
+    );
     await shot(page, "dark-new");
 
     await page.click(".calendar-form-save");
@@ -298,11 +307,14 @@ async function calendar_series_test(page: Page): Promise<void> {
     const review = (await week_events(page, monday)).find(
         (event) => event.title === "Weekly review",
     );
-    const saved = review === undefined
-        ? undefined
-        : ((await request(page, "GET", `/json/calendar/events/${review.id}`, "")) as {
-              event: CalendarEvent;
-          }).event;
+    const saved =
+        review === undefined
+            ? undefined
+            : (
+                  (await request(page, "GET", `/json/calendar/events/${review.id}`, "")) as {
+                      event: CalendarEvent;
+                  }
+              ).event;
     check(
         "the series is saved with its rule",
         saved !== undefined &&
@@ -364,7 +376,9 @@ async function calendar_series_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form", {visible: true});
     await page.type(".calendar-form-title", "Tokyo call");
     await page.click(".calendar-form-time-summary");
-    const start_minute = Number(await page.$eval(".calendar-form-start", (select) => (select as HTMLSelectElement).value));
+    const start_minute = Number(
+        await page.$eval(".calendar-form-start", (select) => (select as HTMLSelectElement).value),
+    );
     await page.click(".calendar-form-timezone");
     await page.waitForSelector(".dropdown-list-search-input", {visible: true});
     await page.type(".dropdown-list-search-input", "Asia/Tokyo");
@@ -374,7 +388,10 @@ async function calendar_series_test(page: Page): Promise<void> {
     );
     await tokyo!.click();
     await page.waitForFunction(
-        () => document.querySelector(".calendar-form-time-summary")!.textContent.includes("(Asia/Tokyo)"),
+        () =>
+            document
+                .querySelector(".calendar-form-time-summary")!
+                .textContent.includes("(Asia/Tokyo)"),
         {polling: 100},
     );
     check("the summary names another timezone", true);
@@ -395,18 +412,22 @@ async function calendar_series_test(page: Page): Promise<void> {
         `start=${moscow_seconds(add_days(monday, -1), 0)}&end=${moscow_seconds(add_days(monday, 60), 0)}`,
     )) as {events: CalendarEvent[]};
     const call = data.events.find((event) => event.title === "Tokyo call");
-    const tokyo_time = call === undefined
-        ? undefined
-        : new Intl.DateTimeFormat("en-US", {
-              hour: "numeric",
-              minute: "numeric",
-              hourCycle: "h23",
-              timeZone: "Asia/Tokyo",
-          }).format(new Date(call.start * 1000));
+    const tokyo_time =
+        call === undefined
+            ? undefined
+            : new Intl.DateTimeFormat("en-US", {
+                  hour: "numeric",
+                  minute: "numeric",
+                  hourCycle: "h23",
+                  timeZone: "Asia/Tokyo",
+              }).format(new Date(call.start * 1000));
     const expected_time = `${String(Math.floor(start_minute / 60)).padStart(2, "0")}:${String(start_minute % 60).padStart(2, "0")}`;
     check(
         "the event keeps its time of day in its timezone",
-        call !== undefined && call.timezone === "Asia/Tokyo" && call.rrule === "" && tokyo_time === expected_time,
+        call !== undefined &&
+            call.timezone === "Asia/Tokyo" &&
+            call.rrule === "" &&
+            tokyo_time === expected_time,
         JSON.stringify({call, tokyo_time, expected_time}),
     );
 

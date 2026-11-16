@@ -420,7 +420,12 @@ function get_context(state: SchedulingState): Record<string, unknown> {
         date_aria_label: $t({defaultMessage: "Date: {date}"}, {date: date_label}),
         is_all_day: state.is_all_day,
         days: get_dates().map((date) => ({
-            label: format_date(date, {weekday: "long", day: "numeric", month: "long", year: "numeric"}),
+            label: format_date(date, {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+            }),
             is_selected: date === state.date,
             hours,
         })),
@@ -548,7 +553,10 @@ function fetch(on_loaded?: () => void): void {
             }
             const data = response_schema.parse(raw_data);
             free_busy = new Map(
-                Object.entries(data.free_busy).map(([user_id, blocks]) => [Number(user_id), blocks]),
+                Object.entries(data.free_busy).map(([user_id, blocks]) => [
+                    Number(user_id),
+                    blocks,
+                ]),
             );
             working_hours = new Map(
                 Object.entries(data.working_hours).map(([user_id, hours]) => [
@@ -593,7 +601,10 @@ function move_selection_to(offset: number): void {
     const scale = get_options().scale;
     const span = state.is_all_day ? 0 : state.duration_minutes;
     const snapped = Math.round(offset / scale) * scale;
-    const clamped = Math.max(0, Math.min(snapped, day_minutes * SHOWN_DAYS - Math.min(span, day_minutes)));
+    const clamped = Math.max(
+        0,
+        Math.min(snapped, day_minutes * SHOWN_DAYS - Math.min(span, day_minutes)),
+    );
     const day_index = Math.min(Math.floor(clamped / day_minutes), SHOWN_DAYS - 1);
     const date = get_dates()[day_index]!;
     if (date !== state.date) {
@@ -633,11 +644,7 @@ function find_time(weeks_searched = 0): void {
     const step = get_options().scale;
     for (const date of get_dates()) {
         const day_start = calendar_layout.get_day_start(date, state.time_zone);
-        for (
-            let minute = work.start;
-            minute + state.duration_minutes <= work.end;
-            minute += step
-        ) {
+        for (let minute = work.start; minute + state.duration_minutes <= work.end; minute += step) {
             const interval = {
                 start: day_start + minute * 60,
                 end: day_start + (minute + state.duration_minutes) * 60,
@@ -786,10 +793,14 @@ export function initialize(): void {
         calendar_form.set_time(state.start_minute, Number($(this).val()));
         render();
     });
-    $view.on("change", selector(".calendar-scheduler-all-day-checkbox"), function (this: HTMLElement) {
-        calendar_form.set_all_day($(this).prop("checked") === true);
-        render();
-    });
+    $view.on(
+        "change",
+        selector(".calendar-scheduler-all-day-checkbox"),
+        function (this: HTMLElement) {
+            calendar_form.set_all_day($(this).prop("checked") === true);
+            render();
+        },
+    );
     $view.on("click", selector(".calendar-scheduler-section-toggle"), function (this: HTMLElement) {
         const section = this.dataset["section"]!;
         if (collapsed_sections.has(section)) {
@@ -818,26 +829,33 @@ export function initialize(): void {
         const left = this.getBoundingClientRect().left;
         move_selection_to((event.clientX - left) / get_minute_width());
     });
-    $view.on("pointerdown", selector(".calendar-scheduler-selection"), function (this: HTMLElement, e) {
-        const event = e.originalEvent as PointerEvent;
-        event.preventDefault();
-        const start_x = event.clientX;
-        const start_offset = get_selection_offset();
-        const minute_width = get_minute_width();
-        const selection = this;
-        selection.setPointerCapture(event.pointerId);
-        const on_move = (move: PointerEvent): void => {
-            const offset = start_offset + (move.clientX - start_x) / minute_width;
-            selection.style.setProperty("--calendar-scheduler-start", String(Math.max(0, offset)));
-        };
-        const on_up = (up: PointerEvent): void => {
-            selection.removeEventListener("pointermove", on_move);
-            selection.removeEventListener("pointerup", on_up);
-            move_selection_to(start_offset + (up.clientX - start_x) / minute_width);
-        };
-        selection.addEventListener("pointermove", on_move);
-        selection.addEventListener("pointerup", on_up);
-    });
+    $view.on(
+        "pointerdown",
+        selector(".calendar-scheduler-selection"),
+        function (this: HTMLElement, e) {
+            const event = e.originalEvent as PointerEvent;
+            event.preventDefault();
+            const start_x = event.clientX;
+            const start_offset = get_selection_offset();
+            const minute_width = get_minute_width();
+            const selection = this;
+            selection.setPointerCapture(event.pointerId);
+            const on_move = (move: PointerEvent): void => {
+                const offset = start_offset + (move.clientX - start_x) / minute_width;
+                selection.style.setProperty(
+                    "--calendar-scheduler-start",
+                    String(Math.max(0, offset)),
+                );
+            };
+            const on_up = (up: PointerEvent): void => {
+                selection.removeEventListener("pointermove", on_move);
+                selection.removeEventListener("pointerup", on_up);
+                move_selection_to(start_offset + (up.clientX - start_x) / minute_width);
+            };
+            selection.addEventListener("pointermove", on_move);
+            selection.addEventListener("pointerup", on_up);
+        },
+    );
     $view.on("keydown", selector(".calendar-scheduler-selection"), (e) => {
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
             return;

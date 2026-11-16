@@ -95,9 +95,13 @@ class RecurrenceTest(ZulipTestCase):
             with self.assertRaisesRegex(JsonableError, error):
                 validate_rrule(rrule)
 
-    def assert_starts(self, rrule: str, expected: list[datetime], start: datetime = MONDAY_10_00) -> None:
+    def assert_starts(
+        self, rrule: str, expected: list[datetime], start: datetime = MONDAY_10_00
+    ) -> None:
         self.assertEqual(
-            get_occurrence_starts(start, "Europe/Moscow", rrule, WEEK_START, WEEK_START + timedelta(days=62)),
+            get_occurrence_starts(
+                start, "Europe/Moscow", rrule, WEEK_START, WEEK_START + timedelta(days=62)
+            ),
             expected,
         )
 
@@ -264,7 +268,11 @@ class CalendarOccurrencesTest(CalendarTestCase):
         wednesday = MONDAY_10_00 + timedelta(days=2)
         thursday = MONDAY_10_00 + timedelta(days=3)
         update_calendar_event(
-            hamlet, event_id, original_start=tuesday, start=tuesday + timedelta(hours=2), title="Moved"
+            hamlet,
+            event_id,
+            original_start=tuesday,
+            start=tuesday + timedelta(hours=2),
+            title="Moved",
         )
         cancel_calendar_event(hamlet, event_id, original_start=wednesday)
         # Moved out of the week.
@@ -527,7 +535,11 @@ class UpdateCalendarEventTest(CalendarTestCase):
 
         # Midnight in Berlin.
         update_calendar_event(
-            hamlet, event_id, start=utc(2026, 11, 15, 23), end=utc(2026, 11, 16, 23), is_all_day=True
+            hamlet,
+            event_id,
+            start=utc(2026, 11, 15, 23),
+            end=utc(2026, 11, 16, 23),
+            is_all_day=True,
         )
         event.refresh_from_db()
         self.assertTrue(event.is_all_day)
@@ -551,7 +563,9 @@ class UpdateCalendarEventTest(CalendarTestCase):
         self.assertEqual(CalendarEvent.objects.get(id=event_id).sequence, 1)
         self.assertFalse(CalendarAttendeeOccurrenceResponse.objects.exists())
 
-        update_calendar_event(hamlet, event_id, original_start=tuesday, end=tuesday + timedelta(hours=1))
+        update_calendar_event(
+            hamlet, event_id, original_start=tuesday, end=tuesday + timedelta(hours=1)
+        )
         exception.refresh_from_db()
         self.assertEqual((exception.start, exception.end), (tuesday, tuesday + timedelta(hours=1)))
         occurrence_response = CalendarAttendeeOccurrenceResponse.objects.get()
@@ -597,7 +611,8 @@ class UpdateCalendarEventTest(CalendarTestCase):
         # othello moves to the optional attendees; iago is removed.
         update_calendar_event(hamlet, event_id, optional_attendees=[othello, prospero])
         self.assertEqual(
-            attendees(), {cordelia.full_name: True, othello.full_name: False, prospero.full_name: False}
+            attendees(),
+            {cordelia.full_name: True, othello.full_name: False, prospero.full_name: False},
         )
         self.assertEqual(self.get_attendee(event_id, cordelia).response, CalendarResponse.ACCEPTED)
 
@@ -684,7 +699,9 @@ class RespondToCalendarEventTest(CalendarTestCase):
 
         cancel_calendar_event(hamlet, event_id)
         with self.assertRaisesRegex(JsonableError, "This event was cancelled"):
-            add_calendar_attendees(hamlet, event_id, [self.example_user("prospero")], is_required=True)
+            add_calendar_attendees(
+                hamlet, event_id, [self.example_user("prospero")], is_required=True
+            )
 
     def test_attendee_settings(self) -> None:
         hamlet = self.example_user("hamlet")
@@ -692,7 +709,11 @@ class RespondToCalendarEventTest(CalendarTestCase):
         event_id = self.create_event(hamlet, required_attendees=[cordelia])
 
         update_calendar_attendee_settings(
-            cordelia, event_id, reminder_minutes=None, category="Green category", show_as=CalendarShowAs.FREE
+            cordelia,
+            event_id,
+            reminder_minutes=None,
+            category="Green category",
+            show_as=CalendarShowAs.FREE,
         )
         attendee = self.get_attendee(event_id, cordelia)
         self.assertIsNone(attendee.reminder_minutes)
@@ -761,7 +782,9 @@ class MeetingChatTest(CalendarTestCase):
 
         # Everyone, and every occurrence of the series, has the same chat.
         self.assertEqual(self.get_chat(hamlet, event_id), chat)
-        result = self.api_post(self.example_user("iago"), f"/api/v1/calendar/events/{event_id}/chat")
+        result = self.api_post(
+            self.example_user("iago"), f"/api/v1/calendar/events/{event_id}/chat"
+        )
         self.assert_json_error(result, "Invalid calendar event ID")
 
     def test_chat_names_are_unique(self) -> None:
@@ -825,7 +848,9 @@ class CalendarNotificationTest(CalendarTestCase):
         hamlet = self.example_user("hamlet")
         cordelia = self.example_user("cordelia")
         othello = self.example_user("othello")
-        event_id = self.create_event(hamlet, required_attendees=[cordelia], optional_attendees=[othello])
+        event_id = self.create_event(
+            hamlet, required_attendees=[cordelia], optional_attendees=[othello]
+        )
         invitation = (
             f"{self.mention(hamlet)} invited you to **Planning** on "
             f"{datetime_to_global_time(MONDAY_10_00)}."
@@ -859,14 +884,15 @@ class CalendarNotificationTest(CalendarTestCase):
         # Times may be given in any time zone.
         moscow_start = MONDAY_10_00.astimezone(ZoneInfo("Europe/Moscow"))
         moscow_id = self.create_event(
-            hamlet, start=moscow_start, end=moscow_start + timedelta(hours=1), required_attendees=[iago]
+            hamlet,
+            start=moscow_start,
+            end=moscow_start + timedelta(hours=1),
+            required_attendees=[iago],
         )
         message = Message.objects.filter(sender=bot, usermessage__user_profile=iago).last()
         assert message is not None
         self.assertTrue(
-            message.content.endswith(
-                f"#calendar/event/{moscow_id}/{timestamp(MONDAY_10_00)})"
-            )
+            message.content.endswith(f"#calendar/event/{moscow_id}/{timestamp(MONDAY_10_00)})")
         )
 
         # Personal events notify nobody.
@@ -884,7 +910,9 @@ class CalendarNotificationTest(CalendarTestCase):
 
         # Changing who is invited invites and removes people; changing
         # only the title notifies nobody.
-        update_calendar_event(hamlet, event_id, title="Standup", required_attendees=[cordelia, iago])
+        update_calendar_event(
+            hamlet, event_id, title="Standup", required_attendees=[cordelia, iago]
+        )
         self.assertEqual(
             self.get_notifications(iago)[-1],
             f"{self.mention(hamlet)} invited you to **Standup** on "
@@ -899,9 +927,7 @@ class CalendarNotificationTest(CalendarTestCase):
         # Moving the series or one occurrence tells the attendees.
         new_start = MONDAY_10_00 + timedelta(hours=2)
         update_calendar_event(hamlet, event_id, start=new_start)
-        moved = (
-            f"{self.mention(hamlet)} moved **Standup** to {datetime_to_global_time(new_start)}."
-        )
+        moved = f"{self.mention(hamlet)} moved **Standup** to {datetime_to_global_time(new_start)}."
         self.assertEqual(self.get_notifications(cordelia)[-1], moved)
         self.assertEqual(self.get_notifications(iago)[-1], moved)
 
@@ -1344,7 +1370,9 @@ class CalendarAPITest(CalendarTestCase):
             CalendarResponse.DECLINED,
         )
         self.assertFalse(
-            CalendarEventException.objects.filter(event_id=series_id, original_start=wednesday).exists()
+            CalendarEventException.objects.filter(
+                event_id=series_id, original_start=wednesday
+            ).exists()
         )
 
         # The organizer cancels the series for everyone.
@@ -1547,7 +1575,10 @@ class CalendarPinnedUsersTest(CalendarTestCase):
             self.assert_json_success(result)
         self.assertEqual(
             self.get_pinned_users(hamlet),
-            [{"user_id": othello.id, "color": "#4f7cff"}, {"user_id": cordelia.id, "color": "#E5484D"}],
+            [
+                {"user_id": othello.id, "color": "#4f7cff"},
+                {"user_id": cordelia.id, "color": "#E5484D"},
+            ],
         )
         self.assertEqual(self.get_pinned_users(cordelia), [])
 
@@ -1557,7 +1588,9 @@ class CalendarPinnedUsersTest(CalendarTestCase):
         self.assert_json_success(result)
         result = self.api_delete(hamlet, f"/api/v1/calendar/pinned_users/{cordelia.id}")
         self.assert_json_success(result)
-        self.assertEqual(self.get_pinned_users(hamlet), [{"user_id": othello.id, "color": "#30a46c"}])
+        self.assertEqual(
+            self.get_pinned_users(hamlet), [{"user_id": othello.id, "color": "#30a46c"}]
+        )
 
         result = self.api_post(
             hamlet, "/api/v1/calendar/pinned_users", {"user_id": cordelia.id, "color": "#e5484d"}
@@ -1572,12 +1605,17 @@ class CalendarPinnedUsersTest(CalendarTestCase):
         hamlet = self.example_user("hamlet")
         othello = self.example_user("othello")
         url = "/api/v1/calendar/pinned_users"
-        self.assert_json_success(self.api_post(hamlet, url, {"user_id": othello.id, "color": "#4f7cff"}))
+        self.assert_json_success(
+            self.api_post(hamlet, url, {"user_id": othello.id, "color": "#4f7cff"})
+        )
 
         for params, error in [
             ({"user_id": othello.id, "color": "#4f7cff"}, "This calendar is already pinned"),
             ({"user_id": hamlet.id, "color": "#4f7cff"}, "You cannot pin your own calendar"),
-            ({"user_id": self.example_user("default_bot").id, "color": "#4f7cff"}, "Invalid user ID"),
+            (
+                {"user_id": self.example_user("default_bot").id, "color": "#4f7cff"},
+                "Invalid user ID",
+            ),
             ({"user_id": self.example_user("iago").id, "color": "blue"}, "Invalid color"),
         ]:
             self.assert_json_error_contains(self.api_post(hamlet, url, params), error)

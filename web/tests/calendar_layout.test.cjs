@@ -168,11 +168,6 @@ run_test("the hours stay put when daylight saving time ends", () => {
         is_all_day: false,
         timezone: "Europe/Berlin",
     };
-    const layout = calendar_layout.get_week_layout(
-        [meeting],
-        berlin_sunday,
-        "Europe/Berlin",
-        0,
-    );
+    const layout = calendar_layout.get_week_layout([meeting], berlin_sunday, "Europe/Berlin", 0);
     assert.deepEqual(layout.days[0].map(summary), [["meeting", 600, 660, 0, 1]]);
 });

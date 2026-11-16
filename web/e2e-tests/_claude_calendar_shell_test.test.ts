@@ -269,7 +269,8 @@ async function calendar_shell_test(page: Page): Promise<void> {
     await wait_for_calendar(page, false);
     check(
         "a link to a topic leaves the calendar",
-        (await current_hash(page)).endsWith("/topic/calendar") && !(await is_calendar_visible(page)),
+        (await current_hash(page)).endsWith("/topic/calendar") &&
+            !(await is_calendar_visible(page)),
     );
 
     // Opening a calendar URL directly.
@@ -291,12 +292,7 @@ async function calendar_shell_test(page: Page): Promise<void> {
     );
 
     // Answering the invitation updates the count live.
-    await request(
-        page,
-        "POST",
-        `/json/calendar/events/${seeded.event_id}/response`,
-        "response=2",
-    );
+    await request(page, "POST", `/json/calendar/events/${seeded.event_id}/response`, "response=2");
     await page.waitForFunction(
         () =>
             document
@@ -327,7 +323,11 @@ async function calendar_shell_test(page: Page): Promise<void> {
             fits: element.scrollWidth <= element.clientWidth,
         };
     });
-    check("the toolbar fits on one line", toolbar.one_line && toolbar.fits, JSON.stringify(toolbar));
+    check(
+        "the toolbar fits on one line",
+        toolbar.one_line && toolbar.fits,
+        JSON.stringify(toolbar),
+    );
     check(
         "the title is in Russian",
         (await page.title()).startsWith("Календарь - "),

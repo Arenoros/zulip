@@ -76,7 +76,14 @@ async function shot_compose(page: Page, name: string): Promise<void> {
     });
 }
 
-type Box = {left: number; right: number; top: number; bottom: number; width: number; height: number};
+type Box = {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    width: number;
+    height: number;
+};
 
 type RowFacts = {
     field: Box;
@@ -111,9 +118,9 @@ async function row_facts(page: Page): Promise<RowFacts> {
             element !== null && (element as HTMLElement).offsetParent !== null;
         const field = document.querySelector("#compose .messagebox")!;
         const textarea = document.querySelector("textarea#compose-textarea")!;
-        const buttons = [...document.querySelectorAll("#compose-row-buttons .compose-row-button")].filter(
-            (button) => shown(button),
-        );
+        const buttons = [
+            ...document.querySelectorAll("#compose-row-buttons .compose-row-button"),
+        ].filter((button) => shown(button));
         const send = document.querySelector("#compose-send-button")!;
         const field_rect = field.getBoundingClientRect();
         const overflowing = [...document.querySelectorAll("#compose .messagebox *")].filter(
@@ -138,7 +145,9 @@ async function row_facts(page: Page): Promise<RowFacts> {
             send_options: box(document.querySelector("#send_later")!),
             toolbar_shown: shown(document.querySelector("#message-formatting-controls-container")),
             corner_buttons_shown: [
-                ...document.querySelectorAll("#message-content-container .composebox-buttons button"),
+                ...document.querySelectorAll(
+                    "#message-content-container .composebox-buttons button",
+                ),
             ].some((button) => shown(button)),
             drafts_link_shown: shown(document.querySelector("#compose-drafts-button")),
             formatting_pressed: document
@@ -158,18 +167,20 @@ async function toolbar_labels(page: Page): Promise<string[]> {
                 "#message-formatting-controls-container .compose_control_button, #message-formatting-controls-container .compose-toolbar-end .compose-row-button",
             ),
         ].filter((element) => (element as HTMLElement).offsetParent !== null);
-        return items
-            .map((element) => ({
-                label: element.getAttribute("aria-label") ?? "",
-                rect: element.getBoundingClientRect(),
-            }))
-            // By rows of the wrapped toolbar, then from left to right.
-            .sort(
-                (a, b) =>
-                    Math.round(a.rect.top / 16) - Math.round(b.rect.top / 16) ||
-                    a.rect.left - b.rect.left,
-            )
-            .map((item) => item.label);
+        return (
+            items
+                .map((element) => ({
+                    label: element.getAttribute("aria-label") ?? "",
+                    rect: element.getBoundingClientRect(),
+                }))
+                // By rows of the wrapped toolbar, then from left to right.
+                .sort(
+                    (a, b) =>
+                        Math.round(a.rect.top / 16) - Math.round(b.rect.top / 16) ||
+                        a.rect.left - b.rect.left,
+                )
+                .map((item) => item.label)
+        );
     });
 }
 
@@ -203,7 +214,9 @@ async function compose_row_test(page: Page): Promise<void> {
         "the row has Formatting, Add emoji, Upload files and More, then the send controls",
         JSON.stringify(facts.row_labels) ===
             JSON.stringify(["Formatting", "Add emoji", "Upload files", "More"]) &&
-            facts.row_buttons.every((button) => near(button.width, 32) && near(button.height, 32)) &&
+            facts.row_buttons.every(
+                (button) => near(button.width, 32) && near(button.height, 32),
+            ) &&
             near(facts.send.width, 32) &&
             near(facts.send_options.width, 20),
         JSON.stringify(facts),
@@ -307,14 +320,22 @@ async function compose_row_test(page: Page): Promise<void> {
     await page.click("textarea#compose-textarea");
     await page.keyboard.type("What to check in the new call window:");
     facts = await row_facts(page);
-    check("the message field is at least 140px tall", facts.textarea.height >= 139.5, `${facts.textarea.height}`);
+    check(
+        "the message field is at least 140px tall",
+        facts.textarea.height >= 139.5,
+        `${facts.textarea.height}`,
+    );
     await shot_compose(page, "light-3-formatting");
 
     // Enter starts a new line in formatting mode; Ctrl+Enter sends.
     await page.keyboard.press("Enter");
     await page.keyboard.type("- sound");
     const value = await textarea_value(page);
-    check("Enter starts a new line in formatting mode", value.includes("\n- sound"), JSON.stringify(value));
+    check(
+        "Enter starts a new line in formatting mode",
+        value.includes("\n- sound"),
+        JSON.stringify(value),
+    );
     await page.keyboard.down("Control");
     await page.keyboard.press("Enter");
     await page.keyboard.up("Control");
@@ -325,14 +346,22 @@ async function compose_row_test(page: Page): Promise<void> {
             ),
         {polling: 100},
     );
-    await page.waitForFunction(() => !document.querySelector("#compose")!.classList.contains("formatting-mode"));
-    check("Ctrl+Enter sends, and sending leaves formatting mode", (await textarea_value(page)) === "");
+    await page.waitForFunction(
+        () => !document.querySelector("#compose")!.classList.contains("formatting-mode"),
+    );
+    check(
+        "Ctrl+Enter sends, and sending leaves formatting mode",
+        (await textarea_value(page)) === "",
+    );
 
     // Moving to another conversation leaves formatting mode.
     await page.click(".compose-formatting-mode-button");
     await go_to(page, hamlet);
     facts = await row_facts(page);
-    check("another conversation starts without formatting mode", !facts.toolbar_shown && facts.formatting_pressed === "false");
+    check(
+        "another conversation starts without formatting mode",
+        !facts.toolbar_shown && facts.formatting_pressed === "false",
+    );
     await go_to(page, othello);
 
     // Maximize and back.
@@ -345,7 +374,9 @@ async function compose_row_test(page: Page): Promise<void> {
     );
     check("Maximize fills the view and offers Collapse", collapse_shown);
     await page.click(".compose-toolbar-end .collapse-composebox-button");
-    await page.waitForFunction(() => !document.querySelector("#compose")!.classList.contains("compose-fullscreen"));
+    await page.waitForFunction(
+        () => !document.querySelector("#compose")!.classList.contains("compose-fullscreen"),
+    );
     check("Collapse goes back to formatting mode", true);
 
     // Preview, then leaving formatting mode, leaves the preview.
@@ -354,8 +385,13 @@ async function compose_row_test(page: Page): Promise<void> {
     await page.click("#compose .markdown_preview");
     await page.waitForSelector("#compose.preview_mode");
     await page.click(".compose-formatting-mode-button");
-    await page.waitForFunction(() => !document.querySelector("#compose")!.classList.contains("preview_mode"));
-    check("leaving formatting mode leaves the preview", (await textarea_value(page)) === "**bold** text");
+    await page.waitForFunction(
+        () => !document.querySelector("#compose")!.classList.contains("preview_mode"),
+    );
+    check(
+        "leaving formatting mode leaves the preview",
+        (await textarea_value(page)) === "**bold** text",
+    );
 
     // Delete draft.
     await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -389,7 +425,11 @@ async function compose_row_test(page: Page): Promise<void> {
     await shot_compose(page, "light-narrow-1");
     await page.click(".compose-formatting-mode-button");
     facts = await row_facts(page);
-    check("at 480px the toolbar wraps without overflowing", facts.overflowing === 0, JSON.stringify(facts));
+    check(
+        "at 480px the toolbar wraps without overflowing",
+        facts.overflowing === 0,
+        JSON.stringify(facts),
+    );
     await shot_compose(page, "light-narrow-3");
     await page.setViewport({width: 1280, height: 1000});
 

@@ -114,9 +114,8 @@ async function texts(page: Page, selector: string): Promise<string[]> {
 }
 
 async function selected_time(page: Page): Promise<string> {
-    return await page.$eval(
-        ".calendar-scheduler-start",
-        (element) => (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
+    return await page.$eval(".calendar-scheduler-start", (element) =>
+        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
     );
 }
 
@@ -161,8 +160,9 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
     );
     check(
         "Hamlet's busy time shows in his row",
-        (await page.$$eval(".calendar-scheduler-person-track", (tracks) =>
-            tracks[2]!.querySelectorAll(".calendar-scheduler-block.busy").length,
+        (await page.$$eval(
+            ".calendar-scheduler-person-track",
+            (tracks) => tracks[2]!.querySelectorAll(".calendar-scheduler-block.busy").length,
         )) === 1,
     );
     await shot(page, "dark");
@@ -207,9 +207,9 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
     await page.click(".calendar-scheduler-work-hours-option");
     await page.waitForFunction(
         () =>
-            document.querySelectorAll(".calendar-scheduler-day")[0]?.querySelectorAll(
-                ".calendar-scheduler-hour",
-            ).length === 24,
+            document
+                .querySelectorAll(".calendar-scheduler-day")[0]
+                ?.querySelectorAll(".calendar-scheduler-hour").length === 24,
     );
     check("the whole day can be shown", true);
     await page.click(".calendar-scheduler-options");
@@ -222,9 +222,8 @@ async function calendar_scheduler_test(page: Page): Promise<void> {
     await page.click(".calendar-scheduler-back");
     await page.waitForSelector(".calendar-form-save", {visible: true});
     await page.click(".calendar-form-time-summary");
-    const form_start = await page.$eval(
-        ".calendar-form-start",
-        (element) => (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
+    const form_start = await page.$eval(".calendar-form-start", (element) =>
+        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
     );
     check("the form has the time chosen in the scheduler", form_start === "11:00 AM", form_start);
     await page.click(".calendar-form-scheduler");

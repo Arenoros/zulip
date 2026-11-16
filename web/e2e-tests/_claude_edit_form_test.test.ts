@@ -48,7 +48,14 @@ print(
 )
 `;
 
-type Seeded = {desdemona: number; iago: number; stream_id: number; from_iago: number; bubble: number; card: number};
+type Seeded = {
+    desdemona: number;
+    iago: number;
+    stream_id: number;
+    from_iago: number;
+    bubble: number;
+    card: number;
+};
 
 async function api(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
@@ -184,13 +191,12 @@ async function edit_facts(page: Page, id: number): Promise<EditFacts> {
             toolbar_above_message:
                 shown(toolbar) && toolbar.getBoundingClientRect().bottom <= textarea.top + 0.5,
             formatting_pressed:
-                row.querySelector(".compose-formatting-mode-button")?.getAttribute(
-                    "aria-pressed",
-                ) ?? null,
+                row
+                    .querySelector(".compose-formatting-mode-button")
+                    ?.getAttribute("aria-pressed") ?? null,
             message_height: textarea.height,
             timer: shown(timer) ? timer.textContent.trim() : "",
-            timer_above_buttons:
-                timer_rect !== undefined && timer_rect.bottom <= control_top + 0.5,
+            timer_above_buttons: timer_rect !== undefined && timer_rect.bottom <= control_top + 0.5,
             overflowing: [...row.querySelectorAll(".message-edit-field *")].filter((child) => {
                 const rect = child.getBoundingClientRect();
                 return rect.width > 0 && rect.right > field.right + 0.5;
@@ -224,9 +230,7 @@ async function shot(page: Page, id: number, name: string): Promise<void> {
 }
 
 async function message_text(page: Page, id: number): Promise<string> {
-    return await page.$eval(`${row(id)} .message_content`, (content) =>
-        content.textContent.trim(),
-    );
+    return await page.$eval(`${row(id)} .message_content`, (content) => content.textContent.trim());
 }
 
 async function edit_form_test(page: Page): Promise<void> {
@@ -377,9 +381,12 @@ async function edit_form_test(page: Page): Promise<void> {
 
     // With Enter to send, Enter saves.
     await open_edit(page, seeded.bubble);
-    await page.evaluate((selector) => {
-        document.querySelector<HTMLTextAreaElement>(selector)!.value = "";
-    }, `${row(seeded.bubble)} .message_edit_content`);
+    await page.evaluate(
+        (selector) => {
+            document.querySelector<HTMLTextAreaElement>(selector)!.value = "";
+        },
+        `${row(seeded.bubble)} .message_edit_content`,
+    );
     await page.keyboard.type("Edited by Enter.");
     await page.keyboard.press("Enter");
     await wait_for_edit_closed(page, seeded.bubble);

@@ -114,7 +114,11 @@ async function visual_test(page: Page): Promise<void> {
             inputs[0]!.closest(".input-group")!.querySelectorAll(".reset-user-setting-to-default")
                 .length,
     );
-    check("the organization default has a reset button", reset_buttons === 1, String(reset_buttons));
+    check(
+        "the organization default has a reset button",
+        reset_buttons === 1,
+        String(reset_buttons),
+    );
 
     await page.click(`${realm_checkbox} + .rendered-checkbox`);
     await page.evaluate(() => {
@@ -122,10 +126,9 @@ async function visual_test(page: Page): Promise<void> {
             .querySelector("#realm-user-default-settings .information-settings .save-button")!
             .dispatchEvent(new MouseEvent("click", {bubbles: true}));
     });
-    await page.waitForSelector(
-        "#realm-user-default-settings .information-settings .save-button",
-        {hidden: true},
-    );
+    await page.waitForSelector("#realm-user-default-settings .information-settings .save-button", {
+        hidden: true,
+    });
     await page.reload();
     await page.waitForSelector(realm_checkbox);
     check("the organization default can be turned off", !(await is_checked(page, realm_checkbox)));
@@ -136,10 +139,9 @@ async function visual_test(page: Page): Promise<void> {
             .querySelector("#realm-user-default-settings .information-settings .save-button")!
             .dispatchEvent(new MouseEvent("click", {bubbles: true}));
     });
-    await page.waitForSelector(
-        "#realm-user-default-settings .information-settings .save-button",
-        {hidden: true},
-    );
+    await page.waitForSelector("#realm-user-default-settings .information-settings .save-button", {
+        hidden: true,
+    });
     await page.reload();
     await page.waitForSelector(realm_checkbox);
     check("the organization default can be turned back on", await is_checked(page, realm_checkbox));

@@ -207,41 +207,56 @@ run_test("losing focus, capture, or the grant releases held buttons", ({override
     }
 });
 
-run_test("scrolling is summed and sent with moves at most 60 times a second", async ({override}) => {
-    const s = setup(override);
-    s.remote_input.set_token(token);
-    s.emit("pointermove", {clientX: 75});
-    for (let i = 0; i < 10; i += 1) {
-        s.emit("wheel", {deltaX: 0.7, deltaY: 100, deltaMode: 0});
-    }
-    s.emit("pointermove", {clientX: 125});
-    await clock.tickAsync(17);
-    assert.deepEqual(s.packets, [
-        {token, sequence: 1, event: {type: "wheel", x: 0.5, y: 0.5, dx: 7, dy: 1000}},
-    ]);
-    await clock.tickAsync(17);
-    assert.deepEqual(s.packets.at(-1), {
-        token,
-        sequence: 2,
-        event: {type: "move", x: 0.75, y: 0.5},
-    });
+run_test(
+    "scrolling is summed and sent with moves at most 60 times a second",
+    async ({override}) => {
+        const s = setup(override);
+        s.remote_input.set_token(token);
+        s.emit("pointermove", {clientX: 75});
+        for (let i = 0; i < 10; i += 1) {
+            s.emit("wheel", {deltaX: 0.7, deltaY: 100, deltaMode: 0});
+        }
+        s.emit("pointermove", {clientX: 125});
+        await clock.tickAsync(17);
+        assert.deepEqual(s.packets, [
+            {token, sequence: 1, event: {type: "wheel", x: 0.5, y: 0.5, dx: 7, dy: 1000}},
+        ]);
+        await clock.tickAsync(17);
+        assert.deepEqual(s.packets.at(-1), {
+            token,
+            sequence: 2,
+            event: {type: "move", x: 0.75, y: 0.5},
+        });
 
-    // The sum is rounded and bounded, not each event.
-    s.emit("wheel", {deltaX: 0.7, deltaY: -7000, deltaMode: 0});
-    s.emit("wheel", {deltaX: 0.7, deltaY: -7000, deltaMode: 0});
-    await clock.tickAsync(17);
-    assert.deepEqual(s.packets.at(-1).event, {type: "wheel", x: 0.5, y: 0.5, dx: 1, dy: -12_000});
-    s.emit("wheel", {deltaX: 0, deltaY: 1000, deltaMode: 1});
-    await clock.tickAsync(17);
-    assert.deepEqual(s.packets.at(-1).event, {type: "wheel", x: 0.5, y: 0.5, dx: 0, dy: 12_000});
-    assert.equal(s.packets.length, 4);
+        // The sum is rounded and bounded, not each event.
+        s.emit("wheel", {deltaX: 0.7, deltaY: -7000, deltaMode: 0});
+        s.emit("wheel", {deltaX: 0.7, deltaY: -7000, deltaMode: 0});
+        await clock.tickAsync(17);
+        assert.deepEqual(s.packets.at(-1).event, {
+            type: "wheel",
+            x: 0.5,
+            y: 0.5,
+            dx: 1,
+            dy: -12_000,
+        });
+        s.emit("wheel", {deltaX: 0, deltaY: 1000, deltaMode: 1});
+        await clock.tickAsync(17);
+        assert.deepEqual(s.packets.at(-1).event, {
+            type: "wheel",
+            x: 0.5,
+            y: 0.5,
+            dx: 0,
+            dy: 12_000,
+        });
+        assert.equal(s.packets.length, 4);
 
-    s.emit("wheel", {deltaX: 0, deltaY: 100, deltaMode: 0});
-    s.remote_input.set_token(undefined);
-    await clock.tickAsync(20);
-    assert.equal(s.packets.length, 4, "scrolling is not sent after the grant ends");
-    s.remote_input.destroy();
-});
+        s.emit("wheel", {deltaX: 0, deltaY: 100, deltaMode: 0});
+        s.remote_input.set_token(undefined);
+        await clock.tickAsync(20);
+        assert.equal(s.packets.length, 4, "scrolling is not sent after the grant ends");
+        s.remote_input.destroy();
+    },
+);
 
 run_test("slow lossy sends do not queue old positions", async ({override}) => {
     const sent = [];

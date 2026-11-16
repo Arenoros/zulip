@@ -73,7 +73,14 @@ async function shot(page: Page, name: string): Promise<void> {
     });
 }
 
-type Rect = {left: number; right: number; top: number; bottom: number; width: number; height: number};
+type Rect = {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+    width: number;
+    height: number;
+};
 
 async function rect_of(page: Page, selector: string): Promise<Rect | undefined> {
     return await page.evaluate((selector) => {
@@ -159,8 +166,14 @@ async function compose_menus_test(page: Page): Promise<void> {
             menu.item_heights.every((height) => height >= 39.5),
         JSON.stringify(menu),
     );
-    check("the + button looks pressed while its menu is open", menu.expanded === "true" && menu.active);
-    check("the + menu opens above the + button", await near_plus_button(page, "#compose-plus-menu-popover"));
+    check(
+        "the + button looks pressed while its menu is open",
+        menu.expanded === "true" && menu.active,
+    );
+    check(
+        "the + menu opens above the + button",
+        await near_plus_button(page, "#compose-plus-menu-popover"),
+    );
     await shot(page, "light-plus-menu");
 
     // Poll and to-do list open their dialogs.
@@ -206,15 +219,18 @@ async function compose_menus_test(page: Page): Promise<void> {
         JSON.stringify({calendar, plus}),
     );
     await page.click(".flatpickr-calendar.open .flatpickr-confirm");
-    await page.waitForFunction(
-        () => document.querySelector<HTMLTextAreaElement>("textarea#compose-textarea")!.value.includes("<time:"),
+    await page.waitForFunction(() =>
+        document
+            .querySelector<HTMLTextAreaElement>("textarea#compose-textarea")!
+            .value.includes("<time:"),
     );
     check("picking a time inserts it into the message", true);
 
     // With text, poll and to-do list are inactive and say why.
     await open_plus_menu(page);
-    const notes = await page.$$eval("#compose-plus-menu-popover .compose-plus-menu-note", (elements) =>
-        elements.map((element) => element.textContent?.trim()),
+    const notes = await page.$$eval(
+        "#compose-plus-menu-popover .compose-plus-menu-note",
+        (elements) => elements.map((element) => element.textContent?.trim()),
     );
     await page.click(".compose-plus-menu-poll");
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -224,8 +240,10 @@ async function compose_menus_test(page: Page): Promise<void> {
     check(
         "with text, Poll and To-do list are inactive and say why",
         JSON.stringify(notes) ===
-            JSON.stringify(["A poll must be an entire message.", "A to-do list must be an entire message."]) &&
-            !poll_dialog_shown,
+            JSON.stringify([
+                "A poll must be an entire message.",
+                "A to-do list must be an entire message.",
+            ]) && !poll_dialog_shown,
         JSON.stringify(notes),
     );
     await shot(page, "light-plus-menu-with-text");
@@ -275,7 +293,9 @@ async function compose_menus_test(page: Page): Promise<void> {
     check(
         "the formatting toolbar no longer has poll, to-do list, global time or saved snippets",
         !toolbar.some((label) =>
-            ["Add poll", "Add to-do list", "Add global time", "Add saved snippet"].includes(label ?? ""),
+            ["Add poll", "Add to-do list", "Add global time", "Add saved snippet"].includes(
+                label ?? "",
+            ),
         ),
         JSON.stringify(toolbar),
     );

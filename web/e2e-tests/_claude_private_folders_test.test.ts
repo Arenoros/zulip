@@ -73,7 +73,9 @@ async function visual_test(page: Page): Promise<void> {
     await page.waitForSelector("#id_new_channel_folder_can_access_group .pill", {visible: true});
     check(
         "a new folder is visible to everyone by default",
-        (await pill_names(page, "#id_new_channel_folder_can_access_group")).join("|").startsWith("Everyone"),
+        (await pill_names(page, "#id_new_channel_folder_can_access_group"))
+            .join("|")
+            .startsWith("Everyone"),
         JSON.stringify(await pill_names(page, "#id_new_channel_folder_can_access_group")),
     );
     await common.screenshot(page, "pf-01-create-folder-modal");
@@ -221,7 +223,8 @@ async function visual_test(page: Page): Promise<void> {
     await hamlet_page.waitForSelector(section_selector(folder.id), {hidden: true});
     check("the folder disappears for Hamlet", true);
     await hamlet_page.waitForFunction(
-        () => !document.querySelector("#stream_filters .stream-name")?.textContent.includes("plans"),
+        () =>
+            !document.querySelector("#stream_filters .stream-name")?.textContent.includes("plans"),
     );
     await sidebar_clip(hamlet_page, "pf-05-hamlet-after-revocation");
     const hamlet_subs = (await api(hamlet_page, "GET", "/json/users/me/subscriptions")) as {

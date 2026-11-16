@@ -13,8 +13,8 @@ async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {

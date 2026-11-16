@@ -397,9 +397,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
     await shot(page, "hover");
 
     // Topic editing in the header.
-    await page.click(
-        `${group_of(ids.plans[2]!)} .on_hover_topic_edit`,
-    );
+    await page.click(`${group_of(ids.plans[2]!)} .on_hover_topic_edit`);
     const editing = await page
         .waitForSelector(".focused-message-list .conversation-fragment-header .topic_edit_form", {
             visible: true,
@@ -454,9 +452,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
     await page.$eval(row(ids.plans[0]!), (row) => {
         row.scrollIntoView({block: "center"});
     });
-    await page.click(
-        `${group_of(ids.plans[0]!)} .conversation-fragment-open`,
-    );
+    await page.click(`${group_of(ids.plans[0]!)} .conversation-fragment-open`);
     const opened_topic = await page
         .waitForSelector(".focused-message-list.open-conversation .message_row", {
             visible: true,
@@ -474,9 +470,7 @@ async function conversation_fragments_test(page: Page): Promise<void> {
     await page.$eval(row(ids.dm), (row) => {
         row.scrollIntoView({block: "center"});
     });
-    await page.click(
-        `${group_of(ids.dm)} .conversation-fragment-open`,
-    );
+    await page.click(`${group_of(ids.dm)} .conversation-fragment-open`);
     await page.waitForFunction(() => window.location.hash.includes("/dm/"), {timeout: 10000});
     await page.waitForSelector(".focused-message-list:not(.mixed-view) .message_row", {
         visible: true,
@@ -490,7 +484,10 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         ["reactions", "#narrow/has/reaction/sender/me"],
         ["all direct messages", "#narrow/is/dm"],
         ["messages from a sender", `#narrow/sender/${iago_id}`],
-        ["a search in one direct message conversation", `#narrow/dm/${othello_id}/sender/${othello_id}`],
+        [
+            "a search in one direct message conversation",
+            `#narrow/dm/${othello_id}/sender/${othello_id}`,
+        ],
     ];
     const not_mixed: string[] = [];
     for (const [name, hash] of mixed_views) {
@@ -559,8 +556,9 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         row(ids.plans[0]!),
     );
     const recolored = await page.$eval(row(ids.plans[0]!), (row) => ({
-        header: getComputedStyle(row.closest(".recipient_row")!.querySelector(".message-header-contents")!)
-            .backgroundColor,
+        header: getComputedStyle(
+            row.closest(".recipient_row")!.querySelector(".message-header-contents")!,
+        ).backgroundColor,
         row: getComputedStyle(row).backgroundColor,
     }));
     check(
@@ -611,8 +609,9 @@ async function conversation_fragments_test(page: Page): Promise<void> {
         row.scrollIntoView({block: "center"});
     });
     const dark = await page.$eval(row(ids.plans[0]!), (row) => ({
-        header: getComputedStyle(row.closest(".recipient_row")!.querySelector(".message-header-contents")!)
-            .backgroundColor,
+        header: getComputedStyle(
+            row.closest(".recipient_row")!.querySelector(".message-header-contents")!,
+        ).backgroundColor,
         row: getComputedStyle(row).backgroundColor,
         feed: getComputedStyle(document.body).backgroundColor,
     }));

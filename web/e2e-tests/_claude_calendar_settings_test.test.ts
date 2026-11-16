@@ -78,9 +78,8 @@ async function text(page: Page, selector: string): Promise<string> {
 }
 
 async function selected_label(page: Page, id: string): Promise<string> {
-    return await page.$eval(
-        `#${id}`,
-        (element) => (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
+    return await page.$eval(`#${id}`, (element) =>
+        (element as HTMLSelectElement).selectedOptions[0]!.textContent.trim(),
     );
 }
 
@@ -117,9 +116,16 @@ async function calendar_settings_test(page: Page): Promise<void> {
     ];
     check(
         "the section shows the defaults",
-        JSON.stringify(work_days) === JSON.stringify([true, true, true, true, true, false, false]) &&
+        JSON.stringify(work_days) ===
+            JSON.stringify([true, true, true, true, true, false, false]) &&
             JSON.stringify(defaults) ===
-                JSON.stringify(["9:00 AM", "6:00 PM", "Work week", "30 minutes", "15 minutes before"]),
+                JSON.stringify([
+                    "9:00 AM",
+                    "6:00 PM",
+                    "Work week",
+                    "30 minutes",
+                    "15 minutes before",
+                ]),
         JSON.stringify(defaults),
     );
     await shot(page, "section-dark");
@@ -128,7 +134,11 @@ async function calendar_settings_test(page: Page): Promise<void> {
     await page.click('label[for="calendar_work_day_5"]');
     await wait_for_status(page, "calendar-work-time-settings", "Saved");
     await page.click('label[for="calendar_work_day_6"]');
-    await page.waitForFunction(() => document.querySelector(".calendar-work-time-settings .alert-notification")?.textContent.includes("Saved"));
+    await page.waitForFunction(() =>
+        document
+            .querySelector(".calendar-work-time-settings .alert-notification")
+            ?.textContent.includes("Saved"),
+    );
     await page.select("#calendar_work_day_start_minutes", "480");
     await page.select("#calendar_work_day_end_minutes", "1020");
     await page.select("#calendar_default_reminder_minutes", "");
@@ -152,7 +162,10 @@ async function calendar_settings_test(page: Page): Promise<void> {
             document.querySelector<HTMLSelectElement>("#calendar_work_day_start_minutes")!.value ===
             "480",
     );
-    check("invalid work hours are refused and undone", get_settings()["work_day_start_minutes"] === 480);
+    check(
+        "invalid work hours are refused and undone",
+        get_settings()["work_day_start_minutes"] === 480,
+    );
     await shot(page, "invalid-dark");
 
     // A change from another client shows in the section.
@@ -169,7 +182,9 @@ async function calendar_settings_test(page: Page): Promise<void> {
     await page.select("#calendar_default_view", "week");
     await wait_for_status(page, "calendar-view-settings", "Saved");
     await page.goto(`${base_url}#calendar`);
-    await page.waitForSelector(".calendar-grid:not(.loading) .calendar-day-column", {visible: true});
+    await page.waitForSelector(".calendar-grid:not(.loading) .calendar-day-column", {
+        visible: true,
+    });
     check(
         "the calendar opens in the default view",
         page.url().includes("#calendar/week/") && (await day_columns(page)) === 7,
@@ -215,7 +230,8 @@ async function calendar_settings_test(page: Page): Promise<void> {
     );
     check(
         "the section is in Russian",
-        labels[0] === "Понедельник" && (await text(page, "#calendar-settings h3")) === "Рабочее время",
+        labels[0] === "Понедельник" &&
+            (await text(page, "#calendar-settings h3")) === "Рабочее время",
         `${labels.join(", ")} / ${await text(page, "#calendar-settings h3")}`,
     );
     await shot(page, "section-light-ru");

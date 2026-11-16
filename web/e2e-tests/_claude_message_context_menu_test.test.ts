@@ -100,7 +100,11 @@ async function check_menu_opens(page: Page, view: string, text: string): Promise
     await page.mouse.click(point.x, point.y, {button: "right"});
     const box = await open_menu_box(page);
     const state = await menu_state(page);
-    check(`${view}: menu opens at the cursor`, near_cursor(box, point), JSON.stringify({box, point}));
+    check(
+        `${view}: menu opens at the cursor`,
+        near_cursor(box, point),
+        JSON.stringify({box, point}),
+    );
     check(`${view}: browser menu is suppressed`, state.prevented === "true");
     check(`${view}: menu belongs to the clicked message`, state.menu_row === point.row_id);
     check(`${view}: clicked message is selected`, state.selected_row === point.row_id);
@@ -120,9 +124,7 @@ async function check_browser_menu_kept(page: Page, name: string, point: Point): 
         delete document.body.dataset["contextMenuPrevented"];
     });
     await page.mouse.click(point.x, point.y, {button: "right"});
-    await page.waitForFunction(
-        () => document.body.dataset["contextMenuPrevented"] !== undefined,
-    );
+    await page.waitForFunction(() => document.body.dataset["contextMenuPrevented"] !== undefined);
     const state = await menu_state(page);
     const box = await menu_box(page);
     check(`${name}: browser menu is kept`, state.prevented === "false");
@@ -182,7 +184,8 @@ async function visual_test(page: Page): Promise<void> {
     const second = {...second_text, x: Math.max(open_box.right, link_right) + 15};
     await page.mouse.click(second.x, second.y, {button: "right"});
     await page.waitForFunction(
-        (row_id) => document.querySelector(".focused-message-list .has_actions_popover")?.id === row_id,
+        (row_id) =>
+            document.querySelector(".focused-message-list .has_actions_popover")?.id === row_id,
         {},
         second.row_id,
     );
@@ -283,11 +286,10 @@ async function visual_test(page: Page): Promise<void> {
 
     // Combined feed.
     await page.goto("http://zulip.zulipdev.com:9981/#feed");
-    await page.waitForFunction(
-        () =>
-            [...document.querySelectorAll(".focused-message-list .message_content")].some(
-                (element) => element.textContent.includes("first plain message"),
-            ),
+    await page.waitForFunction(() =>
+        [...document.querySelectorAll(".focused-message-list .message_content")].some((element) =>
+            element.textContent.includes("first plain message"),
+        ),
     );
     await page.evaluate(() => {
         window.addEventListener("contextmenu", (e) => {

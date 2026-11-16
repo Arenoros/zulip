@@ -200,9 +200,7 @@ async function form_layout(page: Page): Promise<FormLayout> {
                     style("#compose-channel-recipient").borderBottomStyle,
                     style("#compose-channel-recipient").borderBottomColor,
                 ].join(" "),
-                required: element("#stream_message_recipient_topic").getAttribute(
-                    "aria-required",
-                ),
+                required: element("#stream_message_recipient_topic").getAttribute("aria-required"),
             },
             toolbar: {
                 shown: shown("#message-formatting-controls-container"),

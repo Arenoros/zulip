@@ -153,7 +153,11 @@ function get_context(current: Meeting): Record<string, unknown> {
         responses: [
             {response: "accepted", icon: "check", label: $t({defaultMessage: "Accept"})},
             {response: "declined", icon: "close", label: $t({defaultMessage: "Decline"})},
-            {response: "following", icon: "calendar-clock", label: $t({defaultMessage: "Follow meeting"})},
+            {
+                response: "following",
+                icon: "calendar-clock",
+                label: $t({defaultMessage: "Follow meeting"}),
+            },
         ].map((button) => ({...button, is_selected: button.response === response})),
         can_forward: occurrence.allow_forwarding && !occurrence.is_cancelled,
         show_as_label: status.label,
@@ -316,11 +320,15 @@ function show_choices(
             popover_menus.on_show_prep(instance);
         },
         onMount(instance) {
-            $(instance.popper).on("click", ".calendar-card-choice", function (this: HTMLElement, e) {
-                e.preventDefault();
-                popover_menus.hide_current_popover_if_visible(instance);
-                on_choose(this.dataset["choice"]!);
-            });
+            $(instance.popper).on(
+                "click",
+                ".calendar-card-choice",
+                function (this: HTMLElement, e) {
+                    e.preventDefault();
+                    popover_menus.hide_current_popover_if_visible(instance);
+                    on_choose(this.dataset["choice"]!);
+                },
+            );
         },
         onHidden(instance) {
             instance.destroy();
@@ -444,7 +452,11 @@ export function initialize(opts: {on_close: () => void}): void {
     });
     $view.on("click", selector(".calendar-join-button"), () => {
         assert(meeting !== undefined);
-        calendar_call.join(meeting.occurrence.id, false, $("#calendar-view .calendar-meeting-error"));
+        calendar_call.join(
+            meeting.occurrence.id,
+            false,
+            $("#calendar-view .calendar-meeting-error"),
+        );
     });
     $view.on("click", selector(".calendar-join-options-button"), function (this: HTMLElement) {
         show_choices(
@@ -468,7 +480,11 @@ export function initialize(opts: {on_close: () => void}): void {
         }
         e.preventDefault();
         assert(meeting !== undefined);
-        calendar_call.join(meeting.occurrence.id, false, $("#calendar-view .calendar-meeting-error"));
+        calendar_call.join(
+            meeting.occurrence.id,
+            false,
+            $("#calendar-view .calendar-meeting-error"),
+        );
     });
     $view.on("click", selector(".calendar-meeting-chat"), () => {
         assert(meeting !== undefined);
@@ -538,4 +554,3 @@ export function initialize(opts: {on_close: () => void}): void {
         });
     }
 }
-

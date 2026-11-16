@@ -219,9 +219,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     await wait_for_form(page);
     check(
         "the form opens with the title focused",
-        await page.evaluate(() =>
+        (await page.evaluate(() =>
             document.activeElement?.classList.contains("calendar-form-title"),
-        ) === true,
+        )) === true,
     );
     await page.type(".calendar-form-title", "Design review");
     await add_attendee(page, ".calendar-form-required-attendees", "Othello, the Moor of Venice");
@@ -241,7 +241,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form-time-panel", {visible: true});
     await page.click(".calendar-form-date");
     await page.waitForSelector(".calendar-date-picker-popover", {visible: true});
-    await page.click(`.calendar-date-picker-popover .calendar-mini-month-day[data-date="${wednesday}"]`);
+    await page.click(
+        `.calendar-date-picker-popover .calendar-mini-month-day[data-date="${wednesday}"]`,
+    );
     await page.waitForSelector(".calendar-date-picker-popover", {hidden: true});
     await page.select(".calendar-form-start", String(10 * 60));
     let times = await form_times(page);
@@ -263,8 +265,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     await page.click('.calendar-form-format[data-format-type="bold"]');
     check(
         "formatting buttons format the description",
-        (await page.$eval(".calendar-form-description-input", (element) =>
-            (element as HTMLTextAreaElement).value,
+        (await page.$eval(
+            ".calendar-form-description-input",
+            (element) => (element as HTMLTextAreaElement).value,
         )) === "**Agenda**",
     );
     await page.click(".calendar-form-preview");
@@ -289,8 +292,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     check(
         "the emoji picker inserts into the description",
         (
-            await page.$eval(".calendar-form-description-input", (element) =>
-                (element as HTMLTextAreaElement).value,
+            await page.$eval(
+                ".calendar-form-description-input",
+                (element) => (element as HTMLTextAreaElement).value,
             )
         ).includes(":+1:"),
     );
@@ -400,8 +404,9 @@ async function calendar_form_test(page: Page): Promise<void> {
     check(
         "an occurrence keeps the settings of its series",
         (await page.$(".calendar-form-occurrence-note")) !== null &&
-            (await page.$eval(".calendar-form-call-checkbox", (input) =>
-                (input as HTMLInputElement).disabled,
+            (await page.$eval(
+                ".calendar-form-call-checkbox",
+                (input) => (input as HTMLInputElement).disabled,
             )),
     );
     await page.$eval(".calendar-form-title", (input) => {
@@ -454,9 +459,7 @@ async function calendar_form_test(page: Page): Promise<void> {
     // A draft stays when leaving the calendar.
     await page.type(".calendar-form-title", "Draft");
     await page.click("#calendar-navbar-button");
-    await page.waitForFunction(
-        () => !document.body.classList.contains("calendar-view-visible"),
-    );
+    await page.waitForFunction(() => !document.body.classList.contains("calendar-view-visible"));
     await page.click("#calendar-navbar-button");
     await wait_for_form(page);
     check(
@@ -492,10 +495,7 @@ async function calendar_form_test(page: Page): Promise<void> {
     await shot(page, "light-ru-new");
     await page.keyboard.press("Escape");
     await page.waitForSelector(".calendar-form-attendee-options-menu", {hidden: true});
-    check(
-        "Escape closes an open menu, not the form",
-        (await page.$(".calendar-form")) !== null,
-    );
+    check("Escape closes an open menu, not the form", (await page.$(".calendar-form")) !== null);
     for (const width of [1024, 480]) {
         await page.setViewport({width, height: 900});
         await new Promise((resolve) => setTimeout(resolve, 300));

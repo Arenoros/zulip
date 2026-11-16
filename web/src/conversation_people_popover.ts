@@ -38,10 +38,7 @@ function get_user_circle_class(user: User): string | undefined {
     if (user.is_bot || user.is_inaccessible_user || realm.realm_presence_disabled) {
         return undefined;
     }
-    return buddy_data.get_user_circle_class(
-        user.user_id,
-        !people.is_person_active(user.user_id),
-    );
+    return buddy_data.get_user_circle_class(user.user_id, !people.is_person_active(user.user_id));
 }
 
 // A group direct message is a fixed set of people, so adding someone

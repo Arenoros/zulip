@@ -46,10 +46,10 @@
            widgets or a condensed message, take the whole column. */
         &.content_edit_mode,
         &:has(
-                > .message_content:not(.collapsed)
-                    :is(.codehilite, table, .spoiler-block, .widget-content),
-                > .message_content.condensed:not(.collapsed)
-            ) {
+            > .message_content:not(.collapsed)
+                :is(.codehilite, table, .spoiler-block, .widget-content),
+            > .message_content.condensed:not(.collapsed)
+        ) {
             grid-template-columns:
                 var(--bubble-avatar-column-width)
                 minmax(
@@ -584,10 +584,10 @@
 
             &.content_edit_mode,
             &:has(
-                    > .message_content:not(.collapsed)
-                        :is(.codehilite, table, .spoiler-block, .widget-content),
-                    > .message_content.condensed:not(.collapsed)
-                ) {
+                > .message_content:not(.collapsed)
+                    :is(.codehilite, table, .spoiler-block, .widget-content),
+                > .message_content.condensed:not(.collapsed)
+            ) {
                 grid-template-columns:
                     minmax(0, 1fr) max-content max-content max-content
                     minmax(0, calc(100% - var(--bubble-free-edge)));
@@ -603,7 +603,9 @@
                 background-color: var(--color-background-own-message-bubble);
                 color: var(--color-text-own-message-bubble);
                 --color-markdown-link: var(--color-link-own-message-bubble);
-                --color-markdown-link-hover: var(--color-link-own-message-bubble);
+                --color-markdown-link-hover: var(
+                    --color-link-own-message-bubble
+                );
                 --color-markdown-link-decoration: color-mix(
                     in oklch,
                     var(--color-link-own-message-bubble) 30%,
@@ -633,7 +635,9 @@
                 justify-self: end;
             }
 
-            .message_content.condensed ~ .message_length_controller .message_length_toggle {
+            .message_content.condensed
+                ~ .message_length_controller
+                .message_length_toggle {
                 color: var(--color-link-own-message-bubble);
             }
         }

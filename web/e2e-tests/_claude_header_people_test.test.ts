@@ -189,14 +189,12 @@ async function open_people_popover(page: Page): Promise<PopoverFacts> {
             .getBoundingClientRect();
         return {
             heading: popover.querySelector(".conversation-people-heading")!.textContent.trim(),
-            names: members.map(
-                (member) =>
-                    member.querySelector(".conversation-people-name")!.textContent.trim(),
+            names: members.map((member) =>
+                member.querySelector(".conversation-people-name")!.textContent.trim(),
             ),
             captions: members.map(
                 (member) =>
-                    member.querySelector(".conversation-people-caption")?.textContent.trim() ??
-                    "",
+                    member.querySelector(".conversation-people-caption")?.textContent.trim() ?? "",
             ),
             presence: members.map(
                 (member) => member.querySelector(".conversation-people-presence") !== null,
@@ -221,8 +219,9 @@ async function has_people_button(page: Page): Promise<boolean> {
 }
 
 async function typeahead_names(page: Page): Promise<string[]> {
-    return await page.$$eval(".tippy-content .typeahead.dropdown-menu .typeahead-strong-section", (items) =>
-        items.map((item) => item.textContent.trim()),
+    return await page.$$eval(
+        ".tippy-content .typeahead.dropdown-menu .typeahead-strong-section",
+        (items) => items.map((item) => item.textContent.trim()),
     );
 }
 
@@ -305,17 +304,14 @@ async function header_people_test(page: Page): Promise<void> {
     await shot(page, "light-popover", "#header-container, .conversation-people-popover");
 
     // A person opens their card.
-    await page.click(
-        `.conversation-people-member[data-user-id="${seeded.othello}"]`,
-    );
+    await page.click(`.conversation-people-member[data-user-id="${seeded.othello}"]`);
     await page.waitForSelector(".popover-menu-user-full-name", {visible: true});
     const card_name = await page.$eval(".popover-menu-user-full-name", (title) =>
         title.textContent.trim(),
     );
     check(
         "clicking a person opens their user card",
-        card_name.includes("Othello") &&
-            (await page.$(".conversation-people-popover")) === null,
+        card_name.includes("Othello") && (await page.$(".conversation-people-popover")) === null,
         card_name,
     );
     await shot(page, "light-user-card", "#header-container, #user_card_popover");
@@ -373,10 +369,9 @@ async function header_people_test(page: Page): Promise<void> {
     check("adding someone enables the Start button", !disabled_after);
     await shot(page, "light-modal", "#start-group-chat-modal");
     await page.click("#start-group-chat-modal .dialog_submit_button");
-    await page.waitForFunction(
-        () => document.querySelector("#start-group-chat-modal") === null,
-        {polling: 100},
-    );
+    await page.waitForFunction(() => document.querySelector("#start-group-chat-modal") === null, {
+        polling: 100,
+    });
     await page.waitForFunction(
         (hash: string) => window.location.hash === hash,
         {polling: 100},
@@ -403,8 +398,10 @@ async function header_people_test(page: Page): Promise<void> {
     await close_popover(page);
     check(
         "Escape returns the focus to the people button",
-        await page.evaluate(() =>
-            document.activeElement?.classList.contains("message-view-header-people-button") === true,
+        await page.evaluate(
+            () =>
+                document.activeElement?.classList.contains("message-view-header-people-button") ===
+                true,
         ),
     );
 
@@ -413,8 +410,7 @@ async function header_people_test(page: Page): Promise<void> {
     popover = await open_people_popover(page);
     check(
         "notes to self list the current user",
-        JSON.stringify(popover.names) === JSON.stringify(["Desdemona"]) &&
-            popover.start_group_chat,
+        JSON.stringify(popover.names) === JSON.stringify(["Desdemona"]) && popover.start_group_chat,
         JSON.stringify(popover),
     );
     await close_popover(page);
@@ -435,9 +431,14 @@ async function header_people_test(page: Page): Promise<void> {
     // The call buttons stay before the people button when they come
     // and go.
     await open_view(page, views.cordelia);
-    run_python(python_prelude + String.raw`do_deactivate_user(user("cordelia@zulip.com"), acting_user=None)`);
+    run_python(
+        python_prelude +
+            String.raw`do_deactivate_user(user("cordelia@zulip.com"), acting_user=None)`,
+    );
     await page.waitForFunction(
-        () => document.querySelector("#message_view_header .message-view-header-call-buttons") === null,
+        () =>
+            document.querySelector("#message_view_header .message-view-header-call-buttons") ===
+            null,
         {polling: 100},
     );
     facts = await header_facts(page);
@@ -446,7 +447,10 @@ async function header_people_test(page: Page): Promise<void> {
         JSON.stringify(facts.buttons) === JSON.stringify(["People"]) && facts.buttons_centered,
         JSON.stringify(facts.buttons),
     );
-    run_python(python_prelude + String.raw`do_reactivate_user(user("cordelia@zulip.com"), acting_user=None)`);
+    run_python(
+        python_prelude +
+            String.raw`do_reactivate_user(user("cordelia@zulip.com"), acting_user=None)`,
+    );
     await page.waitForSelector("#message_view_header .message-view-header-call-buttons");
     facts = await header_facts(page);
     check(
@@ -482,7 +486,11 @@ async function header_people_test(page: Page): Promise<void> {
         await page.waitForSelector("#message_view_header", {visible: true});
         await page.mouse.move(1, 1);
         facts = await header_facts(page);
-        check(`${name}: the header is 48px tall`, facts.navbar_height === 48, JSON.stringify(facts));
+        check(
+            `${name}: the header is 48px tall`,
+            facts.navbar_height === 48,
+            JSON.stringify(facts),
+        );
         await shot(page, `light-${name}`);
     }
 

@@ -667,7 +667,8 @@ body.calendar-view-visible {
             to bottom,
             transparent 0 calc(var(--calendar-row-height) - 1px),
             var(--color-calendar-grid-row-line)
-                calc(var(--calendar-row-height) - 1px) var(--calendar-row-height)
+                calc(var(--calendar-row-height) - 1px)
+                var(--calendar-row-height)
         );
 
     /* The week could not be loaded: its days are not shown as free. */
@@ -2073,7 +2074,9 @@ body.calendar-view-visible {
     display: grid;
     grid-template-columns:
         var(--calendar-scheduler-people-width)
-        calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-total));
+        calc(
+            var(--calendar-scheduler-minute) * var(--calendar-scheduler-total)
+        );
     /* 44px at 14px/1em */
     grid-auto-rows: minmax(3.1429em, auto);
     align-content: start;
@@ -2108,7 +2111,9 @@ body.calendar-view-visible {
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    width: calc(
+        var(--calendar-scheduler-minute) * var(--calendar-scheduler-span)
+    );
     border-left: 1px solid var(--color-calendar-border);
 
     &.selected .calendar-scheduler-day-label {
@@ -2139,7 +2144,9 @@ body.calendar-view-visible {
     display: flex;
     align-items: center;
     box-sizing: border-box;
-    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    width: calc(
+        var(--calendar-scheduler-minute) * var(--calendar-scheduler-span)
+    );
     padding: 0 0.5714em; /* 8px at 14px/1em */
     overflow: hidden;
     color: var(--color-calendar-text-secondary);
@@ -2189,13 +2196,21 @@ body.calendar-view-visible {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-start));
-    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    left: calc(
+        var(--calendar-scheduler-minute) * var(--calendar-scheduler-start)
+    );
+    width: calc(
+        var(--calendar-scheduler-minute) * var(--calendar-scheduler-span)
+    );
 }
 
 .calendar-scheduler-off-hours,
 .calendar-scheduler-off-hours-swatch {
-    background-color: color-mix(in srgb, var(--color-calendar-text) 9%, transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--color-calendar-text) 9%,
+        transparent
+    );
 }
 
 .calendar-scheduler-no-data,
@@ -2231,11 +2246,17 @@ body.calendar-view-visible {
     );
     z-index: 1;
     box-sizing: border-box;
-    width: calc(var(--calendar-scheduler-minute) * var(--calendar-scheduler-span));
+    width: calc(
+        var(--calendar-scheduler-minute) * var(--calendar-scheduler-span)
+    );
     min-width: 4px;
     border: 2px solid var(--color-calendar-accent);
     border-radius: 3px;
-    background-color: color-mix(in srgb, var(--color-calendar-accent) 22%, transparent);
+    background-color: color-mix(
+        in srgb,
+        var(--color-calendar-accent) 22%,
+        transparent
+    );
     cursor: grab;
     touch-action: none;
 

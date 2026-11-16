@@ -43,7 +43,11 @@ function get_context(): Record<string, unknown> {
         (_, index) => index * WORK_HOURS_STEP_MINUTES,
     );
     const time_options = (selected: number, minutes: number[]): Record<string, unknown>[] =>
-        minutes.map((value) => ({value, label: get_time_label(value), selected: value === selected}));
+        minutes.map((value) => ({
+            value,
+            label: get_time_label(value),
+            selected: value === selected,
+        }));
     return {
         work_days: [1, 2, 3, 4, 5, 6, 7].map((day) => ({
             day,
@@ -91,7 +95,11 @@ export function update(): void {
     $section.find("#calendar_time_scale_minutes").val(String(settings.time_scale_minutes));
     $section
         .find("#calendar_default_reminder_minutes")
-        .val(settings.default_reminder_minutes === null ? "" : String(settings.default_reminder_minutes));
+        .val(
+            settings.default_reminder_minutes === null
+                ? ""
+                : String(settings.default_reminder_minutes),
+        );
 }
 
 function get_change_data(element: HTMLElement): Record<string, string> {

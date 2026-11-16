@@ -67,10 +67,7 @@ function show_submenu(trigger: HTMLElement, parent: tippy.Instance, submenu: Sub
 }
 
 // Opens the submenus of a menu as their items are hovered or focused.
-export function setup_submenus(
-    parent: tippy.Instance,
-    get_submenu: (id: string) => Submenu,
-): void {
+export function setup_submenus(parent: tippy.Instance, get_submenu: (id: string) => Submenu): void {
     const $popper = $(parent.popper);
     $popper.on("mouseenter focusin", ".popover-menu-link", function (this: HTMLElement) {
         if ($(this).closest(".calendar-submenu").length > 0) {
@@ -231,17 +228,16 @@ export function register_filter_menu(on_change: () => void): void {
                     const id = this.dataset["filterOption"]!;
                     const $new = $menu.find(`.calendar-filter-option[data-filter-option="${id}"]`);
                     $(this).attr("aria-checked", $new.attr("aria-checked")!);
-                    $(this).find(".calendar-menu-checkbox").replaceWith($new.find(".calendar-menu-checkbox"));
+                    $(this)
+                        .find(".calendar-menu-checkbox")
+                        .replaceWith($new.find(".calendar-menu-checkbox"));
                 });
             };
             setup_submenus(instance, (id) => get_filter_submenu(id, update));
             $popper.on("click", ".calendar-filter-option", function (this: HTMLElement, e) {
                 e.preventDefault();
                 const option = get_filter_option(this.dataset["filterOption"]!);
-                calendar_filter.set_hidden(
-                    option.keys,
-                    get_checked_state(option.keys) === "true",
-                );
+                calendar_filter.set_hidden(option.keys, get_checked_state(option.keys) === "true");
                 update();
                 current_submenu?.setContent(
                     ui_util.parse_html(

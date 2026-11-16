@@ -252,7 +252,6 @@ check_send_stream_message(othello, get_client("test"), chat.name, "", "@**Desdem
     );
     await shot(page, "recent-dark");
 
-
     // With the keyboard, the closed compose box replies to the chat.
     await page.click("#recent_view_search");
     await page.keyboard.type("design review");

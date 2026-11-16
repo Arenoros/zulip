@@ -174,8 +174,7 @@ export function get_occurrence(
     original_start: number | null,
 ): CalendarOccurrence | undefined {
     return occurrences.find(
-        (occurrence) =>
-            occurrence.id === event_id && occurrence.original_start === original_start,
+        (occurrence) => occurrence.id === event_id && occurrence.original_start === original_start,
     );
 }
 
@@ -409,9 +408,9 @@ function render_events(): void {
         );
         has_all_day_events ||= layout.all_day_lane_count > 0;
     }
-    $grid.find(".calendar-all-day-events").html(
-        render_calendar_all_day_events({events: all_day_events}),
-    );
+    $grid
+        .find(".calendar-all-day-events")
+        .html(render_calendar_all_day_events({events: all_day_events}));
     const load_state = get_load_state();
     $grid.toggleClass("has-all-day-events", has_all_day_events);
     // Events that come into view, from the keyboard for instance, are

@@ -97,12 +97,14 @@ async function visual_test(page: Page): Promise<void> {
     await clip(page, "#id_realm_default_avatar_source", "settings-options");
     const options = await page.evaluate(() =>
         [
-            ...document.querySelectorAll<HTMLInputElement>(
-                "#id_realm_default_avatar_source input",
-            ),
+            ...document.querySelectorAll<HTMLInputElement>("#id_realm_default_avatar_source input"),
         ].map((input) => input.value),
     );
-    check("settings offer three default pictures", options.join(",") === "J,I,G", options.join(","));
+    check(
+        "settings offer three default pictures",
+        options.join(",") === "J,I,G",
+        options.join(","),
+    );
 
     await page.click("#id_realm_default_avatar_source input[value='I']");
     await page.evaluate(() => {

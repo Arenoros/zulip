@@ -118,8 +118,9 @@ async function open_week(page: Page, hash: string): Promise<void> {
 }
 
 async function shown_titles(page: Page): Promise<string[]> {
-    return await page.$$eval(".calendar-grid .calendar-day-column .calendar-event-title", (titles) =>
-        titles.map((title) => title.textContent.trim()).toSorted(),
+    return await page.$$eval(
+        ".calendar-grid .calendar-day-column .calendar-event-title",
+        (titles) => titles.map((title) => title.textContent.trim()).toSorted(),
     );
 }
 
@@ -147,7 +148,10 @@ async function click_option(page: Page, selector: string, label: string): Promis
             const options = [...document.querySelectorAll<HTMLElement>(selector)];
             options
                 .find((option) =>
-                    option.querySelector(".popover-menu-label")!.textContent.trim().startsWith(label),
+                    option
+                        .querySelector(".popover-menu-label")!
+                        .textContent.trim()
+                        .startsWith(label),
                 )!
                 .click();
         },
@@ -173,7 +177,11 @@ async function calendar_menus_test(page: Page): Promise<void> {
     const week_hash = `#calendar/workweek/${seeded.monday}`;
     await open_week(page, week_hash);
     const all_titles = await shown_titles(page);
-    check("every event shows without a filter", all_titles.length === 8, JSON.stringify(all_titles));
+    check(
+        "every event shows without a filter",
+        all_titles.length === 8,
+        JSON.stringify(all_titles),
+    );
 
     // The view menu.
     await open_menu(page, ".calendar-view-menu-trigger", "#calendar-view-menu");
@@ -229,23 +237,29 @@ async function calendar_menus_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-grid.side-by-side");
     await open_menu(page, ".calendar-view-menu-trigger", "#calendar-view-menu");
     await page.click(".calendar-side-by-side-option");
-    await page.waitForFunction(() => document.querySelector(".calendar-grid.side-by-side") === null);
+    await page.waitForFunction(
+        () => document.querySelector(".calendar-grid.side-by-side") === null,
+    );
     check(
         "turning side by side off hides the colleagues, who stay checked",
-        await page.$eval(".calendar-colleague input", (input) => (input as HTMLInputElement).checked),
+        await page.$eval(
+            ".calendar-colleague input",
+            (input) => (input as HTMLInputElement).checked,
+        ),
     );
     await open_menu(page, ".calendar-view-menu-trigger", "#calendar-view-menu");
     await page.click(".calendar-side-by-side-option");
     await page.waitForSelector(".calendar-grid.side-by-side");
     check("turning it on shows them again", true);
     await page.click(".calendar-colleague input");
-    await page.waitForFunction(() => document.querySelector(".calendar-grid.side-by-side") === null);
+    await page.waitForFunction(
+        () => document.querySelector(".calendar-grid.side-by-side") === null,
+    );
 
     // The filter.
     await open_menu(page, ".calendar-filter-menu-trigger", "#calendar-filter-menu");
-    const filter_labels = await page.$$eval(
-        "#calendar-filter-menu .popover-menu-label",
-        (items) => items.map((item) => item.textContent.trim()),
+    const filter_labels = await page.$$eval("#calendar-filter-menu .popover-menu-label", (items) =>
+        items.map((item) => item.textContent.trim()),
     );
     check(
         "the filter menu leaves out channel meetings",
@@ -270,7 +284,11 @@ async function calendar_menus_test(page: Page): Promise<void> {
         (await checked_state(page, "meetings")) === "mixed" &&
             (await checked_state(page, "personal")) === "false",
     );
-    await open_submenu(page, '.calendar-filter-option[data-filter-option="categories"]', "categories");
+    await open_submenu(
+        page,
+        '.calendar-filter-option[data-filter-option="categories"]',
+        "categories",
+    );
     await click_option(page, ".calendar-submenu-option", "Red category");
     await open_submenu(page, '.calendar-filter-option[data-filter-option="show_as"]', "show_as");
     await click_option(page, ".calendar-submenu-option", "Tentative");
@@ -310,7 +328,9 @@ async function calendar_menus_test(page: Page): Promise<void> {
 
     await open_menu(page, ".calendar-filter-menu-trigger", "#calendar-filter-menu");
     await page.click(".calendar-filter-reset");
-    await page.waitForFunction(() => document.querySelector(".calendar-filter-button.active") === null);
+    await page.waitForFunction(
+        () => document.querySelector(".calendar-filter-button.active") === null,
+    );
     check(
         "resetting the filter shows every event",
         (await shown_titles(page)).length === all_titles.length &&

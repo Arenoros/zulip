@@ -152,9 +152,7 @@ async function click_calendar_link(page: Page, containing: string): Promise<void
 }
 
 async function calendar_notifications_test(page: Page): Promise<void> {
-    const {standup_id, bot_id} = JSON.parse(
-        run_python(seed_script).split("SEEDED ")[1]!,
-    ) as Seeded;
+    const {standup_id, bot_id} = JSON.parse(run_python(seed_script).split("SEEDED ")[1]!) as Seeded;
     await common.log_in(page);
     await page.setViewport({width: 1440, height: 900});
     await request(page, "PATCH", "/json/realm", "video_chat_provider=10");
@@ -220,8 +218,10 @@ async function calendar_notifications_test(page: Page): Promise<void> {
     await page.waitForSelector(".calendar-form .calendar-responses:not(.hide)", {visible: true});
     check(
         "the organizer's link opens the meeting with the responses",
-        (await page.$eval(".calendar-form-title", (element) => (element as HTMLInputElement).value)) ===
-            "Planning",
+        (await page.$eval(
+            ".calendar-form-title",
+            (element) => (element as HTMLInputElement).value,
+        )) === "Planning",
     );
 
     // A closed reminder stays closed.

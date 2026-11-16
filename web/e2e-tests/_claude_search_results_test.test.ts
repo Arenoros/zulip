@@ -132,8 +132,10 @@ async function search_results(page: Page): Promise<Results> {
                 label: link.textContent.trim(),
                 href: link.getAttribute("href") ?? "",
                 message_id:
-                    link.closest(".recipient_row")?.querySelector(".message_row")?.getAttribute("data-message-id") ??
-                    "",
+                    link
+                        .closest(".recipient_row")
+                        ?.querySelector(".message_row")
+                        ?.getAttribute("data-message-id") ?? "",
             })),
             notices: [
                 ".search-end-of-results-notice",
@@ -150,15 +152,18 @@ async function selected_after_click(
 ): Promise<{hash: string; selected: string | undefined}> {
     await page.evaluate((index: number) => {
         document
-            .querySelectorAll<HTMLAnchorElement>(".focused-message-list .conversation-fragment-open")
+            .querySelectorAll<HTMLAnchorElement>(
+                ".focused-message-list .conversation-fragment-open",
+            )
             [index]!.click();
     }, index);
     await new Promise((resolve) => setTimeout(resolve, 2500));
     return await page.evaluate(() => ({
         hash: window.location.hash,
         selected:
-            document.querySelector(".focused-message-list .selected_message")?.getAttribute("data-message-id") ??
-            undefined,
+            document
+                .querySelector(".focused-message-list .selected_message")
+                ?.getAttribute("data-message-id") ?? undefined,
     }));
 }
 
@@ -174,8 +179,12 @@ async function highlight_colors(page: Page): Promise<{text: string[]; topic: str
                 ? []
                 : [getComputedStyle(element).backgroundColor, getComputedStyle(element).color];
         return {
-            text: style(document.querySelector(".focused-message-list .message_content .highlight")),
-            topic: style(document.querySelector(".focused-message-list .message_header .highlight")),
+            text: style(
+                document.querySelector(".focused-message-list .message_content .highlight"),
+            ),
+            topic: style(
+                document.querySelector(".focused-message-list .message_header .highlight"),
+            ),
         };
     });
 }
@@ -210,9 +219,11 @@ async function search_results_test(page: Page): Promise<void> {
         client_gravatar: "true",
         apply_markdown: "true",
     }).toString();
-    const all_messages = ((await api(page, "GET", `/json/messages?${query}`)) as {
-        messages: RawMessage[];
-    }).messages;
+    const all_messages = (
+        (await api(page, "GET", `/json/messages?${query}`)) as {
+            messages: RawMessage[];
+        }
+    ).messages;
     const sent = all_messages.filter((message) =>
         [channel_id, direct_id, group_id].includes(message.id),
     );

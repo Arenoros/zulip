@@ -125,15 +125,15 @@ function test(label, f) {
             banners,
             "append",
             (banner) => {
-            banner_count += 1;
-            const $banner = $.create(`call-banner-${banner_count}`);
-            $banner.banner = banner;
-            $banner.$label = $.create(`call-banner-label-${banner_count}`);
-            $banner.$buttons = $.create(`call-banner-buttons-${banner_count}`);
-            $banner.set_find_results(".banner-label", $banner.$label);
-            $banner.set_find_results(".banner-action-buttons", $banner.$buttons);
-            $last_banner = $banner;
-            return $banner;
+                banner_count += 1;
+                const $banner = $.create(`call-banner-${banner_count}`);
+                $banner.banner = banner;
+                $banner.$label = $.create(`call-banner-label-${banner_count}`);
+                $banner.$buttons = $.create(`call-banner-buttons-${banner_count}`);
+                $banner.set_find_results(".banner-label", $banner.$label);
+                $banner.set_find_results(".banner-action-buttons", $banner.$buttons);
+                $last_banner = $banner;
+                return $banner;
             },
             {unused: false},
         );
@@ -213,7 +213,10 @@ test("start call with only bots", ({disallow}) => {
     // Bots don't answer calls, so no one is rung.
     disallow(banners, "append");
     posts[0].success({message_id: 42, result: "success", msg: ""});
-    assert.equal(new_call_windows[0].url, "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&dm=1,4");
+    assert.equal(
+        new_call_windows[0].url,
+        "http://zulip.zulipdev.com/calls/livekit/join?call_id=123&dm=1,4",
+    );
 });
 
 test("start call in the desktop app", ({override}) => {
@@ -413,4 +416,3 @@ test("incoming call stops ringing", () => {
     call_ringing.dispatch({op: "missed_seen", message_ids: [53, 54]});
     assert.equal(livekit_missed_calls.get_unseen_count(), 0);
 });
-

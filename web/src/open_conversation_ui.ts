@@ -43,9 +43,8 @@ export function initialize(): void {
         const {url} = get_topic(this);
         void (async () => {
             await clipboard_handler.copy_link_to_clipboard(url);
-            const tippy_instance: tippy.Instance | undefined = (
-                this as tippy.ReferenceElement
-            )._tippy;
+            const tippy_instance: tippy.Instance | undefined = (this as tippy.ReferenceElement)
+                ._tippy;
             if (tippy_instance) {
                 tippy_instance.setContent($t_html({defaultMessage: "Copied!"}));
                 tippy_instance.show();

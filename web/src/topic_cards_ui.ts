@@ -73,10 +73,7 @@ function reply_in_topic(elem: HTMLElement): void {
     });
 }
 
-function on_click_or_enter(
-    selector: string,
-    handler: (elem: HTMLElement) => void,
-): void {
+function on_click_or_enter(selector: string, handler: (elem: HTMLElement) => void): void {
     $("#message_feed_container").on("click", selector, function (this: HTMLElement, e) {
         e.preventDefault();
         e.stopPropagation();

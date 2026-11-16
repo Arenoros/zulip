@@ -222,8 +222,7 @@ async function calendar_card_test(page: Page): Promise<void> {
     await page.waitForSelector('.calendar-card-respond[data-response="tentative"].selected');
     await close_card(page);
     await page.waitForFunction(
-        (selector) =>
-            document.querySelector(selector)?.classList.contains("tentative") === true,
+        (selector) => document.querySelector(selector)?.classList.contains("tentative") === true,
         {polling: 100},
         event_selector("Review", add_days(monday, 2)),
     );

@@ -154,8 +154,9 @@ async function visual_test(page: Page): Promise<void> {
     );
     check(
         "nothing to save before a change",
-        await page.$eval("#edit_channel_folder .dialog_submit_button", (e) =>
-            (e as HTMLButtonElement).disabled,
+        await page.$eval(
+            "#edit_channel_folder .dialog_submit_button",
+            (e) => (e as HTMLButtonElement).disabled,
         ),
     );
 
@@ -168,8 +169,7 @@ async function visual_test(page: Page): Promise<void> {
     );
     await page.waitForFunction(
         () =>
-            document.querySelectorAll("#id_channel_folder_can_administer_group .pill").length ===
-            2,
+            document.querySelectorAll("#id_channel_folder_can_administer_group .pill").length === 2,
     );
     await common.screenshot(page, "cf-07-administrator-added");
     await page.click("#edit_channel_folder .dialog_submit_button");
@@ -240,7 +240,9 @@ async function visual_test(page: Page): Promise<void> {
     // The settings of the channel the member administers offer the
     // folders they can move it to.
     const sketches_id = await common.get_stream_id(page, "Design/sketches");
-    await page.goto(`http://zulip.zulipdev.com:9981/#channels/${sketches_id}/Design.2Fsketches/general`);
+    await page.goto(
+        `http://zulip.zulipdev.com:9981/#channels/${sketches_id}/Design.2Fsketches/general`,
+    );
     await page.waitForSelector("#folder_id_widget", {visible: true});
     await page.click("#folder_id_widget");
     await page.waitForSelector(".folder_id-dropdown-list-container .list-item", {visible: true});

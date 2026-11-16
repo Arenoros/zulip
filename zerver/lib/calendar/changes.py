@@ -103,7 +103,9 @@ def check_show_as(show_as: int) -> None:
 
 
 def check_attendees(
-    organizer: UserProfile, required_attendees: list[UserProfile], optional_attendees: list[UserProfile]
+    organizer: UserProfile,
+    required_attendees: list[UserProfile],
+    optional_attendees: list[UserProfile],
 ) -> dict[int, bool]:
     """Returns whether each attendee other than the organizer is
     required, by user ID."""
@@ -632,7 +634,9 @@ def add_calendar_attendees(
         raise JsonableError(_("This event was cancelled"))
 
     required_attendees, optional_attendees = (users, []) if is_required else ([], users)
-    is_required_by_user_id = check_attendees(event.organizer, required_attendees, optional_attendees)
+    is_required_by_user_id = check_attendees(
+        event.organizer, required_attendees, optional_attendees
+    )
     existing_user_ids = set(
         CalendarAttendee.objects.filter(event=event).values_list("user_id", flat=True)
     )

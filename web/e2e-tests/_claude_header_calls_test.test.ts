@@ -134,7 +134,9 @@ async function call_button_facts(page: Page): Promise<CallButtonFacts> {
     return await page.evaluate(() => {
         const header = document.querySelector("#message_view_header")!;
         const title = header.querySelector(".message-header-navbar-title")!;
-        const buttons = [...header.querySelectorAll(".message-view-header-call-buttons .icon-button")];
+        const buttons = [
+            ...header.querySelectorAll(".message-view-header-call-buttons .icon-button"),
+        ];
         const header_rect = header.getBoundingClientRect();
         return {
             labels: buttons.map((button) => button.getAttribute("aria-label") ?? ""),
@@ -144,9 +146,8 @@ async function call_button_facts(page: Page): Promise<CallButtonFacts> {
                 return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
             }),
             title_right: title.getBoundingClientRect().right,
-            search_left: document
-                .querySelector("#searchbox .search_icon")!
-                .getBoundingClientRect().left,
+            search_left: document.querySelector("#searchbox .search_icon")!.getBoundingClientRect()
+                .left,
             title_truncated: title.scrollWidth > title.clientWidth,
         };
     });
@@ -240,7 +241,9 @@ async function header_calls_test(page: Page): Promise<void> {
     check(
         "the video call button opens a call with the conversation",
         video_url.includes("/calls/livekit/join?call_id=") &&
-            video_url.includes(`&dm=${[seeded.othello, seeded.desdemona].sort((a, b) => a - b).join(",")}`) &&
+            video_url.includes(
+                `&dm=${[seeded.othello, seeded.desdemona].sort((a, b) => a - b).join(",")}`,
+            ) &&
             !video_url.includes("voice_only"),
         video_url,
     );
@@ -251,7 +254,11 @@ async function header_calls_test(page: Page): Promise<void> {
         "#popup_banners_wrapper .outgoing-call-banner .banner-label",
         (label) => label.textContent?.trim(),
     );
-    check("the call rings the other person", calling === "Calling Othello, the Moor of Venice…", calling);
+    check(
+        "the call rings the other person",
+        calling === "Calling Othello, the Moor of Venice…",
+        calling,
+    );
     await page.click("#popup_banners_wrapper .outgoing-call-cancel");
     await page.waitForFunction(
         () => document.querySelector("#popup_banners_wrapper .outgoing-call-banner") === null,
@@ -271,7 +278,11 @@ async function header_calls_test(page: Page): Promise<void> {
         page,
         "#message_view_header .message-view-header-voice-call",
     );
-    check("the voice call button opens a voice call", voice_url.endsWith("&voice_only=true"), voice_url);
+    check(
+        "the voice call button opens a voice call",
+        voice_url.endsWith("&voice_only=true"),
+        voice_url,
+    );
     await page.waitForSelector("#popup_banners_wrapper .outgoing-call-banner", {visible: true});
     await new Promise((resolve) => setTimeout(resolve, 500));
     await page.click("#popup_banners_wrapper .outgoing-call-cancel");
@@ -345,9 +356,14 @@ async function header_calls_test(page: Page): Promise<void> {
     await page.click("#searchbox .search_icon");
     await page.waitForSelector("#searchbox-input-container .input", {visible: true});
     await page.keyboard.type("hello");
-    run_python(python_prelude + String.raw`do_deactivate_user(user("othello@zulip.com"), acting_user=None)`);
+    run_python(
+        python_prelude +
+            String.raw`do_deactivate_user(user("othello@zulip.com"), acting_user=None)`,
+    );
     await page.waitForFunction(
-        () => document.querySelector("#message_view_header .message-view-header-call-buttons") === null,
+        () =>
+            document.querySelector("#message_view_header .message-view-header-call-buttons") ===
+            null,
         {polling: 100},
     );
     const search_text = await page.$eval("#searchbox-input-container .input", (input) =>
@@ -369,7 +385,9 @@ async function header_calls_test(page: Page): Promise<void> {
     check("Hamlet has call buttons before the provider changes", await has_call_buttons(page));
     await patch(page, "/json/realm", "video_chat_provider=1");
     await page.waitForFunction(
-        () => document.querySelector("#message_view_header .message-view-header-call-buttons") === null,
+        () =>
+            document.querySelector("#message_view_header .message-view-header-call-buttons") ===
+            null,
         {polling: 100},
     );
     check("another call provider hides the buttons without a reload", true);

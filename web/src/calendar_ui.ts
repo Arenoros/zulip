@@ -141,8 +141,7 @@ function get_colleague_list_context(): Record<string, unknown> {
         colleagues: colleagues.map((colleague, index) => ({
             ...colleague,
             is_hidden_in_list:
-                !is_colleague_list_expanded &&
-                index >= calendar_colleagues.COLLAPSED_LIST_LENGTH,
+                !is_colleague_list_expanded && index >= calendar_colleagues.COLLAPSED_LIST_LENGTH,
         })),
         has_more: colleagues.length > calendar_colleagues.COLLAPSED_LIST_LENGTH,
         is_expanded: is_colleague_list_expanded,
@@ -200,10 +199,7 @@ function update_toolbar(location: CalendarLocation): void {
     $("#calendar-view .calendar-range-label").text(get_range_label(location, "long"));
     $("#calendar-view .calendar-short-range-label").text(get_range_label(location, "short"));
     const view_label = is_side_by_side()
-        ? $t(
-              {defaultMessage: "{view} · side by side"},
-              {view: get_view_label(location.view)},
-          )
+        ? $t({defaultMessage: "{view} · side by side"}, {view: get_view_label(location.view)})
         : get_view_label(location.view);
     $("#calendar-view .calendar-view-label").text(view_label);
     $("#calendar-view .calendar-view-button").attr({
@@ -369,7 +365,9 @@ export function hide(): void {
     if (!calendar_util.is_visible()) {
         return;
     }
-    popover_menus.hide_current_popover_if_visible(popover_menus.popover_instances.calendar_view_menu);
+    popover_menus.hide_current_popover_if_visible(
+        popover_menus.popover_instances.calendar_view_menu,
+    );
     popover_menus.hide_current_popover_if_visible(
         popover_menus.popover_instances.calendar_date_picker,
     );
@@ -480,9 +478,7 @@ function register_view_menu_popover(): void {
                         Number(value),
                         report_error($t({defaultMessage: "Failed to save the time scale"})),
                     );
-                    $popper
-                        .find(".calendar-menu-value")
-                        .text(get_time_scale_label(Number(value)));
+                    $popper.find(".calendar-menu-value").text(get_time_scale_label(Number(value)));
                 },
             }));
         },
@@ -496,9 +492,7 @@ function register_view_menu_popover(): void {
 
 function render_date_picker(instance: tippy.Instance, month: Date): void {
     instance.setContent(
-        ui_util.parse_html(
-            render_calendar_date_picker_popover(get_mini_month_context(month)),
-        ),
+        ui_util.parse_html(render_calendar_date_picker_popover(get_mini_month_context(month))),
     );
 }
 
@@ -574,10 +568,14 @@ export function initialize({
         left_panel_month = addMonths(left_panel_month!, 1);
         render_left_panel_mini_month();
     });
-    $view.on("click", ".calendar-left-panel .calendar-mini-month-day", function (this: HTMLElement) {
-        const date = calendar_util.parse_date(this.dataset["date"]!)!;
-        go_to_date(date);
-    });
+    $view.on(
+        "click",
+        ".calendar-left-panel .calendar-mini-month-day",
+        function (this: HTMLElement) {
+            const date = calendar_util.parse_date(this.dataset["date"]!)!;
+            go_to_date(date);
+        },
+    );
 
     register_view_menu_popover();
     register_date_picker_popover();
@@ -673,4 +671,3 @@ export function initialize({
         },
     });
 }
-

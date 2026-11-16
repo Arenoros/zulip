@@ -223,7 +223,11 @@ async function calendar_call_test(page: Page): Promise<void> {
         urls.length === 1 && first.url === urls[0] && first.url.includes(`channel_id=${chat_id}`),
         `${first.url} ${JSON.stringify(urls)}`,
     );
-    check("the call's window is named after the meeting", first.title === "Design review | Zulip", first.title);
+    check(
+        "the call's window is named after the meeting",
+        first.title === "Design review | Zulip",
+        first.title,
+    );
 
     // Joining again, without video, joins the same call.
     await page.click(".calendar-card .calendar-join-options-button");
@@ -295,15 +299,21 @@ async function calendar_call_test(page: Page): Promise<void> {
     await page.waitForSelector("#calendar-meet-now-modal", {visible: true});
     check(
         "meet now is titled by default",
-        (await page.$eval("#calendar-meet-now-title", (element) => (element as HTMLInputElement).value)) ===
-            "Meet now",
+        (await page.$eval(
+            "#calendar-meet-now-title",
+            (element) => (element as HTMLInputElement).value,
+        )) === "Meet now",
     );
     await page.type("#calendar-meet-now-modal .calendar-meet-now-attendees .input", "Othello");
     await page.waitForSelector(".typeahead .active", {visible: true});
     await page.keyboard.press("Enter");
     await page.waitForSelector("#calendar-meet-now-modal .pill", {visible: true});
     await shot(page, "meet-now-dark");
-    const meet_now = await join_call(browser, page, "#calendar-meet-now-modal .dialog_submit_button");
+    const meet_now = await join_call(
+        browser,
+        page,
+        "#calendar-meet-now-modal .dialog_submit_button",
+    );
     const meet_now_event = JSON.parse(
         run_python(
             python_prelude +

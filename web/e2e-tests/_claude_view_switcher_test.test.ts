@@ -68,7 +68,8 @@ async function switcher(page: Page): Promise<Switcher | undefined> {
                         (name) => name !== "zulip-icon",
                     ) ?? "",
             ),
-            title: document.querySelector("#message_view_header .message-header-navbar-title") !==
+            title:
+                document.querySelector("#message_view_header .message-header-navbar-title") !==
                 null,
             hash: window.location.hash,
         };
@@ -145,7 +146,11 @@ async function view_switcher_test(page: Page): Promise<void> {
             JSON.stringify(home?.active) === JSON.stringify(["Combined feed"]) &&
             JSON.stringify(home?.current) === JSON.stringify(["Combined feed"]) &&
             JSON.stringify(home?.icons) ===
-                JSON.stringify(["zulip-icon-all-messages", "zulip-icon-at-sign", "zulip-icon-star"]) &&
+                JSON.stringify([
+                    "zulip-icon-all-messages",
+                    "zulip-icon-at-sign",
+                    "zulip-icon-star",
+                ]) &&
             home?.title === false,
         JSON.stringify(home),
     );
@@ -266,7 +271,9 @@ async function view_switcher_test(page: Page): Promise<void> {
     await page.reload();
     await open(page, "#feed");
     const colors = await page.evaluate(() => {
-        const active = document.querySelector("#message_view_header .view-switcher-segment.active")!;
+        const active = document.querySelector(
+            "#message_view_header .view-switcher-segment.active",
+        )!;
         const other = document.querySelector(
             "#message_view_header .view-switcher-segment:not(.active)",
         )!;

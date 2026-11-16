@@ -9,12 +9,7 @@ function check(name: string, ok: boolean, detail = ""): void {
     console.log(line);
 }
 
-async function api_request(
-    page: Page,
-    method: string,
-    url: string,
-    body: string,
-): Promise<void> {
+async function api_request(page: Page, method: string, url: string, body: string): Promise<void> {
     await page.evaluate(
         async (method, url, body) => {
             const csrf_token =
@@ -287,7 +282,10 @@ async function visual_test(page: Page): Promise<void> {
         metrics.header.x === metrics.row.x && metrics.header.w === metrics.row.w,
     );
     check("long section name is cut off inside the header", metrics.long_name_overflows);
-    check("long section name stays inside the header", metrics.long_name_right <= metrics.header_right);
+    check(
+        "long section name stays inside the header",
+        metrics.long_name_right <= metrics.header_right,
+    );
 
     // Hover a conversation in a section and open its menu.
     const row_selector = `#direct-messages-list .dm-list-item[data-user-ids-string="${cordelia}"]`;
@@ -303,9 +301,7 @@ async function visual_test(page: Page): Promise<void> {
     await page.click('.dm-popover-move-to-section[data-section-name="Notes"]');
     await page.waitForFunction(
         (cordelia) => {
-            const headers = [
-                ...document.querySelectorAll("#direct-messages-list .dm-list > li"),
-            ];
+            const headers = [...document.querySelectorAll("#direct-messages-list .dm-list > li")];
             const notes = headers.findIndex(
                 (li) => li.getAttribute("data-section-name") === "Notes",
             );
@@ -517,8 +513,7 @@ async function visual_test(page: Page): Promise<void> {
         );
     }
     await page.waitForFunction(
-        (count) =>
-            document.querySelectorAll("#direct-messages-list .dm-list-item").length >= count,
+        (count) => document.querySelectorAll("#direct-messages-list .dm-list-item").length >= count,
         {},
         user_ids.length - 1,
     );

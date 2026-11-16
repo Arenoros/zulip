@@ -525,7 +525,9 @@
             background-color: transparent;
 
             &:hover:enabled {
-                background-color: var(--color-livekit-call-button-background-hover);
+                background-color: var(
+                    --color-livekit-call-button-background-hover
+                );
             }
         }
     }

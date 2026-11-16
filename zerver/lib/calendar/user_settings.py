@@ -126,7 +126,12 @@ def update_calendar_user_settings(
         user_settings.work_day_start_minutes = work_day_start_minutes
     if work_day_end_minutes is not None:
         user_settings.work_day_end_minutes = work_day_end_minutes
-    if not 0 <= user_settings.work_day_start_minutes < user_settings.work_day_end_minutes <= MINUTES_PER_DAY:
+    if (
+        not 0
+        <= user_settings.work_day_start_minutes
+        < user_settings.work_day_end_minutes
+        <= MINUTES_PER_DAY
+    ):
         raise JsonableError(_("Invalid work hours"))
     if not isinstance(default_reminder_minutes, Unset):
         if default_reminder_minutes is not None and default_reminder_minutes < 0:

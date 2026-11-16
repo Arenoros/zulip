@@ -135,7 +135,9 @@ async function add_colleague(page: Page, name: string): Promise<void> {
         name,
     );
     await page.evaluate((name) => {
-        const items = [...document.querySelectorAll<HTMLElement>(".dropdown-list-item-common-styles")];
+        const items = [
+            ...document.querySelectorAll<HTMLElement>(".dropdown-list-item-common-styles"),
+        ];
         items.find((item) => item.textContent.trim() === name)!.click();
     }, name);
     await page.waitForFunction(
@@ -169,15 +171,15 @@ async function calendar_names(page: Page): Promise<string[]> {
 async function busy_blocks(page: Page): Promise<string[]> {
     return await page.$$eval(".calendar-grid .calendar-event.free-busy", (blocks) =>
         blocks.map(
-                (block) =>
-                    `${block.querySelector(".calendar-event-title")!.textContent.trim()}|${[
-                        ...block.classList,
-                    ]
-                        .filter((name) =>
-                            ["busy", "tentative", "free", "away", "elsewhere"].includes(name),
-                        )
-                        .join(",")}`,
-            ),
+            (block) =>
+                `${block.querySelector(".calendar-event-title")!.textContent.trim()}|${[
+                    ...block.classList,
+                ]
+                    .filter((name) =>
+                        ["busy", "tentative", "free", "away", "elsewhere"].includes(name),
+                    )
+                    .join(",")}`,
+        ),
     );
 }
 
@@ -242,8 +244,7 @@ async function calendar_colleagues_test(page: Page): Promise<void> {
         const column = document.querySelector(".calendar-day-column")!.getBoundingClientRect();
         return {
             scrolls: container.scrollWidth > container.clientWidth,
-            hours_in_place:
-                Math.abs(hours.left - container.getBoundingClientRect().left) < 1,
+            hours_in_place: Math.abs(hours.left - container.getBoundingClientRect().left) < 1,
             column_width: column.width,
         };
     });
@@ -376,8 +377,9 @@ async function calendar_colleagues_test(page: Page): Promise<void> {
     await wait_for_week(page);
     await page.waitForSelector(".calendar-show-all-button");
     const visible_rows = async (): Promise<number> =>
-        await page.$$eval(".calendar-colleague", (rows) =>
-            rows.filter((row) => row.checkVisibility()).length,
+        await page.$$eval(
+            ".calendar-colleague",
+            (rows) => rows.filter((row) => row.checkVisibility()).length,
         );
     const before = await visible_rows();
     await page.click(".calendar-show-all-button");
@@ -386,8 +388,9 @@ async function calendar_colleagues_test(page: Page): Promise<void> {
         "Show all shows the rest of a long list",
         before === 5 &&
             after === 6 &&
-            (await page.$eval(".calendar-show-all-button", (button) => button.textContent.trim())) ===
-                "Show less",
+            (await page.$eval(".calendar-show-all-button", (button) =>
+                button.textContent.trim(),
+            )) === "Show less",
         `${before} ${after}`,
     );
     await shot(page, "dark-long-list");

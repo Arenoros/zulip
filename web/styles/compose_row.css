@@ -128,7 +128,9 @@
         }
 
         &:hover {
-            background-color: var(--color-background-compose-field-button-hover);
+            background-color: var(
+                --color-background-compose-field-button-hover
+            );
             color: var(--color-compose-field-button-hover);
         }
 
@@ -267,14 +269,14 @@
             /* In the row below the message, or in the menu of its
                "+" button. */
             .compose_control_button_container:has(
-                    .compose_upload_file,
-                    .emoji_map,
-                    .time_pick,
-                    .compose-gif-icon,
-                    .saved_snippets_widget,
-                    .add-poll,
-                    .add-todo-list
-                ) {
+                .compose_upload_file,
+                .emoji_map,
+                .time_pick,
+                .compose-gif-icon,
+                .saved_snippets_widget,
+                .add-poll,
+                .add-todo-list
+            ) {
                 display: none;
             }
 

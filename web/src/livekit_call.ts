@@ -229,7 +229,10 @@ async function note_active_device(kind: MediaDeviceKind): Promise<void> {
     switch (kind) {
         case "audioinput":
             show_notice(
-                $t({defaultMessage: "Your microphone changed to {device}."}, {device: current.label}),
+                $t(
+                    {defaultMessage: "Your microphone changed to {device}."},
+                    {device: current.label},
+                ),
             );
             break;
         case "audiooutput":
@@ -245,7 +248,11 @@ async function note_active_device(kind: MediaDeviceKind): Promise<void> {
     }
 }
 
-async function choose_device(kind: MediaDeviceKind, device_id: string, label: string): Promise<void> {
+async function choose_device(
+    kind: MediaDeviceKind,
+    device_id: string,
+    label: string,
+): Promise<void> {
     chosen_devices.set(kind, device_id);
     try {
         // Not exact, so that LiveKit can fall back to another device
@@ -267,7 +274,10 @@ function close_device_menu(device_menu: DeviceMenu, return_focus = false): void 
     }
 }
 
-async function render_device_group(device_menu: DeviceMenu, kind: MediaDeviceKind): Promise<HTMLElement> {
+async function render_device_group(
+    device_menu: DeviceMenu,
+    kind: MediaDeviceKind,
+): Promise<HTMLElement> {
     const devices = await Room.getLocalDevices(kind, false);
     const group = document.createElement("div");
     group.setAttribute("role", "group");
@@ -319,7 +329,9 @@ async function open_device_menu(device_menu: DeviceMenu): Promise<void> {
 
 function get_display_name(participant: Participant): string {
     const name = participant.name ?? participant.identity;
-    return participant === room.localParticipant ? $t({defaultMessage: "{name} (you)"}, {name}) : name;
+    return participant === room.localParticipant
+        ? $t({defaultMessage: "{name} (you)"}, {name})
+        : name;
 }
 
 function format_duration(total_seconds: number): string {
@@ -736,7 +748,10 @@ function render_screen_share(
     const screen_share_element = document.createElement("div");
     screen_share_element.classList.add("livekit-call-screen-share");
     screen_share_element.append(media_element);
-    if (remote_control_enabled && livekit_remote_control.is_controllable_screen_share(publication)) {
+    if (
+        remote_control_enabled &&
+        livekit_remote_control.is_controllable_screen_share(publication)
+    ) {
         const controls_element = document.createElement("div");
         controls_element.classList.add("livekit-call-screen-share-controls");
         const label_element = document.createElement("span");

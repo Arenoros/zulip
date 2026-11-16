@@ -46,7 +46,9 @@ async function livekit_setting_test(page: Page): Promise<void> {
     await page.screenshot({path: "var/puppeteer/livekit-setting-page.png"});
 
     await page.click("#id_realm_enable_livekit_remote_control + .rendered-checkbox");
-    await page.waitForSelector('#org-compose-settings .save-button[data-status="unsaved"]', {visible: true});
+    await page.waitForSelector('#org-compose-settings .save-button[data-status="unsaved"]', {
+        visible: true,
+    });
     await page.click("#org-compose-settings .save-button");
     await page.waitForFunction(
         () =>

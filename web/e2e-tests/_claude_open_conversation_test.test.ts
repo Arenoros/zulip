@@ -91,8 +91,8 @@ async function set_setting(page: Page, body: string): Promise<void> {
     await page.waitForSelector('input[name="csrfmiddlewaretoken"]');
     const status = await page.evaluate(async (body) => {
         const csrf_token =
-            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')
-                ?.value ?? "";
+            document.querySelector<HTMLInputElement>('input[name="csrfmiddlewaretoken"]')?.value ??
+            "";
         const response = await fetch("/json/settings", {
             method: "PATCH",
             headers: {
@@ -113,11 +113,10 @@ function row(id: number): string {
 }
 
 async function replies_label(page: Page): Promise<string | undefined> {
-    return await page.evaluate(
-        () =>
-            document
-                .querySelector(".focused-message-list .open-conversation-replies-label")
-                ?.textContent.trim(),
+    return await page.evaluate(() =>
+        document
+            .querySelector(".focused-message-list .open-conversation-replies-label")
+            ?.textContent.trim(),
     );
 }
 
@@ -367,8 +366,9 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
             document.querySelector(
                 "#message_view_header .open-conversation-header-topic .topic-card-resolved-label",
             ) !== null &&
-            document.querySelector("#message_view_header .open-conversation-resolve .zulip-icon-check-x") !==
-                null,
+            document.querySelector(
+                "#message_view_header .open-conversation-resolve .zulip-icon-check-x",
+            ) !== null,
     );
     const resolved_title = await page.$eval(
         "#message_view_header .open-conversation-header-topic .message-header-navbar-title",
@@ -419,7 +419,9 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
         `${base_url}#narrow/channel/${stream_id}-offsite/topic/history/near/${history.at(-1)}`,
     );
     await page.waitForSelector(row(history.at(-1)!), {visible: true});
-    const card_before_scrolling = await page.$(".focused-message-list .open-conversation-first-message");
+    const card_before_scrolling = await page.$(
+        ".focused-message-list .open-conversation-first-message",
+    );
     // Scrolling up moves the selection to the top, which loads the
     // older messages.
     await page.mouse.move(640, 500);
@@ -494,9 +496,9 @@ internal_send_stream_message(iago, stream, "venue", "I booked the bus too.")
             font: getComputedStyle(document.documentElement).getPropertyValue(
                 "--base-font-size-px",
             ),
-            overflowing: [...document.querySelectorAll(".focused-message-list .message_row")].filter(
-                (row) => row.getBoundingClientRect().right > list.right + 1,
-            ).length,
+            overflowing: [
+                ...document.querySelectorAll(".focused-message-list .message_row"),
+            ].filter((row) => row.getBoundingClientRect().right > list.right + 1).length,
         };
     }, venue[0]!);
     check(

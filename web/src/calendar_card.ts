@@ -94,7 +94,9 @@ function render_card(): void {
     if (instance === null || card_occurrence === undefined) {
         return;
     }
-    instance.setContent(ui_util.parse_html(render_calendar_card_popover(get_card_context(card_occurrence))));
+    instance.setContent(
+        ui_util.parse_html(render_calendar_card_popover(get_card_context(card_occurrence))),
+    );
 }
 
 function show_error(xhr: JQuery.jqXHR): void {
@@ -131,19 +133,26 @@ function show_choices(
         appendTo: instance.popper,
         content: ui_util.parse_html(render_calendar_card_choices_popover({choices})),
     });
-    $(choices_instance.popper).on("click", ".calendar-card-choice", function (this: HTMLElement, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const choice = this.dataset["choice"]!;
-        hide_choices();
-        on_choose(choice);
-    });
+    $(choices_instance.popper).on(
+        "click",
+        ".calendar-card-choice",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const choice = this.dataset["choice"]!;
+            hide_choices();
+            on_choose(choice);
+        },
+    );
     choices_instance.show();
 }
 
 // Asks whether an action is for this occurrence or the whole series,
 // in a menu under its button.
-function choose_scope(button: HTMLElement, on_choose: (scope: calendar_actions.Scope) => void): void {
+function choose_scope(
+    button: HTMLElement,
+    on_choose: (scope: calendar_actions.Scope) => void,
+): void {
     assert(card_occurrence !== undefined);
     if (card_occurrence.original_start === null) {
         on_choose("series");
@@ -207,7 +216,10 @@ function show_more_menu(button: HTMLElement): void {
         {value: "follow", label: $t({defaultMessage: "Follow meeting"})},
         ...(is_recurring
             ? [
-                  {value: "delete-occurrence", label: $t({defaultMessage: "Delete this occurrence"})},
+                  {
+                      value: "delete-occurrence",
+                      label: $t({defaultMessage: "Delete this occurrence"}),
+                  },
                   {value: "delete-series", label: $t({defaultMessage: "Delete the whole series"})},
               ]
             : [{value: "delete-series", label: $t({defaultMessage: "Delete from my calendar"})}]),
@@ -248,104 +260,115 @@ function open(element: HTMLElement): void {
     popover_menus.toggle_popover_menu(
         element,
         {
-        theme: "popover-menu",
-        placement: "right-start",
-        // An answer draws the grid again, which replaces the event's
-        // element; the card stays next to the new one.
-        getReferenceClientRect: () =>
-            (find_event_element(occurrence) ?? element).getBoundingClientRect(),
-        popperOptions: {
-            modifiers: [
-                {name: "flip", options: {fallbackPlacements: ["left-start", "bottom", "top"]}},
-            ],
-        },
-        onShow(instance) {
-            popover_menus.popover_instances.calendar_card = instance;
-            instance.setContent(
-                ui_util.parse_html(render_calendar_card_popover(get_card_context(occurrence))),
-            );
-            popover_menus.on_show_prep(instance);
-        },
-        onMount(instance) {
-            const $popper = $(instance.popper);
-            $popper.on("change", ".calendar-card-notify-checkbox", function (this: HTMLElement) {
-                $popper
-                    .find(".calendar-card-message")
-                    .prop("disabled", !$(this).prop("checked"));
-            });
-            $popper.on("click", ".calendar-card-respond", function (this: HTMLElement) {
-                const response = this.dataset["response"]!;
-                if (response === "tentative") {
-                    respond(response, "series");
-                } else {
-                    choose_scope(this, (scope) => {
-                        respond(response, scope);
-                    });
-                }
-            });
-            $popper.on("click", ".calendar-card-edit", function (this: HTMLElement) {
-                choose_scope(this, (scope) => {
-                    assert(card_occurrence !== undefined);
-                    const edited = card_occurrence;
-                    hide();
-                    calendar_form.open_edit(edited, scope === "occurrence");
-                });
-            });
-            $popper.on("click", ".calendar-card-expand", function (this: HTMLElement) {
-                assert(card_occurrence !== undefined);
-                const expanded = card_occurrence;
-                if (expanded.organizer_id === current_user.user_id) {
-                    // The organizer changes the meeting, next to its
-                    // attendees' responses.
-                    choose_scope(this, (scope) => {
-                        hide();
-                        calendar_form.open_edit(
-                            expanded,
-                            scope === "occurrence",
-                            !calendar_actions.is_personal(expanded),
-                        );
-                    });
-                    return;
-                }
-                hide();
-                calendar_meeting.open(expanded);
-            });
-            $popper.on("click", ".calendar-join-button", () => {
-                assert(card_occurrence !== undefined);
-                calendar_call.join(card_occurrence.id, false, $popper.find(".calendar-card-error"));
-            });
-            $popper.on("click", ".calendar-join-options-button", function (this: HTMLElement) {
-                show_choices(
-                    this,
-                    "bottom-start",
-                    [{value: "voice_only", label: $t({defaultMessage: "Join without video"})}],
-                    () => {
-                        assert(card_occurrence !== undefined);
-                        calendar_call.join(
-                            card_occurrence.id,
-                            true,
-                            $popper.find(".calendar-card-error"),
-                        );
+            theme: "popover-menu",
+            placement: "right-start",
+            // An answer draws the grid again, which replaces the event's
+            // element; the card stays next to the new one.
+            getReferenceClientRect: () =>
+                (find_event_element(occurrence) ?? element).getBoundingClientRect(),
+            popperOptions: {
+                modifiers: [
+                    {name: "flip", options: {fallbackPlacements: ["left-start", "bottom", "top"]}},
+                ],
+            },
+            onShow(instance) {
+                popover_menus.popover_instances.calendar_card = instance;
+                instance.setContent(
+                    ui_util.parse_html(render_calendar_card_popover(get_card_context(occurrence))),
+                );
+                popover_menus.on_show_prep(instance);
+            },
+            onMount(instance) {
+                const $popper = $(instance.popper);
+                $popper.on(
+                    "change",
+                    ".calendar-card-notify-checkbox",
+                    function (this: HTMLElement) {
+                        $popper
+                            .find(".calendar-card-message")
+                            .prop("disabled", !$(this).prop("checked"));
                     },
                 );
-            });
-            $popper.on("click", ".calendar-card-chat", () => {
-                assert(card_occurrence !== undefined);
-                calendar_meeting_chat.open(card_occurrence.id, $popper.find(".calendar-card-error"));
-            });
-            $popper.on("click", ".calendar-card-cancel", function (this: HTMLElement) {
-                choose_scope(this, confirm_remove);
-            });
-            $popper.on("click", ".calendar-card-more", function (this: HTMLElement) {
-                show_more_menu(this);
-            });
-        },
-        onHidden(instance) {
-            hide_choices();
-            instance.destroy();
-            popover_menus.popover_instances.calendar_card = null;
-            card_occurrence = undefined;
-        },
+                $popper.on("click", ".calendar-card-respond", function (this: HTMLElement) {
+                    const response = this.dataset["response"]!;
+                    if (response === "tentative") {
+                        respond(response, "series");
+                    } else {
+                        choose_scope(this, (scope) => {
+                            respond(response, scope);
+                        });
+                    }
+                });
+                $popper.on("click", ".calendar-card-edit", function (this: HTMLElement) {
+                    choose_scope(this, (scope) => {
+                        assert(card_occurrence !== undefined);
+                        const edited = card_occurrence;
+                        hide();
+                        calendar_form.open_edit(edited, scope === "occurrence");
+                    });
+                });
+                $popper.on("click", ".calendar-card-expand", function (this: HTMLElement) {
+                    assert(card_occurrence !== undefined);
+                    const expanded = card_occurrence;
+                    if (expanded.organizer_id === current_user.user_id) {
+                        // The organizer changes the meeting, next to its
+                        // attendees' responses.
+                        choose_scope(this, (scope) => {
+                            hide();
+                            calendar_form.open_edit(
+                                expanded,
+                                scope === "occurrence",
+                                !calendar_actions.is_personal(expanded),
+                            );
+                        });
+                        return;
+                    }
+                    hide();
+                    calendar_meeting.open(expanded);
+                });
+                $popper.on("click", ".calendar-join-button", () => {
+                    assert(card_occurrence !== undefined);
+                    calendar_call.join(
+                        card_occurrence.id,
+                        false,
+                        $popper.find(".calendar-card-error"),
+                    );
+                });
+                $popper.on("click", ".calendar-join-options-button", function (this: HTMLElement) {
+                    show_choices(
+                        this,
+                        "bottom-start",
+                        [{value: "voice_only", label: $t({defaultMessage: "Join without video"})}],
+                        () => {
+                            assert(card_occurrence !== undefined);
+                            calendar_call.join(
+                                card_occurrence.id,
+                                true,
+                                $popper.find(".calendar-card-error"),
+                            );
+                        },
+                    );
+                });
+                $popper.on("click", ".calendar-card-chat", () => {
+                    assert(card_occurrence !== undefined);
+                    calendar_meeting_chat.open(
+                        card_occurrence.id,
+                        $popper.find(".calendar-card-error"),
+                    );
+                });
+                $popper.on("click", ".calendar-card-cancel", function (this: HTMLElement) {
+                    choose_scope(this, confirm_remove);
+                });
+                $popper.on("click", ".calendar-card-more", function (this: HTMLElement) {
+                    show_more_menu(this);
+                });
+            },
+            onHidden(instance) {
+                hide_choices();
+                instance.destroy();
+                popover_menus.popover_instances.calendar_card = null;
+                card_occurrence = undefined;
+            },
         },
         {
             // A card opened from the keyboard returns there, to the
@@ -356,9 +379,13 @@ function open(element: HTMLElement): void {
 }
 
 export function initialize(): void {
-    $("#calendar-view").on("click", ".calendar-event[data-event-id]", function (this: HTMLElement, e) {
-        e.preventDefault();
-        e.stopPropagation();
-        open(this);
-    });
+    $("#calendar-view").on(
+        "click",
+        ".calendar-event[data-event-id]",
+        function (this: HTMLElement, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            open(this);
+        },
+    );
 }

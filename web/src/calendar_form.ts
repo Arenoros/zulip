@@ -272,9 +272,9 @@ function read_fields(): void {
     }
     state.description =
         $form.find<HTMLTextAreaElement>(".calendar-form-description-input").val() ?? "";
-    state.has_zulip_call = $form.find<HTMLInputElement>(".calendar-form-call-checkbox").prop(
-        "checked",
-    ) as boolean;
+    state.has_zulip_call = $form
+        .find<HTMLInputElement>(".calendar-form-call-checkbox")
+        .prop("checked") as boolean;
     state.required_attendee_ids = get_attendee_ids(required_pills);
     state.optional_attendee_ids = get_attendee_ids(optional_pills);
 }
@@ -367,7 +367,10 @@ function update_time_fields(): void {
     $form.find(".calendar-form-timezone-name").text(form.time_zone);
     $form
         .find(".calendar-form-timezone")
-        .attr("aria-label", $t({defaultMessage: "Time zone: {time_zone}"}, {time_zone: form.time_zone}));
+        .attr(
+            "aria-label",
+            $t({defaultMessage: "Time zone: {time_zone}"}, {time_zone: form.time_zone}),
+        );
     update_recurrence_fields();
     update_suggestions();
     render_day();
@@ -609,13 +612,19 @@ function update_menu_buttons(): void {
     $show_as.find(".calendar-form-menu-label").text(status.label);
     $show_as
         .find(".calendar-form-show-as-swatch")
-        .attr("class", `calendar-event free-busy calendar-legend-swatch calendar-form-show-as-swatch ${status.class_name}`);
+        .attr(
+            "class",
+            `calendar-event free-busy calendar-legend-swatch calendar-form-show-as-swatch ${status.class_name}`,
+        );
     $show_as.attr("aria-label", $t({defaultMessage: "Show as: {status}"}, {status: status.label}));
     $form
         .find('.calendar-form-menu-button[data-menu="reminder"]')
         .attr(
             "aria-label",
-            $t({defaultMessage: "Reminder: {reminder}"}, {reminder: get_reminder_label(state.reminder_minutes)}),
+            $t(
+                {defaultMessage: "Reminder: {reminder}"},
+                {reminder: get_reminder_label(state.reminder_minutes)},
+            ),
         );
     const category = CATEGORIES.find(([name]) => name === state!.category);
     $form
@@ -633,7 +642,10 @@ function update_menu_buttons(): void {
         .find('.calendar-form-menu-button[data-menu="visibility"]')
         .attr(
             "aria-label",
-            $t({defaultMessage: "Visibility: {visibility}"}, {visibility: get_visibility_label(state.is_private)}),
+            $t(
+                {defaultMessage: "Visibility: {visibility}"},
+                {visibility: get_visibility_label(state.is_private)},
+            ),
         )
         .toggleClass("selected", state.is_private);
 }
@@ -656,9 +668,7 @@ function render_day(): void {
             })),
             is_all_day: form.is_all_day,
             top: percent(form.start_minute),
-            height: percent(
-                Math.min(form.duration_minutes, MINUTES_PER_DAY - form.start_minute),
-            ),
+            height: percent(Math.min(form.duration_minutes, MINUTES_PER_DAY - form.start_minute)),
             time_label: `${format_minutes(form.start_minute)} – ${format_minutes(form.start_minute + form.duration_minutes)}`,
         }),
     );
@@ -727,7 +737,9 @@ function start_drag(e: JQuery.TriggeredEvent, is_resize: boolean): void {
     assert(state !== undefined);
     const form = state;
     const pointer = e.originalEvent as PointerEvent;
-    const block = (e.currentTarget as HTMLElement).closest<HTMLElement>(".calendar-form-day-block")!;
+    const block = (e.currentTarget as HTMLElement).closest<HTMLElement>(
+        ".calendar-form-day-block",
+    )!;
     const column = block.closest<HTMLElement>(".calendar-form-day-column")!;
     const start_y = pointer.clientY;
     const start_minute = form.start_minute;
@@ -739,10 +751,7 @@ function start_drag(e: JQuery.TriggeredEvent, is_resize: boolean): void {
             DRAG_STEP_MINUTES,
         );
         if (is_resize) {
-            form.duration_minutes = Math.max(
-                start_duration + delta,
-                DRAG_STEP_MINUTES,
-            );
+            form.duration_minutes = Math.max(start_duration + delta, DRAG_STEP_MINUTES);
         } else {
             form.start_minute = Math.min(
                 Math.max(start_minute + delta, 0),
@@ -820,11 +829,15 @@ export function show_choice_menu(
             popover_menus.on_show_prep(instance);
         },
         onMount(instance) {
-            $(instance.popper).on("click", ".calendar-submenu-option", function (this: HTMLElement, e) {
-                e.preventDefault();
-                on_choose(this.dataset["value"]!);
-                popover_menus.hide_current_popover_if_visible(instance);
-            });
+            $(instance.popper).on(
+                "click",
+                ".calendar-submenu-option",
+                function (this: HTMLElement, e) {
+                    e.preventDefault();
+                    on_choose(this.dataset["value"]!);
+                    popover_menus.hide_current_popover_if_visible(instance);
+                },
+            );
         },
         onHidden(instance) {
             instance.destroy();
@@ -1145,7 +1158,8 @@ function get_changed_data(form: FormState): Record<string, string> {
 }
 
 function save_personal_settings(event_id: number, form: FormState, on_done: () => void): void {
-    const initial = initial_state === undefined ? undefined : (JSON.parse(initial_state) as FormState);
+    const initial =
+        initial_state === undefined ? undefined : (JSON.parse(initial_state) as FormState);
     const data: Record<string, string> = {};
     if (initial?.reminder_minutes !== form.reminder_minutes) {
         data["reminder_minutes"] = JSON.stringify(form.reminder_minutes);
@@ -1162,7 +1176,9 @@ function save_personal_settings(event_id: number, form: FormState, on_done: () =
         data,
         success: on_done,
         error(xhr) {
-            show_error(channel.xhr_error_message($t({defaultMessage: "Failed to save the event"}), xhr));
+            show_error(
+                channel.xhr_error_message($t({defaultMessage: "Failed to save the event"}), xhr),
+            );
             is_saving = false;
         },
     });
@@ -1210,7 +1226,9 @@ function send(): void {
     const on_error = (xhr: JQuery.jqXHR): void => {
         is_saving = false;
         $("#calendar-view .calendar-form-save").prop("disabled", false);
-        show_error(channel.xhr_error_message($t({defaultMessage: "Failed to save the event"}), xhr));
+        show_error(
+            channel.xhr_error_message($t({defaultMessage: "Failed to save the event"}), xhr),
+        );
     };
     const on_saved = (): void => {
         is_saving = false;
@@ -1330,9 +1348,7 @@ export function remove_room(room_id: number): void {
 
 export function remove_attendee(user_id: number): void {
     for (const pills of [required_pills, optional_pills]) {
-        const pill = pills?.getPillByPredicate(
-            (item) => item.user_id === user_id,
-        );
+        const pill = pills?.getPillByPredicate((item) => item.user_id === user_id);
         if (pills !== undefined && pill !== undefined) {
             pills.removePill(util.the(pill.$element), "close");
         }
@@ -1356,7 +1372,11 @@ export function cancel(): void {
     });
 }
 
-function create_pills(selector: string, user_ids: number[], is_disabled: boolean): InputPillContainer<UserPill> {
+function create_pills(
+    selector: string,
+    user_ids: number[],
+    is_disabled: boolean,
+): InputPillContainer<UserPill> {
     const $container = $(`#calendar-view ${selector}`);
     const pills = user_pill.create_pills($container, {exclude_inaccessible_users: true});
     for (const user_id of user_ids) {
@@ -1431,8 +1451,7 @@ function render_form(): void {
     $("#calendar-view .calendar-form-container").html(
         render_calendar_form({
             is_editing: form_editing !== undefined,
-            has_responses:
-                form_editing !== undefined && has_responses(form_editing.occurrence),
+            has_responses: form_editing !== undefined && has_responses(form_editing.occurrence),
             is_occurrence,
             title: form.title,
             location: form.location,

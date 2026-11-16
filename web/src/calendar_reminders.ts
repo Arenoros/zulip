@@ -71,8 +71,7 @@ function get_label(occurrence: CalendarOccurrence, now: number): string {
     if (minutes < 60) {
         return $t(
             {
-                defaultMessage:
-                    "{title} starts in {N, plural, one {# minute} other {# minutes}}.",
+                defaultMessage: "{title} starts in {N, plural, one {# minute} other {# minutes}}.",
             },
             {title: occurrence.title, N: minutes},
         );

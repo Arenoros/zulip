@@ -88,10 +88,7 @@ run_test("get_first_date", () => {
     const weekly = {frequency: "WEEKLY", interval: 1, weekdays: ["MO", "WE"], until: undefined};
     assert.equal(calendar_recurrence.get_first_date(weekly, DATE), "2026-11-16");
     assert.equal(calendar_recurrence.get_first_date(weekly, "2026-11-11"), "2026-11-11");
-    assert.equal(
-        calendar_recurrence.get_first_date({...weekly, weekdays: []}, DATE),
-        DATE,
-    );
+    assert.equal(calendar_recurrence.get_first_date({...weekly, weekdays: []}, DATE), DATE);
     assert.equal(calendar_recurrence.get_first_date({...weekly, frequency: "DAILY"}, DATE), DATE);
 });
 
@@ -110,12 +107,10 @@ run_test("get_occurrence_dates", () => {
         "2026-11-21",
     ]);
     // A weekly series starts on its first weekday.
-    assert.deepEqual(dates({frequency: "WEEKLY", interval: 2, weekdays: ["MO", "TH"]}, "2026-11-13"), [
-        "2026-11-16",
-        "2026-11-19",
-        "2026-11-30",
-        "2026-12-03",
-    ]);
+    assert.deepEqual(
+        dates({frequency: "WEEKLY", interval: 2, weekdays: ["MO", "TH"]}, "2026-11-13"),
+        ["2026-11-16", "2026-11-19", "2026-11-30", "2026-12-03"],
+    );
     assert.deepEqual(dates({frequency: "WEEKLY"}, DATE, 2), ["2026-11-12", "2026-11-19"]);
     // Months without the 31st are skipped.
     assert.deepEqual(dates({frequency: "MONTHLY"}, "2027-01-31", 3, 366), [

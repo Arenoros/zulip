@@ -201,11 +201,7 @@ async function search_filters_test(page: Page): Promise<void> {
 
     // The counts as the server gives them.
     await open(page, `#narrow/search/${keyword}`);
-    const all = await wait_for_labels(page, [
-        "All|0",
-        "Direct and group messages|0",
-        "Channels|0",
-    ]);
+    const all = await wait_for_labels(page, ["All|0", "Direct and group messages|0", "Channels|0"]);
     check(
         "a keyword search has the three filters with the server's counts, All active",
         JSON.stringify(all?.labels) ===
@@ -253,7 +249,10 @@ async function search_filters_test(page: Page): Promise<void> {
             height: nav.height,
             // 44px at 16px/1em.
             expected_height:
-                2.75 * Number.parseFloat(getComputedStyle(document.querySelector(".search-filters")!).fontSize),
+                2.75 *
+                Number.parseFloat(
+                    getComputedStyle(document.querySelector(".search-filters")!).fontSize,
+                ),
             gutter_sticks_at: Number.parseFloat(getComputedStyle(gutter).top),
         };
     });
@@ -329,11 +328,7 @@ async function search_filters_test(page: Page): Promise<void> {
     const no_results = ".empty_feed_notice";
     const without: [string, string, string][] = [
         ["a search in a channel", `#narrow/channel/Verona/search/${keyword}`, no_results],
-        [
-            "a search in a topic",
-            `#narrow/channel/Verona/topic/test/search/${keyword}`,
-            no_results,
-        ],
+        ["a search in a topic", `#narrow/channel/Verona/topic/test/search/${keyword}`, no_results],
         ["the combined feed", "#feed", rows],
         ["a channel", "#narrow/channel/Verona", rows],
         ["direct messages", "#narrow/is/dm", no_results],
@@ -421,7 +416,11 @@ async function search_filters_test(page: Page): Promise<void> {
     );
     await shot(page, "ru");
     await page.setViewport({width: 480, height: 900});
-    await check_narrow_window(page, "in Russian", ["Все|1000+", "Личные и группы|1000+", "Каналы|1000+"]);
+    await check_narrow_window(page, "in Russian", [
+        "Все|1000+",
+        "Личные и группы|1000+",
+        "Каналы|1000+",
+    ]);
     await shot(page, "ru-480");
     await api(page, "PATCH", "/json/settings", "default_language=en");
     await page.reload();
