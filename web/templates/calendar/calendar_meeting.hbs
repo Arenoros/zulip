@@ -1,5 +1,6 @@
 <div class="calendar-meeting" role="region" aria-label="{{title}}">
     <div class="calendar-form-card calendar-form-toolbar calendar-meeting-toolbar">
+        {{#if is_invited}}
         {{#unless is_cancelled}}
             {{#each responses}}
                 <button type="button" class="calendar-toolbar-button calendar-meeting-respond {{#if is_selected}}selected{{/if}}" data-response="{{response}}" aria-pressed="{{#if is_selected}}true{{else}}false{{/if}}" {{#if ../has_scope_choice}}aria-haspopup="true"{{/if}}>
@@ -17,6 +18,7 @@
                 {{#if has_scope_choice}}<i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>{{/if}}
             </button>
         </span>
+        {{/if}}
         {{#if can_forward}}
             <button type="button" class="calendar-toolbar-button calendar-meeting-forward-button tippy-zulip-delayed-tooltip" data-tippy-content="{{t 'Forward' }}" aria-label="{{t 'Forward' }}" aria-expanded="false">
                 <i class="zulip-icon zulip-icon-forward-message" aria-hidden="true"></i>
@@ -27,6 +29,7 @@
                 <i class="zulip-icon zulip-icon-copy" aria-hidden="true"></i>
             </button>
         </span>
+        {{#if is_invited}}
         <span class="calendar-toolbar-separator" aria-hidden="true"></span>
         <button type="button" class="calendar-toolbar-button calendar-meeting-menu-button" data-menu="show_as" aria-haspopup="true" aria-label="{{show_as_aria_label}}">
             <span class="calendar-event free-busy calendar-legend-swatch {{show_as_class}}" aria-hidden="true"></span>
@@ -42,14 +45,17 @@
             <i class="zulip-icon zulip-icon-flag" aria-hidden="true"></i>
             <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
         </button>
+        {{/if}}
         <span class="calendar-toolbar-spacer"></span>
         {{#if can_join_call}}
             {{> calendar_join_button button_class="calendar-toolbar-button"}}
         {{/if}}
-        <button type="button" class="calendar-toolbar-button calendar-meeting-chat">
-            <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
-            {{t "Discussion" }}
-        </button>
+        {{#if can_discuss}}
+            <button type="button" class="calendar-toolbar-button calendar-meeting-chat">
+                <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
+                {{t "Discussion" }}
+            </button>
+        {{/if}}
         <button type="button" class="calendar-toolbar-button calendar-meeting-close">
             <i class="zulip-icon zulip-icon-close" aria-hidden="true"></i>
             {{t "Close" }}
@@ -117,6 +123,14 @@
                         <i class="zulip-icon zulip-icon-globe calendar-form-row-icon" aria-hidden="true"></i>
                         <div class="calendar-form-field">
                             <span class="calendar-meeting-location">{{location}}</span>
+                        </div>
+                    </div>
+                {{/if}}
+                {{#if channel_label}}
+                    <div class="calendar-form-row">
+                        <i class="zulip-icon zulip-icon-hashtag calendar-form-row-icon" aria-hidden="true"></i>
+                        <div class="calendar-form-field">
+                            <span class="calendar-meeting-channel">{{channel_label}}</span>
                         </div>
                     </div>
                 {{/if}}

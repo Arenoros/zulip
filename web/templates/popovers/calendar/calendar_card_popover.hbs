@@ -8,17 +8,17 @@
             <i class="zulip-icon zulip-icon-maximize-diagonal" aria-hidden="true"></i>
         </button>
     </div>
-    {{#if (or can_join_call (not is_personal))}}
+    {{#if (or can_join_call can_discuss)}}
         <div class="calendar-card-join">
             {{#if can_join_call}}
                 {{> ../../calendar/calendar_join_button button_class="calendar-card-button"}}
             {{/if}}
-            {{#unless is_personal}}
+            {{#if can_discuss}}
                 <button type="button" class="calendar-card-button calendar-card-chat">
                     <i class="zulip-icon zulip-icon-message-square" aria-hidden="true"></i>
                     {{t "Discussion" }}
                 </button>
-            {{/unless}}
+            {{/if}}
         </div>
     {{/if}}
     <div class="calendar-card-section">
@@ -36,6 +36,12 @@
             <div class="calendar-card-row">
                 <i class="zulip-icon zulip-icon-globe calendar-card-row-icon" aria-hidden="true"></i>
                 <span class="calendar-card-location">{{location}}</span>
+            </div>
+        {{/if}}
+        {{#if channel_label}}
+            <div class="calendar-card-row">
+                <i class="zulip-icon zulip-icon-hashtag calendar-card-row-icon" aria-hidden="true"></i>
+                <span class="calendar-card-channel">{{channel_label}}</span>
             </div>
         {{/if}}
     </div>
@@ -63,6 +69,7 @@
         </div>
     {{/if}}
     <div class="calendar-card-error alert-error" role="alert"></div>
+    {{#if is_invited}}
     <div class="calendar-card-actions">
         {{#if is_invitee}}
             <button type="button" class="calendar-card-button calendar-card-respond {{#if (eq response "accepted")}}selected{{/if}}" data-response="accepted" {{#if is_recurring}}aria-haspopup="true"{{/if}} aria-pressed="{{#if (eq response "accepted")}}true{{else}}false{{/if}}">
@@ -95,4 +102,5 @@
             </button>
         {{/if}}
     </div>
+    {{/if}}
 </div>

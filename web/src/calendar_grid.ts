@@ -88,6 +88,9 @@ export const occurrence_schema = z.object({
     has_zulip_call: z.boolean(),
     meet_code: z.string(),
     chat_id: z.nullable(z.number()),
+    channel_id: z.nullable(z.number()),
+    topic: z.string(),
+    is_invited: z.boolean(),
     date_created: z.number(),
     attendees: z.array(
         z.object({

@@ -2,7 +2,7 @@
     <div class="calendar-form-card calendar-form-toolbar">
         <button type="button" class="calendar-toolbar-button calendar-form-event-button selected" aria-pressed="true">
             <i class="zulip-icon zulip-icon-calendar" aria-hidden="true"></i>
-            {{t "Event" }}
+            {{#if is_channel_meeting}}{{t "Meeting in a channel" }}{{else}}{{t "Event" }}{{/if}}
         </button>
         <button type="button" class="calendar-toolbar-button calendar-form-series-button" aria-pressed="false" {{#if is_occurrence}}disabled{{/if}}>
             <i class="zulip-icon zulip-icon-refresh-cw" aria-hidden="true"></i>
@@ -23,10 +23,12 @@
             <i class="zulip-icon zulip-icon-flag" aria-hidden="true"></i>
             <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
         </button>
-        <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="visibility" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
-            <i class="zulip-icon zulip-icon-lock" aria-hidden="true"></i>
-            <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
-        </button>
+        {{#unless is_channel_meeting}}
+            <button type="button" class="calendar-toolbar-button calendar-form-menu-button" data-menu="visibility" aria-haspopup="true" {{#if is_occurrence}}disabled{{/if}}>
+                <i class="zulip-icon zulip-icon-lock" aria-hidden="true"></i>
+                <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+            </button>
+        {{/unless}}
         <span class="calendar-toolbar-spacer"></span>
         <button type="button" class="calendar-toolbar-button calendar-form-cancel">{{t "Cancel" }}</button>
         <button type="submit" class="calendar-toolbar-button calendar-form-save">
@@ -48,6 +50,20 @@
                         <div class="calendar-form-field-error calendar-form-title-error" role="alert"></div>
                     </div>
                 </div>
+                {{#if is_channel_meeting}}
+                    <div class="calendar-form-row">
+                        <i class="zulip-icon zulip-icon-hashtag calendar-form-row-icon" aria-hidden="true"></i>
+                        <div class="calendar-form-field">
+                            <button type="button" class="calendar-toolbar-button calendar-form-channel" aria-label="{{t 'Channel' }}" {{#if is_editing}}disabled{{/if}}>
+                                <span class="dropdown_widget_value calendar-form-channel-name"></span>
+                                {{#unless is_editing}}
+                                    <i class="zulip-icon zulip-icon-chevron-down" aria-hidden="true"></i>
+                                {{/unless}}
+                            </button>
+                            <div class="calendar-form-field-error calendar-form-channel-error" role="alert"></div>
+                        </div>
+                    </div>
+                {{/if}}
                 <div class="calendar-form-row">
                     <i class="zulip-icon zulip-icon-users calendar-form-row-icon" aria-hidden="true"></i>
                     <div class="calendar-form-field calendar-form-attendees">

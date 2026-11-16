@@ -926,6 +926,8 @@ export function dispatch_normal_event(event) {
                             });
                         }
                     }
+                    // The calendar shows the meetings in the user's channels.
+                    calendar_grid.refresh();
                     break;
                 case "peer_add": {
                     const stream_ids = sub_store.validate_stream_ids(event.stream_ids);
@@ -948,6 +950,7 @@ export function dispatch_normal_event(event) {
                         const sub = sub_store.get(rec.stream_id);
                         stream_events.mark_unsubscribed(sub);
                     }
+                    calendar_grid.refresh();
                     break;
                 case "update":
                     stream_events.update_property(event.stream_id, event.property, event.value);

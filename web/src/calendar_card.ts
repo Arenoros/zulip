@@ -53,14 +53,14 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
     const title = occurrence.is_cancelled
         ? $t({defaultMessage: "Canceled: {title}"}, {title: occurrence.title})
         : occurrence.title;
+    const organizer_name = organizer?.full_name ?? $t({defaultMessage: "Unknown user"});
     let organizer_label: string;
     if (is_organizer) {
         organizer_label = $t({defaultMessage: "You are the organizer"});
+    } else if (!occurrence.is_invited) {
+        organizer_label = $t({defaultMessage: "Organized by {name}"}, {name: organizer_name});
     } else {
-        organizer_label = $t(
-            {defaultMessage: "{name} invited you"},
-            {name: organizer?.full_name ?? $t({defaultMessage: "Unknown user"})},
-        );
+        organizer_label = $t({defaultMessage: "{name} invited you"}, {name: organizer_name});
     }
     let location = calendar_rooms.get_location_label(occurrence.room_ids, occurrence.location);
     if (location === "" && occurrence.has_zulip_call) {
@@ -71,9 +71,15 @@ function get_card_context(occurrence: CalendarOccurrence): Record<string, unknow
         is_organizer_of_meeting: is_organizer && !personal,
         is_personal: personal,
         can_join_call: calendar_call.can_join(occurrence),
-        is_invitee: !is_organizer && !occurrence.is_cancelled,
+        can_discuss: !personal && calendar_meeting_chat.can_discuss(occurrence),
+        channel_label: calendar_meeting_chat.get_channel_label(occurrence),
+        is_invited: occurrence.is_invited,
+        is_invitee: !is_organizer && !occurrence.is_cancelled && occurrence.is_invited,
         can_notify_organizer:
-            !is_organizer && !occurrence.is_cancelled && occurrence.response_requested,
+            !is_organizer &&
+            !occurrence.is_cancelled &&
+            occurrence.is_invited &&
+            occurrence.response_requested,
         is_recurring: occurrence.original_start !== null,
         time_label: calendar_actions.get_time_label(occurrence),
         location,

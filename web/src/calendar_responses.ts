@@ -131,9 +131,10 @@ export function render($container: JQuery, occurrence: CalendarOccurrence): void
                 avatar_url: get_avatar_url(occurrence.organizer_id),
                 sent_label: get_sent_label(occurrence.date_created),
             },
-            own_status: is_organizer
-                ? undefined
-                : get_own_status(calendar_actions.get_response_name(occurrence.response)),
+            own_status:
+                is_organizer || !occurrence.is_invited
+                    ? undefined
+                    : get_own_status(calendar_actions.get_response_name(occurrence.response)),
             // The organizer may hide the attendees from those invited.
             is_hidden: !is_organizer && occurrence.hide_attendees,
             groups,

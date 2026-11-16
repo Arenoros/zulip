@@ -20,10 +20,12 @@ import type {StreamSubscription} from "./sub_store.ts";
 import * as subscriber_api from "./subscriber_api.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
+import * as util from "./util.ts";
 
 // The chat of a meeting is a private channel without topics, which
 // the server creates when someone first opens it and which is shown
-// among direct message conversations.
+// among direct message conversations. A meeting in a channel is
+// discussed in a topic of that channel instead.
 
 // How far ahead the header of a meeting's chat looks for its next
 // occurrence; the longest range the server allows.
@@ -44,17 +46,49 @@ type NextOccurrence = {
 const next_occurrences = new Map<number, NextOccurrence | null>();
 const fetching_chat_ids = new Set<number>();
 
-function go_to_chat(stream_id: number): void {
-    browser_history.go_to_location(hash_util.by_stream_topic_url(stream_id, ""));
+function go_to_chat(stream_id: number, topic = ""): void {
+    browser_history.go_to_location(hash_util.by_stream_topic_url(stream_id, topic));
+}
+
+// Whether the user can open where the meeting is discussed: attendees
+// who cannot access the channel of a meeting in a channel only join
+// its call.
+export function can_discuss(occurrence: {channel_id: number | null}): boolean {
+    if (occurrence.channel_id === null) {
+        return true;
+    }
+    const sub = sub_store.get(occurrence.channel_id);
+    return sub !== undefined && stream_data.has_content_access(sub);
+}
+
+// The channel and topic of a meeting in a channel, as "#channel >
+// topic", if the user can see the channel.
+export function get_channel_label(occurrence: {
+    channel_id: number | null;
+    topic: string;
+}): string | undefined {
+    const sub = occurrence.channel_id === null ? undefined : sub_store.get(occurrence.channel_id);
+    if (sub === undefined) {
+        return undefined;
+    }
+    return `#${sub.name} > ${util.get_final_topic_display_name(occurrence.topic)}`;
 }
 
 export function open(event_id: number, $error: JQuery): void {
     void channel.post({
         url: `/json/calendar/events/${event_id}/chat`,
         success(data) {
-            const {stream_id} = z.object({stream_id: z.number()}).parse(data);
-            if (stream_data.is_subscribed(stream_id)) {
-                go_to_chat(stream_id);
+            const {stream_id, topic} = z
+                .object({stream_id: z.number(), topic: z.string()})
+                .parse(data);
+            // The chat of a meeting may be new, unlike a channel the
+            // user can access.
+            const sub = sub_store.get(stream_id);
+            if (
+                stream_data.is_subscribed(stream_id) ||
+                (sub !== undefined && !sub.is_meeting_chat)
+            ) {
+                go_to_chat(stream_id, topic);
             } else {
                 pending_chat_id = stream_id;
             }

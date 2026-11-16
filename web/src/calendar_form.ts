@@ -36,6 +36,8 @@ import * as popover_menus from "./popover_menus.ts";
 import * as popovers from "./popovers.ts";
 import * as rendered_markdown from "./rendered_markdown.ts";
 import {current_user} from "./state_data.ts";
+import * as stream_data from "./stream_data.ts";
+import * as sub_store from "./sub_store.ts";
 import * as timerender from "./timerender.ts";
 import * as ui_report from "./ui_report.ts";
 import * as ui_util from "./ui_util.ts";
@@ -95,6 +97,9 @@ type FormState = {
     response_requested: boolean;
     allow_forwarding: boolean;
     hide_attendees: boolean;
+    // The channel of a meeting in a channel, which cannot change; null
+    // until one is chosen.
+    channel_id: number | null | undefined;
 };
 
 type Editing = {
@@ -1090,6 +1095,13 @@ function validate(): boolean {
         return false;
     }
     $title_error.removeClass("shown");
+    const $channel_error = $("#calendar-view .calendar-form-channel-error");
+    if (state.channel_id === null) {
+        $channel_error.text($t({defaultMessage: "Choose a channel."})).addClass("shown");
+        $("#calendar-view .calendar-form-channel").trigger("focus");
+        return false;
+    }
+    $channel_error.removeClass("shown");
     return true;
 }
 
@@ -1122,6 +1134,8 @@ function get_event_data(form: FormState): Record<string, string> {
         required_attendees: JSON.stringify(form.required_attendee_ids),
         optional_attendees: JSON.stringify(form.optional_attendee_ids),
         room_ids: JSON.stringify(form.room_ids),
+        // Since the channel cannot change, it is the same for a change.
+        ...(typeof form.channel_id === "number" && {channel_id: JSON.stringify(form.channel_id)}),
     };
 }
 
@@ -1441,6 +1455,39 @@ function set_up_timezone_widget(): void {
     }).setup();
 }
 
+function set_up_channel_widget(): void {
+    assert(state !== undefined);
+    const $name = $("#calendar-view .calendar-form-channel-name");
+    if (editing !== undefined) {
+        $name.text(
+            sub_store.get(state.channel_id ?? -1)?.name ?? $t({defaultMessage: "Unknown channel"}),
+        );
+        return;
+    }
+    new dropdown_widget.DropdownWidget({
+        widget_name: "calendar_form_channel",
+        widget_selector: "#calendar-view .calendar-form-channel",
+        get_options: () =>
+            stream_data
+                .get_options_for_dropdown_widget()
+                .filter(({stream}) => stream_data.can_post_messages_in_stream(stream)),
+        item_click_callback(event, dropdown, widget) {
+            dropdown.hide();
+            event.preventDefault();
+            event.stopPropagation();
+            assert(state !== undefined);
+            state.channel_id = Number(widget.value());
+            widget.render();
+            $("#calendar-view .calendar-form-channel-error").removeClass("shown");
+        },
+        $events_container: $("#calendar-view .calendar-form"),
+        default_id: state.channel_id ?? undefined,
+        unique_id_type: "number",
+        text_if_current_value_not_in_options: $t({defaultMessage: "Choose a channel"}),
+        search_placeholder_text: $t({defaultMessage: "Find a channel"}),
+    }).setup();
+}
+
 function render_form(): void {
     assert(state !== undefined);
     const form = state;
@@ -1452,6 +1499,7 @@ function render_form(): void {
             is_editing: form_editing !== undefined,
             has_responses: form_editing !== undefined && has_responses(form_editing.occurrence),
             is_occurrence,
+            is_channel_meeting: form.channel_id !== undefined,
             title: form.title,
             location: form.location,
             description: form.description,
@@ -1503,6 +1551,9 @@ function render_form(): void {
         is_occurrence,
     );
     set_up_timezone_widget();
+    if (form.channel_id !== undefined) {
+        set_up_channel_widget();
+    }
     if (form_editing !== undefined && has_responses(form_editing.occurrence)) {
         calendar_responses.render(
             $("#calendar-view .calendar-form .calendar-responses"),
@@ -1551,7 +1602,9 @@ function get_default_reminder(): number | null {
 }
 
 // A new event, at a time or at the next half hour of today.
-export function open_new(date: string, start_minute: number): void {
+// A new event, or with in_channel, a new meeting in a channel to
+// choose.
+export function open_new(date: string, start_minute: number, in_channel = false): void {
     is_responses_shown = false;
     open(
         {
@@ -1575,20 +1628,25 @@ export function open_new(date: string, start_minute: number): void {
             response_requested: true,
             allow_forwarding: true,
             hide_attendees: false,
+            channel_id: in_channel ? null : undefined,
         },
         undefined,
     );
 }
 
-export function open_now(): void {
+export function open_now(in_channel = false): void {
     const now = new TZDate(Date.now(), calendar_grid.get_time_zone());
     const minute = now.getHours() * 60 + now.getMinutes();
     const next = Math.ceil(minute / TIME_STEP_MINUTES) * TIME_STEP_MINUTES;
     const date = format(now, "yyyy-MM-dd");
     if (next >= MINUTES_PER_DAY) {
-        open_new(calendar_util.format_date(addDays(calendar_util.parse_date(date)!, 1)), 0);
+        open_new(
+            calendar_util.format_date(addDays(calendar_util.parse_date(date)!, 1)),
+            0,
+            in_channel,
+        );
     } else {
-        open_new(date, next);
+        open_new(date, next, in_channel);
     }
 }
 
@@ -1628,6 +1686,7 @@ function get_event_state(occurrence: CalendarOccurrence, is_occurrence: boolean)
         response_requested: occurrence.response_requested,
         allow_forwarding: occurrence.allow_forwarding,
         hide_attendees: occurrence.hide_attendees,
+        channel_id: occurrence.channel_id ?? undefined,
     };
 }
 

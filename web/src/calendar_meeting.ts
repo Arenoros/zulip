@@ -149,6 +149,9 @@ function get_context(current: Meeting): Record<string, unknown> {
             ? $t({defaultMessage: "Canceled: {title}"}, {title: occurrence.title})
             : occurrence.title,
         is_cancelled: occurrence.is_cancelled,
+        // Subscribers of the channel of a meeting see it without being
+        // invited, and only join and discuss it.
+        is_invited: occurrence.is_invited,
         has_scope_choice: is_recurring && !is_series,
         responses: [
             {response: "accepted", icon: "check", label: $t({defaultMessage: "Accept"})},
@@ -159,7 +162,8 @@ function get_context(current: Meeting): Record<string, unknown> {
                 label: $t({defaultMessage: "Follow meeting"}),
             },
         ].map((button) => ({...button, is_selected: button.response === response})),
-        can_forward: occurrence.allow_forwarding && !occurrence.is_cancelled,
+        can_forward:
+            occurrence.is_invited && occurrence.allow_forwarding && !occurrence.is_cancelled,
         show_as_label: status.label,
         show_as_class: status.class_name,
         show_as_aria_label: $t({defaultMessage: "Show as: {status}"}, {status: status.label}),
@@ -179,6 +183,8 @@ function get_context(current: Meeting): Record<string, unknown> {
         location: calendar_rooms.get_location_label(occurrence.room_ids, occurrence.location),
         has_zulip_call: occurrence.has_zulip_call,
         can_join_call: calendar_call.can_join(occurrence),
+        can_discuss: calendar_meeting_chat.can_discuss(occurrence),
+        channel_label: calendar_meeting_chat.get_channel_label(occurrence),
         meet_url: `/meet/${occurrence.meet_code}`,
         rendered_description: occurrence.rendered_description,
         call_time_label: get_call_time_label(occurrence),

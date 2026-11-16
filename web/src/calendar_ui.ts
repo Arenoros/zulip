@@ -629,18 +629,28 @@ export function initialize({
                 instance.setContent(
                     ui_util.parse_html(
                         render_calendar_card_choices_popover({
-                            choices: [{value: "event", label: $t({defaultMessage: "Event"})}],
+                            choices: [
+                                {value: "event", label: $t({defaultMessage: "Event"})},
+                                {
+                                    value: "channel_meeting",
+                                    label: $t({defaultMessage: "Meeting in a channel"}),
+                                },
+                            ],
                         }),
                     ),
                 );
                 popover_menus.on_show_prep(instance);
             },
             onMount(instance) {
-                $(instance.popper).on("click", ".calendar-card-choice", (e) => {
-                    e.preventDefault();
-                    popover_menus.hide_current_popover_if_visible(instance);
-                    calendar_form.open_now();
-                });
+                $(instance.popper).on(
+                    "click",
+                    ".calendar-card-choice",
+                    function (this: HTMLElement, e) {
+                        e.preventDefault();
+                        popover_menus.hide_current_popover_if_visible(instance);
+                        calendar_form.open_now(this.dataset["choice"] === "channel_meeting");
+                    },
+                );
             },
             onHidden(instance) {
                 instance.destroy();
