@@ -45,6 +45,7 @@
             {{#each calendars}}
                 {{#each ../days}}
                     <div class="calendar-day-column {{#if is_today}}today{{/if}} {{#if @first}}first-of-calendar{{/if}}" data-date="{{date}}" {{#if ../color}}data-css-calendar-person-color="{{../color}}"{{/if}}>
+                        <div class="calendar-day-off-hours" aria-hidden="true"></div>
                         <div class="calendar-day-events"></div>
                         {{#if is_today}}
                             <div class="calendar-now-line"></div>

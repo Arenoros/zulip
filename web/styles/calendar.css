@@ -680,6 +680,16 @@ body.calendar-view-visible {
     }
 }
 
+/* Outside of the work hours of the calendar's owner. */
+.calendar-off-hours {
+    position: absolute;
+    top: calc(var(--calendar-off-hours-top) * 1%);
+    left: 0;
+    right: 0;
+    height: calc(var(--calendar-off-hours-height) * 1%);
+    pointer-events: none;
+}
+
 .calendar-now-line {
     position: absolute;
     left: 0;
@@ -2217,6 +2227,7 @@ body.calendar-view-visible {
     );
 }
 
+.calendar-off-hours,
 .calendar-scheduler-off-hours,
 .calendar-scheduler-off-hours-swatch {
     background-color: color-mix(

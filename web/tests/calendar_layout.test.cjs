@@ -192,3 +192,37 @@ run_test("the hours stay put when daylight saving time ends", () => {
         [["meeting", 600, 660, 0, 1]],
     );
 });
+
+run_test("off hours", () => {
+    const hours = {
+        timezone: "",
+        work_days: [1, 2, 3, 4, 5],
+        work_day_start_minutes: 9 * 60,
+        work_day_end_minutes: 18 * 60,
+    };
+    // Monday, a work day, and Saturday, which is not.
+    assert.deepEqual(calendar_layout.get_off_hours("2026-11-09", MOSCOW, hours), [
+        {start_minute: 0, end_minute: 9 * 60},
+        {start_minute: 18 * 60, end_minute: 24 * 60},
+    ]);
+    assert.deepEqual(calendar_layout.get_off_hours("2026-11-14", MOSCOW, hours), [
+        {start_minute: 0, end_minute: 24 * 60},
+    ]);
+    // Work hours in Tokyo, 6 hours ahead of Moscow, from 9:00 to 18:00
+    // there, are 3:00 to 12:00 in Moscow.
+    const tokyo = {...hours, timezone: "Asia/Tokyo"};
+    assert.deepEqual(calendar_layout.get_off_hours("2026-11-09", MOSCOW, tokyo), [
+        {start_minute: 0, end_minute: 3 * 60},
+        {start_minute: 12 * 60, end_minute: 24 * 60},
+    ]);
+    // Work hours in New York, 8 hours behind Moscow, from 9:00 to 18:00
+    // there, are 17:00 to 2:00 the next day in Moscow: Friday's end is
+    // on Saturday morning in Moscow.
+    const new_york = {...hours, timezone: "America/New_York"};
+    assert.deepEqual(calendar_layout.get_off_hours("2026-11-14", MOSCOW, new_york), [
+        {start_minute: 2 * 60, end_minute: 24 * 60},
+    ]);
+    assert.deepEqual(calendar_layout.get_off_hours("2026-11-10", MOSCOW, new_york), [
+        {start_minute: 2 * 60, end_minute: 17 * 60},
+    ]);
+});

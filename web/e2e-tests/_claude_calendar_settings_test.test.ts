@@ -203,6 +203,35 @@ async function calendar_settings_test(page: Page): Promise<void> {
         page.url().includes("#calendar/week/") && (await day_columns(page)) === 7,
         page.url(),
     );
+    // The time outside of the work hours, from Monday to Sunday, in
+    // hours of the day.
+    const off_hours = await page.$$eval("#calendar-view .calendar-day-column", (columns) =>
+        columns.map((column) =>
+            [...column.querySelectorAll<HTMLElement>(".calendar-off-hours")]
+                .map((span) => {
+                    const top = Number(span.style.getPropertyValue("--calendar-off-hours-top"));
+                    const height = Number(
+                        span.style.getPropertyValue("--calendar-off-hours-height"),
+                    );
+                    return `${Math.round(top * 0.24)}-${Math.round((top + height) * 0.24)}`;
+                })
+                .join(","),
+        ),
+    );
+    check(
+        "the calendar shades the time outside of the work hours",
+        JSON.stringify(off_hours) ===
+            JSON.stringify([
+                "0-8,17-24",
+                "0-8,17-24",
+                "0-8,17-24",
+                "0-8,17-24",
+                "0-24",
+                "0-8,17-24",
+                "0-24",
+            ]),
+        JSON.stringify(off_hours),
+    );
     await page.click("#calendar-view .calendar-view-button");
     await page.waitForSelector("#calendar-view-menu", {visible: true});
     await page.click('.calendar-view-option[data-calendar-view="workweek"]');

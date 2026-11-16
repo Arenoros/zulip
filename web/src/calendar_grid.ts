@@ -8,6 +8,7 @@ import render_calendar_all_day_events from "../templates/calendar/calendar_all_d
 import render_calendar_day_events from "../templates/calendar/calendar_day_events.hbs";
 import render_calendar_grid from "../templates/calendar/calendar_grid.hbs";
 import render_calendar_grid_error from "../templates/calendar/calendar_grid_error.hbs";
+import render_calendar_off_hours from "../templates/calendar/calendar_off_hours.hbs";
 
 import * as calendar_colleagues from "./calendar_colleagues.ts";
 import type {Colleague} from "./calendar_colleagues.ts";
@@ -123,6 +124,15 @@ type FreeBusyBlock = z.infer<typeof free_busy_block_schema> & {
 
 export const free_busy_schema = z.object({
     free_busy: z.record(z.string(), z.array(free_busy_block_schema)),
+    working_hours: z.record(
+        z.string(),
+        z.object({
+            timezone: z.string(),
+            work_days: z.array(z.number()),
+            work_day_start_minutes: z.number(),
+            work_day_end_minutes: z.number(),
+        }),
+    ),
 });
 
 type LoadState = "loading" | "loaded" | "error";
@@ -145,6 +155,8 @@ let events_state: LoadState = "loading";
 // and when they are busy.
 let colleagues: Colleague[] = [];
 let free_busy = new Map<number, FreeBusyBlock[]>();
+// The work hours of the colleagues shown, by their IDs.
+let work_hours = new Map<number, calendar_layout.WorkHours>();
 let free_busy_state: LoadState = "loaded";
 // Responses to requests for a week that is no longer shown are
 // dropped.
@@ -400,6 +412,16 @@ export function apply_data_css($container: JQuery): void {
     }
 }
 
+// The work hours of each calendar shown: the user's, then those of
+// each colleague, once fetched.
+function get_calendar_work_hours(calendar_index: number): calendar_layout.WorkHours | undefined {
+    if (calendar_index === 0) {
+        return {timezone: "", ...settings};
+    }
+    const colleague = colleagues[calendar_index - 1];
+    return colleague === undefined ? undefined : work_hours.get(colleague.user_id);
+}
+
 function render_events(): void {
     const dates = get_shown_dates();
     const $grid = $("#calendar-view .calendar-grid");
@@ -413,15 +435,26 @@ function render_events(): void {
             get_time_zone(),
             settings.time_scale_minutes * MIN_EVENT_ROWS,
         );
+        const hours = get_calendar_work_hours(calendar_index);
         for (const [day_index, placements] of layout.days.entries()) {
-            $columns
-                .eq(calendar_index * dates.length + day_index)
-                .find(".calendar-day-events")
-                .html(
-                    render_calendar_day_events({
-                        events: placements.map((placement) => get_timed_item_context(placement)),
-                    }),
-                );
+            const $column = $columns.eq(calendar_index * dates.length + day_index);
+            $column.find(".calendar-day-off-hours").html(
+                hours === undefined
+                    ? ""
+                    : render_calendar_off_hours({
+                          off_hours: calendar_layout
+                              .get_off_hours(dates[day_index]!, get_time_zone(), hours)
+                              .map(({start_minute, end_minute}) => ({
+                                  top: (start_minute / MINUTES_PER_DAY) * 100,
+                                  height: ((end_minute - start_minute) / MINUTES_PER_DAY) * 100,
+                              })),
+                      }),
+            );
+            $column.find(".calendar-day-events").html(
+                render_calendar_day_events({
+                    events: placements.map((placement) => get_timed_item_context(placement)),
+                }),
+            );
         }
         all_day_events.push(
             ...layout.all_day.map((placement) =>
@@ -597,17 +630,22 @@ function fetch_free_busy(): void {
                 return;
             }
             const time_zone = get_time_zone();
+            const data = free_busy_schema.parse(raw_data);
+            work_hours = new Map(
+                Object.entries(data.working_hours).map(([user_id, hours]) => [
+                    Number(user_id),
+                    hours,
+                ]),
+            );
             free_busy = new Map(
-                Object.entries(free_busy_schema.parse(raw_data).free_busy).map(
-                    ([user_id, blocks]) => [
-                        Number(user_id),
-                        blocks.map((block) => ({
-                            ...block,
-                            is_all_day: false,
-                            timezone: time_zone,
-                        })),
-                    ],
-                ),
+                Object.entries(data.free_busy).map(([user_id, blocks]) => [
+                    Number(user_id),
+                    blocks.map((block) => ({
+                        ...block,
+                        is_all_day: false,
+                        timezone: time_zone,
+                    })),
+                ]),
             );
             free_busy_state = "loaded";
             on_loaded();

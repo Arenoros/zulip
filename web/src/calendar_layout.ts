@@ -68,6 +68,60 @@ export function is_all_day_row_event(event: LayoutEvent): boolean {
     return event.is_all_day || event.end - event.start >= SECONDS_PER_DAY;
 }
 
+export type WorkHours = {
+    // The timezone of the work hours, or "" for that of the calendar.
+    timezone: string;
+    // ISO days of the week, 1 for Monday.
+    work_days: number[];
+    work_day_start_minutes: number;
+    work_day_end_minutes: number;
+};
+
+// The parts of the day that are outside of someone's work hours, in
+// minutes after midnight by the clock of the calendar's timezone, like
+// the events of the day. Work hours in another timezone may begin on
+// the day before or after.
+export function get_off_hours(
+    date_string: string,
+    time_zone: string,
+    hours: WorkHours,
+): {start_minute: number; end_minute: number}[] {
+    const day_start = get_day_start(date_string, time_zone);
+    const day_end = get_day_start(date_string, time_zone, 1);
+    const work_time_zone = hours.timezone || time_zone;
+    const get_minute = (seconds: number): number => {
+        if (seconds <= day_start) {
+            return 0;
+        }
+        if (seconds >= day_end) {
+            return MINUTES_PER_DAY;
+        }
+        return get_minute_of_day(seconds, time_zone);
+    };
+    const off_hours = [];
+    let worked_until = 0;
+    for (const day_offset of [-1, 0, 1]) {
+        const work_day_start = get_day_start(date_string, work_time_zone, day_offset);
+        const weekday = new TZDate(work_day_start * 1000, work_time_zone).getDay() || 7;
+        if (!hours.work_days.includes(weekday)) {
+            continue;
+        }
+        const start = get_minute(work_day_start + hours.work_day_start_minutes * 60);
+        const end = get_minute(work_day_start + hours.work_day_end_minutes * 60);
+        if (start >= end) {
+            continue;
+        }
+        if (start > worked_until) {
+            off_hours.push({start_minute: worked_until, end_minute: start});
+        }
+        worked_until = Math.max(worked_until, end);
+    }
+    if (worked_until < MINUTES_PER_DAY) {
+        off_hours.push({start_minute: worked_until, end_minute: MINUTES_PER_DAY});
+    }
+    return off_hours;
+}
+
 // The dates an event in the all-day area covers, the last one
 // included.
 function get_all_day_dates(event: LayoutEvent, time_zone: string): [string, string] {
