@@ -8490,6 +8490,9 @@ paths:
                               "has_zulip_call": false,
                               "meet_code": "Xc3oQ9pL2mKd",
                               "chat_id": null,
+                              "channel_id": null,
+                              "topic": "",
+                              "is_invited": true,
                               "date_created": 1763190000,
                               "attendees":
                                 [
@@ -8644,6 +8647,18 @@ paths:
                   items:
                     type: integer
                   example: [3]
+                channel_id:
+                  description: |
+                    The ID of a channel to schedule the meeting in, which the
+                    current user must be able to post in. The meeting is
+                    discussed in a topic of the channel named after it, or in
+                    the general chat of a channel without topics, and
+                    Notification Bot announces it, its moves and its
+                    cancellation there. The channel's subscribers see the
+                    meeting without being invited to it. Such a meeting cannot
+                    be private, and its channel cannot be changed.
+                  type: integer
+                  example: 3
               required:
                 - title
                 - start
@@ -8673,6 +8688,8 @@ paths:
               optional_attendees:
                 contentType: application/json
               room_ids:
+                contentType: application/json
+              channel_id:
                 contentType: application/json
       responses:
         "200":
@@ -8758,6 +8775,9 @@ paths:
                             "has_zulip_call": false,
                             "meet_code": "Xc3oQ9pL2mKd",
                             "chat_id": null,
+                            "channel_id": null,
+                            "topic": "",
+                            "is_invited": true,
                             "date_created": 1763190000,
                             "attendees":
                               [
@@ -9085,6 +9105,10 @@ paths:
         in it. Getting the chat subscribes the current user if they left it.
         A series has one chat for all of its occurrences.
 
+        A meeting in a channel is discussed in its topic of the channel instead,
+        which those who can access the channel get, whether they are invited to
+        the meeting or subscribed to the channel.
+
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
       parameters:
         - $ref: "#/components/parameters/CalendarEventId"
@@ -9108,8 +9132,20 @@ paths:
                       stream_id:
                         type: integer
                         description: |
-                          The ID of the meeting's chat.
-                    example: {"msg": "", "result": "success", "stream_id": 15}
+                          The ID of the meeting's chat, or of the channel of
+                          a meeting in a channel.
+                      topic:
+                        type: string
+                        description: |
+                          The topic the meeting is discussed in: `""` for a
+                          meeting's chat, which has no topics.
+                    example:
+                      {
+                        "msg": "",
+                        "result": "success",
+                        "stream_id": 15,
+                        "topic": "",
+                      }
   /calendar/events/{calendar_event_id}/call:
     post:
       operationId: join-calendar-event-call
@@ -9124,6 +9160,10 @@ paths:
         The meeting's attendees can join it, and so can people removed from the
         meeting who are still in its chat. Attendees who left the chat join it
         again.
+
+        The call of a meeting in a channel takes place in its topic, and anyone
+        who can access the channel can join it. Attendees who cannot access the
+        channel can join the call once it takes place, but not start it.
 
         **Changes**: New in Zulip 13.0 (feature level ZF-7b4d09).
       parameters:
@@ -30984,6 +31024,27 @@ components:
           nullable: true
           description: |
             The ID of the channel for the chat of the event, if any.
+        channel_id:
+          type: integer
+          nullable: true
+          description: |
+            For a meeting in a channel, the ID of the channel, whose
+            subscribers see the meeting without being invited to it.
+            Such a meeting is discussed in a topic of the channel
+            rather than in a chat of its own.
+        topic:
+          type: string
+          description: |
+            For a meeting in a channel, the topic it is discussed in, or
+            `""`. The topic keeps its name when the meeting is renamed.
+        is_invited:
+          type: boolean
+          description: |
+            Whether the current user is invited to the event. It is
+            `false` for a meeting in a channel the user is subscribed
+            to, which they see without having been invited; the
+            user's `response` is then `1` (no response) and they have
+            no reminder or category.
         date_created:
           type: integer
           description: |

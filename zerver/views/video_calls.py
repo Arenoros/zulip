@@ -53,6 +53,7 @@ from zerver.lib.cache import (
     flush_zoom_server_access_token_cache,
     zoom_server_access_token_cache_key,
 )
+from zerver.lib.calendar.calls import get_attended_channel_meeting
 from zerver.lib.display_recipient import get_display_recipient
 from zerver.lib.exceptions import ErrorCode, JsonableError, UnauthorizedError
 from zerver.lib.i18n import get_and_set_request_language, get_language_translation_data
@@ -846,6 +847,9 @@ def join_livekit_call(
     )
     call = LiveKitCall.objects.filter(room=room).select_related("message__recipient").first()
     stream = None
+    # A meeting in a channel whose call the user joins as an attendee,
+    # without access to the channel.
+    attended_meeting = None
     if dm_user_ids is not None:
         # People called to join the call can join it too.
         if user_profile.id not in dm_user_ids and (
@@ -857,7 +861,10 @@ def join_livekit_call(
         try:
             stream, _sub = access_stream_by_id(user_profile, channel_id)
         except JsonableError:
-            return render_livekit_call_access_denied(request)
+            if call is not None:
+                attended_meeting = get_attended_channel_meeting(user_profile, call)
+            if attended_meeting is None:
+                return render_livekit_call_access_denied(request)
     if call is not None and call.date_ended is not None:
         return render(
             request,
@@ -874,7 +881,10 @@ def join_livekit_call(
     call_title = _("Call")
     conversation_url = user_profile.realm.url
     call_chat = None
-    if call is not None:
+    if attended_meeting is not None:
+        # Without access to the channel, neither its name nor its chat.
+        call_title = attended_meeting.title
+    elif call is not None:
         call_chat_message = get_livekit_call_chat_message(call)
         conversation_url = get_livekit_call_conversation_url(user_profile.realm, call_chat_message)
         call_chat = get_livekit_call_conversation(call_chat_message).model_dump(exclude_unset=True)

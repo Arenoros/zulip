@@ -10,9 +10,11 @@ from django.utils.timezone import now as timezone_now
 from typing_extensions import override
 
 from zerver.actions.realm_settings import do_set_realm_property
+from zerver.actions.streams import do_change_stream_group_based_setting
 from zerver.actions.user_settings import do_change_user_setting
 from zerver.actions.video_calls import do_end_livekit_call
 from zerver.lib.calendar.changes import (
+    access_calendar_event_channel,
     add_calendar_attendees,
     cancel_calendar_event,
     create_calendar_event,
@@ -23,6 +25,7 @@ from zerver.lib.calendar.changes import (
 from zerver.lib.calendar.occurrences import (
     CalendarOccurrence,
     access_calendar_event_by_id,
+    get_calendar_event,
     get_calendar_occurrences,
     get_free_busy,
     get_unanswered_invitation_counts,
@@ -34,6 +37,7 @@ from zerver.lib.exceptions import JsonableError
 from zerver.lib.test_classes import ZulipTestCase
 from zerver.lib.test_helpers import get_subscription
 from zerver.lib.timestamp import datetime_to_global_time
+from zerver.lib.topic import messages_for_topic
 from zerver.models import (
     CalendarAttendee,
     CalendarAttendeeOccurrenceResponse,
@@ -50,6 +54,7 @@ from zerver.models import (
     UserProfile,
 )
 from zerver.models.calendar import CalendarResponse, CalendarShowAs
+from zerver.models.groups import NamedUserGroup, SystemGroups
 from zerver.models.realms import get_realm
 from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.models.users import get_system_bot
@@ -1186,6 +1191,283 @@ class MeetingCallTest(CalendarTestCase):
         )
 
 
+class ChannelMeetingTest(MeetingCallTest):
+    @override
+    def setUp(self) -> None:
+        super().setUp()
+        self.hamlet = self.example_user("hamlet")
+        self.cordelia = self.example_user("cordelia")
+        self.othello = self.example_user("othello")
+        self.iago = self.example_user("iago")
+        self.channel = self.make_stream("Design", invite_only=True)
+        for user in [self.hamlet, self.cordelia]:
+            self.subscribe(user, "Design")
+
+    def create_channel_meeting(self, **kwargs: Any) -> int:
+        return self.create_event(self.hamlet, channel=self.channel, **kwargs)
+
+    def get_topic_messages(self, topic: str) -> list[str]:
+        assert self.channel.recipient_id is not None
+        return [
+            message.content.split(" [Open in calendar](")[0]
+            for message in messages_for_topic(
+                self.channel.realm_id, self.channel.recipient_id, topic
+            ).order_by("id")
+        ]
+
+    def mention(self, user: UserProfile) -> str:
+        return f"@_**{user.full_name}|{user.id}**"
+
+    def test_create_channel_meeting(self) -> None:
+        event_id = self.create_channel_meeting(required_attendees=[self.othello])
+        event = CalendarEvent.objects.get(id=event_id)
+        self.assertEqual((event.channel, event.topic), (self.channel, "Planning"))
+        self.assertIsNone(event.chat)
+        # Notification Bot announces the meeting in its topic, and
+        # invites only those invited.
+        self.assertEqual(
+            self.get_topic_messages("Planning"),
+            [
+                (
+                    f"{self.mention(self.hamlet)} scheduled **Planning** on "
+                    f"{datetime_to_global_time(MONDAY_10_00)}."
+                )
+            ],
+        )
+        message = self.get_last_message()
+        self.assertEqual(message.sender, get_system_bot(settings.NOTIFICATION_BOT, event.realm_id))
+
+        # Another meeting with the same title gets a topic of its own,
+        # and renaming a meeting keeps its topic, whose links still work.
+        second_id = self.create_channel_meeting()
+        self.assertEqual(CalendarEvent.objects.get(id=second_id).topic, "Planning (2)")
+        update_calendar_event(self.hamlet, event_id, title="Retro")
+        self.assertEqual(CalendarEvent.objects.get(id=event_id).topic, "Planning")
+
+        # A channel without topics discusses its meetings in its
+        # general chat.
+        self.channel.topics_policy = StreamTopicsPolicyEnum.empty_topic_only.value
+        self.channel.save(update_fields=["topics_policy"])
+        start = int(MONDAY_10_00.timestamp())
+        result = self.api_post(
+            self.hamlet,
+            "/api/v1/calendar/events",
+            {
+                "title": "Planning",
+                "start": orjson.dumps(start).decode(),
+                "end": orjson.dumps(start + 1800).decode(),
+                "timezone": "Europe/Moscow",
+                "channel_id": orjson.dumps(self.channel.id).decode(),
+            },
+        )
+        event = CalendarEvent.objects.get(id=self.assert_json_success(result)["id"])
+        self.assertEqual((event.channel, event.topic), (self.channel, ""))
+
+    def test_create_channel_meeting_errors(self) -> None:
+        with self.assertRaisesRegex(JsonableError, "A meeting in a channel cannot be private"):
+            self.create_channel_meeting(is_private=True)
+        event_id = self.create_channel_meeting()
+        with self.assertRaisesRegex(JsonableError, "A meeting in a channel cannot be private"):
+            update_calendar_event(self.hamlet, event_id, is_private=True)
+
+        # Not in a channel the organizer cannot access.
+        start = int(MONDAY_10_00.timestamp())
+        result = self.api_post(
+            self.othello,
+            "/api/v1/calendar/events",
+            {
+                "title": "Planning",
+                "start": orjson.dumps(start).decode(),
+                "end": orjson.dumps(start + 1800).decode(),
+                "timezone": "Europe/Moscow",
+                "channel_id": orjson.dumps(self.channel.id).decode(),
+            },
+        )
+        self.assert_json_error(result, "Invalid channel ID")
+
+        # Nor in the chat of a meeting.
+        chat_meeting_id = self.create_event(self.hamlet)
+        result = self.api_post(self.hamlet, f"/api/v1/calendar/events/{chat_meeting_id}/chat")
+        chat_id = self.assert_json_success(result)["stream_id"]
+        with self.assertRaisesRegex(JsonableError, "Invalid channel ID"):
+            access_calendar_event_channel(self.hamlet, chat_id)
+
+        # Nor where the organizer may not post.
+        nobody = NamedUserGroup.objects.get(
+            name=SystemGroups.NOBODY, realm_for_sharding=self.hamlet.realm, is_system_group=True
+        )
+        do_change_stream_group_based_setting(
+            self.channel, "can_send_message_group", nobody, acting_user=self.iago
+        )
+        with self.assertRaisesRegex(
+            JsonableError, "You do not have permission to post in this channel."
+        ):
+            access_calendar_event_channel(self.hamlet, self.channel.id)
+
+    def test_subscribers_see_channel_meetings(self) -> None:
+        event_id = self.create_channel_meeting(
+            required_attendees=[self.othello], rrule="FREQ=DAILY;UNTIL=20261118T235959Z"
+        )
+        # A subscriber who was not invited sees the meeting, without a
+        # response, reminder or category of their own.
+        occurrences = self.get_occurrences(self.cordelia)
+        self.assert_length(occurrences, 3)
+        first = occurrences[0]
+        self.assertEqual(
+            (first.event_id, first.channel_id, first.topic, first.is_invited),
+            (event_id, self.channel.id, "Planning", False),
+        )
+        self.assertEqual(
+            (first.response, first.reminder_minutes, first.category),
+            (CalendarResponse.NONE, None, ""),
+        )
+        self.assertTrue(all(o.is_invited for o in self.get_occurrences(self.othello)))
+        calendar_event, _changed = get_calendar_event(self.cordelia, event_id)
+        self.assertFalse(calendar_event.is_invited)
+        # It is not an invitation, and does not make them busy.
+        self.assertEqual(
+            get_unanswered_invitation_counts({self.cordelia.id}), {self.cordelia.id: 0}
+        )
+        self.assertEqual(
+            get_free_busy(self.hamlet, [self.cordelia.id], WEEK_START, WEEK_END),
+            {self.cordelia.id: []},
+        )
+        # Only attendees respond to it.
+        with self.assertRaisesRegex(JsonableError, "Invalid calendar event ID"):
+            respond_to_calendar_event(self.cordelia, event_id, CalendarResponse.ACCEPTED)
+
+        # Others see it only if invited.
+        self.assertEqual(self.get_occurrences(self.iago), [])
+        with self.assertRaisesRegex(JsonableError, "Invalid calendar event ID"):
+            get_calendar_event(self.iago, event_id)
+
+        # Cancelled occurrences and meetings leave the calendars of
+        # subscribers who were not invited.
+        cancel_calendar_event(self.hamlet, event_id, MONDAY_10_00)
+        self.assert_length(self.get_occurrences(self.cordelia), 2)
+        cancel_calendar_event(self.hamlet, event_id)
+        self.assertEqual(self.get_occurrences(self.cordelia), [])
+        with self.assertRaisesRegex(JsonableError, "Invalid calendar event ID"):
+            get_calendar_event(self.cordelia, event_id)
+
+        # Leaving the channel hides its meetings.
+        self.create_channel_meeting()
+        self.assert_length(self.get_occurrences(self.cordelia), 1)
+        self.unsubscribe(self.cordelia, "Design")
+        self.assertEqual(self.get_occurrences(self.cordelia), [])
+
+    def test_channel_meeting_changes(self) -> None:
+        event_id = self.create_channel_meeting(rrule="FREQ=DAILY;UNTIL=20261118T235959Z")
+        tuesday = MONDAY_10_00 + timedelta(days=1)
+        update_calendar_event(
+            self.hamlet, event_id, original_start=tuesday, start=tuesday + timedelta(hours=1)
+        )
+        update_calendar_event(self.hamlet, event_id, start=MONDAY_10_00 + timedelta(hours=2))
+        cancel_calendar_event(self.hamlet, event_id)
+        hamlet = self.mention(self.hamlet)
+        self.assertEqual(
+            self.get_topic_messages("Planning")[1:],
+            [
+                (
+                    f"{hamlet} moved **Planning** ({datetime_to_global_time(tuesday)}) to "
+                    f"{datetime_to_global_time(tuesday + timedelta(hours=1))}."
+                ),
+                (
+                    f"{hamlet} moved **Planning** to "
+                    f"{datetime_to_global_time(MONDAY_10_00 + timedelta(hours=2))}."
+                ),
+                f"{hamlet} cancelled **Planning**.",
+            ],
+        )
+
+    @time_machine.travel(utc(2026, 11, 1), tick=False)
+    def test_subscribers_learn_of_changes(self) -> None:
+        with self.capture_send_event_calls(expected_num_events=4) as events:
+            event_id = self.create_channel_meeting(required_attendees=[self.othello])
+        self.assertCountEqual(
+            [
+                (event["event"], sorted(event["users"]))
+                for event in events
+                if event["event"]["type"] == "calendar"
+            ],
+            [
+                (
+                    {"type": "calendar", "event_id": event_id, "unanswered_invitation_count": 0},
+                    sorted([self.hamlet.id, self.cordelia.id]),
+                ),
+                (
+                    {"type": "calendar", "event_id": event_id, "unanswered_invitation_count": 1},
+                    [self.othello.id],
+                ),
+            ],
+        )
+
+    def test_channel_meeting_discussion(self) -> None:
+        event_id = self.create_channel_meeting(required_attendees=[self.othello])
+        # Those who can access the channel discuss the meeting in its
+        # topic, invited or not, and no chat is created.
+        for user in [self.hamlet, self.cordelia]:
+            result = self.api_post(user, f"/api/v1/calendar/events/{event_id}/chat")
+            self.assertEqual(
+                self.assert_json_success(result),
+                {"result": "success", "msg": "", "stream_id": self.channel.id, "topic": "Planning"},
+            )
+        self.assertIsNone(CalendarEvent.objects.get(id=event_id).chat)
+        # Attendees outside of the channel only join the call.
+        result = self.api_post(self.othello, f"/api/v1/calendar/events/{event_id}/chat")
+        self.assert_json_error(result, "Invalid channel ID")
+        result = self.api_post(self.iago, f"/api/v1/calendar/events/{event_id}/chat")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+    def test_channel_meeting_call(self) -> None:
+        event_id = self.create_channel_meeting(
+            required_attendees=[self.othello], has_zulip_call=True
+        )
+        # Attendees outside of the channel cannot start the call, since
+        # starting it posts to the channel.
+        result = self.api_post(self.othello, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(
+            result, "The call has not started yet. Someone in the channel will start it."
+        )
+        meet_url = f"/meet/{CalendarEvent.objects.get(id=event_id).meet_code}"
+        self.login_user(self.othello)
+        response = self.client_post(meet_url)
+        self.assertEqual(response.status_code, 404)
+        self.assert_in_response("Someone in the channel will start it.", response)
+
+        # Subscribers start it in the meeting's topic, invited or not.
+        with self.call_id(123):
+            url = self.join_call(self.cordelia, event_id)
+        self.assertEqual(url, f"/calls/livekit/join?call_id=123&channel_id={self.channel.id}")
+        message = self.get_last_message()
+        self.assertEqual(
+            (message.sender, message.recipient_id, message.topic_name()),
+            (self.cordelia, self.channel.recipient_id, "Planning"),
+        )
+        self.assertEqual(self.join_call(self.hamlet, event_id), url)
+        self.assertEqual(self.join_call(self.othello, event_id), url)
+        result = self.api_post(self.iago, f"/api/v1/calendar/events/{event_id}/call")
+        self.assert_json_error(result, "Invalid calendar event ID")
+
+        # The call window shows attendees outside of the channel only
+        # the meeting, without the channel's name or chat.
+        response = self.client_get(url)
+        self.assert_in_success_response(["<title>Planning | Zulip</title>"], response)
+        self.assertNotIn("Design", response.content.decode())
+        self.login_user(self.cordelia)
+        self.assert_in_success_response(
+            ["<title>#Design &gt; Planning | Zulip</title>"], self.client_get(url)
+        )
+        self.login_user(self.iago)
+        self.assertEqual(self.client_get(url).status_code, 403)
+
+        # The meeting's permanent link joins the call too.
+        self.login_user(self.othello)
+        response = self.client_get(meet_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], url)
+
+
 class CalendarAPITest(CalendarTestCase):
     def get_events(self, user: UserProfile) -> list[dict[str, Any]]:
         result = self.api_get(
@@ -1246,6 +1528,9 @@ class CalendarAPITest(CalendarTestCase):
                 "has_zulip_call": False,
                 "meet_code": event.meet_code,
                 "chat_id": None,
+                "channel_id": None,
+                "topic": "",
+                "is_invited": True,
                 "date_created": timestamp(event.date_created),
                 "attendees": [
                     {

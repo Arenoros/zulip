@@ -5,7 +5,11 @@ from django.conf import settings
 from django.utils.translation import gettext as _
 from django.utils.translation import override as override_language
 
-from zerver.actions.message_send import do_send_messages, internal_prep_private_message
+from zerver.actions.message_send import (
+    do_send_messages,
+    internal_prep_private_message,
+    internal_send_stream_message,
+)
 from zerver.lib.mention import silent_mention_syntax_for_user
 from zerver.lib.timestamp import datetime_to_global_time
 from zerver.models import CalendarEvent, CalendarEventException, UserProfile
@@ -14,7 +18,8 @@ from zerver.models.users import get_system_bot
 
 # Invitations, changes of time, cancellations and responses reach
 # people as direct messages from Notification Bot, which mobile apps
-# notify of too.
+# notify of too. Meetings in a channel are also announced, moved and
+# cancelled in their topic.
 
 
 def get_calendar_event_url(event: CalendarEvent, start: datetime) -> str:
@@ -46,6 +51,21 @@ def send_calendar_notifications(
     do_send_messages(requests)
 
 
+def send_calendar_channel_notification(
+    event: CalendarEvent, start: datetime, get_text: Callable[[], str]
+) -> None:
+    """Sends get_text to the topic of a meeting in a channel, in the
+    organization's language, with a link to the occurrence at start."""
+    if event.channel is None:
+        return
+    bot = get_system_bot(settings.NOTIFICATION_BOT, event.realm_id)
+    with override_language(event.realm.default_language):
+        content = "{text} [{link}]({url})".format(
+            text=get_text(), link=_("Open in calendar"), url=get_calendar_event_url(event, start)
+        )
+    internal_send_stream_message(bot, event.channel, event.topic, content)
+
+
 def format_title(title: str, occurrence_start: datetime | None = None) -> str:
     """The title, and for one occurrence of a series, when it takes
     place, in each reader's time zone."""
@@ -61,6 +81,18 @@ def notify_invited(actor: UserProfile, event: CalendarEvent, user_ids: set[int])
         user_ids,
         event.start,
         lambda: _("{user} invited you to {title} on {time}.").format(
+            user=silent_mention_syntax_for_user(actor),
+            title=format_title(event.title),
+            time=datetime_to_global_time(event.start),
+        ),
+    )
+
+
+def announce_scheduled(actor: UserProfile, event: CalendarEvent) -> None:
+    send_calendar_channel_notification(
+        event,
+        event.start,
+        lambda: _("{user} scheduled {title} on {time}.").format(
             user=silent_mention_syntax_for_user(actor),
             title=format_title(event.title),
             time=datetime_to_global_time(event.start),
@@ -93,17 +125,16 @@ def notify_moved(
         title = exception.title or event.title
         original_start = exception.original_start
         start = exception.start or exception.original_start
-    send_calendar_notifications(
-        actor,
-        event,
-        user_ids,
-        start,
-        lambda: _("{user} moved {title} to {time}.").format(
+
+    def get_text() -> str:
+        return _("{user} moved {title} to {time}.").format(
             user=silent_mention_syntax_for_user(actor),
             title=format_title(title, original_start),
             time=datetime_to_global_time(start),
-        ),
-    )
+        )
+
+    send_calendar_notifications(actor, event, user_ids, start, get_text)
+    send_calendar_channel_notification(event, start, get_text)
 
 
 def notify_cancelled(
@@ -117,16 +148,15 @@ def notify_cancelled(
     if exception is not None:
         title = exception.title or event.title
         start = exception.start or exception.original_start
-    send_calendar_notifications(
-        actor,
-        event,
-        user_ids,
-        start,
-        lambda: _("{user} cancelled {title}.").format(
+
+    def get_text() -> str:
+        return _("{user} cancelled {title}.").format(
             user=silent_mention_syntax_for_user(actor),
             title=format_title(title, None if exception is None else start),
-        ),
-    )
+        )
+
+    send_calendar_notifications(actor, event, user_ids, start, get_text)
+    send_calendar_channel_notification(event, start, get_text)
 
 
 def notify_response(

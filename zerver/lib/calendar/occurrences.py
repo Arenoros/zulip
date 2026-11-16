@@ -72,6 +72,12 @@ class CalendarOccurrence:
     has_zulip_call: bool
     meet_code: str
     chat_id: int | None
+    # A meeting in a channel is discussed in this topic of the channel.
+    channel_id: int | None
+    topic: str
+    # Subscribers of the channel of a meeting see it without being
+    # invited to it.
+    is_invited: bool
     # When the organizer created the event and sent its invitations.
     date_created: datetime
     # Empty when the organizer hides the attendees from others.
@@ -129,6 +135,31 @@ def access_calendar_event_by_id(user_profile: UserProfile, event_id: int) -> Cal
         raise JsonableError(_("Invalid calendar event ID"))
 
 
+def subscribed_channel_query(user_profile: UserProfile) -> Q:
+    """Meetings in the channels the user is subscribed to."""
+    return Q(
+        channel__recipient__subscription__user_profile=user_profile,
+        channel__recipient__subscription__active=True,
+    )
+
+
+def access_calendar_event_for_viewing(user_profile: UserProfile, event_id: int) -> CalendarEvent:
+    """Like access_calendar_event_by_id, but also the meetings in the
+    user's channels, which they may see and discuss without being
+    invited, unless they were cancelled."""
+    event = (
+        CalendarEvent.objects.filter(id=event_id, realm_id=user_profile.realm_id)
+        .filter(
+            Q(calendarattendee__user=user_profile)
+            | (subscribed_channel_query(user_profile) & Q(is_cancelled=False))
+        )
+        .first()
+    )
+    if event is None:
+        raise JsonableError(_("Invalid calendar event ID"))
+    return event
+
+
 @dataclass
 class _Occurrence:
     original_start: datetime | None
@@ -167,12 +198,12 @@ def _get_event_occurrences(
     return occurrences
 
 
-def _event_in_range(range_start: datetime, range_end: datetime) -> Q:
+def _event_in_range(range_start: datetime, range_end: datetime, prefix: str = "event__") -> Q:
     # A series is fetched if it starts before the end of the range;
     # whether it has occurrences in the range is computed afterwards.
-    return Q(event__rrule="", event__start__lt=range_end, event__end__gt=range_start) | (
-        ~Q(event__rrule="") & Q(event__start__lt=range_end)
-    )
+    return Q(
+        **{f"{prefix}rrule": "", f"{prefix}start__lt": range_end, f"{prefix}end__gt": range_start}
+    ) | (~Q(**{f"{prefix}rrule": ""}) & Q(**{f"{prefix}start__lt": range_end}))
 
 
 def _get_events_in_range(
@@ -218,6 +249,17 @@ def _override(value: str | None, series_value: str) -> str:
     return series_value if value is None else value
 
 
+def _get_uninvited_channel_events(
+    user_profile: UserProfile, range_start: datetime, range_end: datetime
+) -> list[CalendarEvent]:
+    return list(
+        CalendarEvent.objects.filter(subscribed_channel_query(user_profile), is_cancelled=False)
+        .filter(_event_in_range(range_start, range_end, prefix=""))
+        .exclude(calendarattendee__user=user_profile)
+        .distinct()
+    )
+
+
 def _get_show_as(attendee: CalendarAttendee, response: int) -> int:
     # Following a meeting keeps the user informed without blocking
     # their time.
@@ -234,13 +276,15 @@ def _get_show_as(attendee: CalendarAttendee, response: int) -> int:
 
 def _make_calendar_occurrence(
     user_profile: UserProfile,
-    attendee: CalendarAttendee,
+    event: CalendarEvent,
+    # None for a meeting in one of the user's channels that they were
+    # not invited to.
+    attendee: CalendarAttendee | None,
     response: int,
     occurrence: _Occurrence,
     attendees: list[CalendarAttendeeData],
     room_ids: list[int],
 ) -> CalendarOccurrence:
-    event = attendee.event
     exception = occurrence.exception
     show_attendees = not event.hide_attendees or event.organizer_id == user_profile.id
     return CalendarOccurrence(
@@ -260,20 +304,23 @@ def _make_calendar_occurrence(
             exception.rendered_description if exception is not None else None,
             event.rendered_description,
         ),
-        show_as=_get_show_as(attendee, response),
+        show_as=event.show_as if attendee is None else _get_show_as(attendee, response),
         is_private=event.is_private,
         is_cancelled=event.is_cancelled or (exception is not None and exception.is_cancelled),
         rrule=event.rrule,
         organizer_id=event.organizer_id,
         response=response,
-        reminder_minutes=attendee.reminder_minutes,
-        category=attendee.category,
+        reminder_minutes=None if attendee is None else attendee.reminder_minutes,
+        category="" if attendee is None else attendee.category,
         response_requested=event.response_requested,
         allow_forwarding=event.allow_forwarding,
         hide_attendees=event.hide_attendees,
         has_zulip_call=event.has_zulip_call,
         meet_code=event.meet_code,
         chat_id=event.chat_id,
+        channel_id=event.channel_id,
+        topic=event.topic,
+        is_invited=attendee is not None,
         date_created=event.date_created,
         attendees=attendees if show_attendees else [],
         room_ids=room_ids,
@@ -287,7 +334,9 @@ def get_calendar_occurrences(
 
     Declined occurrences are left out, as Outlook removes declined
     meetings from the calendar, and so are events and occurrences the
-    user cancelled as their organizer.
+    user cancelled as their organizer. The meetings in the user's
+    channels that they were not invited to are included, without
+    those that were cancelled.
     """
     check_calendar_range(range_start, range_end)
 
@@ -296,7 +345,10 @@ def get_calendar_occurrences(
         for attendee in _get_events_in_range(Q(user=user_profile), range_start, range_end)
         if not (attendee.event.is_cancelled and attendee.event.organizer_id == user_profile.id)
     ]
-    event_ids = {attendee.event_id for attendee in own_attendees}
+    uninvited_events = _get_uninvited_channel_events(user_profile, range_start, range_end)
+    event_ids = {attendee.event_id for attendee in own_attendees} | {
+        event.id for event in uninvited_events
+    }
     exceptions_by_event_id = _get_exceptions_by_event_id(event_ids)
     room_ids_by_event_id = _get_room_ids_by_event_id(event_ids)
 
@@ -319,21 +371,25 @@ def get_calendar_occurrences(
     )
 
     calendar_occurrences = []
-    for attendee in own_attendees:
-        event = attendee.event
+    events: list[tuple[CalendarEvent, CalendarAttendee | None]] = [
+        (attendee.event, attendee) for attendee in own_attendees
+    ] + [(event, None) for event in uninvited_events]
+    for event, attendee in events:
         for occurrence in _get_event_occurrences(
             event, exceptions_by_event_id[event.id], range_start, range_end
         ):
-            response = attendee.response
-            if occurrence.original_start is not None:
-                response = occurrence_responses.get(
-                    (attendee.id, occurrence.original_start), response
-                )
             exception = occurrence.exception
+            response = CalendarResponse.NONE
+            if attendee is not None:
+                response = attendee.response
+                if occurrence.original_start is not None:
+                    response = occurrence_responses.get(
+                        (attendee.id, occurrence.original_start), response
+                    )
             if response == CalendarResponse.DECLINED or (
                 exception is not None
                 and exception.is_cancelled
-                and event.organizer_id == user_profile.id
+                and (attendee is None or event.organizer_id == user_profile.id)
             ):
                 continue
 
@@ -352,6 +408,7 @@ def get_calendar_occurrences(
             calendar_occurrences.append(
                 _make_calendar_occurrence(
                     user_profile,
+                    event,
                     attendee,
                     response,
                     occurrence,
@@ -367,8 +424,8 @@ def get_calendar_event(user_profile: UserProfile, event_id: int) -> tuple[Calend
     """The event as it is in the user's calendar, with the series'
     first occurrence for a series, and whether some of its occurrences
     were changed or cancelled."""
-    event = access_calendar_event_by_id(user_profile, event_id)
-    attendee = CalendarAttendee.objects.select_related("event").get(event=event, user=user_profile)
+    event = access_calendar_event_for_viewing(user_profile, event_id)
+    attendee = CalendarAttendee.objects.filter(event=event, user=user_profile).first()
     attendees = [
         CalendarAttendeeData(user_id, is_required, response, added_by_id)
         for user_id, is_required, response, added_by_id in CalendarAttendee.objects.filter(
@@ -379,8 +436,9 @@ def get_calendar_event(user_profile: UserProfile, event_id: int) -> tuple[Calend
     ]
     calendar_event = _make_calendar_occurrence(
         user_profile,
+        event,
         attendee,
-        attendee.response,
+        CalendarResponse.NONE if attendee is None else attendee.response,
         _Occurrence(None, event.start, event.end, None),
         attendees,
         _get_room_ids_by_event_id({event.id})[event.id],

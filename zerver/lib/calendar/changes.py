@@ -11,6 +11,7 @@ from django.utils.translation import gettext as _
 
 from zerver.actions.streams import bulk_add_subscriptions, rename_stream_without_notice
 from zerver.lib.calendar.notifications import (
+    announce_scheduled,
     notify_cancelled,
     notify_invited,
     notify_moved,
@@ -19,6 +20,7 @@ from zerver.lib.calendar.notifications import (
 )
 from zerver.lib.calendar.occurrences import (
     access_calendar_event_by_id,
+    access_calendar_event_for_viewing,
     get_unanswered_invitation_counts,
 )
 from zerver.lib.calendar.recurrence import is_occurrence_start, validate_rrule
@@ -29,7 +31,14 @@ from zerver.lib.calendar.rooms import (
 )
 from zerver.lib.event_types import CalendarChangeEvent, CalendarFreeBusyEvent
 from zerver.lib.exceptions import JsonableError
-from zerver.lib.streams import can_access_stream_metadata_user_ids, create_stream_if_needed
+from zerver.lib.stream_subscription import get_active_subscriptions_for_stream_id
+from zerver.lib.streams import (
+    access_stream_by_id,
+    access_stream_for_send_message,
+    can_access_stream_metadata_user_ids,
+    create_stream_if_needed,
+    get_stream_topics_policy,
+)
 from zerver.lib.timezone import canonicalize_timezone
 from zerver.lib.types import UNSET, Unset
 from zerver.lib.user_groups import get_role_based_system_groups_dict
@@ -45,6 +54,7 @@ from zerver.models import (
     UserProfile,
 )
 from zerver.models.calendar import DEFAULT_REMINDER_MINUTES, CalendarResponse, CalendarShowAs
+from zerver.models.constants import MAX_TOPIC_NAME_LENGTH
 from zerver.models.groups import SystemGroups
 from zerver.models.streams import StreamTopicsPolicyEnum
 from zerver.tornado.django_api import send_event_on_commit
@@ -134,11 +144,18 @@ def get_attendee_user_ids(event: CalendarEvent) -> set[int]:
 
 
 def send_calendar_change_events(realm: Realm, event: CalendarEvent, user_ids: set[int]) -> None:
-    """Tells the users that the event changed in their calendars, and
-    those who pinned any of the users that their free/busy times may
-    have changed."""
+    """Tells the users, and the subscribers of the meeting's channel,
+    that the event changed in their calendars, and those who pinned
+    any of the users that their free/busy times may have changed."""
     user_ids_by_count: dict[int, list[int]] = defaultdict(list)
-    for user_id, count in get_unanswered_invitation_counts(user_ids).items():
+    calendar_user_ids = set(user_ids)
+    if event.channel_id is not None:
+        calendar_user_ids |= set(
+            get_active_subscriptions_for_stream_id(
+                event.channel_id, include_deactivated_users=False
+            ).values_list("user_profile_id", flat=True)
+        )
+    for user_id, count in get_unanswered_invitation_counts(calendar_user_ids).items():
         user_ids_by_count[count].append(user_id)
     for count, count_user_ids in user_ids_by_count.items():
         send_event_on_commit(
@@ -202,6 +219,35 @@ def get_meeting_chat_name(event: CalendarEvent) -> str:
     raise AssertionError("unreachable")  # nocoverage
 
 
+def access_calendar_event_channel(organizer: UserProfile, channel_id: int) -> Stream:
+    """A channel the organizer may post in for a meeting, other than
+    the chat of a meeting."""
+    channel, _sub = access_stream_by_id(organizer, channel_id)
+    if channel.is_meeting_chat:
+        raise JsonableError(_("Invalid channel ID"))
+    access_stream_for_send_message(organizer, channel, forwarder_user_profile=None)
+    return channel
+
+
+def get_calendar_event_topic(channel: Stream, title: str) -> str:
+    """The topic a meeting in the channel is discussed in: the general
+    chat of a channel without topics, or one named after the meeting,
+    with a number added if another meeting in the channel has it. The
+    topic keeps its name when the meeting is renamed, so that links to
+    the topic keep working."""
+    if (
+        get_stream_topics_policy(channel.realm, channel)
+        == StreamTopicsPolicyEnum.empty_topic_only.value
+    ):
+        return ""
+    for number in itertools.count(1):
+        suffix = "" if number == 1 else f" ({number})"
+        topic = title[: MAX_TOPIC_NAME_LENGTH - len(suffix)].strip() + suffix
+        if not CalendarEvent.objects.filter(channel=channel, topic__iexact=topic).exists():
+            return topic
+    raise AssertionError("unreachable")  # nocoverage
+
+
 @transaction.atomic(durable=True)
 def create_calendar_event(
     organizer: UserProfile,
@@ -223,11 +269,14 @@ def create_calendar_event(
     required_attendees: list[UserProfile],
     optional_attendees: list[UserProfile],
     room_ids: list[int] | None = None,
+    channel: Stream | None = None,
 ) -> int:
     """Creates the event in the organizer's calendar, invites the
-    attendees, if any, and books the rooms, if they are free. Returns
-    the event's ID."""
+    attendees, if any, and books the rooms, if they are free. A meeting
+    in a channel is announced in its topic. Returns the event's ID."""
     title = check_calendar_title(title)
+    if channel is not None and is_private:
+        raise JsonableError(_("A meeting in a channel cannot be private"))
     event_timezone = check_calendar_event_time(start, end, event_timezone, is_all_day)
     check_show_as(show_as)
     if rrule:
@@ -256,6 +305,8 @@ def create_calendar_event(
         hide_attendees=hide_attendees,
         has_zulip_call=has_zulip_call,
         meet_code=secrets.token_urlsafe(9),
+        channel=channel,
+        topic="" if channel is None else get_calendar_event_topic(channel, title),
     )
     CalendarAttendee.objects.create(
         event=event,
@@ -268,6 +319,7 @@ def create_calendar_event(
     set_calendar_event_rooms(event, room_ids)
     check_calendar_event_rooms_free(event)
     notify_invited(organizer, event, set(is_required_by_user_id))
+    announce_scheduled(organizer, event)
     send_calendar_change_events(organizer.realm, event, get_attendee_user_ids(event))
     return event.id
 
@@ -488,6 +540,8 @@ def update_calendar_event(
         check_show_as(show_as)
         event.show_as = show_as
     if is_private is not None:
+        if is_private and event.channel_id is not None:
+            raise JsonableError(_("A meeting in a channel cannot be private"))
         event.is_private = is_private
     if response_requested is not None:
         event.response_requested = response_requested
@@ -679,6 +733,17 @@ def update_calendar_attendee_settings(
     send_calendar_change_events(user_profile.realm, event, {user_profile.id})
 
 
+def get_calendar_event_discussion(user_profile: UserProfile, event_id: int) -> tuple[Stream, str]:
+    """The channel and topic the meeting is discussed in: the topic of
+    a meeting in a channel, for those who can access the channel, or
+    the meeting's own chat."""
+    event = access_calendar_event_for_viewing(user_profile, event_id)
+    if event.channel_id is None:
+        return get_or_create_calendar_event_chat(user_profile, event_id), ""
+    channel, _sub = access_stream_by_id(user_profile, event.channel_id)
+    return channel, event.topic
+
+
 @transaction.atomic(durable=True)
 def get_or_create_calendar_event_chat(user_profile: UserProfile, event_id: int) -> Stream:
     """The meeting's chat, a private channel without topics with all
@@ -687,6 +752,8 @@ def get_or_create_calendar_event_chat(user_profile: UserProfile, event_id: int) 
     access_calendar_event_by_id(user_profile, event_id)
     # Locked, so that attendees opening the chat at once get the same one.
     event = CalendarEvent.objects.select_for_update(no_key=True).get(id=event_id)
+    # A meeting in a channel is discussed in its channel.
+    assert event.channel_id is None
     if event.chat is not None:
         bulk_add_subscriptions(event.chat.realm, [event.chat], [user_profile], acting_user=None)
         return event.chat

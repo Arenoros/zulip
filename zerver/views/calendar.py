@@ -21,10 +21,11 @@ from zerver.lib.calendar.calls import (
     join_calendar_event_call,
 )
 from zerver.lib.calendar.changes import (
+    access_calendar_event_channel,
     add_calendar_attendees,
     cancel_calendar_event,
     create_calendar_event,
-    get_or_create_calendar_event_chat,
+    get_calendar_event_discussion,
     respond_to_calendar_event,
     update_calendar_attendee_settings,
     update_calendar_event,
@@ -186,6 +187,7 @@ def create_calendar_event_backend(
     required_attendees: Json[list[int]] | None = None,
     optional_attendees: Json[list[int]] | None = None,
     room_ids: Json[list[int]] | None = None,
+    channel_id: Json[int] | None = None,
 ) -> HttpResponse:
     event_id = create_calendar_event(
         user_profile,
@@ -206,6 +208,9 @@ def create_calendar_event_backend(
         required_attendees=access_calendar_users(user_profile, required_attendees or []),
         optional_attendees=access_calendar_users(user_profile, optional_attendees or []),
         room_ids=room_ids,
+        channel=None
+        if channel_id is None
+        else access_calendar_event_channel(user_profile, channel_id),
     )
     return json_success(request, data={"id": event_id})
 
@@ -331,8 +336,8 @@ def get_or_create_calendar_event_chat_backend(
     *,
     calendar_event_id: PathOnly[int],
 ) -> HttpResponse:
-    chat = get_or_create_calendar_event_chat(user_profile, calendar_event_id)
-    return json_success(request, data={"stream_id": chat.id})
+    stream, topic = get_calendar_event_discussion(user_profile, calendar_event_id)
+    return json_success(request, data={"stream_id": stream.id, "topic": topic})
 
 
 @typed_endpoint
@@ -372,13 +377,17 @@ def meet_calendar_event(
 
     event = (
         CalendarEvent.objects.filter(realm_id=user_profile.realm_id, meet_code=meet_code)
-        .select_related("realm", "chat")
+        .select_related("realm", "chat", "channel")
         .first()
     )
     if event is None or not can_join_calendar_event_call(user_profile, event):
         return render_livekit_call_access_denied(request)
     try:
         check_calendar_event_call(event)
+        if request.method == "POST":
+            client = RequestNotes.get_notes(request).client
+            assert client is not None
+            return redirect(join_calendar_event_call(user_profile, client, event, voice_only))
     except JsonableError as e:
         return render(
             request,
@@ -387,12 +396,7 @@ def meet_calendar_event(
             status=404,
         )
 
-    if request.method == "POST":
-        client = RequestNotes.get_notes(request).client
-        assert client is not None
-        return redirect(join_calendar_event_call(user_profile, client, event, voice_only))
-
-    call = None if event.chat is None else get_calendar_event_call(event.chat)
+    call = get_calendar_event_call(event)
     if call is not None:
         # Attendees who left the meeting's chat join it again to join
         # its call.
