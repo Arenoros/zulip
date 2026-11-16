@@ -62,7 +62,7 @@ function setup(override, send) {
         videoHeight: 100,
         clientWidth: 200,
         clientHeight: 100,
-        setPointerCapture: () => {},
+        setPointerCapture() {},
         focus() {
             video.dispatchEvent(new Event("focus"));
         },
@@ -263,9 +263,9 @@ run_test("slow lossy sends do not queue old positions", async ({override}) => {
     let finish;
     const s = setup(override, async (_token, _sequence, event) => {
         sent.push(event);
-        await new Promise((resolve) => {
-            finish = resolve;
-        });
+        const {promise, resolve} = Promise.withResolvers();
+        finish = resolve;
+        await promise;
     });
     s.remote_input.set_token(token);
     s.emit("pointermove");
@@ -313,9 +313,9 @@ run_test("a failed old send does not cancel a new grant", async ({override}) => 
     const s = setup(override, async (token, _sequence, event) => {
         packets.push({token, event});
         if (token === "a".repeat(32)) {
-            await new Promise((_resolve, reject) => {
-                fail = reject;
-            });
+            const {promise, reject} = Promise.withResolvers();
+            fail = reject;
+            await promise;
         }
     });
     s.remote_input.set_token(token);

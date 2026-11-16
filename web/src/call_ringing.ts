@@ -99,7 +99,12 @@ function open_call(url: string): void {
 export function open_window_for_new_call(): {show: (url: string) => void; close: () => void} {
     // The desktop app opens calls in its own window, whenever asked.
     if (electron_bridge !== undefined) {
-        return {show: open_call, close() {}};
+        return {
+            show: open_call,
+            close() {
+                // No window is open until the call is shown.
+            },
+        };
     }
     // Browsers block windows that are not opened directly in response
     // to a click, so an empty window opens right away.
