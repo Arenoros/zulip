@@ -1539,6 +1539,7 @@ class CalendarChangeEventsTest(CalendarTestCase):
             {hamlet.id: 0, cordelia.id: 2},
         )
 
+    @time_machine.travel(utc(2026, 11, 1), tick=False)
     def test_free_busy_events_name_only_pinned_users(self) -> None:
         hamlet = self.example_user("hamlet")
         cordelia = self.example_user("cordelia")
