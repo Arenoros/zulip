@@ -117,6 +117,36 @@ An event becomes a meeting when you invite colleagues to it.
   is private.
 </ZulipTip>
 
+## Schedule a meeting in a channel
+
+A meeting in a channel is discussed in a topic of the channel named
+after the meeting, and everyone subscribed to the channel sees it in
+their calendar and can join its call, even without an invitation. The
+people you invite get an invitation as for any other meeting.
+Notification Bot announces the meeting in its topic, as well as when it
+is moved or canceled.
+
+<Tabs>
+  <TabItem label="Desktop/Web">
+    <FlattenedSteps>
+      <GoToCalendar />
+
+      1. Click the arrow next to **Create** in the upper right of the
+         calendar, and select **Meeting in a channel**.
+
+      1. Choose a channel, and add a title and the colleagues to
+         invite.
+
+      1. Click **Save**.
+    </FlattenedSteps>
+  </TabItem>
+</Tabs>
+
+The meeting's channel can't be changed, and its topic keeps its name
+when the meeting is renamed, so that links to the topic keep working.
+In a channel without topics, the meeting is discussed in the channel's
+general chat. A meeting in a channel can't be private.
+
 ## Find a time for a meeting
 
 The scheduler shows, for a week from the date of the meeting, when
@@ -323,6 +353,10 @@ hides it. People invited later join the chat and see its history;
 people removed from the meeting stay in it. A series has one chat for
 all of its occurrences.
 
+A [meeting in a channel](#schedule-a-meeting-in-a-channel) is
+discussed in its topic of the channel instead. People invited to it
+who can't access the channel only join its call.
+
 <Tabs>
   <TabItem label="Desktop/Web">
     <FlattenedSteps>
@@ -346,6 +380,11 @@ A meeting with a Zulip call has its call in the meeting's chat. The
 first person to join starts it, which posts its link in the chat, and
 the people who join after them join the same call. Anyone in the
 meeting's chat can join it.
+
+The call of a meeting in a channel takes place in its topic, and anyone
+who can access the channel can join it. People invited to the meeting
+who can't access the channel can join the call once someone in the
+channel has started it.
 
 <Tabs>
   <TabItem label="Desktop/Web">
@@ -442,7 +481,9 @@ is the same on all your devices.
 
 You can hide some kinds of your events, such as personal events,
 meetings you haven't answered, events of a category, or recurring
-events. The filter applies to your own calendar on this device.
+events. **Meetings in channels** shows or hides the meetings in your
+channels that you aren't invited to. The filter applies to your own
+calendar on this device.
 
 <Tabs>
   <TabItem label="Desktop/Web">
