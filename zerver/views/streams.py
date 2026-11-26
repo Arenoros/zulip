@@ -58,6 +58,7 @@ from zerver.lib.exceptions import (
     JsonableError,
     OrganizationOwnerRequiredError,
 )
+from zerver.lib.markdown.fenced_code import wrap_in_quote_block
 from zerver.lib.mention import MentionBackend, silent_mention_syntax_for_user
 from zerver.lib.message import bulk_access_stream_messages_query
 from zerver.lib.response import json_success
@@ -112,7 +113,7 @@ from zerver.lib.users import access_bot_by_id, bulk_access_users_by_email, bulk_
 from zerver.lib.utils import assert_is_not_none
 from zerver.models import ChannelFolder, Stream, UserGroup, UserMessage, UserProfile, UserTopic
 from zerver.models.groups import SystemGroups
-from zerver.models.streams import StreamTopicsPolicyEnum
+from zerver.models.streams import StreamTopicsPolicyEnum, Subscription
 from zerver.models.users import get_system_bot
 
 
@@ -1177,7 +1178,11 @@ def send_user_subscribed_and_new_channel_notifications(
                             content=new_channel_message.format(
                                 user_name=silent_mention_syntax_for_user(user_profile),
                             )
-                            + f"\n```` quote\n{stream_description}\n````",
+                            + "\n"
+                            + wrap_in_quote_block(
+                                stream_description,
+                                default_language=stream.realm.default_code_block_language,
+                            ),
                         ),
                     )
 
@@ -1386,7 +1391,7 @@ def json_get_stream_id(
 class SubscriptionPropertyChangeRequest(BaseModel):
     stream_id: int
     property: str
-    value: bool | str
+    value: bool | int | str
 
     @model_validator(mode="after")
     def validate_terms(self) -> "SubscriptionPropertyChangeRequest":
@@ -1410,6 +1415,12 @@ class SubscriptionPropertyChangeRequest(BaseModel):
         elif self.property in boolean_properties:
             if not isinstance(self.value, bool):
                 raise JsonableError(_("{property} is not a boolean").format(property=self.property))
+        elif self.property == "web_left_sidebar_topics_order":
+            if (
+                type(self.value) is not int
+                or self.value not in Subscription.WEB_LEFT_SIDEBAR_TOPICS_ORDER_CHOICES
+            ):
+                raise JsonableError(_("Invalid {property}").format(property=self.property))
         else:
             raise JsonableError(
                 _("Unknown subscription property: {property}").format(property=self.property)
@@ -1424,7 +1435,7 @@ def update_subscriptions_property(
     *,
     property: str,
     stream_id: PathOnly[Json[int]],
-    value: Annotated[Json[bool] | str, Field(union_mode="left_to_right")],
+    value: Annotated[Json[bool | int] | str, Field(union_mode="left_to_right")],
 ) -> HttpResponse:
     change_request = SubscriptionPropertyChangeRequest(
         stream_id=stream_id, property=property, value=value

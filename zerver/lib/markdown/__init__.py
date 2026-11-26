@@ -1534,6 +1534,37 @@ class Fence:
     is_code: bool
 
 
+LIST_ITEM_REGEX = re.compile(
+    r"""
+    ^[ ]*                   # Start with zero or more spaces
+    ([*+-]|[0-9]{1,9}\.)    # A bullet marker (*, +, or -) or 1-9 digits followed by "."
+    [ ]+                    # Followed by one or more spaces
+    (.*)                    # The list content, which could be empty
+    """,
+    re.VERBOSE,
+)
+
+
+def line_is_in_code_fence(line: str, open_fences: list[Fence]) -> bool:
+    """Update `open_fences` in place based on `line`, and return whether
+    we are currently inside a non-quote fenced code block. Shared by
+    preprocessors that need to skip fenced code while scanning lines."""
+    m = FENCE_RE.match(line)
+    if m:
+        fence_str = m.group("fence")
+        lang: str | None = m.group("lang")
+        is_code = lang not in ("quote", "quoted")
+        matches_last_fence = fence_str == open_fences[-1].fence_str if open_fences else False
+        closes_last_fence = not lang and matches_last_fence
+
+        if closes_last_fence:
+            open_fences.pop()
+        else:
+            open_fences.append(Fence(fence_str, is_code))
+
+    return any(fence.is_code for fence in open_fences)
+
+
 class MarkdownListPreprocessor(markdown.preprocessors.Preprocessor):
     """Allows list blocks that come directly after another block
     to be rendered as a list.
@@ -1542,40 +1573,22 @@ class MarkdownListPreprocessor(markdown.preprocessors.Preprocessor):
     directly after a line of text, and inserts a newline between
     to satisfy Markdown"""
 
-    LI_RE = re.compile(r"^[ ]*([*+-]|\d\.)[ ]+(.*)", re.MULTILINE)
-
     @override
     def run(self, lines: list[str]) -> list[str]:
         """Insert a newline between a paragraph and ulist if missing"""
         inserts = 0
-        in_code_fence: bool = False
         open_fences: list[Fence] = []
         copy = lines[:]
         for i in range(len(lines) - 1):
             # Ignore anything that is inside a fenced code block but not quoted.
             # We ignore all lines where some parent is a non-quote code block.
-            m = FENCE_RE.match(lines[i])
-            if m:
-                fence_str = m.group("fence")
-                lang: str | None = m.group("lang")
-                is_code = lang not in ("quote", "quoted")
-                matches_last_fence = (
-                    fence_str == open_fences[-1].fence_str if open_fences else False
-                )
-                closes_last_fence = not lang and matches_last_fence
-
-                if closes_last_fence:
-                    open_fences.pop()
-                else:
-                    open_fences.append(Fence(fence_str, is_code))
-
-                in_code_fence = any(fence.is_code for fence in open_fences)
+            in_code_fence = line_is_in_code_fence(lines[i], open_fences)
 
             # If we're not in a fenced block and we detect an upcoming list
             # hanging off any block (including a list of another type), add
             # a newline.
-            li1 = self.LI_RE.match(lines[i])
-            li2 = self.LI_RE.match(lines[i + 1])
+            li1 = LIST_ITEM_REGEX.match(lines[i])
+            li2 = LIST_ITEM_REGEX.match(lines[i + 1])
             if (
                 not in_code_fence
                 and lines[i]
@@ -2119,7 +2132,7 @@ class ImageInlineProcessor(markdown.inlinepatterns.ImageInlineProcessor):
         super().__init__(pattern, zmd)
         self.zmd = zmd
 
-    def zulip_specific_src_changes(self, img: Element) -> Element | None:
+    def zulip_specific_image_changes(self, img: Element) -> Element | None:
         # function partially copied from LinkInlineProcessor.zulip_specific_link_changes
         src = img.get("src")
         assert src is not None
@@ -2145,7 +2158,13 @@ class ImageInlineProcessor(markdown.inlinepatterns.ImageInlineProcessor):
         # before rendering; Else, its header didn't parse as
         # a valid image type which libvips handles.
         if not db_data or path_id not in db_data.user_upload_previews.image_metadata:
-            return None
+            link = Element("a")
+            link.set("href", src)
+            if (title := img.get("title")) is not None:
+                link.set("title", title)
+            alt = img.get("alt", "")
+            link.text = markdown.util.AtomicString(alt if alt.strip() else src)
+            return link
         else:
             assert path_id in db_data.user_upload_previews.image_metadata
             metadata = db_data.user_upload_previews.image_metadata[path_id]
@@ -2179,11 +2198,11 @@ class ImageInlineProcessor(markdown.inlinepatterns.ImageInlineProcessor):
     ) -> tuple[Element | str | None, int | None, int | None]:
         ret = super().handleMatch(m, data)
         if ret[0] is not None:
-            img, match_start, index = ret
-            assert isinstance(img, Element)
-            img = self.zulip_specific_src_changes(img)
-            if img is not None:
-                return img, match_start, index
+            el, match_start, index = ret
+            assert isinstance(el, Element)
+            el = self.zulip_specific_image_changes(el)
+            if el is not None:
+                return el, match_start, index
         return None, None, None
 
 

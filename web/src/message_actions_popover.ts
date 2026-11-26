@@ -41,6 +41,8 @@ const quote_menu_selection_by_instance = new WeakMap<
     compose_reply.QuoteMenuSelection
 >();
 
+let message_actions_popover_props: Partial<tippy.Props> | undefined;
+
 function get_action_menu_menu_items(): JQuery {
     return $("[data-tippy-root] #message-actions-menu-dropdown li:not(.divider) a");
 }
@@ -83,19 +85,22 @@ function focus_first_action_popover_item(): void {
     popover_menus.focus_first_popover_item($items);
 }
 
+export function can_open_message_actions_menu(message: Message): boolean {
+    // Don't open the popup for locally echoed messages for now.
+    // It creates bugs with things like keyboard handlers when
+    // we get the server response.
+    // We also suppress the popup for messages in an editing state,
+    // including previews.
+    return !message.locally_echoed && !message_edit.currently_editing_messages.has(message.id);
+}
+
 export function toggle_message_actions_menu(message: Message): boolean {
     if (popover_menus.is_message_actions_popover_displayed()) {
         popovers.hide_all();
         return true;
     }
 
-    if (message.locally_echoed || message_edit.currently_editing_messages.has(message.id)) {
-        // Don't open the popup for locally echoed messages for now.
-        // It creates bugs with things like keyboard handlers when
-        // we get the server response.
-        // We also suppress the popup for messages in an editing state,
-        // including previews, when a user tries to reach them from the
-        // keyboard.
+    if (!can_open_message_actions_menu(message)) {
         return true;
     }
 
@@ -113,6 +118,28 @@ export function toggle_message_actions_menu(message: Message): boolean {
     quote_menu_selection_at_button_mousedown = undefined;
     $popover_reference.trigger("click");
     return true;
+}
+
+export function open_message_actions_menu_at_mouse_position(
+    message_id: number,
+    x: number,
+    y: number,
+): void {
+    if (popovers.any_active()) {
+        popovers.hide_all();
+    }
+
+    assert(message_lists.current !== undefined);
+    const $row = message_lists.current.get_row(message_id);
+    // This has no ⋮ press of its own, so make sure it cannot consume a
+    // stale selection left behind by an earlier one.
+    quote_menu_selection_at_button_mousedown = undefined;
+    assert(message_actions_popover_props !== undefined);
+    popover_menus.toggle_popover_menu(
+        the($row.find(".message-actions-menu-button")),
+        message_actions_popover_props,
+        {mouse_position: {x, y}},
+    );
 }
 
 export function toggle_hide_link_previews(message: Message): void {
@@ -153,7 +180,7 @@ export function initialize({
         },
     );
 
-    popover_menus.register_popover_menu(".actions_hover .message-actions-menu-button", {
+    message_actions_popover_props = {
         theme: "popover-menu",
         placement: "bottom",
         popperOptions: {
@@ -338,5 +365,9 @@ export function initialize({
             popover_menus.popover_instances.message_actions = null;
             message_actions_popover_keyboard_toggle = false;
         },
-    });
+    };
+    popover_menus.register_popover_menu(
+        ".actions_hover .message-actions-menu-button",
+        message_actions_popover_props,
+    );
 }

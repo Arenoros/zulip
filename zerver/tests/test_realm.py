@@ -15,6 +15,7 @@ import orjson
 import time_machine
 from django.conf import settings
 from django.core import mail
+from django.db import IntegrityError
 from django.test import override_settings
 from django.utils.timezone import now as timezone_now
 from typing_extensions import override
@@ -131,6 +132,13 @@ class RealmTest(ZulipTestCase):
             self.assertRaises(AssertionError),
         ):
             do_create_realm("zulipselfhosting", "Test Realm")
+
+    def test_realm_creation_unexpected_integrity_error(self) -> None:
+        with (
+            mock.patch.object(Realm, "save", side_effect=IntegrityError("unexpected error")),
+            self.assertRaises(IntegrityError),
+        ):
+            do_create_realm("new-realm-subdomain", "New Realm")
 
     def test_permission_for_education_non_profit_organization(self) -> None:
         realm = do_create_realm(
@@ -2830,6 +2838,7 @@ class RealmAPITest(ZulipTestCase):
             demote_inactive_streams=UserProfile.DEMOTE_STREAMS_CHOICES,
             web_mark_read_on_scroll_policy=UserProfile.WEB_MARK_READ_ON_SCROLL_POLICY_CHOICES,
             web_channel_default_view=UserProfile.WEB_CHANNEL_DEFAULT_VIEW_CHOICES,
+            web_left_sidebar_topics_order=UserProfile.WEB_LEFT_SIDEBAR_TOPICS_ORDER_CHOICES,
             user_list_style=UserProfile.USER_LIST_STYLE_CHOICES,
             web_animate_image_previews=["always", "on_hover", "never"],
             web_stream_unreads_count_display_policy=UserProfile.WEB_STREAM_UNREADS_COUNT_DISPLAY_POLICY_CHOICES,

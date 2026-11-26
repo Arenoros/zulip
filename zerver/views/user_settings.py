@@ -365,6 +365,11 @@ def json_change_settings(
     web_home_view: Annotated[str, check_string_in_validator(web_home_view_options)] | None = None,
     web_inbox_show_channel_folders: Json[bool] | None = None,
     web_left_sidebar_show_channel_folders: Json[bool] | None = None,
+    web_left_sidebar_topics_order: Annotated[
+        Json[int],
+        check_int_in_validator(UserProfile.WEB_LEFT_SIDEBAR_TOPICS_ORDER_CHOICES),
+    ]
+    | None = None,
     web_left_sidebar_unreads_count_summary: Json[bool] | None = None,
     web_line_height_percent: Json[int] | None = None,
     web_mark_read_on_scroll_policy: Annotated[
@@ -372,6 +377,7 @@ def json_change_settings(
     ]
     | None = None,
     web_navigate_to_sent_message: Json[bool] | None = None,
+    web_right_click_opens_message_actions_menu: Json[bool] | None = None,
     web_stream_unreads_count_display_policy: Annotated[
         Json[int],
         check_int_in_validator(UserProfile.WEB_STREAM_UNREADS_COUNT_DISPLAY_POLICY_CHOICES),

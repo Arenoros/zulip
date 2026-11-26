@@ -949,6 +949,7 @@ exports.fixtures = {
                 pin_to_top: false,
                 push_notifications: false,
                 stream_weekly_traffic: 40,
+                web_left_sidebar_topics_order: 0,
                 wildcard_mentions_notify: false,
                 subscribers: [5, 8, 13, 21],
             },
@@ -1376,6 +1377,13 @@ exports.fixtures = {
         value: false,
     },
 
+    user_settings__web_left_sidebar_topics_order: {
+        type: "user_settings",
+        op: "update",
+        property: "web_left_sidebar_topics_order",
+        value: 2,
+    },
+
     user_settings__web_left_sidebar_unreads_count_summary: {
         type: "user_settings",
         op: "update",
@@ -1402,6 +1410,13 @@ exports.fixtures = {
         op: "update",
         property: "web_navigate_to_sent_message",
         value: false,
+    },
+
+    user_settings__web_right_click_opens_message_actions_menu: {
+        type: "user_settings",
+        op: "update",
+        property: "web_right_click_opens_message_actions_menu",
+        value: true,
     },
 
     user_settings__web_stream_unreads_count_display_policy: {

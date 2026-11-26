@@ -2166,13 +2166,13 @@ class StreamAdminTest(ZulipTestCase):
         expected_notification = (
             f"@_**{user_profile.full_name}|{user_profile.id}** changed the description for this channel.\n\n"
             "* **Old description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "Test description\n"
-            "````\n"
+            "```\n"
             "* **New description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "*No description.*\n"
-            "````"
+            "```"
         )
         self.assertEqual(messages[-1].content, expected_notification)
 
@@ -2188,13 +2188,13 @@ class StreamAdminTest(ZulipTestCase):
         expected_notification = (
             f"@_**{user_profile.full_name}|{user_profile.id}** changed the description for this channel.\n\n"
             "* **Old description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "*No description.*\n"
-            "````\n"
+            "```\n"
             "* **New description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "Test description\n"
-            "````"
+            "```"
         )
         self.assertEqual(messages[-1].content, expected_notification)
 
@@ -2210,13 +2210,13 @@ class StreamAdminTest(ZulipTestCase):
         expected_notification = (
             f"@_**{user_profile.full_name}|{user_profile.id}** changed the description for this channel.\n\n"
             "* **Old description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "Test description\n"
-            "````\n"
+            "```\n"
             "* **New description:**\n"
-            "```` quote\n"
+            "```quote\n"
             "a multi line description\n"
-            "````"
+            "```"
         )
         self.assertEqual(messages[-1].content, expected_notification)
 
@@ -2231,6 +2231,25 @@ class StreamAdminTest(ZulipTestCase):
             "property": "description",
         }
         self.assertEqual(realm_audit_log.extra_data, expected_extra_data)
+
+        result = self.client_patch(
+            f"/json/streams/{stream_id}",
+            {"description": "Breaking out\r````\r**Not quoted**"},
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assertTrue(
+            messages[-1].content.endswith(
+                "* **New description:**\n"
+                "`````quote\n"
+                "Breaking out\r````\r**Not quoted**\n"
+                "````\n"
+                "`````"
+            )
+        )
+        assert messages[-1].rendered_content is not None
+        self.assertNotIn("<strong>Not quoted</strong>", messages[-1].rendered_content)
+        self.assertTrue(messages[-1].rendered_content.endswith("</blockquote>"))
 
         # Test notification is not sent in `channel events` if `send_channel_events_messages` is `False`.
         do_set_realm_property(stream.realm, "send_channel_events_messages", False, acting_user=None)
@@ -2314,7 +2333,7 @@ class StreamAdminTest(ZulipTestCase):
         self.assert_length(messages, 1)
         expected_notification = (
             f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
-            "* **Old retention period**: Forever\n"
+            "* **Old retention period**: Forever (organization default)\n"
             "* **New retention period**: 2 days\n\n"
             "Messages in this channel will now be automatically deleted 2 days after they are sent."
         )
@@ -2358,7 +2377,7 @@ class StreamAdminTest(ZulipTestCase):
         expected_notification = (
             f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
             "* **Old retention period**: 8 days\n"
-            "* **New retention period**: Forever\n\n"
+            "* **New retention period**: Forever (organization default)\n\n"
             "Messages in this channel will now be retained forever."
         )
         self.assertEqual(messages[2].content, expected_notification)
@@ -2371,6 +2390,87 @@ class StreamAdminTest(ZulipTestCase):
             RealmAuditLog.NEW_VALUE: None,
         }
         self.assertEqual(realm_audit_log.extra_data, expected_extra_data)
+
+        # Go from realm default (forever) to forever
+        result = self.client_patch(
+            f"/json/streams/{stream.id}",
+            {"message_retention_days": orjson.dumps("unlimited").decode()},
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assert_length(messages, 4)
+        expected_notification = (
+            f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
+            "* **Old retention period**: Forever (organization default)\n"
+            "* **New retention period**: Forever\n\n"
+            "Messages in this channel will now be retained forever."
+        )
+        self.assertEqual(messages[3].content, expected_notification)
+
+        # Go from forever to realm default (forever)
+        result = self.client_patch(
+            f"/json/streams/{stream.id}",
+            {"message_retention_days": orjson.dumps("realm_default").decode()},
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assert_length(messages, 5)
+        expected_notification = (
+            f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
+            "* **Old retention period**: Forever\n"
+            "* **New retention period**: Forever (organization default)\n\n"
+            "Messages in this channel will now be retained forever."
+        )
+        self.assertEqual(messages[4].content, expected_notification)
+
+        do_set_realm_property(realm, "message_retention_days", 10, acting_user=None)
+
+        # Go from realm default (10 days) to 10 days
+        result = self.client_patch(
+            f"/json/streams/{stream.id}", {"message_retention_days": orjson.dumps(10).decode()}
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assert_length(messages, 6)
+        expected_notification = (
+            f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
+            "* **Old retention period**: 10 days (organization default)\n"
+            "* **New retention period**: 10 days\n\n"
+            "Messages in this channel will now be automatically deleted 10 days after they are sent."
+        )
+        self.assertEqual(messages[5].content, expected_notification)
+
+        # Go from 10 days to realm default (10 days)
+        result = self.client_patch(
+            f"/json/streams/{stream.id}",
+            {"message_retention_days": orjson.dumps("realm_default").decode()},
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assert_length(messages, 7)
+        expected_notification = (
+            f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
+            "* **Old retention period**: 10 days\n"
+            "* **New retention period**: 10 days (organization default)\n\n"
+            "Messages in this channel will now be automatically deleted 10 days after they are sent."
+        )
+        self.assertEqual(messages[6].content, expected_notification)
+
+        # Go from realm default (10 days) to forever
+        result = self.client_patch(
+            f"/json/streams/{stream.id}",
+            {"message_retention_days": orjson.dumps("unlimited").decode()},
+        )
+        self.assert_json_success(result)
+        messages = get_topic_messages(user_profile, stream, "channel events")
+        self.assert_length(messages, 8)
+        expected_notification = (
+            f"@_**Desdemona|{user_profile.id}** has changed the [message retention period](/help/message-retention-policy) for this channel:\n"
+            "* **Old retention period**: 10 days (organization default)\n"
+            "* **New retention period**: Forever\n\n"
+            "Messages in this channel will now be retained forever."
+        )
+        self.assertEqual(messages[7].content, expected_notification)
 
         # Test notification is not sent in `channel events` if `send_channel_events_messages` is `False`.
         do_set_realm_property(stream.realm, "send_channel_events_messages", False, acting_user=None)
@@ -3270,7 +3370,7 @@ class StreamAdminTest(ZulipTestCase):
         cordelia = self.example_user("cordelia")
         iago = self.example_user("iago")
         result = self.attempt_unsubscribe_of_principal(
-            query_count=38,
+            query_count=35,
             target_users=[cordelia],
             is_realm_admin=True,
             is_subbed=True,
@@ -3305,7 +3405,7 @@ class StreamAdminTest(ZulipTestCase):
             for name in ["cordelia", "prospero", "iago", "hamlet", "outgoing_webhook_bot"]
         ]
         result = self.attempt_unsubscribe_of_principal(
-            query_count=59,
+            query_count=56,
             cache_count=26,
             target_users=target_users,
             is_realm_admin=True,
@@ -3325,7 +3425,7 @@ class StreamAdminTest(ZulipTestCase):
         cordelia = self.example_user("cordelia")
         iago = self.example_user("iago")
         result = self.attempt_unsubscribe_of_principal(
-            query_count=41,
+            query_count=38,
             target_users=[cordelia],
             is_realm_admin=True,
             is_subbed=True,
@@ -3352,7 +3452,7 @@ class StreamAdminTest(ZulipTestCase):
         cordelia = self.example_user("cordelia")
         iago = self.example_user("iago")
         result = self.attempt_unsubscribe_of_principal(
-            query_count=42,
+            query_count=39,
             target_users=[cordelia],
             is_realm_admin=True,
             is_subbed=False,
@@ -3388,7 +3488,7 @@ class StreamAdminTest(ZulipTestCase):
         cordelia = self.example_user("cordelia")
         iago = self.example_user("iago")
         result = self.attempt_unsubscribe_of_principal(
-            query_count=38,
+            query_count=35,
             target_users=[cordelia],
             is_realm_admin=True,
             is_subbed=True,
@@ -3410,7 +3510,7 @@ class StreamAdminTest(ZulipTestCase):
 
     def test_admin_remove_multiple_users_from_stream_legacy_emails(self) -> None:
         result = self.attempt_unsubscribe_of_principal(
-            query_count=47,
+            query_count=44,
             target_users=[self.example_user("cordelia"), self.example_user("prospero")],
             is_realm_admin=True,
             is_subbed=True,
@@ -3881,7 +3981,7 @@ class StreamAdminTest(ZulipTestCase):
         self.make_stream(public_stream)
         for user in [iago, cordelia, hamlet]:
             self.subscribe(user, public_stream)
-        with self.assert_database_query_count(43):
+        with self.assert_database_query_count(40):
             self.client_delete(
                 "/json/users/me/subscriptions",
                 {
@@ -3894,7 +3994,7 @@ class StreamAdminTest(ZulipTestCase):
         self.make_stream(private_stream, invite_only=True)
         for user in [iago, cordelia, hamlet]:
             self.subscribe(user, private_stream)
-        with self.assert_database_query_count(37):
+        with self.assert_database_query_count(34):
             self.client_delete(
                 "/json/users/me/subscriptions",
                 {
@@ -4307,7 +4407,7 @@ class SubscriptionAPITest(ZulipTestCase):
         self.assertEqual(msg.sender_id, self.notification_bot(self.test_realm).id)
         expected_msg = (
             f"**Public** channel created by @_**{invitee_full_name}|{invitee.id}**. **Description:**\n"
-            "```` quote\n*No description.*\n````"
+            "```quote\n*No description.*\n```"
         )
         self.assertEqual(msg.content, expected_msg)
 
@@ -4653,7 +4753,7 @@ class SubscriptionAPITest(ZulipTestCase):
         self.assertEqual(msg.sender.email, settings.NOTIFICATION_BOT)
         self.assertIn(
             f"**{policy_name}** channel created by @_**{self.test_user.full_name}|{self.test_user.id}**. **Description:**\n"
-            "```` quote",
+            "```quote",
             msg.content,
         )
 
@@ -4664,7 +4764,7 @@ class SubscriptionAPITest(ZulipTestCase):
         streams_to_sub = ["multi_user_stream"]
         with (
             self.capture_send_event_calls(expected_num_events=5) as events,
-            self.assert_database_query_count(45),
+            self.assert_database_query_count(42),
         ):
             self.subscribe_via_post(
                 self.test_user,
@@ -5612,7 +5712,7 @@ class SubscriptionAPITest(ZulipTestCase):
         ]
 
         # Test creating a public stream when realm does not have a notification stream.
-        with self.assert_database_query_count(45):
+        with self.assert_database_query_count(42):
             self.subscribe_via_post(
                 self.test_user,
                 [new_streams[0]],
@@ -5620,7 +5720,7 @@ class SubscriptionAPITest(ZulipTestCase):
             )
 
         # Test creating private stream.
-        with self.assert_database_query_count(52):
+        with self.assert_database_query_count(49):
             self.subscribe_via_post(
                 self.test_user,
                 [new_streams[1]],
@@ -5632,7 +5732,7 @@ class SubscriptionAPITest(ZulipTestCase):
         new_stream_announcements_stream = get_stream(self.streams[0], self.test_realm)
         self.test_realm.new_stream_announcements_stream_id = new_stream_announcements_stream.id
         self.test_realm.save()
-        with self.assert_database_query_count(53):
+        with self.assert_database_query_count(50):
             self.subscribe_via_post(
                 self.test_user,
                 [new_streams[2]],
@@ -5826,7 +5926,7 @@ class SubscriptionAPITest(ZulipTestCase):
         # the bot should send DMs to all the newly subscribed users, but
         # no announcement message.
         now = timezone_now()
-        with self.assert_database_query_count(70):
+        with self.assert_database_query_count(67):
             response = self.subscribe_via_post(
                 desdemona,
                 [test_channel.name],
@@ -5856,7 +5956,7 @@ class SubscriptionAPITest(ZulipTestCase):
         # we expect an announcement message and new channel message,
         # but no DM notifications.
         now = timezone_now()
-        with self.assert_database_query_count(53):
+        with self.assert_database_query_count(50):
             response = self.subscribe_via_post(
                 desdemona,
                 ["test B"],
@@ -5901,7 +6001,7 @@ class SubscriptionAPITest(ZulipTestCase):
         self.assertEqual(
             new_channel_message[0].content,
             f"**Public** channel created by @_**{desdemona.full_name}|{desdemona.id}**. **Description:**\n"
-            "```` quote\n*No description.*\n````",
+            "```quote\n*No description.*\n```",
         )
 
         # When subscribing to an already existing channel, if the number of new
@@ -5945,7 +6045,7 @@ class SubscriptionAPITest(ZulipTestCase):
         now = timezone_now()
         with (
             self.settings(MAX_BULK_SUBSCRIPTION_MESSAGES=5),
-            self.assert_database_query_count(53),
+            self.assert_database_query_count(50),
         ):
             response = self.subscribe_via_post(
                 desdemona,
@@ -5991,13 +6091,13 @@ class SubscriptionAPITest(ZulipTestCase):
         self.assertEqual(
             new_channel_message[0].content,
             f"**Public** channel created by @_**{desdemona.full_name}|{desdemona.id}**. **Description:**\n"
-            "```` quote\n*No description.*\n````",
+            "```quote\n*No description.*\n```",
         )
 
         # When send_new_subscription_messages is false, confirm that the
         # response doesn't include new_subscription_messages_sent boolean
         # field.
-        with self.assert_database_query_count(45):
+        with self.assert_database_query_count(42):
             response = self.subscribe_via_post(
                 desdemona,
                 ["test E"],

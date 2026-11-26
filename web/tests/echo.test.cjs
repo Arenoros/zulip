@@ -3,7 +3,9 @@
 const assert = require("node:assert/strict");
 
 const {make_user_group} = require("./lib/example_group.cjs");
+const {make_realm} = require("./lib/example_realm.cjs");
 const {make_stream} = require("./lib/example_stream.cjs");
+const {make_user} = require("./lib/example_user.cjs");
 const {clock, mock_esm, zrequire} = require("./lib/namespace.cjs");
 const {make_stub} = require("./lib/stub.cjs");
 const {run_test, noop} = require("./lib/test.cjs");
@@ -11,7 +13,14 @@ const {$} = require("./lib/zjquery.cjs");
 
 const browser_history = mock_esm("../src/browser_history");
 const compose_notifications = mock_esm("../src/compose_notifications");
+const compose_ui = mock_esm("../src/compose_ui");
+const drafts = mock_esm("../src/drafts", {
+    draft_model: {
+        deleteDrafts: noop,
+    },
+});
 const hash_util = mock_esm("../src/hash_util");
+const local_message = mock_esm("../src/local_message");
 const markdown = mock_esm("../src/markdown");
 const message_lists = mock_esm("../src/message_lists");
 const message_events_util = mock_esm("../src/message_events_util");
@@ -90,12 +99,15 @@ const echo = zrequire("echo");
 const echo_state = zrequire("echo_state");
 const people = zrequire("people");
 const pm_conversations = zrequire("pm_conversations");
-const {set_current_user} = zrequire("state_data");
+const {set_current_user, set_realm} = zrequire("state_data");
 const stream_data = zrequire("stream_data");
 const stream_topic_history = zrequire("stream_topic_history");
+const user_groups = zrequire("user_groups");
 
 const current_user = {};
 set_current_user(current_user);
+const realm = make_realm();
+set_realm(realm);
 
 const general_sub = make_stream({
     stream_id: 101,
@@ -103,6 +115,122 @@ const general_sub = make_stream({
     subscribed: true,
 });
 stream_data.add_sub_for_tests(general_sub);
+
+run_test("try_deliver_locally with group mentions", ({override}) => {
+    override(current_user, "user_id", 123);
+    people.add_active_user(make_user({user_id: 123}));
+    people.initialize_current_user(123);
+    user_groups.add(
+        make_user_group({
+            name: "allowed",
+            can_mention_group: {
+                direct_members: [123],
+                direct_subgroups: [],
+            },
+        }),
+    );
+    user_groups.add(
+        make_user_group({
+            name: "restricted",
+            can_mention_group: {
+                direct_members: [],
+                direct_subgroups: [],
+            },
+        }),
+    );
+    user_groups.add(
+        make_user_group({
+            name: "deactivated",
+            deactivated: true,
+            can_mention_group: {direct_members: [], direct_subgroups: []},
+        }),
+    );
+    const mention_permission_group = user_groups.add(make_user_group({members: [123]}));
+    override(markdown, "contains_backend_only_syntax", () => false);
+    override(markdown, "render", (content) => ({content, flags: []}));
+    override(markdown, "get_topic_links", () => []);
+    override(compose_ui, "is_expanded", () => false);
+
+    let reserved_local_ids = 0;
+    override(local_message, "get_next_id_float", () => {
+        reserved_local_ids += 1;
+        return 100.01;
+    });
+
+    for (const [content, group_names, should_echo] of [
+        ["Hello", [], true],
+        ["@*allowed*", ["allowed"], true],
+        ["@*unknown*", ["unknown"], true],
+        ["@*restricted*", ["restricted"], false],
+        ["@_*restricted*", [], true],
+        ["@*deactivated*", ["deactivated"], true],
+        ["@*allowed* @*restricted*", ["allowed", "restricted"], false],
+    ]) {
+        override(markdown, "get_user_group_mentions", (text) => {
+            assert.equal(text, content);
+            return group_names;
+        });
+        const previous_reserved_local_ids = reserved_local_ids;
+        let inserted_message = false;
+        const message = echo.try_deliver_locally(
+            {
+                type: "stream",
+                stream_id: general_sub.stream_id,
+                topic: "test",
+                content,
+            },
+            ({raw_messages}) => {
+                inserted_message = true;
+                assert.equal(raw_messages[0].raw_content, content);
+                return raw_messages;
+            },
+        );
+        assert.equal(message !== undefined, should_echo, content);
+        assert.equal(
+            reserved_local_ids - previous_reserved_local_ids,
+            Number(should_echo),
+            content,
+        );
+        assert.equal(inserted_message, should_echo, content);
+    }
+
+    override(markdown, "get_user_group_mentions", (content) => {
+        assert.ok(["@*allowed*", "@*restricted*"].includes(content));
+        return content === "@*allowed*" ? ["allowed"] : ["restricted"];
+    });
+    override(realm, "realm_direct_message_initiator_group", mention_permission_group.id);
+    people.add_active_user(make_user({user_id: 321}));
+    let inserted_private_message = false;
+    const insert_private_message = ({raw_messages}) => {
+        inserted_private_message = true;
+        return raw_messages;
+    };
+    assert.notEqual(
+        echo.try_deliver_locally(
+            {
+                type: "private",
+                to_user_ids: "321",
+                content: "@*allowed*",
+            },
+            insert_private_message,
+        ),
+        undefined,
+    );
+    assert.equal(inserted_private_message, true);
+    inserted_private_message = false;
+    assert.equal(
+        echo.try_deliver_locally(
+            {
+                type: "private",
+                to_user_ids: "321",
+                content: "@*restricted*",
+            },
+            insert_private_message,
+        ),
+        undefined,
+    );
+    assert.equal(inserted_private_message, false);
+});
 
 run_test("process_from_server for un-echoed messages", () => {
     const waiting_for_ack = new Map();
@@ -163,6 +291,56 @@ run_test("process_from_server for differently rendered messages", ({override}) =
             topic_links: new_value,
         },
     ]);
+});
+
+function set_up_local_echo(override, local_id, draft_id) {
+    const deleted_draft_ids = [];
+    override(drafts.draft_model, "deleteDrafts", (draft_ids) => {
+        deleted_draft_ids.push(...draft_ids);
+    });
+    const message = {
+        id: Number.parseFloat(local_id),
+        local_id,
+        type: "stream",
+        stream_id: general_sub.stream_id,
+        topic: "test",
+        content: "<p>hello</p>",
+        draft_id,
+        locally_echoed: true,
+    };
+    echo.track_local_message(message);
+    override(message_store, "get", () => message);
+    override(message_store, "reify_message_id", () => {
+        // Mirror the real conversion, which drops the local-echo fields.
+        delete message.draft_id;
+    });
+    override(compose_notifications, "reify_message_id", noop);
+    override(hash_util, "search_terms_to_hash", noop);
+    override(browser_history, "update_current_history_state_data", noop);
+    return {message, deleted_draft_ids};
+}
+
+run_test("process_from_server deletes the draft of a send that errored", ({override}) => {
+    const {message, deleted_draft_ids} = set_up_local_echo(override, "40.01", "draft-40");
+
+    echo.message_send_error(message.id, "Connection reset");
+    assert.ok(message.failed_request);
+    assert.deepEqual(deleted_draft_ids, []);
+
+    // The server had accepted the message, so its event still arrives.
+    echo.process_from_server([{id: 41, local_id: "40.01", content: message.content}]);
+    assert.ok(!message.failed_request);
+    assert.deepEqual(deleted_draft_ids, ["draft-40"]);
+});
+
+run_test("reify_message_id deletes a sent message's draft only once", ({override}) => {
+    const {message, deleted_draft_ids} = set_up_local_echo(override, "42.01", "draft-42");
+
+    // The send response reifies the message, then its event arrives.
+    echo.reify_message_id("42.01", 43);
+    assert.deepEqual(deleted_draft_ids, ["draft-42"]);
+    echo.process_from_server([{id: 43, local_id: "42.01", content: message.content}]);
+    assert.deepEqual(deleted_draft_ids, ["draft-42"]);
 });
 
 run_test("process_from_server for messages to add to narrow", ({override}) => {

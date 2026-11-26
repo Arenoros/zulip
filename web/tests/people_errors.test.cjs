@@ -12,11 +12,12 @@ const reload_state = mock_esm("../src/reload_state", {
     is_in_progress: () => false,
 });
 const server_events_state = mock_esm("../src/server_events_state", {
-    has_received_first_events_response: () => true,
+    has_applied_first_events_response: () => true,
 });
 const settings_data = mock_esm("../src/settings_data");
 
 const people = zrequire("people");
+const watchdog = zrequire("watchdog");
 const {set_realm} = zrequire("state_data");
 
 set_realm(make_realm());
@@ -37,13 +38,19 @@ run_test("report_late_add", ({override}) => {
     blueslip.expect("error", "Added user late");
     people.report_late_add(55, "foo@example.com");
 
-    // Before the first /json/events poll has returned, the people
-    // store may legitimately lack users created after the /register
-    // snapshot, so we demote the error to a log.
-    override(server_events_state, "has_received_first_events_response", () => false);
-    blueslip.expect("log", "Added user late", 2);
+    // Before the first /json/events response has been applied, the
+    // people store may legitimately lack users created after the
+    // /register snapshot, so we demote the error to a log.
+    override(server_events_state, "has_applied_first_events_response", () => false);
+    blueslip.expect("log", "Added user late", 3);
     people.report_late_add(55, "foo@example.com");
-    override(server_events_state, "has_received_first_events_response", () => true);
+    override(server_events_state, "has_applied_first_events_response", () => true);
+
+    // While reconnecting to the events system after being suspended
+    // or offline, we may not yet have received realm_user/add events.
+    watchdog.set_suspect_offline(true);
+    people.report_late_add(55, "foo@example.com");
+    watchdog.set_suspect_offline(false);
 
     override(settings_data, "user_can_access_all_other_users", () => false);
     override(reload_state, "is_in_progress", () => true);

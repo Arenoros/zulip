@@ -1389,9 +1389,12 @@ run_test("user_settings", ({override}) => {
         called = false;
         override(settings_preferences, "report_emojiset_change", stub.f);
         override(activity_ui, "build_user_sidebar", noop);
+        const update_private_messages_stub = make_stub();
+        override(pm_list, "update_private_messages", update_private_messages_stub.f);
         override(user_settings, "emojiset", "text");
         dispatch(event);
         assert.equal(stub.num_calls, 1);
+        assert.equal(update_private_messages_stub.num_calls, 1);
         assert_same(called, true);
         assert_same(user_settings.emojiset, "google");
     }
@@ -1404,6 +1407,11 @@ run_test("user_settings", ({override}) => {
     event = event_fixtures.user_settings__web_inbox_show_channel_folders;
     dispatch(event);
     assert_same(user_settings.web_inbox_show_channel_folders, false);
+
+    event = event_fixtures.user_settings__web_left_sidebar_topics_order;
+    override(user_settings, "web_left_sidebar_topics_order", 1);
+    dispatch(event);
+    assert_same(user_settings.web_left_sidebar_topics_order, 2);
 
     event = event_fixtures.user_settings__web_left_sidebar_show_channel_folders;
     override(stream_list, "build_stream_list", noop);
@@ -1507,6 +1515,11 @@ run_test("user_settings", ({override}) => {
     override(user_settings, "web_navigate_to_sent_message", true);
     dispatch(event);
     assert_same(user_settings.web_navigate_to_sent_message, false);
+
+    event = event_fixtures.user_settings__web_right_click_opens_message_actions_menu;
+    override(user_settings, "web_right_click_opens_message_actions_menu", false);
+    dispatch(event);
+    assert_same(user_settings.web_right_click_opens_message_actions_menu, true);
 
     {
         const event = event_fixtures.user_settings_web_suggest_update_timezone;

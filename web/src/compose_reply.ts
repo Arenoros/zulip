@@ -329,7 +329,7 @@ function get_textarea_to_quote(forward_message?: boolean): JQuery<HTMLTextAreaEl
     // the quote in that textarea, else we default to the compose box.
     const last_focused_compose_type_input = compose_state.get_last_focused_compose_type_input();
     const $textarea =
-        last_focused_compose_type_input?.isConnected && forward_message
+        last_focused_compose_type_input?.isConnected && !forward_message
             ? $(last_focused_compose_type_input)
             : $<HTMLTextAreaElement>("textarea#compose-textarea");
     return $textarea;
@@ -884,6 +884,41 @@ function get_range_intersection_with_element(range: Range, element: Node): Range
     }
 
     return intersection;
+}
+
+// Whether (x, y) is on selected text inside `container`. This tests the
+// rects of the selected part of each text node, because
+// Range.getClientRects() also covers the blank area around a fully
+// selected paragraph or code block.
+export function is_point_on_selected_text(
+    selection: Selection,
+    container: Node,
+    x: number,
+    y: number,
+): boolean {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        for (let i = 0; i < selection.rangeCount; i += 1) {
+            const range = selection.getRangeAt(i);
+            if (!range.intersectsNode(node)) {
+                continue;
+            }
+            const text_range = get_range_intersection_with_element(range, node);
+            for (const rect of text_range.getClientRects()) {
+                if (
+                    rect.width > 0 &&
+                    rect.height > 0 &&
+                    x >= rect.left &&
+                    x <= rect.right &&
+                    y >= rect.top &&
+                    y <= rect.bottom
+                ) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 export let get_message_selection = (selection = window.getSelection()): string => {

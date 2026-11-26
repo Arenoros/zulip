@@ -62,6 +62,7 @@ from corporate.views.session import (
     start_card_update_stripe_session_for_remote_server,
     start_card_update_stripe_session_for_remote_server_upgrade,
 )
+from corporate.views.sitemap import sitemap_view
 from corporate.views.sponsorship import (
     remote_realm_sponsorship,
     remote_realm_sponsorship_page,
@@ -156,6 +157,7 @@ landing_page_urls = [
         landing_view,
         {"template_name": "corporate/slack-alternative.html"},
     ),
+    path("try-zulip/", landing_view, {"template_name": "corporate/try-zulip.html"}),
     path("self-hosting/", landing_view, {"template_name": "corporate/self-hosting.html"}),
     path("zulip-cloud/", landing_view, {"template_name": "corporate/zulip-cloud.html"}),
     path("security/", landing_view, {"template_name": "corporate/security.html"}),
@@ -266,6 +268,10 @@ i18n_urlpatterns += landing_page_urls
 
 # Make a copy of i18n_urlpatterns so that they appear without prefix for English
 urlpatterns = list(i18n_urlpatterns)
+
+urlpatterns += [
+    path("sitemap.xml", sitemap_view),
+]
 
 urlpatterns += [
     path("remote-billing-login/<signed_billing_access_token>", remote_realm_billing_finalize_login),

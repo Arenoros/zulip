@@ -156,9 +156,12 @@ def get_unused_fence(content: str) -> str:
     # Define the regular expression pattern to match ``` fences
     fence_length_re = re.compile(r"^ {0,3}(`{3,})", re.MULTILINE)
 
+    # Markdown normalizes whitespace before parsing fenced blocks.
+    lines = NormalizeWhitespace(Markdown()).run(content.split("\n"))
+
     # Initialize the length variable to 3, corresponding to default fence length
     length = 3
-    matches = fence_length_re.findall(content)
+    matches = fence_length_re.findall("\n".join(lines))
     for match in matches:
         length = max(length, len(match) + 1)
 
@@ -620,6 +623,38 @@ def close_unclosed_fences(content: str, default_language: str | None = None) -> 
     """
     unclosed_fences = UnclosedFenceFinder(Markdown()).get_unclosed_fences(content, default_language)
     return "\n".join([content, *unclosed_fences])
+
+
+def wrap_in_quote_block(content: str, *, default_language: str | None) -> str:
+    """Wraps content in a quote block that nothing in content can end
+    early or extend past its closing fence. default_language is the
+    realm's default code block language, which applies to fences
+    nested in a quote block.
+    """
+    fence = get_unused_fence(content)
+    content = close_unclosed_fences(content, default_language)
+    return f"{fence}quote\n{content}\n{fence}"
+
+
+def wrap_in_spoiler_block(content: str, header: str) -> str:
+    """Wraps content in a spoiler block that nothing in content can end
+    early or extend past its closing fence. header must not contain
+    backticks or tildes, which would keep the opening fence from
+    being recognized.
+    """
+    fence = get_unused_fence(content)
+    # The realm's default code block language doesn't apply to fences
+    # nested in a spoiler block.
+    content = close_unclosed_fences(content)
+    return f"{fence}spoiler {header}\n{content}\n{fence}"
+
+
+def wrap_in_code_block(content: str) -> str:
+    """Wraps content in a code block that nothing in content can end
+    early.
+    """
+    fence = get_unused_fence(content)
+    return f"{fence}\n{content}\n{fence}"
 
 
 def makeExtension(*args: Any, **kwargs: Any) -> FencedCodeExtension:

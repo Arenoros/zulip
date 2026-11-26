@@ -117,6 +117,22 @@ class UserBaseSettings(models.Model):
     # of the Zulip web app.
     web_left_sidebar_show_channel_folders = models.BooleanField(default=True, db_default=True)
 
+    # UI setting controlling whether the Zulip web app's left sidebar
+    # lists a channel's resolved topics after its unresolved ones.
+    # Subscriptions can override it per channel.
+    WEB_LEFT_SIDEBAR_TOPICS_ORDER_RECENT_ACTIVITY = 1
+    WEB_LEFT_SIDEBAR_TOPICS_ORDER_UNRESOLVED_FIRST = 2
+
+    WEB_LEFT_SIDEBAR_TOPICS_ORDER_CHOICES = [
+        WEB_LEFT_SIDEBAR_TOPICS_ORDER_RECENT_ACTIVITY,
+        WEB_LEFT_SIDEBAR_TOPICS_ORDER_UNRESOLVED_FIRST,
+    ]
+
+    web_left_sidebar_topics_order = models.PositiveSmallIntegerField(
+        default=WEB_LEFT_SIDEBAR_TOPICS_ORDER_RECENT_ACTIVITY,
+        db_default=WEB_LEFT_SIDEBAR_TOPICS_ORDER_RECENT_ACTIVITY,
+    )
+
     # UI setting controlling whether or not the Zulip web app will
     # mark messages as read as it scrolls through the feed.
 
@@ -193,6 +209,12 @@ class UserBaseSettings(models.Model):
     # Setting to control whether to automatically go to the
     # conversation where message was sent.
     web_navigate_to_sent_message = models.BooleanField(default=True)
+
+    # Setting to control whether right-clicking on a message opens the
+    # message actions menu instead of the browser's context menu.
+    web_right_click_opens_message_actions_menu = models.BooleanField(
+        default=False, db_default=False
+    )
 
     ### Notifications settings. ###
 
@@ -387,10 +409,12 @@ class UserBaseSettings(models.Model):
         web_home_view=str,
         web_inbox_show_channel_folders=bool,
         web_left_sidebar_show_channel_folders=bool,
+        web_left_sidebar_topics_order=int,
         web_left_sidebar_unreads_count_summary=bool,
         web_line_height_percent=int,
         web_mark_read_on_scroll_policy=int,
         web_navigate_to_sent_message=bool,
+        web_right_click_opens_message_actions_menu=bool,
         web_stream_unreads_count_display_policy=int,
         web_suggest_update_timezone=bool,
     )

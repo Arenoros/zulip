@@ -43,6 +43,8 @@ const compose_notifications = mock_esm("../src/compose_notifications");
 const compose_pm_pill = mock_esm("../src/compose_pm_pill");
 const loading = mock_esm("../src/loading");
 const markdown = mock_esm("../src/markdown");
+const local_message = mock_esm("../src/local_message");
+const message_events = mock_esm("../src/message_events");
 const narrow_state = mock_esm("../src/narrow_state");
 const rendered_markdown = mock_esm("../src/rendered_markdown");
 const resize = mock_esm("../src/resize");
@@ -257,7 +259,7 @@ test_ui("send_message_success", ({override, override_rewire}) => {
     assert.ok(draft_deleted);
 });
 
-test_ui("send_message", ({override, override_rewire, mock_template}) => {
+test_ui("send_message", ({disallow, override, override_rewire, mock_template}) => {
     mock_banners();
     clock.setSystemTime(new Date(fake_now * 1000));
 
@@ -286,10 +288,6 @@ test_ui("send_message", ({override, override_rewire, mock_template}) => {
     });
 
     override_rewire(drafts, "update_draft", () => 100);
-    override(drafts.draft_model, "getDraft", (draft_id) => {
-        assert.equal(draft_id, 100);
-        return {};
-    });
 
     // Tests start here.
     (function test_message_send_success_codepath() {
@@ -378,6 +376,12 @@ test_ui("send_message", ({override, override_rewire, mock_template}) => {
     // Tests start here.
     (function test_param_error_function_passed_from_send_message() {
         stub_state = initialize_state_stub_dict();
+        override(drafts.draft_model, "getDraft", () => ({is_sending_saving: true}));
+        let edited_draft;
+        override(drafts.draft_model, "editDraft", (draft_id, draft) => {
+            assert.equal(draft_id, 100);
+            edited_draft = draft;
+        });
 
         compose.send_message();
 
@@ -387,6 +391,18 @@ test_ui("send_message", ({override, override_rewire, mock_template}) => {
             send_msg_called: 1,
         };
         assert.deepEqual(stub_state, state);
+        assert.ok(echo_error_msg_checked);
+        assert.deepEqual(edited_draft, {is_sending_saving: false});
+    })();
+
+    (function test_error_after_message_event_deleted_draft() {
+        stub_state = initialize_state_stub_dict();
+        echo_error_msg_checked = false;
+        override(drafts.draft_model, "getDraft", () => false);
+        disallow(drafts.draft_model, "editDraft");
+
+        compose.send_message();
+
         assert.ok(echo_error_msg_checked);
     })();
 
@@ -405,6 +421,13 @@ test_ui("send_message", ({override, override_rewire, mock_template}) => {
 
         override(sent_messages, "get_new_local_id", () => "loc-55");
 
+        override(drafts.draft_model, "getDraft", () => ({is_sending_saving: true}));
+        let edited_draft;
+        override(drafts.draft_model, "editDraft", (draft_id, draft) => {
+            assert.equal(draft_id, 100);
+            edited_draft = draft;
+        });
+
         compose.send_message();
 
         const state = {
@@ -415,11 +438,109 @@ test_ui("send_message", ({override, override_rewire, mock_template}) => {
         assert.deepEqual(stub_state, state);
         assert.ok(!echo_error_msg_checked);
         assert.ok(banner_rendered);
+        assert.deepEqual(edited_draft, {is_sending_saving: false});
         assert.equal(fake_compose_box.textarea_val(), "default message");
         assert.ok(fake_compose_box.is_textarea_focused());
         assert.ok(!fake_compose_box.is_submit_button_spinner_visible());
     })();
 });
+
+test_ui(
+    "send_message with disallowed group mention",
+    ({override, override_rewire, mock_template}) => {
+        mock_banners();
+        clock.setSystemTime(new Date(fake_now * 1000));
+        const fake_compose_box = new FakeComposeBox();
+        const server_message_id = 128;
+        simulate_draft_ui_interactions();
+        compose_state.topic("");
+        compose_state.set_message_type("private");
+        override(current_user, "user_id", new_user.user_id);
+        override(compose_pm_pill, "get_emails", () => alice.email);
+        override(compose_pm_pill, "get_user_ids", () => [alice.user_id]);
+        override(markdown, "render", noop);
+        override(markdown, "get_topic_links", () => []);
+        override(server_events_state, "assert_get_events_running", noop);
+        override(sent_messages, "get_new_local_id", () => "loc-group-mention");
+        override_rewire(drafts, "update_compose_draft_count", noop);
+        override_rewire(drafts, "update_draft", () => 100);
+        let reified_messages = 0;
+        override_rewire(echo, "reify_message_id", (local_id, message_id) => {
+            assert.equal(local_id, "123.04");
+            assert.equal(message_id, server_message_id);
+            reified_messages += 1;
+        });
+        user_groups.add(
+            make_user_group({
+                name: "restricted",
+                can_mention_group: {direct_members: [], direct_subgroups: []},
+            }),
+        );
+        override(realm, "realm_direct_message_initiator_group", everyone.id);
+        override(markdown, "contains_backend_only_syntax", () => false);
+        override(markdown, "get_user_group_mentions", (content) => {
+            assert.ok(["Hello @*allowed*", "Hello @*restricted*"].includes(content));
+            return content === "Hello @*allowed*" ? ["allowed"] : ["restricted"];
+        });
+
+        user_groups.add(
+            make_user_group({
+                name: "allowed",
+                can_mention_group: {direct_members: [new_user.user_id], direct_subgroups: []},
+            }),
+        );
+        let reserved_local_ids = 0;
+        override(local_message, "get_next_id_float", () => {
+            reserved_local_ids += 1;
+            return 123.04;
+        });
+        let inserted_messages = 0;
+        override(message_events, "insert_new_messages", ({raw_messages}) => {
+            inserted_messages += raw_messages.length;
+            return raw_messages;
+        });
+        fake_compose_box.set_textarea_val("Hello @*allowed*");
+        let allowed_message_sent = false;
+        override(transmit, "send_message", (payload, success) => {
+            assert.equal(payload.content, "Hello @*allowed*");
+            assert.equal(payload.locally_echoed, true);
+            allowed_message_sent = true;
+            success({...payload, id: server_message_id});
+        });
+        compose.send_message();
+        assert.equal(allowed_message_sent, true);
+        assert.equal(reified_messages, 1);
+        assert.equal(reserved_local_ids, 1);
+        assert.equal(inserted_messages, 1);
+        assert.equal(fake_compose_box.textarea_val(), "");
+
+        fake_compose_box.reset();
+        fake_compose_box.set_textarea_val("Hello @*restricted*");
+        const server_error = "You are not allowed to mention user group 'restricted'.";
+        let banner_rendered = false;
+        mock_template("compose_banner/compose_banner.hbs", false, (data) => {
+            assert.equal(data.classname, "generic_compose_error");
+            assert.equal(data.banner_text, server_error);
+            banner_rendered = true;
+            return "<banner-stub>";
+        });
+        override(transmit, "send_message", (payload, _success, error) => {
+            assert.equal(payload.content, "Hello @*restricted*");
+            assert.equal(payload.locally_echoed, false);
+            error(server_error, "BAD_REQUEST");
+        });
+
+        compose.send_message();
+
+        assert.ok(banner_rendered);
+        assert.equal(reified_messages, 1);
+        assert.equal(reserved_local_ids, 1);
+        assert.equal(inserted_messages, 1);
+        assert.equal(fake_compose_box.textarea_val(), "Hello @*restricted*");
+        assert.ok(fake_compose_box.is_textarea_focused());
+        assert.ok(!fake_compose_box.is_submit_button_spinner_visible());
+    },
+);
 
 test_ui("handle_enter_key_with_preview_open", ({override, override_rewire}) => {
     mock_banners();
@@ -477,7 +598,7 @@ test_ui("handle_enter_key_with_preview_open", ({override, override_rewire}) => {
     compose.handle_enter_key_with_preview_open();
 });
 
-test_ui("finish", ({override, override_rewire}) => {
+test_ui("finish", ({override, override_rewire, mock_template}) => {
     mock_banners();
 
     const fake_compose_box = new FakeComposeBox();
@@ -539,6 +660,46 @@ test_ui("finish", ({override, override_rewire}) => {
         // cleared, as would happen asynchronously on send success.
         compose.clear_compose_box();
         fake_compose_box.assert_preview_mode_is_off();
+    })();
+
+    (function test_when_scheduling_message_fails() {
+        simulate_draft_ui_interactions();
+        override_rewire(drafts, "update_compose_draft_count", noop);
+        fake_compose_box.set_textarea_val("scheduled message");
+        override_rewire(compose_ui, "compose_spinner_visible", false);
+
+        let banner_rendered = false;
+        mock_template("compose_banner/compose_banner.hbs", false, (data) => {
+            assert.equal(data.classname, "generic_compose_error");
+            assert.equal(data.banner_text, "Error sending message: Server says 400");
+            banner_rendered = true;
+            return "<banner-stub>";
+        });
+        override(channel, "post", ({url, error}) => {
+            assert.equal(url, "/json/scheduled_messages");
+            error();
+        });
+        override(channel, "xhr_error_message", () => "Error sending message: Server says 400");
+
+        assert.ok(compose.finish(true));
+
+        assert.ok(banner_rendered);
+        assert.ok(!fake_compose_box.is_submit_button_spinner_visible());
+        const draft = drafts.draft_model.getDraft(drafts.compose_draft_id);
+        assert.equal(draft.content, "scheduled message");
+        assert.equal(draft.is_sending_saving, false);
+    })();
+
+    (function test_scheduling_error_after_draft_deleted() {
+        const draft_id = drafts.compose_draft_id;
+        override(channel, "post", ({error}) => {
+            drafts.draft_model.deleteDrafts([draft_id]);
+            error();
+        });
+
+        assert.ok(compose.finish(true));
+
+        assert.equal(drafts.draft_model.getDraft(draft_id), false);
     })();
 });
 

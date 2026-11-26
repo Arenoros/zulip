@@ -11,6 +11,7 @@ import render_scroll_to_time_popover from "../templates/popovers/scroll_to_time_
 import * as activity_ui from "./activity_ui.ts";
 import * as browser_history from "./browser_history.ts";
 import * as buddy_data from "./buddy_data.ts";
+import * as common from "./common.ts";
 import * as compose_actions from "./compose_actions.ts";
 import * as compose_reply from "./compose_reply.ts";
 import * as compose_state from "./compose_state.ts";
@@ -18,6 +19,7 @@ import * as emoji_picker from "./emoji_picker.ts";
 import * as flatpickr from "./flatpickr.ts";
 import * as hash_util from "./hash_util.ts";
 import * as hashchange from "./hashchange.ts";
+import * as message_actions_popover from "./message_actions_popover.ts";
 import * as message_edit from "./message_edit.ts";
 import * as message_lists from "./message_lists.ts";
 import * as message_store from "./message_store.ts";
@@ -241,6 +243,141 @@ export function initialize(): void {
     // selection function which will open the compose box  and select the message.
     if (!util.is_mobile()) {
         $("#main_div").on("click", ".messagebox", select_message_function);
+    }
+
+    // With web_right_click_opens_message_actions_menu, right-clicking a
+    // message's content opens the message actions menu where the mouse
+    // is, instead of the browser's context menu.
+    function initialize_right_click_message_actions_menu(): void {
+        // The right-click in progress: the message whose actions menu it
+        // should open, whether it's a Mac Control-click, and the
+        // selection for the menu to quote. This is decided on mousedown,
+        // before the browser changes the selection for its own menu.
+        let right_click:
+            {message_id: number; is_control_click: boolean; selection_ranges: Range[]} | undefined;
+        // Whether to swallow the click event that Safari sends after a
+        // Control-click whose menu we replaced with ours, so that it
+        // doesn't act like a click on the message.
+        let ignore_next_click = false;
+
+        function forget_right_click(): void {
+            right_click = undefined;
+            ignore_next_click = false;
+        }
+
+        // A right-click starts with a mousedown, and a context menu
+        // opened from the keyboard with a keydown, so either one ends
+        // any earlier right-click. These listeners use the capture phase
+        // to run before the mousedown handler below that records a new
+        // right-click.
+        document.addEventListener("mousedown", forget_right_click, {capture: true});
+        document.addEventListener(
+            "keydown",
+            (e) => {
+                // A key held down during a right-click repeats, which
+                // shouldn't end it.
+                if (!e.repeat) {
+                    forget_right_click();
+                }
+            },
+            {capture: true},
+        );
+
+        // In the capture phase, this stops the click before the message's
+        // click handlers, and the document's own bubbling ones, see it.
+        document.addEventListener(
+            "click",
+            (e) => {
+                if (ignore_next_click) {
+                    ignore_next_click = false;
+                    e.stopPropagation();
+                }
+            },
+            {capture: true},
+        );
+
+        $("#main_div").on("mousedown", ".message_content", function (this: HTMLElement, e) {
+            // On a Mac, Control-click is a right-click.
+            const is_control_click = e.button === 0 && e.ctrlKey && common.has_mac_keyboard();
+            const is_right_click = e.button === 2 || is_control_click;
+            if (!is_right_click || !user_settings.web_right_click_opens_message_actions_menu) {
+                return;
+            }
+
+            assert(e.target instanceof Element);
+            if (is_clickable_message_element($(e.target))) {
+                // Links, images, and other elements with their own click
+                // behavior keep the browser's menu.
+                return;
+            }
+
+            const message_id = rows.get_message_id(this);
+            const selection = window.getSelection();
+            assert(selection !== null);
+            const selected_message_ids = compose_reply.get_highlighted_message_ids(selection);
+            let selection_ranges: Range[] = [];
+            if (selected_message_ids !== undefined) {
+                // Keep the selection, which some browsers clear on
+                // right-click.
+                e.preventDefault();
+                if (
+                    !selected_message_ids.includes(message_id) ||
+                    compose_reply.is_point_on_selected_text(selection, this, e.clientX, e.clientY)
+                ) {
+                    // On the selected text, or on another message, the
+                    // browser's menu, which can copy or search for the
+                    // selected text, is more useful.
+                    return;
+                }
+                // Elsewhere in a selected message, our menu offers to
+                // quote the selection.
+                selection_ranges = Array.from({length: selection.rangeCount}, (_, i) =>
+                    selection.getRangeAt(i).cloneRange(),
+                );
+            }
+
+            const message = message_store.get(message_id);
+            if (
+                message !== undefined &&
+                message_actions_popover.can_open_message_actions_menu(message)
+            ) {
+                right_click = {message_id, is_control_click, selection_ranges};
+            }
+        });
+
+        $("#main_div").on("contextmenu", ".message_content", function (this: HTMLElement, e) {
+            // Only a right-click whose mousedown chose this message opens
+            // our menu; a context menu opened from the keyboard gets the
+            // browser's.
+            const message_id = rows.get_message_id(this);
+            if (right_click?.message_id !== message_id) {
+                return;
+            }
+
+            const {is_control_click, selection_ranges} = right_click;
+            right_click = undefined;
+            ignore_next_click = is_control_click;
+            e.preventDefault();
+            // Safari selects the word under the mouse before firing
+            // contextmenu; put back the selection the menu should quote.
+            const selection = window.getSelection();
+            assert(selection !== null);
+            selection.removeAllRanges();
+            for (const range of selection_ranges) {
+                selection.addRange(range);
+            }
+            assert(message_lists.current !== undefined);
+            message_lists.current.select_id(message_id);
+            message_actions_popover.open_message_actions_menu_at_mouse_position(
+                message_id,
+                e.clientX,
+                e.clientY,
+            );
+        });
+    }
+
+    if (!util.is_mobile()) {
+        initialize_right_click_message_actions_menu();
     }
 
     $("#main_div").on("click", ".star_container", function (e) {
@@ -697,7 +834,12 @@ export function initialize(): void {
             const should_show_status = is_compact_mode || is_truncated;
 
             const user_id_string = $elem.attr("data-user-id")!;
-            const title_data = buddy_data.get_title_data(user_id_string, false, should_show_status);
+            const title_data = buddy_data.get_title_data(
+                user_id_string,
+                false,
+                should_show_status,
+                buddy_data.get_conversation_participants_callback()(),
+            );
 
             // `target_node` is the `ul` element since it stays in DOM even after updates.
             function get_target_node(): HTMLElement {

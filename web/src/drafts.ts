@@ -242,6 +242,12 @@ export const draft_model = (function () {
         return changed;
     }
 
+    function undeleteDraft(id: string, draft: LocalStorageDraft): void {
+        const drafts = get();
+        drafts[id] = draft;
+        save(drafts);
+    }
+
     function deleteDrafts(ids: string[]): void {
         const drafts = get();
 
@@ -259,6 +265,7 @@ export const draft_model = (function () {
         getDraftCount,
         addDraft,
         editDraft,
+        undeleteDraft,
         deleteDrafts,
     };
 })();
@@ -447,6 +454,13 @@ type UpdateDraftOptions = {
 };
 
 export let update_draft = (opts: UpdateDraftOptions = {}): string | undefined => {
+    if (compose_draft_id !== undefined && draft_model.getDraft(compose_draft_id) === false) {
+        // The draft was deleted while restored in the compose box,
+        // e.g., when the failed message it was restored from was
+        // resent successfully. Save the compose contents as a new
+        // draft.
+        compose_draft_id = undefined;
+    }
     const draft_id = compose_draft_id;
     const old_draft = draft_id === undefined ? undefined : draft_model.getDraft(draft_id);
 
@@ -503,6 +517,16 @@ export let update_draft = (opts: UpdateDraftOptions = {}): string | undefined =>
 
 export function rewire_update_draft(value: typeof update_draft): void {
     update_draft = value;
+}
+
+export function clear_is_sending_saving(draft_id: string): void {
+    const draft = draft_model.getDraft(draft_id);
+    // The draft may have been deleted while its message was sending.
+    if (draft === false) {
+        return;
+    }
+    draft.is_sending_saving = false;
+    draft_model.editDraft(draft_id, draft);
 }
 
 export function current_recipient_data(): {

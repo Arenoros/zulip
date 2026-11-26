@@ -36,6 +36,7 @@ from zerver.lib.event_types import (
     SubscriptionUpdateEvent,
 )
 from zerver.lib.exceptions import JsonableError
+from zerver.lib.markdown.fenced_code import wrap_in_quote_block
 from zerver.lib.mention import silent_mention_syntax_for_user, silent_mention_syntax_for_user_group
 from zerver.lib.message import get_last_message_id
 from zerver.lib.queue import queue_event_on_commit
@@ -474,6 +475,7 @@ def send_subscription_add_events(
                 is_muted=subscription.is_muted,
                 pin_to_top=subscription.pin_to_top,
                 push_notifications=subscription.push_notifications,
+                web_left_sidebar_topics_order=subscription.web_left_sidebar_topics_order,
                 wildcard_mentions_notify=subscription.wildcard_mentions_notify,
                 # Computed fields not present in Subscription.API_FIELDS
                 in_home_view=not subscription.is_muted,
@@ -1567,16 +1569,17 @@ def send_change_stream_description_notification(
         if old_description == "":
             old_description = "*" + _("No description.") + "*"
 
+        default_language = stream.realm.default_code_block_language
         notification_string = (
             _("{user} changed the description for this channel.").format(user=user_mention)
             + "\n\n* **"
             + _("Old description")
-            + ":**"
-            + f"\n```` quote\n{old_description}\n````\n"
-            + "* **"
+            + ":**\n"
+            + wrap_in_quote_block(old_description, default_language=default_language)
+            + "\n* **"
             + _("New description")
-            + ":**"
-            + f"\n```` quote\n{new_description}\n````"
+            + ":**\n"
+            + wrap_in_quote_block(new_description, default_language=default_language)
         )
 
         maybe_send_channel_events_notice(
@@ -1633,6 +1636,9 @@ def send_change_stream_message_retention_days_notification(
     sender = get_system_bot(settings.NOTIFICATION_BOT, user_profile.realm_id)
     user_mention = silent_mention_syntax_for_user(user_profile)
 
+    old_is_realm_default = old_value is None
+    new_is_realm_default = new_value is None
+
     # If switching from or to the organization's default retention policy,
     # we want to take the realm's default into account.
     if old_value is None:
@@ -1640,20 +1646,21 @@ def send_change_stream_message_retention_days_notification(
     if new_value is None:
         new_value = stream.realm.message_retention_days
 
+    def format_retention_period(value: int, is_realm_default: bool) -> str:
+        if value == Stream.MESSAGE_RETENTION_SPECIAL_VALUES_MAP["unlimited"]:
+            if is_realm_default:
+                return _("Forever (organization default)")
+            return _("Forever")
+        if is_realm_default:
+            return _("{number_of_days} days (organization default)").format(number_of_days=value)
+        return _("{number_of_days} days").format(number_of_days=value)
+
     with override_language(stream.realm.default_language):
-        if old_value == Stream.MESSAGE_RETENTION_SPECIAL_VALUES_MAP["unlimited"]:
-            old_retention_period = _("Forever")
-            new_retention_period = _("{number_of_days} days").format(number_of_days=new_value)
-            summary_line = _(
-                "Messages in this channel will now be automatically deleted {number_of_days} days after they are sent."
-            ).format(number_of_days=new_value)
-        elif new_value == Stream.MESSAGE_RETENTION_SPECIAL_VALUES_MAP["unlimited"]:
-            old_retention_period = _("{number_of_days} days").format(number_of_days=old_value)
-            new_retention_period = _("Forever")
+        old_retention_period = format_retention_period(old_value, old_is_realm_default)
+        new_retention_period = format_retention_period(new_value, new_is_realm_default)
+        if new_value == Stream.MESSAGE_RETENTION_SPECIAL_VALUES_MAP["unlimited"]:
             summary_line = _("Messages in this channel will now be retained forever.")
         else:
-            old_retention_period = _("{number_of_days} days").format(number_of_days=old_value)
-            new_retention_period = _("{number_of_days} days").format(number_of_days=new_value)
             summary_line = _(
                 "Messages in this channel will now be automatically deleted {number_of_days} days after they are sent."
             ).format(number_of_days=new_value)

@@ -50,7 +50,13 @@ from zerver.lib.markdown import (
     url_embed_preview_enabled,
     url_to_a,
 )
-from zerver.lib.markdown.fenced_code import FencedBlockPreprocessor, close_unclosed_fences
+from zerver.lib.markdown.fenced_code import (
+    FencedBlockPreprocessor,
+    close_unclosed_fences,
+    wrap_in_code_block,
+    wrap_in_quote_block,
+    wrap_in_spoiler_block,
+)
 from zerver.lib.markdown.from_html import convert_html_to_markdown
 from zerver.lib.mdiff import diff_strings
 from zerver.lib.mention import (
@@ -246,6 +252,67 @@ class FencedBlockPreprocessorTest(ZulipTestCase):
         self.assertEqual(closed_content, content + "\n```\n```")
         rendered_content = markdown_convert_wrapper(closed_content + "\n\nafter")
         self.assertTrue(rendered_content.endswith("\n<p>after</p>"))
+
+    def test_wrap_in_quote_block(self) -> None:
+        cases = [
+            ("no fences", "hello", "```"),
+            ("closed code block", "```\ncode\n```", "````"),
+            ("unclosed code block", "```\ncode", "````"),
+            ("longest fence wins", "```\n`````\n````", "``````"),
+            ("tilde fences", "~~~\ncode\n~~~", "```"),
+            ("indented fence", "text\n   ````", "`````"),
+            ("indented code, not a fence", "text\n    ````", "```"),
+            ("lone carriage returns", "text\r````\rmore", "`````"),
+            ("windows line endings", "text\r\n````\r\nmore", "`````"),
+            ("control characters in the fence", "text\n\x02````\x03\nmore", "`````"),
+        ]
+        for case, content, fence in cases:
+            with self.subTest(case=case):
+                wrapped_content = wrap_in_quote_block(content, default_language=None)
+                self.assertTrue(wrapped_content.startswith(f"{fence}quote\n{content}\n"))
+                self.assertTrue(wrapped_content.endswith(f"\n{fence}"))
+                rendered_content = markdown_convert_wrapper(wrapped_content + "\n\nafter")
+                self.assertTrue(rendered_content.startswith("<blockquote>\n"))
+                self.assertTrue(rendered_content.endswith("\n</blockquote>\n<p>after</p>"))
+
+    def test_wrap_in_spoiler_block(self) -> None:
+        content = "```\n````quote\ncode"
+        wrapped_content = wrap_in_spoiler_block(content, "Header")
+        self.assertEqual(wrapped_content, "`````spoiler Header\n" + content + "\n```\n`````")
+        rendered_content = markdown_convert_wrapper(wrapped_content + "\n\nafter")
+        self.assertTrue(rendered_content.startswith('<div class="spoiler-block">'))
+        self.assertTrue(rendered_content.endswith("</div></div>\n<p>after</p>"))
+
+    def test_wrap_in_code_block(self) -> None:
+        content = "```quote\n````"
+        wrapped_content = wrap_in_code_block(content)
+        self.assertEqual(wrapped_content, "`````\n" + content + "\n`````")
+        rendered_content = markdown_convert_wrapper(wrapped_content + "\n\nafter")
+        self.assertEqual(
+            rendered_content,
+            '<div class="codehilite"><pre><span></span><code>```quote\n````\n</code></pre></div>\n'
+            "<p>after</p>",
+        )
+
+    def test_wrap_with_default_code_block_language(self) -> None:
+        realm = get_realm("zulip")
+        do_set_realm_property(realm, "default_code_block_language", "quote", acting_user=None)
+
+        # With quote as the default language, an unlabeled fence opens a
+        # quote block when nested in a quote block, but a code block when
+        # nested in a spoiler block.
+        content = "```\n```py\ncode"
+        wrapped_content = wrap_in_quote_block(
+            content, default_language=realm.default_code_block_language
+        )
+        self.assertEqual(wrapped_content, "````quote\n" + content + "\n```\n```\n````")
+        rendered_content = markdown_convert_wrapper(wrapped_content + "\n\nafter")
+        self.assertTrue(rendered_content.endswith("\n</blockquote>\n<p>after</p>"))
+
+        wrapped_content = wrap_in_spoiler_block(content, "Header")
+        self.assertEqual(wrapped_content, "````spoiler Header\n" + content + "\n```\n````")
+        rendered_content = markdown_convert_wrapper(wrapped_content + "\n\nafter")
+        self.assertTrue(rendered_content.endswith("</div></div>\n<p>after</p>"))
 
 
 def markdown_convert_wrapper(content: str) -> str:
@@ -526,6 +593,11 @@ class MarkdownListPreprocessorTest(ZulipTestCase):
     def test_basic_list(self) -> None:
         preprocessor = MarkdownListPreprocessor()
         original, expected = self.split_message("List without a gap\n<>* One\n* Two")
+        self.assertEqual(preprocessor.run(original), expected)
+
+    def test_basic_list_with_double_digit_numbers(self) -> None:
+        preprocessor = MarkdownListPreprocessor()
+        original, expected = self.split_message("List without a gap\n<>10. One\n11. Two")
         self.assertEqual(preprocessor.run(original), expected)
 
     def test_list_after_quotes(self) -> None:
@@ -1159,7 +1231,7 @@ class MarkdownEmbedsTest(ZulipTestCase):
         with self.assertLogs(level="WARNING"):
             message_id = self.send_message_content(f"![Audio link](/user_uploads/{path_id})")
 
-        expected = f"<p>![Audio link]({url})</p>"
+        expected = f'<p><a href="{url}">Audio link</a></p>'
         self.assert_message_content_is(message_id, expected)
 
         # Test audio files are not previewed when the content type
@@ -1173,8 +1245,27 @@ class MarkdownEmbedsTest(ZulipTestCase):
         )[0]
         path_id = re.sub(r"/user_uploads/", "", url)
         message_id = self.send_message_content(f"![Audio link](/user_uploads/{path_id})")
-        expected = f"<p>![Audio link]({url})</p>"
+        expected = f'<p><a href="{url}">Audio link</a></p>'
         self.assert_message_content_is(message_id, expected)
+
+    def test_inline_image_syntax_for_video(self) -> None:
+        """A video upload has no ImageAttachment row, so `![...](...)`
+        renders like `[...](...)`, including the video preview."""
+        url = upload_message_attachment(
+            "clip.mp4",
+            "video/mp4",
+            b"",
+            self.example_user("othello"),
+        )[0]
+        expected = (
+            f'<p><a href="{url}">clip.mp4</a></p>\n'
+            '<div class="message_inline_image message_inline_video">'
+            f'<a href="{url}" title="clip.mp4"><video preload="metadata" src="{url}"></video></a>'
+            "</div>"
+        )
+        for content in [f"![clip.mp4]({url})", f"[clip.mp4]({url})"]:
+            message_id = self.send_message_content(content)
+            self.assert_message_content_is(message_id, expected)
 
     @override_settings(INLINE_IMAGE_PREVIEW=False)
     def test_image_preview_enabled(self) -> None:

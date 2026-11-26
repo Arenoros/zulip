@@ -18,7 +18,66 @@ clients should check the `zulip_feature_level` field, present in the
 /register`](/api/register-queue) responses, to determine the API
 format used by the Zulip server that they are interacting with.
 
+## Changes in Zulip 14.0
+
+**Feature level 527**
+
+* [Message formatting](/api/message-formatting#images): Markdown image
+  syntax for an uploaded file that the server can't preview as an
+  image or audio player now renders as a link to the file, rather
+  than as literal Markdown text. If thumbnailing an image in Markdown
+  image syntax fails after the message is sent, the image is now
+  replaced with that link, rather than removed.
+
+**Feature level 526**
+
+* [`POST /register`](/api/register-queue), [`PATCH /settings`](/api/update-settings),
+  [`PATCH /realm/user_settings_defaults`](/api/update-realm-user-settings-defaults):
+  Added new `web_right_click_opens_message_actions_menu` display setting,
+  controlling whether right-clicking on a message opens the [message
+  actions menu](/help/message-actions) instead of the browser's context menu.
+
+**Feature level 525**
+
+* [`POST /register`](/api/register-queue), [`PATCH /settings`](/api/update-settings),
+  [`PATCH /realm/user_settings_defaults`](/api/update-realm-user-settings-defaults):
+  Added new `web_left_sidebar_topics_order` display setting, controlling
+  whether the web/desktop application's left sidebar lists a channel's
+  resolved topics after its unresolved ones.
+
+* [`POST /users/me/subscriptions/properties`](/api/update-subscription-settings),
+  [`PATCH /users/me/subscriptions/{stream_id}`](/api/update-subscription-property),
+  [`GET /users/me/subscriptions`](/api/get-subscriptions),
+  [`POST /register`](/api/register-queue), [`GET /events`](/api/get-events):
+  Added `web_left_sidebar_topics_order` subscription property, a per-channel
+  override of the user setting of the same name. The subscription properties
+  endpoints now accept an integer `value` for it.
+
+**Feature level 524**
+
+* `PATCH /bots/{bot_id}`: Sending `service_payload_url` for a bot
+  that is not an outgoing-webhook bot now returns an HTTP 400 error.
+* `PATCH /bots/{bot_id}`: `service_interface` and
+  `service_payload_url` can now be updated independently.
+  Sending only `service_payload_url` no longer resets the
+  interface to generic. Sending `service_interface` for a
+  bot that is not an outgoing-webhook bot, or with an invalid
+  value, now returns an error instead of being ignored.
+* `PATCH /bots/{bot_id}`: The endpoint no longer returns the current
+  state of the bot in the response data; on success, it now returns
+  a standard JSON success response with no additional fields.
+
+**Feature level 523**
+
+No changes; start of Zulip 14.0 development branch.
+
+Feature levels 517-522 reserved for future use in 13.x maintenance releases.
+
 ## Changes in Zulip 13.0
+
+**Feature level 517**
+
+No changes; API feature level used for the Zulip 13.0 release.
 
 **Feature level 516**
 
@@ -70,6 +129,8 @@ format used by the Zulip server that they are interacting with.
   workspace-restricted, audience. Clients should use this to warn users that
   the video call feature is restricted to a particular Google Workspace before
   starting the Google OAuth flow for the Google Meet video call integration.
+* `PATCH /bots/{bot_id}`: The `config_data` parameter is now only accepted
+  for embedded bots; sending it for other bot types returns an error.
 
 **Feature level 513**
 
@@ -1021,7 +1082,7 @@ No changes; API feature level used for the Zulip 11.0 release.
   integration URL parameter options. Previously, these optional URL
   parameters were included in the `config_options` field (see feature
   level 318 entry). The `config_options` object is now reserved for
-  configuration data that can be set when creating an bot user for a
+  configuration data that can be set when creating a bot user for a
   specific incoming webhook integration.
 
 **Feature level 402**
@@ -3342,7 +3403,7 @@ No changes; feature level used for Zulip 7.0 release.
 
 * [All REST API endpoints](/api/rest-error-handling#ignored-parameters):
   Implemented `ignored_parameters_unsupported` as a possible return value
-  in the JSON success response for all endpoints. This value is a array
+  in the JSON success response for all endpoints. This value is an array
   of any parameters that were sent in the request by the client that are
   not supported by the endpoint. Previously, unsupported parameters were
   silently ignored, except in the subset of endpoints which already
@@ -4602,7 +4663,7 @@ No changes; feature level used for Zulip 3.0 release.
   `realm_bot` events no longer contain an `email` field to identify
   the user; use the `user_id` field instead.  Previously, some (but
   not all) events of these types contained an `email` key in addition to
-  to `user_id`) for identifying the modified user.
+  `user_id` for identifying the modified user.
 * [`PATCH /users/{user_id}`](/api/update-user): The `is_admin` and
   `is_guest` parameters were removed in favor of the more general
   `role` parameter for specifying a change in user role.

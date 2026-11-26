@@ -23,6 +23,7 @@ import * as typeahead from "./typeahead.ts";
 import {is_user_in_setting_group} from "./user_groups.ts";
 import {user_settings} from "./user_settings.ts";
 import * as util from "./util.ts";
+import * as watchdog from "./watchdog.ts";
 
 export type ProfileDatum = z.infer<typeof profile_datum_schema>;
 export type User = z.infer<typeof user_schema>;
@@ -1456,15 +1457,19 @@ export function report_late_add(user_id: number, email: string): void {
     // who don't exist in our users data set. This can happen because
     // we're in the middle of a reload (and thus stopped our event
     // queue polling), because we are a spectator and never had an
-    // event queue in the first place, or because the first
-    // /json/events poll for this page's queue hasn't yet returned —
-    // in which case the message fetch may reference users created
-    // after the /register snapshot, and the corresponding
-    // realm_user/add event simply hasn't been delivered yet.
+    // event queue in the first place, or because no /json/events
+    // response for this page's queue has been applied yet — in which
+    // case the message fetch may reference users created after the
+    // /register snapshot, and the corresponding realm_user/add event
+    // hasn't been delivered yet, or is being stored until the initial
+    // message fetch finishes. The same applies while we are
+    // reconnecting to the events system after being suspended or
+    // offline, until we receive the events we missed.
     if (
         reload_state.is_in_progress() ||
         page_params.is_spectator ||
-        !server_events_state.has_received_first_events_response()
+        watchdog.suspects_user_is_offline() ||
+        !server_events_state.has_applied_first_events_response()
     ) {
         blueslip.log("Added user late", {user_id, email});
     } else if (!settings_data.user_can_access_all_other_users()) {

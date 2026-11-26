@@ -839,6 +839,7 @@ paths:
                                         "color": "#76ce90",
                                         "is_muted": false,
                                         "pin_to_top": false,
+                                        "web_left_sidebar_topics_order": 0,
                                         "audible_notifications": null,
                                         "desktop_notifications": null,
                                         "email_notifications": null,
@@ -13194,6 +13195,7 @@ paths:
                               "invite_only": false,
                               "name": "Denmark",
                               "pin_to_top": false,
+                              "web_left_sidebar_topics_order": 0,
                               "push_notifications": false,
                               "stream_id": 1,
                               "subscribers": [7, 10, 11, 12, 14],
@@ -13209,6 +13211,7 @@ paths:
                               "invite_only": false,
                               "name": "Scotland",
                               "pin_to_top": false,
+                              "web_left_sidebar_topics_order": 0,
                               "push_notifications": false,
                               "stream_id": 3,
                               "subscribers": [7, 11, 12, 14],
@@ -15983,6 +15986,22 @@ paths:
 
                     **Changes**: New in Zulip 12.0 (feature level 431).
                   example: true
+                web_left_sidebar_topics_order:
+                  description: |
+                    Whether the web/desktop application's left sidebar lists a
+                    channel's resolved topics after its unresolved ones.
+                    Subscriptions can override this per channel with the
+                    subscription property of the same name.
+
+                    - 1 - All topics in order of recent activity
+                    - 2 - Resolved topics after unresolved topics
+
+                    **Changes**: New in Zulip 14.0 (feature level 525).
+                  type: integer
+                  enum:
+                    - 1
+                    - 2
+                  example: 1
                 web_left_sidebar_show_channel_folders:
                   type: boolean
                   description: |
@@ -16287,6 +16306,14 @@ paths:
                     this behavior was not configurable.
                   type: boolean
                   example: true
+                web_right_click_opens_message_actions_menu:
+                  description: |
+                    Web/desktop app setting for whether right-clicking on a message
+                    opens the message actions menu instead of the browser's context menu.
+
+                    **Changes**: New in Zulip 14.0 (feature level 526).
+                  type: boolean
+                  example: false
             encoding:
               starred_message_counts:
                 contentType: application/json
@@ -16327,6 +16354,8 @@ paths:
               hide_ai_features:
                 contentType: application/json
               web_inbox_show_channel_folders:
+                contentType: application/json
+              web_left_sidebar_topics_order:
                 contentType: application/json
               web_left_sidebar_show_channel_folders:
                 contentType: application/json
@@ -16395,6 +16424,8 @@ paths:
               email_address_visibility:
                 contentType: application/json
               web_navigate_to_sent_message:
+                contentType: application/json
+              web_right_click_opens_message_actions_menu:
                 contentType: application/json
       responses:
         "200":
@@ -20158,6 +20189,18 @@ paths:
                               are displayed in the web/desktop application's Inbox view.
 
                               **Changes**: New in Zulip 12.0 (feature level 431).
+                          web_left_sidebar_topics_order:
+                            type: integer
+                            description: |
+                              Whether the web/desktop application's left sidebar lists a
+                              channel's resolved topics after its unresolved ones.
+                              Subscriptions can override this per channel with the
+                              subscription property of the same name.
+
+                              - 1 - All topics in order of recent activity
+                              - 2 - Resolved topics after unresolved topics
+
+                              **Changes**: New in Zulip 14.0 (feature level 525).
                           web_left_sidebar_show_channel_folders:
                             type: boolean
                             description: |
@@ -20442,6 +20485,13 @@ paths:
 
                               **Changes**: New in Zulip 9.0 (feature level 268). Previously,
                               this behavior was not configurable.
+                          web_right_click_opens_message_actions_menu:
+                            type: boolean
+                            description: |
+                              Web/desktop app setting for whether right-clicking on a message
+                              opens the message actions menu instead of the browser's context menu.
+
+                              **Changes**: New in Zulip 14.0 (feature level 526).
                       user_topics:
                         type: array
                         description: |
@@ -22595,6 +22645,18 @@ paths:
                               are displayed in the web/desktop application's Inbox view.
 
                               **Changes**: New in Zulip 12.0 (feature level 431).
+                          web_left_sidebar_topics_order:
+                            type: integer
+                            description: |
+                              Whether the web/desktop application's left sidebar lists a
+                              channel's resolved topics after its unresolved ones.
+                              Subscriptions can override this per channel with the
+                              subscription property of the same name.
+
+                              - 1 - All topics in order of recent activity
+                              - 2 - Resolved topics after unresolved topics
+
+                              **Changes**: New in Zulip 14.0 (feature level 525).
                           web_left_sidebar_show_channel_folders:
                             type: boolean
                             description: |
@@ -22870,6 +22932,13 @@ paths:
 
                               **Changes**: New in Zulip 9.0 (feature level 268). Previously,
                               this behavior was not configurable.
+                          web_right_click_opens_message_actions_menu:
+                            type: boolean
+                            description: |
+                              Web/desktop app setting for whether right-clicking on a message
+                              opens the message actions menu instead of the browser's context menu.
+
+                              **Changes**: New in Zulip 14.0 (feature level 526).
                       realm_users:
                         type: array
                         description: |
@@ -23973,6 +24042,22 @@ paths:
                     are displayed in the web/desktop application's Inbox view.
 
                     **Changes**: New in Zulip 12.0 (feature level 431).
+                web_left_sidebar_topics_order:
+                  description: |
+                    Whether the web/desktop application's left sidebar lists a
+                    channel's resolved topics after its unresolved ones.
+                    Subscriptions can override this per channel with the
+                    subscription property of the same name.
+
+                    - 1 - All topics in order of recent activity
+                    - 2 - Resolved topics after unresolved topics
+
+                    **Changes**: New in Zulip 14.0 (feature level 525).
+                  type: integer
+                  enum:
+                    - 1
+                    - 2
+                  example: 1
                 web_left_sidebar_show_channel_folders:
                   type: boolean
                   description: |
@@ -24362,6 +24447,14 @@ paths:
                     this behavior was not configurable.
                   type: boolean
                   example: true
+                web_right_click_opens_message_actions_menu:
+                  description: |
+                    Web/desktop app setting for whether right-clicking on a message
+                    opens the message actions menu instead of the browser's context menu.
+
+                    **Changes**: New in Zulip 14.0 (feature level 526).
+                  type: boolean
+                  example: false
             encoding:
               target_users:
                 contentType: application/json
@@ -24406,6 +24499,8 @@ paths:
               hide_ai_features:
                 contentType: application/json
               web_inbox_show_channel_folders:
+                contentType: application/json
+              web_left_sidebar_topics_order:
                 contentType: application/json
               web_left_sidebar_show_channel_folders:
                 contentType: application/json
@@ -24478,6 +24573,8 @@ paths:
               email_address_visibility:
                 contentType: application/json
               web_navigate_to_sent_message:
+                contentType: application/json
+              web_right_click_opens_message_actions_menu:
                 contentType: application/json
       responses:
         "200":
@@ -29258,6 +29355,23 @@ components:
             **Changes**: Prior to Zulip 2.1.0, this feature was
             represented by the more confusingly named `in_home_view` (with the
             opposite value, `in_home_view=!is_muted`).
+        web_left_sidebar_topics_order:
+          type: integer
+          enum:
+            - 0
+            - 1
+            - 2
+          description: |
+            Whether the web/desktop application's left sidebar lists the
+            channel's resolved topics after its unresolved ones.
+
+            - 0 - The value of this setting should be inherited from the
+              user-level default setting, `web_left_sidebar_topics_order`,
+              for this channel.
+            - 1 - All topics in order of recent activity
+            - 2 - Resolved topics after unresolved topics
+
+            **Changes**: New in Zulip 14.0 (feature level 525).
         in_home_view:
           type: boolean
           deprecated: true
@@ -31726,6 +31840,7 @@ components:
         - push_notifications
         - email_notifications
         - wildcard_mentions_notify
+        - web_left_sidebar_topics_order
       description: |
         One of the channel properties described below:
 
@@ -31759,12 +31874,23 @@ components:
 
         - `"wildcard_mentions_notify"`: Whether wildcard mentions trigger
           notifications as though they were personal mentions in this channel.
+
+        - `"web_left_sidebar_topics_order"`: Whether the web/desktop
+          application's left sidebar lists the channel's resolved topics
+          after its unresolved ones: 0 to follow the user's
+          `web_left_sidebar_topics_order` setting, 1 for all topics in
+          order of recent activity, 2 for resolved topics after unresolved
+          topics.<br>
+          **Changes**: New in Zulip 14.0 (feature level 525).
       example: "pin_to_top"
     SubscriptionPropertyValue:
       oneOf:
         - type: boolean
           description: |
             The new boolean value for the specified property.
+        - type: integer
+          description: |
+            The new integer value for the specified property.
         - type: string
           description: |
             The hex value of the user's display color for the channel.
@@ -31773,8 +31899,11 @@ components:
 
         If the property is `"color"`, then `value` is a string
         representing the hex value of the user's display
-        color for the channel. For all other above properties,
-        `value` is a boolean.
+        color for the channel. If the property is
+        `"web_left_sidebar_topics_order"`, then `value` is an integer.
+        For all other above properties, `value` is a boolean.
+
+        **Changes**: Integer values are new in Zulip 14.0 (feature level 525).
       example: "true"
 
   ###################

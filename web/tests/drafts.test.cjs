@@ -280,6 +280,83 @@ test("draft_model delete", () => {
     assert.deepEqual(draft_model.getDraft(id), false);
 });
 
+test("clear_is_sending_saving", () => {
+    const draft_model = drafts.draft_model;
+    const id = draft_model.addDraft({...draft_1, is_sending_saving: true});
+
+    drafts.clear_is_sending_saving(id);
+    assert.deepEqual(draft_model.getDraft(id), draft_1);
+
+    // The draft can be deleted while its message is sending.
+    draft_model.deleteDrafts([id]);
+    drafts.clear_is_sending_saving(id);
+    assert.equal(draft_model.getDraft(id), false);
+});
+
+test("draft_model restore deleted draft", () => {
+    const draft_model = drafts.draft_model;
+    const ls = localstorage();
+    assert.equal(ls.get("draft"), undefined);
+
+    const id = draft_model.addDraft(draft_1);
+    draft_model.deleteDrafts([id]);
+    assert.deepEqual(draft_model.getDraft(id), false);
+
+    // Undoing a deletion restores the draft under its original id, so
+    // a compose box still holding that id keeps saving to it.
+    draft_model.undeleteDraft(id, draft_1);
+    assert.deepEqual(draft_model.getDraft(id), draft_1);
+    assert.equal(draft_model.getDraftCount(), 1);
+});
+
+test("undo draft deletion keeps the draft id", ({override, mock_template}) => {
+    const draft_model = drafts.draft_model;
+    const ls = localstorage();
+    assert.equal(ls.get("draft"), undefined);
+    override(settings_data, "using_dark_theme", () => false);
+    override(messages_overlay_ui, "set_initial_element", noop);
+    override(messages_overlay_ui, "get_and_clear_pending_restore_element_id", () => undefined);
+    mock_template("draft_table_body.hbs", false, () => "<draft table stub>");
+    mock_template("components/banner.hbs", false, () => "<banner stub>");
+    // These selectors are accessed during render_widgets(),
+    // update_bulk_delete_ui() and set_count().
+    function set_overlay_results() {
+        $.set_results(".drafts-list", []);
+        $.set_results(".drafts-tab-pane .overlay-message-row", []);
+        $.set_results(".draft-selection-checkbox", []);
+        $(".top_left_drafts").set_find_results(".unread_count", $("<unread-count-stub>"));
+        $(".compose-drafts-count-container").set_find_results(
+            ".compose-drafts-count",
+            $("<compose-drafts-count-stub>"),
+        );
+    }
+    set_overlay_results();
+
+    const draft_id = draft_model.addDraft(draft_1);
+    drafts_overlay_ui.initialize();
+    drafts_overlay_ui.launch();
+    const undo_handler = $("body").get_on_handler(
+        "click",
+        "#draft_overlay_banner_container .draft-delete-banner-undo-button",
+    );
+
+    const $draft_row = $.create("draft-row");
+    $draft_row.attr("data-draft-id", draft_id);
+    $draft_row[0].remove = noop;
+    const $delete_button = $("#drafts_table .overlay_message_controls .delete-overlay-message");
+    $delete_button.set_closest_results(".overlay-message-row", [$draft_row[0]]);
+    $delete_button.get_on_handler("click").call($delete_button[0]);
+    assert.equal(draft_model.getDraft(draft_id), false);
+
+    // Undo re-renders the overlay, which rebinds the row handlers on
+    // fresh elements in a real DOM.
+    $.clear_all_elements();
+    set_overlay_results();
+    undo_handler();
+    assert.deepEqual(draft_model.getDraft(draft_id), draft_1);
+    assert.equal(draft_model.getDraftCount(), 1);
+});
+
 test("snapshot_message", ({override}) => {
     override(user_pill, "get_user_ids", () => [aaron.user_id]);
     mock_banners();
@@ -388,6 +465,23 @@ test("update_draft", ({override}) => {
     assert.equal(draft_id, "5-2");
     assert.ok(!tippy_show_called);
     assert.ok(!tippy_destroy_called);
+
+    // The draft was deleted while restored in the compose box, so
+    // the compose contents are saved as a new draft.
+    override(Date, "now", () => 9);
+    drafts.draft_model.deleteDrafts(["5-2"]);
+    compose_state.message_content("dummy content edited after the draft was deleted");
+    tippy_show_called = false;
+    tippy_destroy_called = false;
+    draft_id = drafts.update_draft();
+    assert.equal(draft_id, "9-2");
+    assert.equal(drafts.compose_draft_id, "9-2");
+    assert.equal(
+        drafts.draft_model.getDraft("9-2").content,
+        "dummy content edited after the draft was deleted",
+    );
+    assert.ok(tippy_show_called);
+    assert.ok(tippy_destroy_called);
 });
 
 test("rename_stream_recipient", () => {
@@ -893,4 +987,48 @@ test("server_rendering_for_backend_only_syntax", ({override, mock_template}) => 
     // Only the draft with the image triggered a server render request;
     // the plain text draft did not.
     assert.equal(post_calls, 1);
+});
+
+test("launch saves the open compose draft", ({override, mock_template}) => {
+    override(settings_data, "using_dark_theme", () => false);
+
+    const draft_model = drafts.draft_model;
+    const ls = localstorage();
+    const saved_draft = {
+        topic: "topic",
+        type: "stream",
+        content: "Some stream message",
+        stream_id: stream_1.stream_id,
+        updatedAt: Date.now(),
+        is_sending_saving: false,
+        drafts_version: 1,
+    };
+    ls.set("drafts", {id1: saved_draft});
+
+    // The user restored the draft into the compose box, and has typed
+    // more since it was last saved.
+    compose_state.set_message_type("stream");
+    compose_state.set_stream_id(stream_1.stream_id);
+    compose_state.topic("topic");
+    compose_state.message_content("Some stream message, with more typed since");
+    drafts.set_compose_draft_id("id1");
+
+    mock_template("draft_table_body.hbs", false, (data) => {
+        const all_drafts = [...data.context.narrow_drafts, ...data.context.other_drafts];
+        assert.equal(all_drafts.length, 1);
+        assert.equal(all_drafts[0].raw_content, "Some stream message, with more typed since");
+        return "<draft table stub>";
+    });
+    override(messages_overlay_ui, "set_initial_element", noop);
+    override(messages_overlay_ui, "get_and_clear_pending_restore_element_id", () => undefined);
+
+    $.set_results(".drafts-list", []);
+    $.set_results(".drafts-tab-pane .overlay-message-row", []);
+    $.set_results(".draft-selection-checkbox", []);
+
+    drafts_overlay_ui.launch();
+
+    // The up-to-date compose content was saved to the existing draft,
+    // so restoring it cannot lose the newer content.
+    assert.equal(draft_model.getDraft("id1").content, "Some stream message, with more typed since");
 });

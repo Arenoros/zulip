@@ -94,6 +94,10 @@ export const web_channel_default_view_values: Record<
     },
 };
 
+// A subscription with this value follows the user's
+// web_left_sidebar_topics_order setting.
+export const web_left_sidebar_topics_order_inherit = 0;
+
 export const user_list_style_values: {
     compact: SettingDescription<number>;
     with_status: SettingDescription<number>;
@@ -704,6 +708,9 @@ export const preferences_settings_labels = {
     web_line_height_percent: $t({defaultMessage: "Message-area line height (%)"}),
     web_navigate_to_sent_message: $t({
         defaultMessage: "Automatically go to conversation where you sent a message",
+    }),
+    web_right_click_opens_message_actions_menu: $t({
+        defaultMessage: "Right-click on a message opens the message actions menu",
     }),
 };
 
